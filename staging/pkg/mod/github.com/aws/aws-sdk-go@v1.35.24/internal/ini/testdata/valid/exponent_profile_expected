@@ -1,0 +1,7 @@
+{
+	"default": {
+		"exponent": 10000,
+		"exponent_2": 0.0001,
+		"exponent_should_be_string": "0x1ob"
+	}
+}

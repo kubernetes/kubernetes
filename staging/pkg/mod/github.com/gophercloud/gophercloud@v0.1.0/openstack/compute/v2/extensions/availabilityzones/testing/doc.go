@@ -1,0 +1,2 @@
+// availabilityzones unittests
+package testing

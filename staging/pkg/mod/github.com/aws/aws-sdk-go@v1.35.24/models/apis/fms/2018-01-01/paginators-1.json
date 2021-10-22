@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListComplianceStatus": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PolicyComplianceStatusList"
+    },
+    "ListMemberAccounts": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "MemberAccounts"
+    },
+    "ListPolicies": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PolicyList"
+    }
+  }
+}

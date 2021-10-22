@@ -1,0 +1,16 @@
+language: go
+go: 1.12.x
+install:
+  - unset GOROOT
+  - unset GOPATH
+matrix:
+  include:
+    - os: linux
+      dist: xenial
+    - os: osx
+      osx_image: xcode10.1
+script:
+  - ./test.bash
+cache:
+  directories:
+    - .cache

@@ -1,0 +1,1069 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://cloudbuild.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Cloud Build",
+  "description": "Creates and manages builds on Google Cloud Platform.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/cloud-build/docs/",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "cloudbuild:v1alpha1",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://cloudbuild.mtls.googleapis.com/",
+  "name": "cloudbuild",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "projects": {
+      "resources": {
+        "workerPools": {
+          "methods": {
+            "create": {
+              "description": "Creates a `WorkerPool` to run the builds, and returns the new worker pool.\n\nThis API is experimental.",
+              "flatPath": "v1alpha1/projects/{projectsId}/workerPools",
+              "httpMethod": "POST",
+              "id": "cloudbuild.projects.workerPools.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "ID of the parent project.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha1/{+parent}/workerPools",
+              "request": {
+                "$ref": "WorkerPool"
+              },
+              "response": {
+                "$ref": "WorkerPool"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "delete": {
+              "description": "Deletes a `WorkerPool` by its project ID and WorkerPool name.\n\nThis API is experimental.",
+              "flatPath": "v1alpha1/projects/{projectsId}/workerPools/{workerPoolsId}",
+              "httpMethod": "DELETE",
+              "id": "cloudbuild.projects.workerPools.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The field will contain name of the resource requested, for example:\n\"projects/project-1/workerPools/workerpool-name\"",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/workerPools/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha1/{+name}",
+              "response": {
+                "$ref": "Empty"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Returns information about a `WorkerPool`.\n\nThis API is experimental.",
+              "flatPath": "v1alpha1/projects/{projectsId}/workerPools/{workerPoolsId}",
+              "httpMethod": "GET",
+              "id": "cloudbuild.projects.workerPools.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The field will contain name of the resource requested, for example:\n\"projects/project-1/workerPools/workerpool-name\"",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/workerPools/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha1/{+name}",
+              "response": {
+                "$ref": "WorkerPool"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List project's `WorkerPool`s.\n\nThis API is experimental.",
+              "flatPath": "v1alpha1/projects/{projectsId}/workerPools",
+              "httpMethod": "GET",
+              "id": "cloudbuild.projects.workerPools.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "ID of the parent project.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha1/{+parent}/workerPools",
+              "response": {
+                "$ref": "ListWorkerPoolsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "patch": {
+              "description": "Update a `WorkerPool`.\n\nThis API is experimental.",
+              "flatPath": "v1alpha1/projects/{projectsId}/workerPools/{workerPoolsId}",
+              "httpMethod": "PATCH",
+              "id": "cloudbuild.projects.workerPools.patch",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The field will contain name of the resource requested, for example:\n\"projects/project-1/workerPools/workerpool-name\"",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/workerPools/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha1/{+name}",
+              "request": {
+                "$ref": "WorkerPool"
+              },
+              "response": {
+                "$ref": "WorkerPool"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20200220",
+  "rootUrl": "https://cloudbuild.googleapis.com/",
+  "schemas": {
+    "ArtifactObjects": {
+      "description": "Files in the workspace to upload to Cloud Storage upon successful\ncompletion of all build steps.",
+      "id": "ArtifactObjects",
+      "properties": {
+        "location": {
+          "description": "Cloud Storage bucket and optional object path, in the form\n\"gs://bucket/path/to/somewhere/\". (see [Bucket Name\nRequirements](https://cloud.google.com/storage/docs/bucket-naming#requirements)).\n\nFiles in the workspace matching any path pattern will be uploaded to\nCloud Storage with this location as a prefix.",
+          "type": "string"
+        },
+        "paths": {
+          "description": "Path globs used to match files in the build's workspace.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "timing": {
+          "$ref": "TimeSpan",
+          "description": "Output only. Stores timing information for pushing all artifact objects."
+        }
+      },
+      "type": "object"
+    },
+    "ArtifactResult": {
+      "description": "An artifact that was uploaded during a build. This\nis a single record in the artifact manifest JSON file.",
+      "id": "ArtifactResult",
+      "properties": {
+        "fileHash": {
+          "description": "The file hash of the artifact.",
+          "items": {
+            "$ref": "FileHashes"
+          },
+          "type": "array"
+        },
+        "location": {
+          "description": "The path of an artifact in a Google Cloud Storage bucket, with the\ngeneration number. For example,\n`gs://mybucket/path/to/output.jar#generation`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Artifacts": {
+      "description": "Artifacts produced by a build that should be uploaded upon\nsuccessful completion of all build steps.",
+      "id": "Artifacts",
+      "properties": {
+        "images": {
+          "description": "A list of images to be pushed upon the successful completion of all build\nsteps.\n\nThe images will be pushed using the builder service account's credentials.\n\nThe digests of the pushed images will be stored in the Build resource's\nresults field.\n\nIf any of the images fail to be pushed, the build is marked FAILURE.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "objects": {
+          "$ref": "ArtifactObjects",
+          "description": "A list of objects to be uploaded to Cloud Storage upon successful\ncompletion of all build steps.\n\nFiles in the workspace matching specified paths globs will be uploaded to\nthe specified Cloud Storage location using the builder service account's\ncredentials.\n\nThe location and generation of the uploaded objects will be stored in the\nBuild resource's results field.\n\nIf any objects fail to be pushed, the build is marked FAILURE."
+        }
+      },
+      "type": "object"
+    },
+    "Build": {
+      "description": "A build resource in the Cloud Build API.\n\nAt a high level, a `Build` describes where to find source code, how to build\nit (for example, the builder image to run on the source), and where to store\nthe built artifacts.\n\nFields can include the following variables, which will be expanded when the\nbuild is created:\n\n- $PROJECT_ID: the project ID of the build.\n- $BUILD_ID: the autogenerated ID of the build.\n- $REPO_NAME: the source repository name specified by RepoSource.\n- $BRANCH_NAME: the branch name specified by RepoSource.\n- $TAG_NAME: the tag name specified by RepoSource.\n- $REVISION_ID or $COMMIT_SHA: the commit SHA specified by RepoSource or\n  resolved from the specified branch or tag.\n- $SHORT_SHA: first 7 characters of $REVISION_ID or $COMMIT_SHA.",
+      "id": "Build",
+      "properties": {
+        "artifacts": {
+          "$ref": "Artifacts",
+          "description": "Artifacts produced by the build that should be uploaded upon\nsuccessful completion of all build steps."
+        },
+        "buildTriggerId": {
+          "description": "Output only. The ID of the `BuildTrigger` that triggered this build, if it\nwas triggered automatically.",
+          "type": "string"
+        },
+        "createTime": {
+          "description": "Output only. Time at which the request to create the build was received.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "finishTime": {
+          "description": "Output only. Time at which execution of the build was finished.\n\nThe difference between finish_time and start_time is the duration of the\nbuild's execution.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "id": {
+          "description": "Output only. Unique identifier of the build.",
+          "type": "string"
+        },
+        "images": {
+          "description": "A list of images to be pushed upon the successful completion of all build\nsteps.\n\nThe images are pushed using the builder service account's credentials.\n\nThe digests of the pushed images will be stored in the `Build` resource's\nresults field.\n\nIf any of the images fail to be pushed, the build status is marked\n`FAILURE`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logUrl": {
+          "description": "Output only. URL to logs for this build in Google Cloud Console.",
+          "type": "string"
+        },
+        "logsBucket": {
+          "description": "Google Cloud Storage bucket where logs should be written (see\n[Bucket Name\nRequirements](https://cloud.google.com/storage/docs/bucket-naming#requirements)).\nLogs file names will be of the format `${logs_bucket}/log-${build_id}.txt`.",
+          "type": "string"
+        },
+        "options": {
+          "$ref": "BuildOptions",
+          "description": "Special options for this build."
+        },
+        "projectId": {
+          "description": "Output only. ID of the project.",
+          "type": "string"
+        },
+        "results": {
+          "$ref": "Results",
+          "description": "Output only. Results of the build."
+        },
+        "secrets": {
+          "description": "Secrets to decrypt using Cloud Key Management Service.",
+          "items": {
+            "$ref": "Secret"
+          },
+          "type": "array"
+        },
+        "source": {
+          "$ref": "Source",
+          "description": "The location of the source files to build."
+        },
+        "sourceProvenance": {
+          "$ref": "SourceProvenance",
+          "description": "Output only. A permanent fixed identifier for source."
+        },
+        "startTime": {
+          "description": "Output only. Time at which execution of the build was started.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "status": {
+          "description": "Output only. Status of the build.",
+          "enum": [
+            "STATUS_UNKNOWN",
+            "QUEUED",
+            "WORKING",
+            "SUCCESS",
+            "FAILURE",
+            "INTERNAL_ERROR",
+            "TIMEOUT",
+            "CANCELLED"
+          ],
+          "enumDescriptions": [
+            "Status of the build is unknown.",
+            "Build or step is queued; work has not yet begun.",
+            "Build or step is being executed.",
+            "Build or step finished successfully.",
+            "Build or step failed to complete successfully.",
+            "Build or step failed due to an internal cause.",
+            "Build or step took longer than was allowed.",
+            "Build or step was canceled by a user."
+          ],
+          "type": "string"
+        },
+        "statusDetail": {
+          "description": "Output only. Customer-readable message about the current status.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Required. The operations to be performed on the workspace.",
+          "items": {
+            "$ref": "BuildStep"
+          },
+          "type": "array"
+        },
+        "substitutions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Substitutions data for `Build` resource.",
+          "type": "object"
+        },
+        "tags": {
+          "description": "Tags for annotation of a `Build`. These are not docker tags.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "timeout": {
+          "description": "Amount of time that this build should be allowed to run, to second\ngranularity. If this amount of time elapses, work on the build will cease\nand the build status will be `TIMEOUT`.\n\nDefault time is ten minutes.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "timing": {
+          "additionalProperties": {
+            "$ref": "TimeSpan"
+          },
+          "description": "Output only. Stores timing information for phases of the build. Valid keys\nare:\n\n* BUILD: time to execute all build steps\n* PUSH: time to push all specified images.\n* FETCHSOURCE: time to fetch source.\n\nIf the build does not specify source or images,\nthese keys will not be included.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "BuildOperationMetadata": {
+      "description": "Metadata for build operations.",
+      "id": "BuildOperationMetadata",
+      "properties": {
+        "build": {
+          "$ref": "Build",
+          "description": "The build that the operation is tracking."
+        }
+      },
+      "type": "object"
+    },
+    "BuildOptions": {
+      "description": "Optional arguments to enable specific features of builds.",
+      "id": "BuildOptions",
+      "properties": {
+        "diskSizeGb": {
+          "description": "Requested disk size for the VM that runs the build. Note that this is *NOT*\n\"disk free\"; some of the space will be used by the operating system and\nbuild utilities. Also note that this is the minimum disk size that will be\nallocated for the build -- the build may run with a larger disk than\nrequested. At present, the maximum disk size is 1000GB; builds that request\nmore than the maximum are rejected with an error.",
+          "format": "int64",
+          "type": "string"
+        },
+        "env": {
+          "description": "A list of global environment variable definitions that will exist for all\nbuild steps in this build. If a variable is defined in both globally and in\na build step, the variable will use the build step value.\n\nThe elements are of the form \"KEY=VALUE\" for the environment variable \"KEY\"\nbeing given the value \"VALUE\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logStreamingOption": {
+          "description": "Option to define build log streaming behavior to Google Cloud\nStorage.",
+          "enum": [
+            "STREAM_DEFAULT",
+            "STREAM_ON",
+            "STREAM_OFF"
+          ],
+          "enumDescriptions": [
+            "Service may automatically determine build log streaming behavior.",
+            "Build logs should be streamed to Google Cloud Storage.",
+            "Build logs should not be streamed to Google Cloud Storage; they will be\nwritten when the build is completed."
+          ],
+          "type": "string"
+        },
+        "logging": {
+          "description": "Option to specify the logging mode, which determines where the logs are\nstored.",
+          "enum": [
+            "LOGGING_UNSPECIFIED",
+            "LEGACY",
+            "GCS_ONLY"
+          ],
+          "enumDescriptions": [
+            "The service determines the logging mode. The default is `LEGACY`. Do not\nrely on the default logging behavior as it may change in the future.",
+            "Stackdriver logging and Cloud Storage logging are enabled.",
+            "Only Cloud Storage logging is enabled."
+          ],
+          "type": "string"
+        },
+        "machineType": {
+          "description": "Compute Engine machine type on which to run the build.",
+          "enum": [
+            "UNSPECIFIED",
+            "N1_HIGHCPU_8",
+            "N1_HIGHCPU_32"
+          ],
+          "enumDescriptions": [
+            "Standard machine type.",
+            "Highcpu machine with 8 CPUs.",
+            "Highcpu machine with 32 CPUs."
+          ],
+          "type": "string"
+        },
+        "requestedVerifyOption": {
+          "description": "Requested verifiability options.",
+          "enum": [
+            "NOT_VERIFIED",
+            "VERIFIED"
+          ],
+          "enumDescriptions": [
+            "Not a verifiable build. (default)",
+            "Verified build."
+          ],
+          "type": "string"
+        },
+        "secretEnv": {
+          "description": "A list of global environment variables, which are encrypted using a Cloud\nKey Management Service crypto key. These values must be specified in the\nbuild's `Secret`. These variables will be available to all build steps\nin this build.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sourceProvenanceHash": {
+          "description": "Requested hash for SourceProvenance.",
+          "enumDescriptions": [
+            "No hash requested.",
+            "Use a sha256 hash.",
+            "Use a md5 hash."
+          ],
+          "items": {
+            "enum": [
+              "NONE",
+              "SHA256",
+              "MD5"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "substitutionOption": {
+          "description": "Option to specify behavior when there is an error in the substitution\nchecks.",
+          "enum": [
+            "MUST_MATCH",
+            "ALLOW_LOOSE"
+          ],
+          "enumDescriptions": [
+            "Fails the build if error in substitutions checks, like missing\na substitution in the template or in the map.",
+            "Do not fail the build if error in substitutions checks."
+          ],
+          "type": "string"
+        },
+        "volumes": {
+          "description": "Global list of volumes to mount for ALL build steps\n\nEach volume is created as an empty volume prior to starting the build\nprocess. Upon completion of the build, volumes and their contents are\ndiscarded. Global volume names and paths cannot conflict with the volumes\ndefined a build step.\n\nUsing a global volume in a build with only one step is not valid as\nit is indicative of a build request with an incorrect configuration.",
+          "items": {
+            "$ref": "Volume"
+          },
+          "type": "array"
+        },
+        "workerPool": {
+          "description": "Option to specify a `WorkerPool` for the build.\nFormat: projects/{project}/workerPools/{workerPool}\n\nThis field is experimental.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BuildStep": {
+      "description": "A step in the build pipeline.",
+      "id": "BuildStep",
+      "properties": {
+        "args": {
+          "description": "A list of arguments that will be presented to the step when it is started.\n\nIf the image used to run the step's container has an entrypoint, the `args`\nare used as arguments to that entrypoint. If the image does not define\nan entrypoint, the first element in args is used as the entrypoint,\nand the remainder will be used as arguments.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dir": {
+          "description": "Working directory to use when running this step's container.\n\nIf this value is a relative path, it is relative to the build's working\ndirectory. If this value is absolute, it may be outside the build's working\ndirectory, in which case the contents of the path may not be persisted\nacross build step executions, unless a `volume` for that path is specified.\n\nIf the build specifies a `RepoSource` with `dir` and a step with a `dir`,\nwhich specifies an absolute path, the `RepoSource` `dir` is ignored for\nthe step's execution.",
+          "type": "string"
+        },
+        "entrypoint": {
+          "description": "Entrypoint to be used instead of the build step image's default entrypoint.\nIf unset, the image's default entrypoint is used.",
+          "type": "string"
+        },
+        "env": {
+          "description": "A list of environment variable definitions to be used when running a step.\n\nThe elements are of the form \"KEY=VALUE\" for the environment variable \"KEY\"\nbeing given the value \"VALUE\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Unique identifier for this build step, used in `wait_for` to\nreference this build step as a dependency.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Required. The name of the container image that will run this particular\nbuild step.\n\nIf the image is available in the host's Docker daemon's cache, it\nwill be run directly. If not, the host will attempt to pull the image\nfirst, using the builder service account's credentials if necessary.\n\nThe Docker daemon's cache will already have the latest versions of all of\nthe officially supported build steps\n([https://github.com/GoogleCloudPlatform/cloud-builders](https://github.com/GoogleCloudPlatform/cloud-builders)).\nThe Docker daemon will also have cached many of the layers for some popular\nimages, like \"ubuntu\", \"debian\", but they will be refreshed at the time you\nattempt to use them.\n\nIf you built an image in a previous build step, it will be stored in the\nhost's Docker daemon's cache and is available to use as the name for a\nlater build step.",
+          "type": "string"
+        },
+        "pullTiming": {
+          "$ref": "TimeSpan",
+          "description": "Output only. Stores timing information for pulling this build step's\nbuilder image only."
+        },
+        "secretEnv": {
+          "description": "A list of environment variables which are encrypted using a Cloud Key\nManagement Service crypto key. These values must be specified in the\nbuild's `Secret`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "description": "Output only. Status of the build step. At this time, build step status is\nonly updated on build completion; step status is not updated in real-time\nas the build progresses.",
+          "enum": [
+            "STATUS_UNKNOWN",
+            "QUEUED",
+            "WORKING",
+            "SUCCESS",
+            "FAILURE",
+            "INTERNAL_ERROR",
+            "TIMEOUT",
+            "CANCELLED"
+          ],
+          "enumDescriptions": [
+            "Status of the build is unknown.",
+            "Build or step is queued; work has not yet begun.",
+            "Build or step is being executed.",
+            "Build or step finished successfully.",
+            "Build or step failed to complete successfully.",
+            "Build or step failed due to an internal cause.",
+            "Build or step took longer than was allowed.",
+            "Build or step was canceled by a user."
+          ],
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Time limit for executing this build step. If not defined, the step has no\ntime limit and will be allowed to continue to run until either it completes\nor the build itself times out.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "timing": {
+          "$ref": "TimeSpan",
+          "description": "Output only. Stores timing information for executing this build step."
+        },
+        "volumes": {
+          "description": "List of volumes to mount into the build step.\n\nEach volume is created as an empty volume prior to execution of the\nbuild step. Upon completion of the build, volumes and their contents are\ndiscarded.\n\nUsing a named volume in only one step is not valid as it is indicative\nof a build request with an incorrect configuration.",
+          "items": {
+            "$ref": "Volume"
+          },
+          "type": "array"
+        },
+        "waitFor": {
+          "description": "The ID(s) of the step(s) that this build step depends on.\nThis build step will not start until all the build steps in `wait_for`\nhave completed successfully. If `wait_for` is empty, this build step will\nstart when all previous build steps in the `Build.Steps` list have\ncompleted successfully.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "BuiltImage": {
+      "description": "An image built by the pipeline.",
+      "id": "BuiltImage",
+      "properties": {
+        "digest": {
+          "description": "Docker Registry 2.0 digest.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name used to push the container image to Google Container Registry, as\npresented to `docker push`.",
+          "type": "string"
+        },
+        "pushTiming": {
+          "$ref": "TimeSpan",
+          "description": "Output only. Stores timing information for pushing the specified image."
+        }
+      },
+      "type": "object"
+    },
+    "Empty": {
+      "description": "A generic empty message that you can re-use to avoid defining duplicated\nempty messages in your APIs. A typical example is to use it as the request\nor the response type of an API method. For instance:\n\n    service Foo {\n      rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n    }\n\nThe JSON representation for `Empty` is empty JSON object `{}`.",
+      "id": "Empty",
+      "properties": {},
+      "type": "object"
+    },
+    "FileHashes": {
+      "description": "Container message for hashes of byte content of files, used in\nSourceProvenance messages to verify integrity of source input to the build.",
+      "id": "FileHashes",
+      "properties": {
+        "fileHash": {
+          "description": "Collection of file hashes.",
+          "items": {
+            "$ref": "Hash"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Hash": {
+      "description": "Container message for hash values.",
+      "id": "Hash",
+      "properties": {
+        "type": {
+          "description": "The type of hash that was performed.",
+          "enum": [
+            "NONE",
+            "SHA256",
+            "MD5"
+          ],
+          "enumDescriptions": [
+            "No hash requested.",
+            "Use a sha256 hash.",
+            "Use a md5 hash."
+          ],
+          "type": "string"
+        },
+        "value": {
+          "description": "The hash value.",
+          "format": "byte",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListWorkerPoolsResponse": {
+      "description": "Response containing existing `WorkerPools`.",
+      "id": "ListWorkerPoolsResponse",
+      "properties": {
+        "workerPools": {
+          "description": "`WorkerPools` for the project.",
+          "items": {
+            "$ref": "WorkerPool"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Network": {
+      "description": "Network describes the GCP network used to create workers in.",
+      "id": "Network",
+      "properties": {
+        "network": {
+          "description": "Network on which the workers are created.\n\"default\" network is used if empty.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project id containing the defined network and subnetwork. For a peered VPC,\nthis will be the same as the project_id in which the workers are created.\nFor a shared VPC, this will be the project sharing the network with the\nproject_id project in which workers will be created. For custom workers\nwith no VPC, this will be the same as project_id.",
+          "type": "string"
+        },
+        "subnetwork": {
+          "description": "Subnetwork on which the workers are created.\n\"default\" subnetwork is used if empty.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RepoSource": {
+      "description": "Location of the source in a Google Cloud Source Repository.",
+      "id": "RepoSource",
+      "properties": {
+        "branchName": {
+          "description": "Regex matching branches to build.\n\nThe syntax of the regular expressions accepted is the syntax accepted by\nRE2 and described at https://github.com/google/re2/wiki/Syntax",
+          "type": "string"
+        },
+        "commitSha": {
+          "description": "Explicit commit SHA to build.",
+          "type": "string"
+        },
+        "dir": {
+          "description": "Directory, relative to the source root, in which to run the build.\n\nThis must be a relative path. If a step's `dir` is specified and is an\nabsolute path, this value is ignored for that step's execution.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ID of the project that owns the Cloud Source Repository. If omitted, the\nproject ID requesting the build is assumed.",
+          "type": "string"
+        },
+        "repoName": {
+          "description": "Required. Name of the Cloud Source Repository.",
+          "type": "string"
+        },
+        "substitutions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Substitutions to use in a triggered build.\nShould only be used with RunBuildTrigger",
+          "type": "object"
+        },
+        "tagName": {
+          "description": "Regex matching tags to build.\n\nThe syntax of the regular expressions accepted is the syntax accepted by\nRE2 and described at https://github.com/google/re2/wiki/Syntax",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Results": {
+      "description": "Artifacts created by the build pipeline.",
+      "id": "Results",
+      "properties": {
+        "artifactManifest": {
+          "description": "Path to the artifact manifest. Only populated when artifacts are uploaded.",
+          "type": "string"
+        },
+        "artifactTiming": {
+          "$ref": "TimeSpan",
+          "description": "Time to push all non-container artifacts."
+        },
+        "buildStepImages": {
+          "description": "List of build step digests, in the order corresponding to build step\nindices.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "buildStepOutputs": {
+          "description": "List of build step outputs, produced by builder images, in the order\ncorresponding to build step indices.\n\n[Cloud Builders](https://cloud.google.com/cloud-build/docs/cloud-builders)\ncan produce this output by writing to `$BUILDER_OUTPUT/output`.\nOnly the first 4KB of data is stored.",
+          "items": {
+            "format": "byte",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "images": {
+          "description": "Container images that were built as a part of the build.",
+          "items": {
+            "$ref": "BuiltImage"
+          },
+          "type": "array"
+        },
+        "numArtifacts": {
+          "description": "Number of artifacts uploaded. Only populated when artifacts are uploaded.",
+          "format": "int64",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Secret": {
+      "description": "Pairs a set of secret environment variables containing encrypted\nvalues with the Cloud KMS key to use to decrypt the value.",
+      "id": "Secret",
+      "properties": {
+        "kmsKeyName": {
+          "description": "Cloud KMS key name to use to decrypt these envs.",
+          "type": "string"
+        },
+        "secretEnv": {
+          "additionalProperties": {
+            "format": "byte",
+            "type": "string"
+          },
+          "description": "Map of environment variable name to its encrypted value.\n\nSecret environment variables must be unique across all of a build's\nsecrets, and must be used by at least one build step. Values can be at most\n64 KB in size. There can be at most 100 secret values across all of a\nbuild's secrets.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Source": {
+      "description": "Location of the source in a supported storage service.",
+      "id": "Source",
+      "properties": {
+        "repoSource": {
+          "$ref": "RepoSource",
+          "description": "If provided, get the source from this location in a Cloud Source\nRepository."
+        },
+        "storageSource": {
+          "$ref": "StorageSource",
+          "description": "If provided, get the source from this location in Google Cloud Storage."
+        }
+      },
+      "type": "object"
+    },
+    "SourceProvenance": {
+      "description": "Provenance of the source. Ways to find the original source, or verify that\nsome source was used for this build.",
+      "id": "SourceProvenance",
+      "properties": {
+        "fileHashes": {
+          "additionalProperties": {
+            "$ref": "FileHashes"
+          },
+          "description": "Output only. Hash(es) of the build source, which can be used to verify that\nthe original source integrity was maintained in the build. Note that\n`FileHashes` will only be populated if `BuildOptions` has requested a\n`SourceProvenanceHash`.\n\nThe keys to this map are file paths used as build source and the values\ncontain the hash values for those files.\n\nIf the build source came in a single package such as a gzipped tarfile\n(`.tar.gz`), the `FileHash` will be for the single path to that file.",
+          "type": "object"
+        },
+        "resolvedRepoSource": {
+          "$ref": "RepoSource",
+          "description": "A copy of the build's `source.repo_source`, if exists, with any\nrevisions resolved."
+        },
+        "resolvedStorageSource": {
+          "$ref": "StorageSource",
+          "description": "A copy of the build's `source.storage_source`, if exists, with any\ngenerations resolved."
+        }
+      },
+      "type": "object"
+    },
+    "StorageSource": {
+      "description": "Location of the source in an archive file in Google Cloud Storage.",
+      "id": "StorageSource",
+      "properties": {
+        "bucket": {
+          "description": "Google Cloud Storage bucket containing the source (see\n[Bucket Name\nRequirements](https://cloud.google.com/storage/docs/bucket-naming#requirements)).",
+          "type": "string"
+        },
+        "generation": {
+          "description": "Google Cloud Storage generation for the object. If the generation is\nomitted, the latest generation will be used.",
+          "format": "int64",
+          "type": "string"
+        },
+        "object": {
+          "description": "Google Cloud Storage object containing the source.\n\nThis object must be a gzipped archive file (`.tar.gz`) containing source to\nbuild.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TimeSpan": {
+      "description": "Start and end times for a build execution phase.",
+      "id": "TimeSpan",
+      "properties": {
+        "endTime": {
+          "description": "End of time span.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Start of time span.",
+          "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Volume": {
+      "description": "Volume describes a Docker container volume which is mounted into build steps\nin order to persist files across build step execution.",
+      "id": "Volume",
+      "properties": {
+        "name": {
+          "description": "Name of the volume to mount.\n\nVolume names must be unique per build step and must be valid names for\nDocker volumes. Each named volume must be used by at least two build steps.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path at which to mount the volume.\n\nPaths must be absolute and cannot conflict with other volume paths on the\nsame build step or with certain reserved volume paths.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WorkerConfig": {
+      "description": "WorkerConfig defines the configuration to be used for a creating workers in\nthe pool.",
+      "id": "WorkerConfig",
+      "properties": {
+        "diskSizeGb": {
+          "description": "Size of the disk attached to the worker, in GB.\nSee https://cloud.google.com/compute/docs/disks/\nIf `0` is specified, Cloud Build will use a standard disk size.\n`disk_size` is overridden if you specify a different disk size in\n`build_options`. In this case, a VM with a disk size specified in the\n`build_options` will be created on demand at build time. For more\ninformation see\nhttps://cloud.google.com/cloud-build/docs/api/reference/rest/v1/projects.builds#buildoptions",
+          "format": "int64",
+          "type": "string"
+        },
+        "machineType": {
+          "description": "Machine Type of the worker, such as n1-standard-1.\nSee https://cloud.google.com/compute/docs/machine-types.\nIf left blank, Cloud Build will use a standard unspecified machine to\ncreate the worker pool.\n`machine_type` is overridden if you specify a different machine type in\n`build_options`. In this case, the VM specified in the `build_options`\nwill be created on demand at build time. For more information see\nhttps://cloud.google.com/cloud-build/docs/speeding-up-builds#using_custom_virtual_machine_sizes",
+          "type": "string"
+        },
+        "network": {
+          "$ref": "Network",
+          "description": "The network definition used to create the worker.\nIf this section is left empty, the workers will be created in\nWorkerPool.project_id on the default network."
+        },
+        "tag": {
+          "description": "The tag applied to the worker, and the same tag used by the firewall rule.\nIt is used to identify the Cloud Build workers among other VMs.\nThe default value for tag is `worker`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WorkerPool": {
+      "description": "Configuration for a WorkerPool to run the builds.\n\nWorkers are machines that Cloud Build uses to run your builds. By default,\nall workers run in a project owned by Cloud Build. To have full control over\nthe workers that execute your builds -- such as enabling them to access\nprivate resources on your private network -- you can request Cloud Build to\nrun the workers in your own project by creating a custom workers pool.",
+      "id": "WorkerPool",
+      "properties": {
+        "createTime": {
+          "description": "Output only. Time at which the request to create the `WorkerPool` was\nreceived.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "deleteTime": {
+          "description": "Output only. Time at which the request to delete the `WorkerPool` was\nreceived.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "name": {
+          "description": "User-defined name of the `WorkerPool`.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "The project ID of the GCP project for which the `WorkerPool` is created.",
+          "type": "string"
+        },
+        "regions": {
+          "description": "List of regions to create the `WorkerPool`. Regions can't be empty.\nIf Cloud Build adds a new GCP region in the future, the existing\n`WorkerPool` will not be enabled in the new region automatically;\nyou must add the new region to the `regions` field to enable the\n`WorkerPool` in that region.",
+          "enumDescriptions": [
+            "no region",
+            "us-central1 region",
+            "us-west1 region",
+            "us-east1 region",
+            "us-east4 region"
+          ],
+          "items": {
+            "enum": [
+              "REGION_UNSPECIFIED",
+              "us-central1",
+              "us-west1",
+              "us-east1",
+              "us-east4"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "serviceAccountEmail": {
+          "description": "Output only. The service account used to manage the `WorkerPool`. The\nservice account must have the Compute Instance Admin (Beta) permission at\nthe project level.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Output only. WorkerPool Status.",
+          "enum": [
+            "STATUS_UNSPECIFIED",
+            "CREATING",
+            "RUNNING",
+            "DELETING",
+            "DELETED"
+          ],
+          "enumDescriptions": [
+            "Status of the `WorkerPool` is unknown.",
+            "`WorkerPool` is being created.",
+            "`WorkerPool` is running.",
+            "`WorkerPool` is being deleted: cancelling builds and draining workers.",
+            "`WorkerPool` is deleted."
+          ],
+          "type": "string"
+        },
+        "updateTime": {
+          "description": "Output only. Time at which the request to update the `WorkerPool` was\nreceived.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "workerConfig": {
+          "$ref": "WorkerConfig",
+          "description": "Configuration to be used for a creating workers in the `WorkerPool`."
+        },
+        "workerCount": {
+          "description": "Total number of workers to be created across all requested regions.",
+          "format": "int64",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Build API",
+  "version": "v1alpha1",
+  "version_module": true
+}

@@ -1,0 +1,2980 @@
+{
+  "metadata": {
+    "apiVersion": "2019-12-02",
+    "endpointPrefix": "schemas",
+    "signingName": "schemas",
+    "serviceFullName": "Schemas",
+    "serviceId": "schemas",
+    "protocol": "rest-json",
+    "jsonVersion": "1.1",
+    "uid": "schemas-2019-12-02",
+    "signatureVersion": "v4"
+  },
+  "operations": {
+    "CreateDiscoverer": {
+      "name": "CreateDiscoverer",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/discoverers",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "CreateDiscovererRequest"
+      },
+      "output": {
+        "shape": "CreateDiscovererResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateRegistry": {
+      "name": "CreateRegistry",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/registries/name/{registryName}",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "CreateRegistryRequest"
+      },
+      "output": {
+        "shape": "CreateRegistryResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateSchema": {
+      "name": "CreateSchema",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "CreateSchemaRequest"
+      },
+      "output": {
+        "shape": "CreateSchemaResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "DeleteDiscoverer": {
+      "name": "DeleteDiscoverer",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/discoverers/id/{discovererId}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "DeleteDiscovererRequest"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DeleteRegistry": {
+      "name": "DeleteRegistry",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/registries/name/{registryName}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "DeleteRegistryRequest"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DeleteResourcePolicy": {
+      "name": "DeleteResourcePolicy",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/policy",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "DeleteResourcePolicyRequest"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DeleteSchema": {
+      "name": "DeleteSchema",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "DeleteSchemaRequest"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DeleteSchemaVersion": {
+      "name": "DeleteSchemaVersion",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/version/{schemaVersion}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "DeleteSchemaVersionRequest"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DescribeCodeBinding": {
+      "name": "DescribeCodeBinding",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/language/{language}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeCodeBindingRequest"
+      },
+      "output": {
+        "shape": "DescribeCodeBindingResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "DescribeDiscoverer": {
+      "name": "DescribeDiscoverer",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/discoverers/id/{discovererId}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeDiscovererRequest"
+      },
+      "output": {
+        "shape": "DescribeDiscovererResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DescribeRegistry": {
+      "name": "DescribeRegistry",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeRegistryRequest"
+      },
+      "output": {
+        "shape": "DescribeRegistryResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "DescribeSchema": {
+      "name": "DescribeSchema",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeSchemaRequest"
+      },
+      "output": {
+        "shape": "DescribeSchemaResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "GetCodeBindingSource": {
+      "name": "GetCodeBindingSource",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/language/{language}/source",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetCodeBindingSourceRequest"
+      },
+      "output": {
+        "shape": "GetCodeBindingSourceResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "GetDiscoveredSchema": {
+      "name": "GetDiscoveredSchema",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/discover",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetDiscoveredSchemaRequest"
+      },
+      "output": {
+        "shape": "GetDiscoveredSchemaResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "GetResourcePolicy": {
+      "name": "GetResourcePolicy",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/policy",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetResourcePolicyRequest"
+      },
+      "output": {
+        "shape": "GetResourcePolicyResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "ListDiscoverers": {
+      "name": "ListDiscoverers",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/discoverers",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListDiscoverersRequest"
+      },
+      "output": {
+        "shape": "ListDiscoverersResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "ListRegistries": {
+      "name": "ListRegistries",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListRegistriesRequest"
+      },
+      "output": {
+        "shape": "ListRegistriesResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "ListSchemaVersions": {
+      "name": "ListSchemaVersions",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/versions",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListSchemaVersionsRequest"
+      },
+      "output": {
+        "shape": "ListSchemaVersionsResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "ListSchemas": {
+      "name": "ListSchemas",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListSchemasRequest"
+      },
+      "output": {
+        "shape": "ListSchemasResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "ListTagsForResource": {
+      "name": "ListTagsForResource",
+      "http": {
+        "method": "GET",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListTagsForResourceRequest"
+      },
+      "output": {
+        "shape": "ListTagsForResourceResponse"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "PutCodeBinding": {
+      "name": "PutCodeBinding",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/language/{language}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "PutCodeBindingRequest"
+      },
+      "output": {
+        "shape": "PutCodeBindingResponse"
+      },
+      "errors": [
+        {
+          "shape": "GoneException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "PutResourcePolicy": {
+      "name": "PutResourcePolicy",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/policy",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "PutResourcePolicyRequest"
+      },
+      "output": {
+        "shape": "PutResourcePolicyResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "PreconditionFailedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "SearchSchemas": {
+      "name": "SearchSchemas",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/search",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "SearchSchemasRequest"
+      },
+      "output": {
+        "shape": "SearchSchemasResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "StartDiscoverer": {
+      "name": "StartDiscoverer",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/discoverers/id/{discovererId}/start",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "StartDiscovererRequest"
+      },
+      "output": {
+        "shape": "StartDiscovererResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "StopDiscoverer": {
+      "name": "StopDiscoverer",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/discoverers/id/{discovererId}/stop",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "StopDiscovererRequest"
+      },
+      "output": {
+        "shape": "StopDiscovererResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "TagResource": {
+      "name": "TagResource",
+      "http": {
+        "method": "POST",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "TagResourceRequest"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "UntagResource": {
+      "name": "UntagResource",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "UntagResourceRequest"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        }
+      ]
+    },
+    "UpdateDiscoverer": {
+      "name": "UpdateDiscoverer",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/discoverers/id/{discovererId}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateDiscovererRequest"
+      },
+      "output": {
+        "shape": "UpdateDiscovererResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "UpdateRegistry": {
+      "name": "UpdateRegistry",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/registries/name/{registryName}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateRegistryRequest"
+      },
+      "output": {
+        "shape": "UpdateRegistryResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "UpdateSchema": {
+      "name": "UpdateSchema",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateSchemaRequest"
+      },
+      "output": {
+        "shape": "UpdateSchemaResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        }
+      ]
+    },
+    "ExportSchema": {
+      "name": "ExportSchema",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/registries/name/{registryName}/schemas/name/{schemaName}/export",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ExportSchemaRequest"
+      },
+      "output": {
+        "shape": "ExportSchemaResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "UnauthorizedException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    }
+  },
+  "shapes": {
+    "BadRequestException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 400
+      }
+    },
+    "CodeBindingOutput": {
+      "type": "structure",
+      "members": {
+        "CreationDate": {
+          "shape": "__timestampIso8601"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Status": {
+          "shape": "CodeGenerationStatus"
+        }
+      }
+    },
+    "CodeGenerationStatus": {
+      "type": "string",
+      "enum": [
+        "CREATE_IN_PROGRESS",
+        "CREATE_COMPLETE",
+        "CREATE_FAILED"
+      ]
+    },
+    "ConflictException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 409
+      }
+    },
+    "CreateDiscovererInput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "SourceArn": {
+          "shape": "__stringMin20Max1600"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "SourceArn"
+      ]
+    },
+    "CreateDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "SourceArn": {
+          "shape": "__stringMin20Max1600"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "SourceArn"
+      ]
+    },
+    "CreateDiscovererResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "DiscovererArn": {
+          "shape": "__string"
+        },
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "SourceArn": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "CreateRegistryInput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "CreateRegistryRequest": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "RegistryName"
+      ]
+    },
+    "CreateRegistryResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "RegistryArn": {
+          "shape": "__string"
+        },
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "CreateSchemaInput": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__stringMin1Max100000"
+        },
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      },
+      "required": [
+        "Type",
+        "Content"
+      ]
+    },
+    "CreateSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__stringMin1Max100000"
+        },
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName",
+        "Type",
+        "Content"
+      ]
+    },
+    "CreateSchemaResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "__string"
+        },
+        "VersionCreatedDate": {
+          "shape": "__timestampIso8601"
+        }
+      }
+    },
+    "DeleteDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "discovererId"
+        }
+      },
+      "required": [
+        "DiscovererId"
+      ]
+    },
+    "DeleteRegistryRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        }
+      },
+      "required": [
+        "RegistryName"
+      ]
+    },
+    "DeleteResourcePolicyRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "registryName"
+        }
+      }
+    },
+    "DeleteSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName"
+      ]
+    },
+    "DeleteSchemaVersionRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaVersion"
+        }
+      },
+      "required": [
+        "SchemaVersion",
+        "RegistryName",
+        "SchemaName"
+      ]
+    },
+    "DescribeCodeBindingRequest": {
+      "type": "structure",
+      "members": {
+        "Language": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "language"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaVersion"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName",
+        "Language"
+      ]
+    },
+    "DescribeCodeBindingResponse": {
+      "type": "structure",
+      "members": {
+        "CreationDate": {
+          "shape": "__timestampIso8601"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Status": {
+          "shape": "CodeGenerationStatus"
+        }
+      }
+    },
+    "DescribeDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "discovererId"
+        }
+      },
+      "required": [
+        "DiscovererId"
+      ]
+    },
+    "DescribeDiscovererResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "DiscovererArn": {
+          "shape": "__string"
+        },
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "SourceArn": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "DescribeRegistryRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        }
+      },
+      "required": [
+        "RegistryName"
+      ]
+    },
+    "DescribeRegistryResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "RegistryArn": {
+          "shape": "__string"
+        },
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "DescribeSchemaOutput": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        },
+        "Description": {
+          "shape": "__string"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "__string"
+        },
+        "VersionCreatedDate": {
+          "shape": "__timestampIso8601"
+        }
+      }
+    },
+    "DescribeSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaVersion"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName"
+      ]
+    },
+    "DescribeSchemaResponse": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        },
+        "Description": {
+          "shape": "__string"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "__string"
+        },
+        "VersionCreatedDate": {
+          "shape": "__timestampIso8601"
+        }
+      }
+    },
+    "DiscovererOutput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "DiscovererArn": {
+          "shape": "__string"
+        },
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "SourceArn": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "DiscovererState": {
+      "type": "string",
+      "enum": [
+        "STARTED",
+        "STOPPED"
+      ]
+    },
+    "DiscovererStateOutput": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        }
+      }
+    },
+    "DiscovererSummary": {
+      "type": "structure",
+      "members": {
+        "DiscovererArn": {
+          "shape": "__string"
+        },
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "SourceArn": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "ErrorOutput": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ]
+    },
+    "ForbiddenException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 403
+      }
+    },
+    "GetCodeBindingSourceOutput": {
+      "type": "string"
+    },
+    "GetCodeBindingSourceRequest": {
+      "type": "structure",
+      "members": {
+        "Language": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "language"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaVersion"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName",
+        "Language"
+      ]
+    },
+    "GetCodeBindingSourceResponse": {
+      "type": "structure",
+      "members": {
+        "Body": {
+          "shape": "Body"
+        }
+      },
+      "payload": "Body"
+    },
+    "GetDiscoveredSchemaInput": {
+      "type": "structure",
+      "members": {
+        "Events": {
+          "shape": "__listOfGetDiscoveredSchemaVersionItemInput"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      },
+      "required": [
+        "Type",
+        "Events"
+      ]
+    },
+    "GetDiscoveredSchemaOutput": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        }
+      }
+    },
+    "GetDiscoveredSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "Events": {
+          "shape": "__listOfGetDiscoveredSchemaVersionItemInput"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      },
+      "required": [
+        "Type",
+        "Events"
+      ]
+    },
+    "GetDiscoveredSchemaResponse": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        }
+      }
+    },
+    "GetDiscoveredSchemaVersionItemInput": {
+      "type": "string",
+      "min": 1,
+      "max": 100000
+    },
+    "GetResourcePolicyOutput": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      }
+    },
+    "GetResourcePolicyRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "registryName"
+        }
+      }
+    },
+    "GetResourcePolicyResponse": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      }
+    },
+    "GoneException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 410
+      }
+    },
+    "InternalServerErrorException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 500
+      }
+    },
+    "Limit": {
+      "type": "integer",
+      "min": 1,
+      "max": 100
+    },
+    "ListDiscoverersOutput": {
+      "type": "structure",
+      "members": {
+        "Discoverers": {
+          "shape": "__listOfDiscovererSummary"
+        },
+        "NextToken": {
+          "shape": "__string"
+        }
+      }
+    },
+    "ListDiscoverersRequest": {
+      "type": "structure",
+      "members": {
+        "DiscovererIdPrefix": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "discovererIdPrefix"
+        },
+        "Limit": {
+          "shape": "__integer",
+          "location": "querystring",
+          "locationName": "limit"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "SourceArnPrefix": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "sourceArnPrefix"
+        }
+      }
+    },
+    "ListDiscoverersResponse": {
+      "type": "structure",
+      "members": {
+        "Discoverers": {
+          "shape": "__listOfDiscovererSummary"
+        },
+        "NextToken": {
+          "shape": "__string"
+        }
+      }
+    },
+    "ListRegistriesOutput": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Registries": {
+          "shape": "__listOfRegistrySummary"
+        }
+      }
+    },
+    "ListRegistriesRequest": {
+      "type": "structure",
+      "members": {
+        "Limit": {
+          "shape": "__integer",
+          "location": "querystring",
+          "locationName": "limit"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "RegistryNamePrefix": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "registryNamePrefix"
+        },
+        "Scope": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "scope"
+        }
+      }
+    },
+    "ListRegistriesResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Registries": {
+          "shape": "__listOfRegistrySummary"
+        }
+      }
+    },
+    "ListSchemaVersionsOutput": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "SchemaVersions": {
+          "shape": "__listOfSchemaVersionSummary"
+        }
+      }
+    },
+    "ListSchemaVersionsRequest": {
+      "type": "structure",
+      "members": {
+        "Limit": {
+          "shape": "__integer",
+          "location": "querystring",
+          "locationName": "limit"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName"
+      ]
+    },
+    "ListSchemaVersionsResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "SchemaVersions": {
+          "shape": "__listOfSchemaVersionSummary"
+        }
+      }
+    },
+    "ListSchemasOutput": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Schemas": {
+          "shape": "__listOfSchemaSummary"
+        }
+      }
+    },
+    "ListSchemasRequest": {
+      "type": "structure",
+      "members": {
+        "Limit": {
+          "shape": "__integer",
+          "location": "querystring",
+          "locationName": "limit"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaNamePrefix": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaNamePrefix"
+        }
+      },
+      "required": [
+        "RegistryName"
+      ]
+    },
+    "ListSchemasResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Schemas": {
+          "shape": "__listOfSchemaSummary"
+        }
+      }
+    },
+    "ListTagsForResourceOutput": {
+      "type": "structure",
+      "members": {
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resource-arn"
+        }
+      },
+      "required": [
+        "ResourceArn"
+      ]
+    },
+    "ListTagsForResourceResponse": {
+      "type": "structure",
+      "members": {
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "LockServiceLinkedRoleInput": {
+      "type": "structure",
+      "members": {
+        "RoleArn": {
+          "shape": "__stringMin1Max1600"
+        },
+        "Timeout": {
+          "shape": "__integerMin1Max29000"
+        }
+      },
+      "required": [
+        "Timeout",
+        "RoleArn"
+      ]
+    },
+    "LockServiceLinkedRoleOutput": {
+      "type": "structure",
+      "members": {
+        "CanBeDeleted": {
+          "shape": "__boolean"
+        },
+        "ReasonOfFailure": {
+          "shape": "__stringMin1Max1600"
+        },
+        "RelatedResources": {
+          "shape": "__listOfDiscovererSummary"
+        }
+      }
+    },
+    "LockServiceLinkedRoleRequest": {
+      "type": "structure",
+      "members": {
+        "RoleArn": {
+          "shape": "__stringMin1Max1600"
+        },
+        "Timeout": {
+          "shape": "__integerMin1Max29000"
+        }
+      },
+      "required": [
+        "Timeout",
+        "RoleArn"
+      ]
+    },
+    "LockServiceLinkedRoleResponse": {
+      "type": "structure",
+      "members": {
+        "CanBeDeleted": {
+          "shape": "__boolean"
+        },
+        "ReasonOfFailure": {
+          "shape": "__stringMin1Max1600"
+        },
+        "RelatedResources": {
+          "shape": "__listOfDiscovererSummary"
+        }
+      }
+    },
+    "NotFoundException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 404
+      }
+    },
+    "PreconditionFailedException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 412
+      }
+    },
+    "PutCodeBindingRequest": {
+      "type": "structure",
+      "members": {
+        "Language": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "language"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaVersion"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName",
+        "Language"
+      ]
+    },
+    "PutCodeBindingResponse": {
+      "type": "structure",
+      "members": {
+        "CreationDate": {
+          "shape": "__timestampIso8601"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Status": {
+          "shape": "CodeGenerationStatus"
+        }
+      }
+    },
+    "PutResourcePolicyInput": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Policy"
+      ]
+    },
+    "PutResourcePolicyOutput": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      }
+    },
+    "PutResourcePolicyRequest": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "registryName"
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Policy"
+      ]
+    },
+    "PutResourcePolicyResponse": {
+      "type": "structure",
+      "members": {
+        "Policy": {
+          "shape": "__string",
+          "jsonvalue": true
+        },
+        "RevisionId": {
+          "shape": "__string"
+        }
+      }
+    },
+    "RegistryOutput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "RegistryArn": {
+          "shape": "__string"
+        },
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "RegistrySummary": {
+      "type": "structure",
+      "members": {
+        "RegistryArn": {
+          "shape": "__string"
+        },
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "SchemaOutput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "__string"
+        },
+        "VersionCreatedDate": {
+          "shape": "__timestampIso8601"
+        }
+      }
+    },
+    "SchemaSummary": {
+      "type": "structure",
+      "members": {
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "VersionCount": {
+          "shape": "__long"
+        }
+      }
+    },
+    "SchemaVersionSummary": {
+      "type": "structure",
+      "members": {
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Type": {
+          "shape": "__string"
+        }
+      }
+    },
+    "SearchSchemaSummary": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersions": {
+          "shape": "__listOfSearchSchemaVersionSummary"
+        }
+      }
+    },
+    "SearchSchemaVersionSummary": {
+      "type": "structure",
+      "members": {
+        "CreatedDate": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Type": {
+          "shape": "__string"
+        }
+      }
+    },
+    "SearchSchemasOutput": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Schemas": {
+          "shape": "__listOfSearchSchemaSummary"
+        }
+      }
+    },
+    "SearchSchemasRequest": {
+      "type": "structure",
+      "members": {
+        "Keywords": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "keywords"
+        },
+        "Limit": {
+          "shape": "__integer",
+          "location": "querystring",
+          "locationName": "limit"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "Keywords"
+      ]
+    },
+    "SearchSchemasResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string"
+        },
+        "Schemas": {
+          "shape": "__listOfSearchSchemaSummary"
+        }
+      }
+    },
+    "ServiceUnavailableException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 503
+      }
+    },
+    "StartDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "discovererId"
+        }
+      },
+      "required": [
+        "DiscovererId"
+      ]
+    },
+    "StartDiscovererResponse": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        }
+      }
+    },
+    "StopDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "discovererId"
+        }
+      },
+      "required": [
+        "DiscovererId"
+      ]
+    },
+    "StopDiscovererResponse": {
+      "type": "structure",
+      "members": {
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        }
+      }
+    },
+    "TagResourceInput": {
+      "type": "structure",
+      "members": {
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "Tags"
+      ]
+    },
+    "TagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resource-arn"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "ResourceArn",
+        "Tags"
+      ]
+    },
+    "Tags": {
+      "type": "map",
+      "key": {
+        "shape": "__string"
+      },
+      "value": {
+        "shape": "__string"
+      }
+    },
+    "TooManyRequestsException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 429
+      }
+    },
+    "Type": {
+      "type": "string",
+      "enum": [
+        "OpenApi3"
+      ]
+    },
+    "UnauthorizedException": {
+      "type": "structure",
+      "members": {
+        "Code": {
+          "shape": "__string"
+        },
+        "Message": {
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Message",
+        "Code"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 401
+      }
+    },
+    "UnlockServiceLinkedRoleInput": {
+      "type": "structure",
+      "members": {
+        "RoleArn": {
+          "shape": "__stringMin1Max1600"
+        }
+      },
+      "required": [
+        "RoleArn"
+      ]
+    },
+    "UnlockServiceLinkedRoleRequest": {
+      "type": "structure",
+      "members": {
+        "RoleArn": {
+          "shape": "__stringMin1Max1600"
+        }
+      },
+      "required": [
+        "RoleArn"
+      ]
+    },
+    "UnlockServiceLinkedRoleResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UntagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resource-arn"
+        },
+        "TagKeys": {
+          "shape": "__listOf__string",
+          "location": "querystring",
+          "locationName": "tagKeys"
+        }
+      },
+      "required": [
+        "TagKeys",
+        "ResourceArn"
+      ]
+    },
+    "UpdateDiscovererInput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        }
+      }
+    },
+    "UpdateDiscovererRequest": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "DiscovererId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "discovererId"
+        }
+      },
+      "required": [
+        "DiscovererId"
+      ]
+    },
+    "UpdateDiscovererResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "DiscovererArn": {
+          "shape": "__string"
+        },
+        "DiscovererId": {
+          "shape": "__string"
+        },
+        "SourceArn": {
+          "shape": "__string"
+        },
+        "State": {
+          "shape": "DiscovererState"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "UpdateRegistryInput": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        }
+      }
+    },
+    "UpdateRegistryRequest": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        }
+      },
+      "required": [
+        "RegistryName"
+      ]
+    },
+    "UpdateRegistryResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "RegistryArn": {
+          "shape": "__string"
+        },
+        "RegistryName": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        }
+      }
+    },
+    "UpdateSchemaInput": {
+      "type": "structure",
+      "members": {
+        "ClientTokenId": {
+          "shape": "__stringMin0Max36",
+          "idempotencyToken": true
+        },
+        "Content": {
+          "shape": "__stringMin1Max100000"
+        },
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      }
+    },
+    "UpdateSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "ClientTokenId": {
+          "shape": "__stringMin0Max36",
+          "idempotencyToken": true
+        },
+        "Content": {
+          "shape": "__stringMin1Max100000"
+        },
+        "Description": {
+          "shape": "__stringMin0Max256"
+        },
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "Type": {
+          "shape": "Type"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName"
+      ]
+    },
+    "UpdateSchemaResponse": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string"
+        },
+        "LastModified": {
+          "shape": "__timestampIso8601"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Tags": {
+          "shape": "Tags",
+          "locationName": "tags"
+        },
+        "Type": {
+          "shape": "__string"
+        },
+        "VersionCreatedDate": {
+          "shape": "__timestampIso8601"
+        }
+      }
+    },
+    "ExportSchemaOutput": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Type": {
+          "shape": "__string"
+        }
+      }
+    },
+    "ExportSchemaRequest": {
+      "type": "structure",
+      "members": {
+        "RegistryName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "registryName"
+        },
+        "SchemaName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "schemaName"
+        },
+        "SchemaVersion": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "schemaVersion"
+        },
+        "Type": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "type"
+        }
+      },
+      "required": [
+        "RegistryName",
+        "SchemaName",
+        "Type"
+      ]
+    },
+    "ExportSchemaResponse": {
+      "type": "structure",
+      "members": {
+        "Content": {
+          "shape": "__string"
+        },
+        "SchemaArn": {
+          "shape": "__string"
+        },
+        "SchemaName": {
+          "shape": "__string"
+        },
+        "SchemaVersion": {
+          "shape": "__string"
+        },
+        "Type": {
+          "shape": "__string"
+        }
+      }
+    },
+    "__boolean": {
+      "type": "boolean"
+    },
+    "__double": {
+      "type": "double"
+    },
+    "__integer": {
+      "type": "integer"
+    },
+    "__integerMin1Max29000": {
+      "type": "integer",
+      "min": 1,
+      "max": 29000
+    },
+    "__listOfDiscovererSummary": {
+      "type": "list",
+      "member": {
+        "shape": "DiscovererSummary"
+      }
+    },
+    "__listOfGetDiscoveredSchemaVersionItemInput": {
+      "type": "list",
+      "min": 1,
+      "max": 10,
+      "member": {
+        "shape": "GetDiscoveredSchemaVersionItemInput"
+      }
+    },
+    "__listOfRegistrySummary": {
+      "type": "list",
+      "member": {
+        "shape": "RegistrySummary"
+      }
+    },
+    "__listOfSchemaSummary": {
+      "type": "list",
+      "member": {
+        "shape": "SchemaSummary"
+      }
+    },
+    "__listOfSchemaVersionSummary": {
+      "type": "list",
+      "member": {
+        "shape": "SchemaVersionSummary"
+      }
+    },
+    "__listOfSearchSchemaSummary": {
+      "type": "list",
+      "member": {
+        "shape": "SearchSchemaSummary"
+      }
+    },
+    "__listOfSearchSchemaVersionSummary": {
+      "type": "list",
+      "member": {
+        "shape": "SearchSchemaVersionSummary"
+      }
+    },
+    "__listOf__string": {
+      "type": "list",
+      "member": {
+        "shape": "__string"
+      }
+    },
+    "__long": {
+      "type": "long"
+    },
+    "__string": {
+      "type": "string"
+    },
+    "__stringMin0Max256": {
+      "type": "string",
+      "min": 0,
+      "max": 256
+    },
+    "__stringMin0Max36": {
+      "type": "string",
+      "min": 0,
+      "max": 36
+    },
+    "__stringMin1Max100000": {
+      "type": "string",
+      "min": 1,
+      "max": 100000
+    },
+    "__stringMin1Max1600": {
+      "type": "string",
+      "min": 1,
+      "max": 1600
+    },
+    "__stringMin20Max1600": {
+      "type": "string",
+      "min": 20,
+      "max": 1600
+    },
+    "__timestampIso8601": {
+      "type": "timestamp",
+      "timestampFormat": "iso8601"
+    },
+    "__timestampUnix": {
+      "type": "timestamp",
+      "timestampFormat": "unixTimestamp"
+    },
+    "Body": {
+      "type": "blob"
+    }
+  }
+}

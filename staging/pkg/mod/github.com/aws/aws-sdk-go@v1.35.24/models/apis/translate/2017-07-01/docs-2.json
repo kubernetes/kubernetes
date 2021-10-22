@@ -1,0 +1,469 @@
+{
+  "version": "2.0",
+  "service": "<p>Provides translation between one source language and another of the same set of languages.</p>",
+  "operations": {
+    "DeleteTerminology": "<p>A synchronous action that deletes a custom terminology.</p>",
+    "DescribeTextTranslationJob": "<p>Gets the properties associated with an asycnhronous batch translation job including name, ID, status, source and target languages, input/output S3 buckets, and so on.</p>",
+    "GetTerminology": "<p>Retrieves a custom terminology.</p>",
+    "ImportTerminology": "<p>Creates or updates a custom terminology, depending on whether or not one already exists for the given terminology name. Importing a terminology with the same name as an existing one will merge the terminologies based on the chosen merge strategy. Currently, the only supported merge strategy is OVERWRITE, and so the imported terminology will overwrite an existing terminology of the same name.</p> <p>If you import a terminology that overwrites an existing one, the new terminology take up to 10 minutes to fully propagate and be available for use in a translation due to cache policies with the DataPlane service that performs the translations.</p>",
+    "ListTerminologies": "<p>Provides a list of custom terminologies associated with your account.</p>",
+    "ListTextTranslationJobs": "<p>Gets a list of the batch translation jobs that you have submitted.</p>",
+    "StartTextTranslationJob": "<p>Starts an asynchronous batch translation job. Batch translation jobs can be used to translate large volumes of text across multiple documents at once. For more information, see <a>async</a>.</p> <p>Batch translation jobs can be described with the <a>DescribeTextTranslationJob</a> operation, listed with the <a>ListTextTranslationJobs</a> operation, and stopped with the <a>StopTextTranslationJob</a> operation.</p> <note> <p>Amazon Translate does not support batch translation of multiple source languages at once.</p> </note>",
+    "StopTextTranslationJob": "<p>Stops an asynchronous batch translation job that is in progress.</p> <p>If the job's state is <code>IN_PROGRESS</code>, the job will be marked for termination and put into the <code>STOP_REQUESTED</code> state. If the job completes before it can be stopped, it is put into the <code>COMPLETED</code> state. Otherwise, the job is put into the <code>STOPPED</code> state.</p> <p>Asynchronous batch translation jobs are started with the <a>StartTextTranslationJob</a> operation. You can use the <a>DescribeTextTranslationJob</a> or <a>ListTextTranslationJobs</a> operations to get a batch translation job's <code>JobId</code>.</p>",
+    "TranslateText": "<p>Translates input text from the source language to the target language. For a list of available languages and language codes, see <a>what-is-languages</a>.</p>"
+  },
+  "shapes": {
+    "AppliedTerminology": {
+      "base": "<p>The custom terminology applied to the input text by Amazon Translate for the translated text response. This is optional in the response and will only be present if you specified terminology input in the request. Currently, only one terminology can be applied per TranslateText request.</p>",
+      "refs": {
+        "AppliedTerminologyList$member": null
+      }
+    },
+    "AppliedTerminologyList": {
+      "base": null,
+      "refs": {
+        "TranslateTextResponse$AppliedTerminologies": "<p>The names of the custom terminologies applied to the input text by Amazon Translate for the translated text response.</p>"
+      }
+    },
+    "BoundedLengthString": {
+      "base": null,
+      "refs": {
+        "TranslateTextRequest$Text": "<p>The text to translate. The text string can be a maximum of 5,000 bytes long. Depending on your character set, this may be fewer than 5,000 characters.</p>"
+      }
+    },
+    "ClientTokenString": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobRequest$ClientToken": "<p>A unique identifier for the request. This token is auto-generated when using the Amazon Translate SDK.</p>"
+      }
+    },
+    "ContentType": {
+      "base": null,
+      "refs": {
+        "InputDataConfig$ContentType": "<p>Describes the format of the data that you submit to Amazon Translate as input. You can specify one of the following multipurpose internet mail extension (MIME) types:</p> <ul> <li> <p> <code>text/html</code>: The input data consists of one or more HTML files. Amazon Translate translates only the text that resides in the <code>html</code> element in each file.</p> </li> <li> <p> <code>text/plain</code>: The input data consists of one or more unformatted text files. Amazon Translate translates every character in this type of input.</p> </li> <li> <p> <code>application/vnd.openxmlformats-officedocument.wordprocessingml.document</code>: The input data consists of one or more Word documents (.docx).</p> </li> <li> <p> <code>application/vnd.openxmlformats-officedocument.presentationml.presentation</code>: The input data consists of one or more PowerPoint Presentation files (.pptx).</p> </li> <li> <p> <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code>: The input data consists of one or more Excel Workbook files (.xlsx).</p> </li> </ul> <important> <p>If you structure your input data as HTML, ensure that you set this parameter to <code>text/html</code>. By doing so, you cut costs by limiting the translation to the contents of the <code>html</code> element in each file. Otherwise, if you set this parameter to <code>text/plain</code>, your costs will cover the translation of every character.</p> </important>"
+      }
+    },
+    "DeleteTerminologyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTextTranslationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTextTranslationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "ImportTerminologyRequest$Description": "<p>The description of the custom terminology being imported.</p>",
+        "TerminologyProperties$Description": "<p>The description of the custom terminology properties.</p>"
+      }
+    },
+    "DetectedLanguageLowConfidenceException": {
+      "base": "<p>The confidence that Amazon Comprehend accurately detected the source language is low. If a low confidence level is acceptable for your application, you can use the language in the exception to call Amazon Translate again. For more information, see the <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/API_DetectDominantLanguage.html\">DetectDominantLanguage</a> operation in the <i>Amazon Comprehend Developer Guide</i>. </p>",
+      "refs": {
+      }
+    },
+    "EncryptionKey": {
+      "base": "<p>The encryption key used to encrypt the custom terminologies used by Amazon Translate.</p>",
+      "refs": {
+        "ImportTerminologyRequest$EncryptionKey": "<p>The encryption key for the custom terminology being imported.</p>",
+        "TerminologyProperties$EncryptionKey": "<p>The encryption key for the custom terminology.</p>"
+      }
+    },
+    "EncryptionKeyID": {
+      "base": null,
+      "refs": {
+        "EncryptionKey$Id": "<p>The Amazon Resource Name (ARN) of the encryption key being used to encrypt the custom terminology.</p>"
+      }
+    },
+    "EncryptionKeyType": {
+      "base": null,
+      "refs": {
+        "EncryptionKey$Type": "<p>The type of encryption key used by Amazon Translate to encrypt custom terminologies.</p>"
+      }
+    },
+    "GetTerminologyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTerminologyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IamRoleArn": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobRequest$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of an AWS Identity Access and Management (IAM) role that grants Amazon Translate read access to your input data. For more nformation, see <a>identity-and-access-management</a>.</p>",
+        "TextTranslationJobProperties$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of an AWS Identity Access and Management (IAM) role that granted Amazon Translate read access to the job's input data.</p>"
+      }
+    },
+    "ImportTerminologyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportTerminologyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InputDataConfig": {
+      "base": "<p>The input configuration properties for requesting a batch translation job.</p>",
+      "refs": {
+        "StartTextTranslationJobRequest$InputDataConfig": "<p>Specifies the format and S3 location of the input documents for the translation job.</p>",
+        "TextTranslationJobProperties$InputDataConfig": "<p>The input configuration properties that were specified when the job was requested.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "JobDetails$TranslatedDocumentsCount": "<p>The number of documents successfully processed during a translation job.</p>",
+        "JobDetails$DocumentsWithErrorsCount": "<p>The number of documents that could not be processed during a translation job.</p>",
+        "JobDetails$InputDocumentsCount": "<p>The number of documents used as input in a translation job.</p>",
+        "TerminologyProperties$SizeBytes": "<p>The size of the file used when importing a custom terminology.</p>",
+        "TerminologyProperties$TermCount": "<p>The number of terms included in the custom terminology.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>An internal server error occurred. Retry your request.</p>",
+      "refs": {
+      }
+    },
+    "InvalidFilterException": {
+      "base": "<p>The filter specified for the operation is invalid. Specify a different filter.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterValueException": {
+      "base": "<p>The value of the parameter is invalid. Review the value of the parameter you are using to correct it, and then retry your operation.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p> The request that you made is invalid. Check your request to determine why it's invalid and then retry the request. </p>",
+      "refs": {
+      }
+    },
+    "JobDetails": {
+      "base": "<p>The number of documents successfully and unsuccessfully processed during a translation job.</p>",
+      "refs": {
+        "TextTranslationJobProperties$JobDetails": "<p>The number of documents successfully and unsuccessfully processed during the translation job.</p>"
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "DescribeTextTranslationJobRequest$JobId": "<p>The identifier that Amazon Translate generated for the job. The <a>StartTextTranslationJob</a> operation returns this identifier in its response.</p>",
+        "StartTextTranslationJobResponse$JobId": "<p>The identifier generated for the job. To get the status of a job, use this ID with the <a>DescribeTextTranslationJob</a> operation.</p>",
+        "StopTextTranslationJobRequest$JobId": "<p>The job ID of the job to be stopped.</p>",
+        "StopTextTranslationJobResponse$JobId": "<p>The job ID of the stopped batch translation job.</p>",
+        "TextTranslationJobProperties$JobId": "<p>The ID of the translation job.</p>"
+      }
+    },
+    "JobName": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobRequest$JobName": "<p>The name of the batch translation job to be performed.</p>",
+        "TextTranslationJobFilter$JobName": "<p>Filters the list of jobs by name.</p>",
+        "TextTranslationJobProperties$JobName": "<p>The user-defined name of the translation job.</p>"
+      }
+    },
+    "JobStatus": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobResponse$JobStatus": "<p>The status of the job. Possible values include:</p> <ul> <li> <p> <code>SUBMITTED</code> - The job has been received and is queued for processing.</p> </li> <li> <p> <code>IN_PROGRESS</code> - Amazon Translate is processing the job.</p> </li> <li> <p> <code>COMPLETED</code> - The job was successfully completed and the output is available.</p> </li> <li> <p> <code>COMPLETED_WITH_ERROR</code> - The job was completed with errors. The errors can be analyzed in the job's output.</p> </li> <li> <p> <code>FAILED</code> - The job did not complete. To get details, use the <a>DescribeTextTranslationJob</a> operation.</p> </li> <li> <p> <code>STOP_REQUESTED</code> - The user who started the job has requested that it be stopped.</p> </li> <li> <p> <code>STOPPED</code> - The job has been stopped.</p> </li> </ul>",
+        "StopTextTranslationJobResponse$JobStatus": "<p>The status of the designated job. Upon successful completion, the job's status will be <code>STOPPED</code>.</p>",
+        "TextTranslationJobFilter$JobStatus": "<p>Filters the list of jobs based by job status.</p>",
+        "TextTranslationJobProperties$JobStatus": "<p>The status of the translation job.</p>"
+      }
+    },
+    "LanguageCodeString": {
+      "base": null,
+      "refs": {
+        "DetectedLanguageLowConfidenceException$DetectedLanguageCode": "<p>The language code of the auto-detected language from Amazon Comprehend.</p>",
+        "LanguageCodeStringList$member": null,
+        "StartTextTranslationJobRequest$SourceLanguageCode": "<p>The language code of the input language. For a list of language codes, see <a>what-is-languages</a>.</p> <p>Amazon Translate does not automatically detect a source language during batch translation jobs.</p>",
+        "TargetLanguageCodeStringList$member": null,
+        "TerminologyProperties$SourceLanguageCode": "<p>The language code for the source text of the translation request for which the custom terminology is being used.</p>",
+        "TextTranslationJobProperties$SourceLanguageCode": "<p>The language code of the language of the source text. The language must be a language supported by Amazon Translate.</p>",
+        "TranslateTextRequest$SourceLanguageCode": "<p>The language code for the language of the source text. The language must be a language supported by Amazon Translate. For a list of language codes, see <a>what-is-languages</a>.</p> <p>To have Amazon Translate determine the source language of your text, you can specify <code>auto</code> in the <code>SourceLanguageCode</code> field. If you specify <code>auto</code>, Amazon Translate will call <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/comprehend-general.html\">Amazon Comprehend</a> to determine the source language.</p>",
+        "TranslateTextRequest$TargetLanguageCode": "<p>The language code requested for the language of the target text. The language must be a language supported by Amazon Translate.</p>",
+        "TranslateTextResponse$SourceLanguageCode": "<p>The language code for the language of the source text.</p>",
+        "TranslateTextResponse$TargetLanguageCode": "<p>The language code for the language of the target text. </p>",
+        "UnsupportedLanguagePairException$SourceLanguageCode": "<p>The language code for the language of the input text. </p>",
+        "UnsupportedLanguagePairException$TargetLanguageCode": "<p>The language code for the language of the translated text. </p>"
+      }
+    },
+    "LanguageCodeStringList": {
+      "base": null,
+      "refs": {
+        "TerminologyProperties$TargetLanguageCodes": "<p>The language codes for the target languages available with the custom terminology file. All possible target languages are returned in array.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The specified limit has been exceeded. Review your request and retry it with a quantity below the stated limit.</p>",
+      "refs": {
+      }
+    },
+    "ListTerminologiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTerminologiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTextTranslationJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTextTranslationJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResultsInteger": {
+      "base": null,
+      "refs": {
+        "ListTerminologiesRequest$MaxResults": "<p>The maximum number of custom terminologies returned per list request.</p>",
+        "ListTextTranslationJobsRequest$MaxResults": "<p>The maximum number of results to return in each page. The default value is 100.</p>"
+      }
+    },
+    "MergeStrategy": {
+      "base": null,
+      "refs": {
+        "ImportTerminologyRequest$MergeStrategy": "<p>The merge strategy of the custom terminology being imported. Currently, only the OVERWRITE merge strategy is supported. In this case, the imported terminology will overwrite an existing terminology of the same name.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListTerminologiesRequest$NextToken": "<p>If the result of the request to ListTerminologies was truncated, include the NextToken to fetch the next group of custom terminologies. </p>",
+        "ListTerminologiesResponse$NextToken": "<p> If the response to the ListTerminologies was truncated, the NextToken fetches the next group of custom terminologies.</p>",
+        "ListTextTranslationJobsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListTextTranslationJobsResponse$NextToken": "<p>The token to use to retreive the next page of results. This value is <code>null</code> when there are no more results to return.</p>"
+      }
+    },
+    "OutputDataConfig": {
+      "base": "<p>The output configuration properties for a batch translation job.</p>",
+      "refs": {
+        "StartTextTranslationJobRequest$OutputDataConfig": "<p>Specifies the S3 folder to which your job output will be saved. </p>",
+        "TextTranslationJobProperties$OutputDataConfig": "<p>The output configuration properties that were specified when the job was requested.</p>"
+      }
+    },
+    "ResourceName": {
+      "base": null,
+      "refs": {
+        "AppliedTerminology$Name": "<p>The name of the custom terminology applied to the input text by Amazon Translate for the translated text response.</p>",
+        "DeleteTerminologyRequest$Name": "<p>The name of the custom terminology being deleted. </p>",
+        "GetTerminologyRequest$Name": "<p>The name of the custom terminology being retrieved.</p>",
+        "ImportTerminologyRequest$Name": "<p>The name of the custom terminology being imported.</p>",
+        "ResourceNameList$member": null,
+        "TerminologyProperties$Name": "<p>The name of the custom terminology.</p>"
+      }
+    },
+    "ResourceNameList": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobRequest$TerminologyNames": "<p>The name of the terminology to use in the batch translation job. For a list of available terminologies, use the <a>ListTerminologies</a> operation.</p>",
+        "TextTranslationJobProperties$TerminologyNames": "<p>A list containing the names of the terminologies applied to a translation job. Only one terminology can be applied per <a>StartTextTranslationJob</a> request at this time.</p>",
+        "TranslateTextRequest$TerminologyNames": "<p>The name of the terminology list file to be used in the TranslateText request. You can use 1 terminology list at most in a <code>TranslateText</code> request. Terminology lists can contain a maximum of 256 terms.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource you are looking for has not been found. Review the resource you're looking for and see if a different resource will accomplish your needs before retrying the revised request.</p>",
+      "refs": {
+      }
+    },
+    "S3Uri": {
+      "base": null,
+      "refs": {
+        "InputDataConfig$S3Uri": "<p>The URI of the AWS S3 folder that contains the input file. The folder must be in the same Region as the API endpoint you are calling.</p>",
+        "OutputDataConfig$S3Uri": "<p>The URI of the S3 folder that contains a translation job's output file. The folder must be in the same Region as the API endpoint that you are calling.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The Amazon Translate service is temporarily unavailable. Please wait a bit and then retry your request.</p>",
+      "refs": {
+      }
+    },
+    "StartTextTranslationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartTextTranslationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopTextTranslationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopTextTranslationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "DetectedLanguageLowConfidenceException$Message": null,
+        "InternalServerException$Message": null,
+        "InvalidFilterException$Message": null,
+        "InvalidParameterValueException$Message": null,
+        "InvalidRequestException$Message": null,
+        "LimitExceededException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ServiceUnavailableException$Message": null,
+        "Term$SourceText": "<p>The source text of the term being translated by the custom terminology.</p>",
+        "Term$TargetText": "<p>The target text of the term being translated by the custom terminology.</p>",
+        "TerminologyDataLocation$RepositoryType": "<p>The repository type for the custom terminology data.</p>",
+        "TerminologyDataLocation$Location": "<p>The location of the custom terminology data.</p>",
+        "TextSizeLimitExceededException$Message": null,
+        "TooManyRequestsException$Message": null,
+        "TranslateTextResponse$TranslatedText": "<p>The translated text.</p>",
+        "UnsupportedLanguagePairException$Message": null
+      }
+    },
+    "TargetLanguageCodeStringList": {
+      "base": null,
+      "refs": {
+        "StartTextTranslationJobRequest$TargetLanguageCodes": "<p>The language code of the output language.</p>",
+        "TextTranslationJobProperties$TargetLanguageCodes": "<p>The language code of the language of the target text. The language must be a language supported by Amazon Translate.</p>"
+      }
+    },
+    "Term": {
+      "base": "<p>The term being translated by the custom terminology.</p>",
+      "refs": {
+        "TermList$member": null
+      }
+    },
+    "TermList": {
+      "base": null,
+      "refs": {
+        "AppliedTerminology$Terms": "<p>The specific terms of the custom terminology applied to the input text by Amazon Translate for the translated text response. A maximum of 250 terms will be returned, and the specific terms applied will be the first 250 terms in the source text. </p>"
+      }
+    },
+    "TerminologyArn": {
+      "base": null,
+      "refs": {
+        "TerminologyProperties$Arn": "<p> The Amazon Resource Name (ARN) of the custom terminology. </p>"
+      }
+    },
+    "TerminologyData": {
+      "base": "<p>The data associated with the custom terminology.</p>",
+      "refs": {
+        "ImportTerminologyRequest$TerminologyData": "<p>The terminology data for the custom terminology being imported.</p>"
+      }
+    },
+    "TerminologyDataFormat": {
+      "base": null,
+      "refs": {
+        "GetTerminologyRequest$TerminologyDataFormat": "<p>The data format of the custom terminology being retrieved, either CSV or TMX.</p>",
+        "TerminologyData$Format": "<p>The data format of the custom terminology. Either CSV or TMX.</p>"
+      }
+    },
+    "TerminologyDataLocation": {
+      "base": "<p>The location of the custom terminology data.</p>",
+      "refs": {
+        "GetTerminologyResponse$TerminologyDataLocation": "<p>The data location of the custom terminology being retrieved. The custom terminology file is returned in a presigned url that has a 30 minute expiration.</p>"
+      }
+    },
+    "TerminologyFile": {
+      "base": null,
+      "refs": {
+        "TerminologyData$File": "<p>The file containing the custom terminology data. Your version of the AWS SDK performs a Base64-encoding on this field before sending a request to the AWS service. Users of the SDK should not perform Base64-encoding themselves.</p>"
+      }
+    },
+    "TerminologyProperties": {
+      "base": "<p>The properties of the custom terminology.</p>",
+      "refs": {
+        "GetTerminologyResponse$TerminologyProperties": "<p>The properties of the custom terminology being retrieved.</p>",
+        "ImportTerminologyResponse$TerminologyProperties": "<p>The properties of the custom terminology being imported.</p>",
+        "TerminologyPropertiesList$member": null
+      }
+    },
+    "TerminologyPropertiesList": {
+      "base": null,
+      "refs": {
+        "ListTerminologiesResponse$TerminologyPropertiesList": "<p>The properties list of the custom terminologies returned on the list request.</p>"
+      }
+    },
+    "TextSizeLimitExceededException": {
+      "base": "<p> The size of the text you submitted exceeds the size limit. Reduce the size of the text or use a smaller document and then retry your request. </p>",
+      "refs": {
+      }
+    },
+    "TextTranslationJobFilter": {
+      "base": "<p>Provides information for filtering a list of translation jobs. For more information, see <a>ListTextTranslationJobs</a>.</p>",
+      "refs": {
+        "ListTextTranslationJobsRequest$Filter": "<p>The parameters that specify which batch translation jobs to retrieve. Filters include job name, job status, and submission time. You can only set one filter at a time.</p>"
+      }
+    },
+    "TextTranslationJobProperties": {
+      "base": "<p>Provides information about a translation job.</p>",
+      "refs": {
+        "DescribeTextTranslationJobResponse$TextTranslationJobProperties": "<p>An object that contains the properties associated with an asynchronous batch translation job.</p>",
+        "TextTranslationJobPropertiesList$member": null
+      }
+    },
+    "TextTranslationJobPropertiesList": {
+      "base": null,
+      "refs": {
+        "ListTextTranslationJobsResponse$TextTranslationJobPropertiesList": "<p>A list containing the properties of each job that is returned.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "TerminologyProperties$CreatedAt": "<p>The time at which the custom terminology was created, based on the timestamp.</p>",
+        "TerminologyProperties$LastUpdatedAt": "<p>The time at which the custom terminology was last update, based on the timestamp.</p>",
+        "TextTranslationJobFilter$SubmittedBeforeTime": "<p>Filters the list of jobs based on the time that the job was submitted for processing and returns only the jobs submitted before the specified time. Jobs are returned in ascending order, oldest to newest.</p>",
+        "TextTranslationJobFilter$SubmittedAfterTime": "<p>Filters the list of jobs based on the time that the job was submitted for processing and returns only the jobs submitted after the specified time. Jobs are returned in descending order, newest to oldest.</p>",
+        "TextTranslationJobProperties$SubmittedTime": "<p>The time at which the translation job was submitted.</p>",
+        "TextTranslationJobProperties$EndTime": "<p>The time at which the translation job ended.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p> You have made too many requests within a short period of time. Wait for a short time and then try your request again.</p>",
+      "refs": {
+      }
+    },
+    "TranslateTextRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TranslateTextResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnboundedLengthString": {
+      "base": null,
+      "refs": {
+        "TextTranslationJobProperties$Message": "<p>An explanation of any errors that may have occured during the translation job.</p>"
+      }
+    },
+    "UnsupportedLanguagePairException": {
+      "base": "<p>Amazon Translate does not support translation from the language of the source text into the requested target language. For more information, see <a>how-to-error-msg</a>. </p>",
+      "refs": {
+      }
+    }
+  }
+}

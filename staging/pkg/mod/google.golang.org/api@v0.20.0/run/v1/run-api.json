@@ -1,0 +1,3569 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://run.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Cloud Run",
+  "description": "Deploy and manage user provided container images that scale automatically based on HTTP traffic.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/run/",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "run:v1",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://run.mtls.googleapis.com/",
+  "name": "run",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "api": {
+      "resources": {
+        "v1": {
+          "resources": {
+            "namespaces": {
+              "resources": {
+                "secrets": {
+                  "methods": {
+                    "create": {
+                      "description": "Creates a new secret.",
+                      "flatPath": "api/v1/namespaces/{namespacesId}/secrets",
+                      "httpMethod": "POST",
+                      "id": "run.api.v1.namespaces.secrets.create",
+                      "parameterOrder": [
+                        "parent"
+                      ],
+                      "parameters": {
+                        "parent": {
+                          "description": "Required. The project ID or project number in which this secret should\nbe created.",
+                          "location": "path",
+                          "pattern": "^namespaces/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "api/v1/{+parent}/secrets",
+                      "request": {
+                        "$ref": "Secret"
+                      },
+                      "response": {
+                        "$ref": "Secret"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "get": {
+                      "description": "Rpc to get information about a secret.",
+                      "flatPath": "api/v1/namespaces/{namespacesId}/secrets/{secretsId}",
+                      "httpMethod": "GET",
+                      "id": "run.api.v1.namespaces.secrets.get",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "name": {
+                          "description": "Required. The name of the secret being retrieved. If needed, replace\n{namespace_id} with the project ID.",
+                          "location": "path",
+                          "pattern": "^namespaces/[^/]+/secrets/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "api/v1/{+name}",
+                      "response": {
+                        "$ref": "Secret"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "replaceSecret": {
+                      "description": "Rpc to replace a secret.\n\nOnly the spec and metadata labels and annotations are modifiable. After\nthe Update request, Cloud Run will work to make the 'status'\nmatch the requested 'spec'.\n\nMay provide metadata.resourceVersion to enforce update from last read for\noptimistic concurrency control.",
+                      "flatPath": "api/v1/namespaces/{namespacesId}/secrets/{secretsId}",
+                      "httpMethod": "PUT",
+                      "id": "run.api.v1.namespaces.secrets.replaceSecret",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "name": {
+                          "description": "Required. The name of the secret being retrieved. If needed, replace\n{namespace_id} with the project ID.",
+                          "location": "path",
+                          "pattern": "^namespaces/[^/]+/secrets/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "api/v1/{+name}",
+                      "request": {
+                        "$ref": "Secret"
+                      },
+                      "response": {
+                        "$ref": "Secret"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "namespaces": {
+      "resources": {
+        "authorizeddomains": {
+          "methods": {
+            "list": {
+              "description": "List authorized domains.",
+              "flatPath": "apis/domains.cloudrun.com/v1/namespaces/{namespacesId}/authorizeddomains",
+              "httpMethod": "GET",
+              "id": "run.namespaces.authorizeddomains.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "pageSize": {
+                  "description": "Maximum results to return per page.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "Continuation token for fetching the next page of results.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "parent": {
+                  "description": "Name of the parent Application resource. Example: `apps/myapp`.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/domains.cloudrun.com/v1/{+parent}/authorizeddomains",
+              "response": {
+                "$ref": "ListAuthorizedDomainsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        },
+        "configurations": {
+          "methods": {
+            "get": {
+              "description": "Get information about a configuration.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/configurations/{configurationsId}",
+              "httpMethod": "GET",
+              "id": "run.namespaces.configurations.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the configuration to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/configurations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Configuration"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List configurations.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/configurations",
+              "httpMethod": "GET",
+              "id": "run.namespaces.configurations.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "continue": {
+                  "description": "Optional encoded string to continue paging.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fieldSelector": {
+                  "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "includeUninitialized": {
+                  "description": "Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                },
+                "labelSelector": {
+                  "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The maximum number of records that should be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "parent": {
+                  "description": "The namespace from which the configurations should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "watch": {
+                  "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+parent}/configurations",
+              "response": {
+                "$ref": "ListConfigurationsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        },
+        "domainmappings": {
+          "methods": {
+            "create": {
+              "description": "Create a new domain mapping.",
+              "flatPath": "apis/domains.cloudrun.com/v1/namespaces/{namespacesId}/domainmappings",
+              "httpMethod": "POST",
+              "id": "run.namespaces.domainmappings.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "The namespace in which the domain mapping should be created.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/domains.cloudrun.com/v1/{+parent}/domainmappings",
+              "request": {
+                "$ref": "DomainMapping"
+              },
+              "response": {
+                "$ref": "DomainMapping"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "delete": {
+              "description": "Delete a domain mapping.",
+              "flatPath": "apis/domains.cloudrun.com/v1/namespaces/{namespacesId}/domainmappings/{domainmappingsId}",
+              "httpMethod": "DELETE",
+              "id": "run.namespaces.domainmappings.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "apiVersion": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name of the domain mapping to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/domainmappings/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "propagationPolicy": {
+                  "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "apis/domains.cloudrun.com/v1/{+name}",
+              "response": {
+                "$ref": "Status"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Get information about a domain mapping.",
+              "flatPath": "apis/domains.cloudrun.com/v1/namespaces/{namespacesId}/domainmappings/{domainmappingsId}",
+              "httpMethod": "GET",
+              "id": "run.namespaces.domainmappings.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the domain mapping to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/domainmappings/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/domains.cloudrun.com/v1/{+name}",
+              "response": {
+                "$ref": "DomainMapping"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List domain mappings.",
+              "flatPath": "apis/domains.cloudrun.com/v1/namespaces/{namespacesId}/domainmappings",
+              "httpMethod": "GET",
+              "id": "run.namespaces.domainmappings.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "continue": {
+                  "description": "Optional encoded string to continue paging.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fieldSelector": {
+                  "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "includeUninitialized": {
+                  "description": "Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                },
+                "labelSelector": {
+                  "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The maximum number of records that should be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "parent": {
+                  "description": "The namespace from which the domain mappings should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "watch": {
+                  "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                }
+              },
+              "path": "apis/domains.cloudrun.com/v1/{+parent}/domainmappings",
+              "response": {
+                "$ref": "ListDomainMappingsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        },
+        "revisions": {
+          "methods": {
+            "delete": {
+              "description": "Delete a revision.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/revisions/{revisionsId}",
+              "httpMethod": "DELETE",
+              "id": "run.namespaces.revisions.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "apiVersion": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name of the revision to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/revisions/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "propagationPolicy": {
+                  "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Status"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Get information about a revision.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/revisions/{revisionsId}",
+              "httpMethod": "GET",
+              "id": "run.namespaces.revisions.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the revision to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/revisions/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Revision"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List revisions.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/revisions",
+              "httpMethod": "GET",
+              "id": "run.namespaces.revisions.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "continue": {
+                  "description": "Optional encoded string to continue paging.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fieldSelector": {
+                  "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "includeUninitialized": {
+                  "description": "Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                },
+                "labelSelector": {
+                  "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The maximum number of records that should be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "parent": {
+                  "description": "The namespace from which the revisions should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "watch": {
+                  "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+parent}/revisions",
+              "response": {
+                "$ref": "ListRevisionsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        },
+        "routes": {
+          "methods": {
+            "get": {
+              "description": "Get information about a route.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/routes/{routesId}",
+              "httpMethod": "GET",
+              "id": "run.namespaces.routes.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the route to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/routes/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Route"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List routes.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/routes",
+              "httpMethod": "GET",
+              "id": "run.namespaces.routes.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "continue": {
+                  "description": "Optional encoded string to continue paging.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fieldSelector": {
+                  "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "includeUninitialized": {
+                  "description": "Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                },
+                "labelSelector": {
+                  "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The maximum number of records that should be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "parent": {
+                  "description": "The namespace from which the routes should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "watch": {
+                  "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+parent}/routes",
+              "response": {
+                "$ref": "ListRoutesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        },
+        "services": {
+          "methods": {
+            "create": {
+              "description": "Create a service.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/services",
+              "httpMethod": "POST",
+              "id": "run.namespaces.services.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "The namespace in which the service should be created.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+parent}/services",
+              "request": {
+                "$ref": "Service"
+              },
+              "response": {
+                "$ref": "Service"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "delete": {
+              "description": "Delete a service.\nThis will cause the Service to stop serving traffic and will delete the\nchild entities like Routes, Configurations and Revisions.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/services/{servicesId}",
+              "httpMethod": "DELETE",
+              "id": "run.namespaces.services.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "apiVersion": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "Cloud Run currently ignores this parameter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name of the service to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/services/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "propagationPolicy": {
+                  "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Status"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Get information about a service.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/services/{servicesId}",
+              "httpMethod": "GET",
+              "id": "run.namespaces.services.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the service to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/services/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "response": {
+                "$ref": "Service"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "List services.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/services",
+              "httpMethod": "GET",
+              "id": "run.namespaces.services.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "continue": {
+                  "description": "Optional encoded string to continue paging.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fieldSelector": {
+                  "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "includeUninitialized": {
+                  "description": "Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                },
+                "labelSelector": {
+                  "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The maximum number of records that should be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "parent": {
+                  "description": "The namespace from which the services should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "watch": {
+                  "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                  "location": "query",
+                  "type": "boolean"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+parent}/services",
+              "response": {
+                "$ref": "ListServicesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "replaceService": {
+              "description": "Replace a service.\n\nOnly the spec and metadata labels and annotations are modifiable. After\nthe Update request, Cloud Run will work to make the 'status'\nmatch the requested 'spec'.\n\nMay provide metadata.resourceVersion to enforce update from last read for\noptimistic concurrency control.",
+              "flatPath": "apis/serving.knative.dev/v1/namespaces/{namespacesId}/services/{servicesId}",
+              "httpMethod": "PUT",
+              "id": "run.namespaces.services.replaceService",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the service being replaced.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                  "location": "path",
+                  "pattern": "^namespaces/[^/]+/services/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "apis/serving.knative.dev/v1/{+name}",
+              "request": {
+                "$ref": "Service"
+              },
+              "response": {
+                "$ref": "Service"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "projects": {
+      "resources": {
+        "locations": {
+          "methods": {
+            "list": {
+              "description": "Lists information about the supported locations for this service.",
+              "flatPath": "v1/projects/{projectsId}/locations",
+              "httpMethod": "GET",
+              "id": "run.projects.locations.list",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "The standard list filter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The resource that owns the locations collection, if applicable.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "The standard list page size.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "The standard list page token.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v1/{+name}/locations",
+              "response": {
+                "$ref": "ListLocationsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          },
+          "resources": {
+            "authorizeddomains": {
+              "methods": {
+                "list": {
+                  "description": "List authorized domains.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/authorizeddomains",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.authorizeddomains.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "pageSize": {
+                      "description": "Maximum results to return per page.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "Continuation token for fetching the next page of results.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "Name of the parent Application resource. Example: `apps/myapp`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+parent}/authorizeddomains",
+                  "response": {
+                    "$ref": "ListAuthorizedDomainsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "configurations": {
+              "methods": {
+                "get": {
+                  "description": "Get information about a configuration.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/configurations/{configurationsId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.configurations.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the configuration to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/configurations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Configuration"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "List configurations.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/configurations",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.configurations.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "continue": {
+                      "description": "Optional encoded string to continue paging.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "fieldSelector": {
+                      "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "includeUninitialized": {
+                      "description": "Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "labelSelector": {
+                      "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "limit": {
+                      "description": "The maximum number of records that should be returned.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "parent": {
+                      "description": "The namespace from which the configurations should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "watch": {
+                      "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    }
+                  },
+                  "path": "v1/{+parent}/configurations",
+                  "response": {
+                    "$ref": "ListConfigurationsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "domainmappings": {
+              "methods": {
+                "create": {
+                  "description": "Create a new domain mapping.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/domainmappings",
+                  "httpMethod": "POST",
+                  "id": "run.projects.locations.domainmappings.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "The namespace in which the domain mapping should be created.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+parent}/domainmappings",
+                  "request": {
+                    "$ref": "DomainMapping"
+                  },
+                  "response": {
+                    "$ref": "DomainMapping"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Delete a domain mapping.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/domainmappings/{domainmappingsId}",
+                  "httpMethod": "DELETE",
+                  "id": "run.projects.locations.domainmappings.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "apiVersion": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name of the domain mapping to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/domainmappings/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "propagationPolicy": {
+                      "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Status"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Get information about a domain mapping.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/domainmappings/{domainmappingsId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.domainmappings.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the domain mapping to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/domainmappings/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "DomainMapping"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "List domain mappings.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/domainmappings",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.domainmappings.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "continue": {
+                      "description": "Optional encoded string to continue paging.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "fieldSelector": {
+                      "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "includeUninitialized": {
+                      "description": "Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "labelSelector": {
+                      "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "limit": {
+                      "description": "The maximum number of records that should be returned.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "parent": {
+                      "description": "The namespace from which the domain mappings should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "watch": {
+                      "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    }
+                  },
+                  "path": "v1/{+parent}/domainmappings",
+                  "response": {
+                    "$ref": "ListDomainMappingsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "revisions": {
+              "methods": {
+                "delete": {
+                  "description": "Delete a revision.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/revisions/{revisionsId}",
+                  "httpMethod": "DELETE",
+                  "id": "run.projects.locations.revisions.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "apiVersion": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name of the revision to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/revisions/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "propagationPolicy": {
+                      "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Status"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Get information about a revision.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/revisions/{revisionsId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.revisions.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the revision to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/revisions/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Revision"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "List revisions.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/revisions",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.revisions.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "continue": {
+                      "description": "Optional encoded string to continue paging.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "fieldSelector": {
+                      "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "includeUninitialized": {
+                      "description": "Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "labelSelector": {
+                      "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "limit": {
+                      "description": "The maximum number of records that should be returned.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "parent": {
+                      "description": "The namespace from which the revisions should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "watch": {
+                      "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    }
+                  },
+                  "path": "v1/{+parent}/revisions",
+                  "response": {
+                    "$ref": "ListRevisionsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "routes": {
+              "methods": {
+                "get": {
+                  "description": "Get information about a route.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/routes/{routesId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.routes.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the route to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/routes/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Route"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "List routes.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/routes",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.routes.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "continue": {
+                      "description": "Optional encoded string to continue paging.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "fieldSelector": {
+                      "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "includeUninitialized": {
+                      "description": "Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "labelSelector": {
+                      "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "limit": {
+                      "description": "The maximum number of records that should be returned.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "parent": {
+                      "description": "The namespace from which the routes should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "watch": {
+                      "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    }
+                  },
+                  "path": "v1/{+parent}/routes",
+                  "response": {
+                    "$ref": "ListRoutesResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "secrets": {
+              "methods": {
+                "create": {
+                  "description": "Creates a new secret.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/secrets",
+                  "httpMethod": "POST",
+                  "id": "run.projects.locations.secrets.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "Required. The project ID or project number in which this secret should\nbe created.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+parent}/secrets",
+                  "request": {
+                    "$ref": "Secret"
+                  },
+                  "response": {
+                    "$ref": "Secret"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Rpc to get information about a secret.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/secrets/{secretsId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.secrets.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "Required. The name of the secret being retrieved. If needed, replace\n{namespace_id} with the project ID.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/secrets/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Secret"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "replaceSecret": {
+                  "description": "Rpc to replace a secret.\n\nOnly the spec and metadata labels and annotations are modifiable. After\nthe Update request, Cloud Run will work to make the 'status'\nmatch the requested 'spec'.\n\nMay provide metadata.resourceVersion to enforce update from last read for\noptimistic concurrency control.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/secrets/{secretsId}",
+                  "httpMethod": "PUT",
+                  "id": "run.projects.locations.secrets.replaceSecret",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "Required. The name of the secret being retrieved. If needed, replace\n{namespace_id} with the project ID.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/secrets/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "request": {
+                    "$ref": "Secret"
+                  },
+                  "response": {
+                    "$ref": "Secret"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "services": {
+              "methods": {
+                "create": {
+                  "description": "Create a service.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services",
+                  "httpMethod": "POST",
+                  "id": "run.projects.locations.services.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "The namespace in which the service should be created.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+parent}/services",
+                  "request": {
+                    "$ref": "Service"
+                  },
+                  "response": {
+                    "$ref": "Service"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Delete a service.\nThis will cause the Service to stop serving traffic and will delete the\nchild entities like Routes, Configurations and Revisions.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}",
+                  "httpMethod": "DELETE",
+                  "id": "run.projects.locations.services.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "apiVersion": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Cloud Run currently ignores this parameter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name of the service to delete.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "propagationPolicy": {
+                      "description": "Specifies the propagation policy of delete. Cloud Run currently ignores\nthis setting, and deletes in the background. Please see\nkubernetes.io/docs/concepts/workloads/controllers/garbage-collection/ for\nmore information.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Status"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Get information about a service.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.services.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the service to retrieve.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "response": {
+                    "$ref": "Service"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "getIamPolicy": {
+                  "description": "Get the IAM Access Control policy currently in effect for the given\nCloud Run service. This result does not include any inherited policies.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}:getIamPolicy",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.services.getIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "options.requestedPolicyVersion": {
+                      "description": "Optional. The policy format version to be returned.\n\nValid values are 0, 1, and 3. Requests specifying an invalid value will be\nrejected.\n\nRequests for policies with any conditional bindings must specify version 3.\nPolicies without any conditional bindings may specify any valid value or\nleave the field unset.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+resource}:getIamPolicy",
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "List services.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services",
+                  "httpMethod": "GET",
+                  "id": "run.projects.locations.services.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "continue": {
+                      "description": "Optional encoded string to continue paging.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "fieldSelector": {
+                      "description": "Allows to filter resources based on a specific value for a field name.\nSend this in a query string format. i.e. 'metadata.name%3Dlorem'.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "includeUninitialized": {
+                      "description": "Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "labelSelector": {
+                      "description": "Allows to filter resources based on a label. Supported operations are\n=, !=, exists, in, and notIn.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "limit": {
+                      "description": "The maximum number of records that should be returned.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "parent": {
+                      "description": "The namespace from which the services should be listed.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "The baseline resource version from which the list or watch operation should\nstart. Not currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "watch": {
+                      "description": "Flag that indicates that the client expects to watch this resource as well.\nNot currently used by Cloud Run.",
+                      "location": "query",
+                      "type": "boolean"
+                    }
+                  },
+                  "path": "v1/{+parent}/services",
+                  "response": {
+                    "$ref": "ListServicesResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "replaceService": {
+                  "description": "Replace a service.\n\nOnly the spec and metadata labels and annotations are modifiable. After\nthe Update request, Cloud Run will work to make the 'status'\nmatch the requested 'spec'.\n\nMay provide metadata.resourceVersion to enforce update from last read for\noptimistic concurrency control.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}",
+                  "httpMethod": "PUT",
+                  "id": "run.projects.locations.services.replaceService",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the service being replaced.\nFor Cloud Run (fully managed), replace {namespace_id} with the project ID\nor number.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}",
+                  "request": {
+                    "$ref": "Service"
+                  },
+                  "response": {
+                    "$ref": "Service"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "setIamPolicy": {
+                  "description": "Sets the IAM Access control policy for the specified Service. Overwrites\nany existing policy.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}:setIamPolicy",
+                  "httpMethod": "POST",
+                  "id": "run.projects.locations.services.setIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+resource}:setIamPolicy",
+                  "request": {
+                    "$ref": "SetIamPolicyRequest"
+                  },
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "testIamPermissions": {
+                  "description": "Returns permissions that a caller has on the specified Project.\n\nThere are no permissions required for making this API call.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/services/{servicesId}:testIamPermissions",
+                  "httpMethod": "POST",
+                  "id": "run.projects.locations.services.testIamPermissions",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/services/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+resource}:testIamPermissions",
+                  "request": {
+                    "$ref": "TestIamPermissionsRequest"
+                  },
+                  "response": {
+                    "$ref": "TestIamPermissionsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20200219",
+  "rootUrl": "https://run.googleapis.com/",
+  "schemas": {
+    "Addressable": {
+      "description": "Information for connecting over HTTP(s).",
+      "id": "Addressable",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditConfig": {
+      "description": "Specifies the audit configuration for a service.\nThe configuration determines which permission types are logged, and what\nidentities, if any, are exempted from logging.\nAn AuditConfig must have one or more AuditLogConfigs.\n\nIf there are AuditConfigs for both `allServices` and a specific service,\nthe union of the two AuditConfigs is used for that service: the log_types\nspecified in each AuditConfig are enabled, and the exempted_members in each\nAuditLogConfig are exempted.\n\nExample Policy with multiple AuditConfigs:\n\n    {\n      \"audit_configs\": [\n        {\n          \"service\": \"allServices\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n              \"exempted_members\": [\n                \"user:jose@example.com\"\n              ]\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n            },\n            {\n              \"log_type\": \"ADMIN_READ\",\n            }\n          ]\n        },\n        {\n          \"service\": \"sampleservice.googleapis.com\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n              \"exempted_members\": [\n                \"user:aliya@example.com\"\n              ]\n            }\n          ]\n        }\n      ]\n    }\n\nFor sampleservice, this policy enables DATA_READ, DATA_WRITE and ADMIN_READ\nlogging. It also exempts jose@example.com from DATA_READ logging, and\naliya@example.com from DATA_WRITE logging.",
+      "id": "AuditConfig",
+      "properties": {
+        "auditLogConfigs": {
+          "description": "The configuration for logging of each type of permission.",
+          "items": {
+            "$ref": "AuditLogConfig"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "Specifies a service that will be enabled for audit logging.\nFor example, `storage.googleapis.com`, `cloudsql.googleapis.com`.\n`allServices` is a special value that covers all services.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditLogConfig": {
+      "description": "Provides the configuration for logging a type of permissions.\nExample:\n\n    {\n      \"audit_log_configs\": [\n        {\n          \"log_type\": \"DATA_READ\",\n          \"exempted_members\": [\n            \"user:jose@example.com\"\n          ]\n        },\n        {\n          \"log_type\": \"DATA_WRITE\",\n        }\n      ]\n    }\n\nThis enables 'DATA_READ' and 'DATA_WRITE' logging, while exempting\njose@example.com from DATA_READ logging.",
+      "id": "AuditLogConfig",
+      "properties": {
+        "exemptedMembers": {
+          "description": "Specifies the identities that do not cause logging for this type of\npermission.\nFollows the same format of Binding.members.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logType": {
+          "description": "The log type that this config enables.",
+          "enum": [
+            "LOG_TYPE_UNSPECIFIED",
+            "ADMIN_READ",
+            "DATA_WRITE",
+            "DATA_READ"
+          ],
+          "enumDescriptions": [
+            "Default case. Should never be this.",
+            "Admin reads. Example: CloudIAM getIamPolicy",
+            "Data writes. Example: CloudSQL Users create",
+            "Data reads. Example: CloudSQL Users list"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizedDomain": {
+      "description": "A domain that a user has been authorized to administer. To authorize use\nof a domain, verify ownership via\n[Webmaster Central](https://www.google.com/webmasters/verification/home).",
+      "id": "AuthorizedDomain",
+      "properties": {
+        "id": {
+          "description": "Relative name of the domain authorized for use. Example: `example.com`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Read only. Full path to the `AuthorizedDomain` resource in the API.\nExample: `apps/myapp/authorizedDomains/example.com`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "description": "Associates `members` with a `role`.",
+      "id": "Binding",
+      "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "The condition that is associated with this binding.\nNOTE: An unsatisfied condition will not allow user access via current\nbinding. Different bindings, including their conditions, are examined\nindependently."
+        },
+        "members": {
+          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@example.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n* `deleted:user:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a user that has been recently deleted. For\n   example, `alice@example.com?uid=123456789012345678901`. If the user is\n   recovered, this value reverts to `user:{emailid}` and the recovered user\n   retains the role in the binding.\n\n* `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address (plus\n   unique identifier) representing a service account that has been recently\n   deleted. For example,\n   `my-other-app@appspot.gserviceaccount.com?uid=123456789012345678901`.\n   If the service account is undeleted, this value reverts to\n   `serviceAccount:{emailid}` and the undeleted service account retains the\n   role in the binding.\n\n* `deleted:group:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a Google group that has been recently\n   deleted. For example, `admins@example.com?uid=123456789012345678901`. If\n   the group is recovered, this value reverts to `group:{emailid}` and the\n   recovered group retains the role in the binding.\n\n\n* `domain:{domain}`: The G Suite domain (primary) that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "role": {
+          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ConfigMapEnvSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nConfigMapEnvSource selects a ConfigMap to populate the environment\nvariables with.\n\nThe contents of the target ConfigMap's Data field will represent the\nkey-value pairs as environment variables.",
+      "id": "ConfigMapEnvSource",
+      "properties": {
+        "localObjectReference": {
+          "$ref": "LocalObjectReference",
+          "description": "This field should not be used directly as it is meant to be inlined\ndirectly into the message. Use the \"name\" field instead."
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe ConfigMap to select from.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the ConfigMap must be defined",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ConfigMapKeySelector": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSelects a key from a ConfigMap.",
+      "id": "ConfigMapKeySelector",
+      "properties": {
+        "key": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe key to select.",
+          "type": "string"
+        },
+        "localObjectReference": {
+          "$ref": "LocalObjectReference",
+          "description": "This field should not be used directly as it is meant to be inlined\ndirectly into the message. Use the \"name\" field instead."
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe ConfigMap to select from.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the ConfigMap or its key must be defined",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ConfigMapVolumeSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nAdapts a ConfigMap into a volume.\nThe contents of the target ConfigMap's Data field will be presented in a\nvolume as files using the keys in the Data field as the file names, unless\nthe items element is populated with specific mappings of keys to paths.",
+      "id": "ConfigMapVolumeSource",
+      "properties": {
+        "defaultMode": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMode bits to use on created files by default. Must be a value between 0 and\n0777. Defaults to 0644. Directories within the path are not affected by\nthis setting. This might be in conflict with other options that affect the\nfile mode, like fsGroup, and the result can be other mode bits set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "items": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nIf unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional.",
+          "items": {
+            "$ref": "KeyToPath"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nName of the config.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the Secret or its keys must be defined.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Configuration": {
+      "description": "Configuration represents the \"floating HEAD\" of a linear history of\nRevisions, and optionally how the containers those revisions reference are\nbuilt. Users create new Revisions by updating the Configuration's spec. The\n\"latest created\" revision's name is available under status, as is the \"latest\nready\" revision's name. See also:\nhttps://github.com/knative/serving/blob/master/docs/spec/overview.md#configuration",
+      "id": "Configuration",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of resource, in this case always \"Configuration\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Metadata associated with this Configuration, including name, namespace,\nlabels, and annotations."
+        },
+        "spec": {
+          "$ref": "ConfigurationSpec",
+          "description": "Spec holds the desired state of the Configuration (from the client)."
+        },
+        "status": {
+          "$ref": "ConfigurationStatus",
+          "description": "Status communicates the observed state of the Configuration (from the\ncontroller)."
+        }
+      },
+      "type": "object"
+    },
+    "ConfigurationSpec": {
+      "description": "ConfigurationSpec holds the desired state of the Configuration (from the\nclient).",
+      "id": "ConfigurationSpec",
+      "properties": {
+        "template": {
+          "$ref": "RevisionTemplate",
+          "description": "Optional metadata for this Revision, including labels and annotations. Name\nwill be generated by the Configuration.\nTo set minimum instances for this revision, use the\n\"autoscaling.knative.dev/minScale\" annotation key. (Cloud Run for Anthos\nonly). To set maximum instances for this revision, use the\n\"autoscaling.knative.dev/maxScale\" annotation key.\nTo set Cloud SQL connections for the revision, use the\n\"run.googleapis.com/cloudsql-instances\" annotation key. Values should be\ncomma separated."
+        }
+      },
+      "type": "object"
+    },
+    "ConfigurationStatus": {
+      "description": "ConfigurationStatus communicates the observed state of the Configuration\n(from the controller).",
+      "id": "ConfigurationStatus",
+      "properties": {
+        "conditions": {
+          "description": "Conditions communicates information about ongoing/complete\nreconciliation processes that bring the \"spec\" inline with the observed\nstate of the world.",
+          "items": {
+            "$ref": "GoogleCloudRunV1Condition"
+          },
+          "type": "array"
+        },
+        "latestCreatedRevisionName": {
+          "description": "LatestCreatedRevisionName is the last revision that was created from this\nConfiguration. It might not be ready yet, for that use\nLatestReadyRevisionName.",
+          "type": "string"
+        },
+        "latestReadyRevisionName": {
+          "description": "LatestReadyRevisionName holds the name of the latest Revision stamped out\nfrom this Configuration that has had its \"Ready\" condition become \"True\".",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the 'Generation' of the Configuration that\nwas last processed by the controller. The observed generation is updated\neven if the controller failed to process the spec and create the Revision.\n\nClients polling for completed reconciliation should poll until\nobservedGeneration = metadata.generation, and the Ready condition's status\nis True or False.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Container": {
+      "description": "A single application container.\nThis specifies both the container to run, the command to run in the container\nand the arguments to supply to it.\nNote that additional arguments may be supplied by the system to the container\nat runtime.",
+      "id": "Container",
+      "properties": {
+        "args": {
+          "description": "(Optional)\n\nCloud Run fully managed: supported\n\nCloud Run for Anthos: supported\n\nArguments to the entrypoint.\nThe docker image's CMD is used if this is not provided.\nVariable references $(VAR_NAME) are expanded using the container's\nenvironment. If a variable cannot be resolved, the reference in the input\nstring will be unchanged. The $(VAR_NAME) syntax can be escaped with a\ndouble $$, ie: $$(VAR_NAME). Escaped references will never be expanded,\nregardless of whether the variable exists or not.\nMore info:\nhttps://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "env": {
+          "description": "(Optional)\n\nCloud Run fully managed: supported\n\nCloud Run for Anthos: supported\n\nList of environment variables to set in the container.",
+          "items": {
+            "$ref": "EnvVar"
+          },
+          "type": "array"
+        },
+        "envFrom": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nList of sources to populate environment variables in the container.\nThe keys defined within a source must be a C_IDENTIFIER. All invalid keys\nwill be reported as an event when the container is starting. When a key\nexists in multiple sources, the value associated with the last source will\ntake precedence. Values defined by an Env with a duplicate key will take\nprecedence. Cannot be updated.",
+          "items": {
+            "$ref": "EnvFromSource"
+          },
+          "type": "array"
+        },
+        "image": {
+          "description": "Cloud Run fully managed: only supports containers from Google Container\nRegistry\n\nCloud Run for Anthos: supported\n\nURL of the Container image.\nMore info: https://kubernetes.io/docs/concepts/containers/images",
+          "type": "string"
+        },
+        "imagePullPolicy": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nImage pull policy.\nOne of Always, Never, IfNotPresent.\nDefaults to Always if :latest tag is specified, or IfNotPresent otherwise.\nMore info:\nhttps://kubernetes.io/docs/concepts/containers/images#updating-images",
+          "type": "string"
+        },
+        "livenessProbe": {
+          "$ref": "Probe",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPeriodic probe of container liveness.\nContainer will be restarted if the probe fails.\nMore info:\nhttps://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+        },
+        "name": {
+          "description": "(Optional)\n\nName of the container specified as a DNS_LABEL.",
+          "type": "string"
+        },
+        "ports": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nList of ports to expose from the container. Exposing a port here gives\nthe system additional information about the network connections a\ncontainer uses, but is primarily informational. Not specifying a port here\nDOES NOT prevent that port from being exposed. Any port which is\nlistening on the default \"0.0.0.0\" address inside a container will be\naccessible from the network.",
+          "items": {
+            "$ref": "ContainerPort"
+          },
+          "type": "array"
+        },
+        "readinessProbe": {
+          "$ref": "Probe",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPeriodic probe of container service readiness.\nContainer will be removed from service endpoints if the probe fails.\nMore info:\nhttps://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+        },
+        "resources": {
+          "$ref": "ResourceRequirements",
+          "description": "(Optional)\n\nCloud Run fully managed: supported\n\nCloud Run for Anthos: supported\n\nCompute Resources required by this container.\nMore info:\nhttps://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
+        },
+        "securityContext": {
+          "$ref": "SecurityContext",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSecurity options the pod should run with.\nMore info: https://kubernetes.io/docs/concepts/policy/security-context/\nMore info:\nhttps://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+        },
+        "terminationMessagePath": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPath at which the file to which the container's termination\nmessage will be written is mounted into the container's filesystem. Message\nwritten is intended to be brief final status, such as an assertion failure\nmessage. Will be truncated by the node if greater than 4096 bytes. The\ntotal message length across all containers will be limited to 12kb.\nDefaults to /dev/termination-log.",
+          "type": "string"
+        },
+        "terminationMessagePolicy": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nIndicate how the termination message should be populated. File will use the\ncontents of terminationMessagePath to populate the container status message\non both success and failure. FallbackToLogsOnError will use the last chunk\nof container log output if the termination message file is empty and the\ncontainer exited with an error. The log output is limited to 2048 bytes or\n80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
+          "type": "string"
+        },
+        "volumeMounts": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPod volumes to mount into the container's filesystem.",
+          "items": {
+            "$ref": "VolumeMount"
+          },
+          "type": "array"
+        },
+        "workingDir": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nContainer's working directory.\nIf not specified, the container runtime's default will be used, which\nmight be configured in the container image.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ContainerPort": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nContainerPort represents a network port in a single container.",
+      "id": "ContainerPort",
+      "properties": {
+        "containerPort": {
+          "description": "(Optional)\n\nCloud Run fully managed: supported\n\nCloud Run for Anthos: supported\n\nPort number the container listens on.\nThis must be a valid port number, 0 \u003c x \u003c 65536.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "name": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nIf specified, used to specify which protocol to use.\nAllowed values are \"http1\" and \"h2c\".",
+          "type": "string"
+        },
+        "protocol": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nProtocol for port. Must be TCP.\nDefaults to \"TCP\".",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DomainMapping": {
+      "description": "Resource to hold the state and status of a user's domain mapping.",
+      "id": "DomainMapping",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"domains.cloudrun.com/v1\".",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of resource, in this case \"DomainMapping\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Metadata associated with this BuildTemplate."
+        },
+        "spec": {
+          "$ref": "DomainMappingSpec",
+          "description": "The spec for this DomainMapping."
+        },
+        "status": {
+          "$ref": "DomainMappingStatus",
+          "description": "The current status of the DomainMapping."
+        }
+      },
+      "type": "object"
+    },
+    "DomainMappingSpec": {
+      "description": "The desired state of the Domain Mapping.",
+      "id": "DomainMappingSpec",
+      "properties": {
+        "certificateMode": {
+          "description": "The mode of the certificate.",
+          "enum": [
+            "CERTIFICATE_MODE_UNSPECIFIED",
+            "NONE",
+            "AUTOMATIC"
+          ],
+          "enumDescriptions": [
+            "",
+            "Do not provision an HTTPS certificate.",
+            "Automatically provisions an HTTPS certificate via LetsEncrypt."
+          ],
+          "type": "string"
+        },
+        "forceOverride": {
+          "description": "If set, the mapping will override any mapping set before this spec was set.\nIt is recommended that the user leaves this empty to receive an error\nwarning about a potential conflict and only set it once the respective UI\nhas given such a warning.",
+          "type": "boolean"
+        },
+        "routeName": {
+          "description": "The name of the Knative Route that this DomainMapping applies to.\nThe route must exist.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DomainMappingStatus": {
+      "description": "The current state of the Domain Mapping.",
+      "id": "DomainMappingStatus",
+      "properties": {
+        "conditions": {
+          "description": "Array of observed DomainMappingConditions, indicating the current state\nof the DomainMapping.",
+          "items": {
+            "$ref": "GoogleCloudRunV1Condition"
+          },
+          "type": "array"
+        },
+        "mappedRouteName": {
+          "description": "The name of the route that the mapping currently points to.",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the 'Generation' of the DomainMapping that\nwas last processed by the controller.\n\nClients polling for completed reconciliation should poll until\nobservedGeneration = metadata.generation and the Ready condition's status\nis True or False.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "resourceRecords": {
+          "description": "The resource records required to configure this domain mapping. These\nrecords must be added to the domain's DNS configuration in order to\nserve the application via this domain mapping.",
+          "items": {
+            "$ref": "ResourceRecord"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "EnvFromSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nEnvFromSource represents the source of a set of ConfigMaps",
+      "id": "EnvFromSource",
+      "properties": {
+        "configMapRef": {
+          "$ref": "ConfigMapEnvSource",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe ConfigMap to select from"
+        },
+        "prefix": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nAn optional identifier to prepend to each key in the ConfigMap. Must be a\nC_IDENTIFIER.",
+          "type": "string"
+        },
+        "secretRef": {
+          "$ref": "SecretEnvSource",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe Secret to select from"
+        }
+      },
+      "type": "object"
+    },
+    "EnvVar": {
+      "description": "EnvVar represents an environment variable present in a Container.",
+      "id": "EnvVar",
+      "properties": {
+        "name": {
+          "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+          "type": "string"
+        },
+        "value": {
+          "description": "(Optional)\n\nVariable references $(VAR_NAME) are expanded\nusing the previous defined environment variables in the container and\nany route environment variables. If a variable cannot be resolved,\nthe reference in the input string will be unchanged. The $(VAR_NAME)\nsyntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped\nreferences will never be expanded, regardless of whether the variable\nexists or not.\nDefaults to \"\".",
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "EnvVarSource",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSource for the environment variable's value. Cannot be used if value is not\nempty."
+        }
+      },
+      "type": "object"
+    },
+    "EnvVarSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nEnvVarSource represents a source for the value of an EnvVar.",
+      "id": "EnvVarSource",
+      "properties": {
+        "configMapKeyRef": {
+          "$ref": "ConfigMapKeySelector",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSelects a key of a ConfigMap."
+        },
+        "secretKeyRef": {
+          "$ref": "SecretKeySelector",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSelects a key of a secret in the pod's namespace"
+        }
+      },
+      "type": "object"
+    },
+    "ExecAction": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nExecAction describes a \"run in container\" action.",
+      "id": "ExecAction",
+      "properties": {
+        "command": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nCommand is the command line to execute inside the container, the working\ndirectory for the command  is root ('/') in the container's filesystem. The\ncommand is simply exec'd, it is not run inside a shell, so traditional\nshell instructions ('|', etc) won't work. To use a shell, you need to\nexplicitly call out to that shell. Exit status of 0 is treated as\nlive/healthy and non-zero is unhealthy.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information.",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudRunV1Condition": {
+      "description": "Condition defines a generic condition for a Resource",
+      "id": "GoogleCloudRunV1Condition",
+      "properties": {
+        "lastTransitionTime": {
+          "description": "Optional. Last time the condition transitioned from one status to another.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "message": {
+          "description": "Optional. Human readable message indicating details about the current status.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Optional. One-word CamelCase reason for the condition's last transition.",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Optional. How to interpret failures of this condition, one of Error, Warning, Info",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the condition, one of True, False, Unknown.",
+          "type": "string"
+        },
+        "type": {
+          "description": "type is used to communicate the status of the reconciliation process.\nSee also:\nhttps://github.com/knative/serving/blob/master/docs/spec/errors.md#error-conditions-and-reporting\nTypes common to all resources include:\n* \"Ready\": True when the Resource is ready.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HTTPGetAction": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHTTPGetAction describes an action based on HTTP Get requests.",
+      "id": "HTTPGetAction",
+      "properties": {
+        "host": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHost name to connect to, defaults to the pod IP. You probably want to set\n\"Host\" in httpHeaders instead.",
+          "type": "string"
+        },
+        "httpHeaders": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nCustom headers to set in the request. HTTP allows repeated headers.",
+          "items": {
+            "$ref": "HTTPHeader"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPath to access on the HTTP server.",
+          "type": "string"
+        },
+        "scheme": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nScheme to use for connecting to the host.\nDefaults to HTTP.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HTTPHeader": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHTTPHeader describes a custom header to be used in HTTP probes",
+      "id": "HTTPHeader",
+      "properties": {
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe header field name",
+          "type": "string"
+        },
+        "value": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe header field value",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Handler": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHandler defines a specific action that should be taken",
+      "id": "Handler",
+      "properties": {
+        "exec": {
+          "$ref": "ExecAction",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nOne and only one of the following should be specified.\nExec specifies the action to take."
+        },
+        "httpGet": {
+          "$ref": "HTTPGetAction",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHTTPGet specifies the http request to perform."
+        },
+        "tcpSocket": {
+          "$ref": "TCPSocketAction",
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nTCPSocket specifies an action involving a TCP port.\nTCP hooks not yet supported"
+        }
+      },
+      "type": "object"
+    },
+    "IntOrString": {
+      "description": "IntOrString is a type that can hold an int32 or a string.  When used in\nJSON or YAML marshalling and unmarshalling, it produces or consumes the\ninner type.  This allows you to have, for example, a JSON field that can\naccept a name or number.",
+      "id": "IntOrString",
+      "properties": {
+        "intVal": {
+          "description": "The int value.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "strVal": {
+          "description": "The string value.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The type of the value.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "KeyToPath": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMaps a string key to a path within a volume.",
+      "id": "KeyToPath",
+      "properties": {
+        "key": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe key to project.",
+          "type": "string"
+        },
+        "mode": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMode bits to use on this file, must be a value between 0 and 0777. If not\nspecified, the volume defaultMode will be used. This might be in conflict\nwith other options that affect the file mode, like fsGroup, and the result\ncan be other mode bits set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "path": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListAuthorizedDomainsResponse": {
+      "description": "A list of Authorized Domains.",
+      "id": "ListAuthorizedDomainsResponse",
+      "properties": {
+        "domains": {
+          "description": "The authorized domains belonging to the user.",
+          "items": {
+            "$ref": "AuthorizedDomain"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "Continuation token for fetching the next page of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListConfigurationsResponse": {
+      "description": "ListConfigurationsResponse is a list of Configuration resources.",
+      "id": "ListConfigurationsResponse",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of Configurations.",
+          "items": {
+            "$ref": "Configuration"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case \"ConfigurationList\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Metadata associated with this Configuration list."
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListDomainMappingsResponse": {
+      "description": "ListDomainMappingsResponse is a list of DomainMapping resources.",
+      "id": "ListDomainMappingsResponse",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"domains.cloudrun.com/v1\".",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of DomainMappings.",
+          "items": {
+            "$ref": "DomainMapping"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case \"DomainMappingList\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Metadata associated with this DomainMapping list."
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListLocationsResponse": {
+      "description": "The response message for Locations.ListLocations.",
+      "id": "ListLocationsResponse",
+      "properties": {
+        "locations": {
+          "description": "A list of locations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Location"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListMeta": {
+      "description": "ListMeta describes metadata that synthetic resources must have, including\nlists and various status objects. A resource may have only one of\n{ObjectMeta, ListMeta}.",
+      "id": "ListMeta",
+      "properties": {
+        "continue": {
+          "description": "continue may be set if the user set a limit on the number of items\nreturned, and indicates that the server has more data available. The value\nis opaque and may be used to issue another request to the endpoint that\nserved this list to retrieve the next set of available objects. Continuing\na list may not be possible if the server configuration has changed or more\nthan a few minutes have passed. The resourceVersion field returned when\nusing this continue value will be identical to the value in the first\nresponse.",
+          "type": "string"
+        },
+        "resourceVersion": {
+          "description": "String that identifies the server's internal version of this object that\ncan be used by clients to determine when objects have changed. Value must\nbe treated as opaque by clients and passed unmodified back to the server.\nPopulated by the system.\nRead-only.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency\n+optional",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "SelfLink is a URL representing this object.\nPopulated by the system.\nRead-only.\n+optional",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListRevisionsResponse": {
+      "description": "ListRevisionsResponse is a list of Revision resources.",
+      "id": "ListRevisionsResponse",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of Revisions.",
+          "items": {
+            "$ref": "Revision"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case \"RevisionList\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Metadata associated with this revision list."
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListRoutesResponse": {
+      "description": "ListRoutesResponse is a list of Route resources.",
+      "id": "ListRoutesResponse",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of Routes.",
+          "items": {
+            "$ref": "Route"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case always \"RouteList\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Metadata associated with this Route list."
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListServicesResponse": {
+      "description": "A list of Service resources.",
+      "id": "ListServicesResponse",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of Services.",
+          "items": {
+            "$ref": "Service"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case \"ServiceList\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Metadata associated with this Service list."
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "LocalObjectReference": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nLocalObjectReference contains enough information to let you locate the\nreferenced object inside the same namespace.",
+      "id": "LocalObjectReference",
+      "properties": {
+        "name": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nName of the referent.\nMore info:\nhttps://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Location": {
+      "description": "A resource that represents Google Cloud Platform location.",
+      "id": "Location",
+      "properties": {
+        "displayName": {
+          "description": "The friendly name for this location, typically a nearby city name.\nFor example, \"Tokyo\".",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Cross-service attributes for the location. For example\n\n    {\"cloud.googleapis.com/region\": \"us-east1\"}",
+          "type": "object"
+        },
+        "locationId": {
+          "description": "The canonical id for this location. For example: `\"us-east1\"`.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata. For example the available capacity at the given\nlocation.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Resource name for the location, which may vary between implementations.\nFor example: `\"projects/example-project/locations/us-east1\"`",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ObjectMeta": {
+      "description": "k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta is metadata that all\npersisted resources must have, which includes all objects users must create.",
+      "id": "ObjectMeta",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "(Optional)\n\nAnnotations is an unstructured key value map stored with a resource that\nmay be set by external tools to store and retrieve arbitrary metadata. They\nare not queryable and should be preserved when modifying objects. More\ninfo: http://kubernetes.io/docs/user-guide/annotations",
+          "type": "object"
+        },
+        "clusterName": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe name of the cluster which the object belongs to.\nThis is used to distinguish resources with same name and namespace in\ndifferent clusters. This field is not set anywhere right now and apiserver\nis going to ignore it if set in create or update request.",
+          "type": "string"
+        },
+        "creationTimestamp": {
+          "description": "(Optional)\n\nCreationTimestamp is a timestamp representing the server time when this\nobject was created. It is not guaranteed to be set in happens-before order\nacross separate operations. Clients may not set this value. It is\nrepresented in RFC3339 form and is in UTC.\n\nPopulated by the system.\nRead-only.\nNull for lists.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "deletionGracePeriodSeconds": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nNumber of seconds allowed for this object to gracefully terminate before\nit will be removed from the system. Only set when deletionTimestamp is also\nset. May only be shortened. Read-only.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "deletionTimestamp": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nDeletionTimestamp is RFC 3339 date and time at which this resource will be\ndeleted. This field is set by the server when a graceful deletion is\nrequested by the user, and is not directly settable by a client. The\nresource is expected to be deleted (no longer visible from resource lists,\nand not reachable by name) after the time in this field, once the\nfinalizers list is empty. As long as the finalizers list contains items,\ndeletion is blocked. Once the deletionTimestamp is set, this value may not\nbe unset or be set further into the future, although it may be shortened or\nthe resource may be deleted prior to this time. For example, a user may\nrequest that a pod is deleted in 30 seconds. The Kubelet will react by\nsending a graceful termination signal to the containers in the pod. After\nthat 30 seconds, the Kubelet will send a hard termination signal (SIGKILL)\nto the container and after cleanup, remove the pod from the API. In the\npresence of network partitions, this object may still exist after this\ntimestamp, until an administrator or automated process can determine the\nresource is fully terminated.\nIf not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested.\nRead-only.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "finalizers": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMust be empty before the object is deleted from the registry. Each entry\nis an identifier for the responsible component that will remove the entry\nfrom the list. If the deletionTimestamp of the object is non-nil, entries\nin this list can only be removed.\n+patchStrategy=merge",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "generateName": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nGenerateName is an optional prefix, used by the server, to generate a\nunique name ONLY IF the Name field has not been provided. If this field is\nused, the name returned to the client will be different than the name\npassed. This value will also be combined with a unique suffix. The provided\nvalue has the same validation rules as the Name field, and may be truncated\nby the length of the suffix required to make the value unique on the\nserver.\n\nIf this field is specified and the generated name exists, the server will\nNOT return a 409 - instead, it will either return 201 Created or 500 with\nReason ServerTimeout indicating a unique name could not be found in the\ntime allotted, and the client should retry (optionally after the time\nindicated in the Retry-After header).\n\nApplied only if Name is not specified.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency\n string generateName = 2;",
+          "type": "string"
+        },
+        "generation": {
+          "description": "(Optional)\n\nA sequence number representing a specific generation of the desired state.\nPopulated by the system. Read-only.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "(Optional)\n\nMap of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand routes.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+          "type": "object"
+        },
+        "name": {
+          "description": "Name must be unique within a namespace, within a Cloud Run region.\nIs required when creating\nresources, although some resources may allow a client to request the\ngeneration of an appropriate name automatically. Name is primarily intended\nfor creation idempotence and configuration definition. Cannot be updated.\nMore info: http://kubernetes.io/docs/user-guide/identifiers#names\n+optional",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace defines the space within each name must be unique, within a\nCloud Run region. In Cloud Run the namespace must be equal to either the\nproject ID or project number.",
+          "type": "string"
+        },
+        "ownerReferences": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nList of objects that own this object. If ALL objects in the list have\nbeen deleted, this object will be garbage collected.",
+          "items": {
+            "$ref": "OwnerReference"
+          },
+          "type": "array"
+        },
+        "resourceVersion": {
+          "description": "(Optional)\n\nAn opaque value that represents the internal version of this object that\ncan be used by clients to determine when objects have changed. May be used\nfor optimistic concurrency, change detection, and the watch operation on a\nresource or set of resources. Clients must treat these values as opaque and\npassed unmodified back to the server. They may only be valid for a\nparticular resource or set of resources.\n\nPopulated by the system.\nRead-only.\nValue must be treated as opaque by clients and .\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "(Optional)\n\nSelfLink is a URL representing this object.\nPopulated by the system.\nRead-only.\n string selfLink = 4;",
+          "type": "string"
+        },
+        "uid": {
+          "description": "(Optional)\n\nUID is the unique in time and space value for this object. It is typically\ngenerated by the server on successful creation of a resource and is not\nallowed to change on PUT operations.\n\nPopulated by the system.\nRead-only.\nMore info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "OwnerReference": {
+      "description": "OwnerReference contains enough information to let you identify an owning\nobject. Currently, an owning object must be in the same namespace, so there\nis no namespace field.",
+      "id": "OwnerReference",
+      "properties": {
+        "apiVersion": {
+          "description": "API version of the referent.",
+          "type": "string"
+        },
+        "blockOwnerDeletion": {
+          "description": "If true, AND if the owner has the \"foregroundDeletion\" finalizer, then\nthe owner cannot be deleted from the key-value store until this\nreference is removed.\nDefaults to false.\nTo set this field, a user needs \"delete\" permission of the owner,\notherwise 422 (Unprocessable Entity) will be returned.\n+optional",
+          "type": "boolean"
+        },
+        "controller": {
+          "description": "If true, this reference points to the managing controller.\n+optional",
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "Kind of the referent.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the referent.\nMore info: http://kubernetes.io/docs/user-guide/identifiers#names",
+          "type": "string"
+        },
+        "uid": {
+          "description": "UID of the referent.\nMore info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Policy": {
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Google Cloud resources.\n\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members` to a single `role`. Members can be user accounts, service accounts,\nGoogle groups, and domains (such as G Suite). A `role` is a named list of\npermissions; each `role` can be an IAM predefined role or a user-created\ncustom role.\n\nOptionally, a `binding` can specify a `condition`, which is a logical\nexpression that allows access to a resource only if the expression evaluates\nto `true`. A condition can add constraints based on attributes of the\nrequest, the resource, or both.\n\n**JSON example:**\n\n    {\n      \"bindings\": [\n        {\n          \"role\": \"roles/resourcemanager.organizationAdmin\",\n          \"members\": [\n            \"user:mike@example.com\",\n            \"group:admins@example.com\",\n            \"domain:google.com\",\n            \"serviceAccount:my-project-id@appspot.gserviceaccount.com\"\n          ]\n        },\n        {\n          \"role\": \"roles/resourcemanager.organizationViewer\",\n          \"members\": [\"user:eve@example.com\"],\n          \"condition\": {\n            \"title\": \"expirable access\",\n            \"description\": \"Does not grant access after Sep 2020\",\n            \"expression\": \"request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\",\n          }\n        }\n      ],\n      \"etag\": \"BwWWja0YfJA=\",\n      \"version\": 3\n    }\n\n**YAML example:**\n\n    bindings:\n    - members:\n      - user:mike@example.com\n      - group:admins@example.com\n      - domain:google.com\n      - serviceAccount:my-project-id@appspot.gserviceaccount.com\n      role: roles/resourcemanager.organizationAdmin\n    - members:\n      - user:eve@example.com\n      role: roles/resourcemanager.organizationViewer\n      condition:\n        title: expirable access\n        description: Does not grant access after Sep 2020\n        expression: request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\n    - etag: BwWWja0YfJA=\n    - version: 3\n\nFor a description of IAM and its features, see the\n[IAM documentation](https://cloud.google.com/iam/docs/).",
+      "id": "Policy",
+      "properties": {
+        "auditConfigs": {
+          "description": "Specifies cloud audit logging configuration for this policy.",
+          "items": {
+            "$ref": "AuditConfig"
+          },
+          "type": "array"
+        },
+        "bindings": {
+          "description": "Associates a list of `members` to a `role`. Optionally, may specify a\n`condition` that determines how and when the `bindings` are applied. Each\nof the `bindings` must contain at least one member.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy.\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.",
+          "format": "byte",
+          "type": "string"
+        },
+        "version": {
+          "description": "Specifies the format of the policy.\n\nValid values are `0`, `1`, and `3`. Requests that specify an invalid value\nare rejected.\n\nAny operation that affects conditional role bindings must specify version\n`3`. This requirement applies to the following operations:\n\n* Getting a policy that includes a conditional role binding\n* Adding a conditional role binding to a policy\n* Changing a conditional role binding in a policy\n* Removing any role binding, with or without a condition, from a policy\n  that includes conditions\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.\n\nIf a policy does not include any conditions, operations on that policy may\nspecify any valid version or leave the field unset.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Probe": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nProbe describes a health check to be performed against a container to\ndetermine whether it is alive or ready to receive traffic.",
+      "id": "Probe",
+      "properties": {
+        "failureThreshold": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMinimum consecutive failures for the probe to be considered failed after\nhaving succeeded. Defaults to 3. Minimum value is 1.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "handler": {
+          "$ref": "Handler",
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe action taken to determine the health of a container"
+        },
+        "initialDelaySeconds": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nNumber of seconds after the container has started before liveness probes\nare initiated. More info:\nhttps://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "format": "int32",
+          "type": "integer"
+        },
+        "periodSeconds": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nHow often (in seconds) to perform the probe.\nDefault to 10 seconds. Minimum value is 1.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "successThreshold": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMinimum consecutive successes for the probe to be considered successful\nafter having failed. Defaults to 1. Must be 1 for liveness. Minimum value\nis 1.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nNumber of seconds after which the probe times out.\nDefaults to 1 second. Minimum value is 1.\nMore info:\nhttps://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceRecord": {
+      "description": "A DNS resource record.",
+      "id": "ResourceRecord",
+      "properties": {
+        "name": {
+          "description": "Relative name of the object affected by this record. Only applicable for\n`CNAME` records. Example: 'www'.",
+          "type": "string"
+        },
+        "rrdata": {
+          "description": "Data for this record. Values vary by record type, as defined in RFC 1035\n(section 5) and RFC 1034 (section 3.6.1).",
+          "type": "string"
+        },
+        "type": {
+          "description": "Resource record type. Example: `AAAA`.",
+          "enum": [
+            "RECORD_TYPE_UNSPECIFIED",
+            "A",
+            "AAAA",
+            "CNAME"
+          ],
+          "enumDescriptions": [
+            "An unknown resource record.",
+            "An A resource record. Data is an IPv4 address.",
+            "An AAAA resource record. Data is an IPv6 address.",
+            "A CNAME resource record. Data is a domain name to be aliased."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceRequirements": {
+      "description": "ResourceRequirements describes the compute resource requirements.",
+      "id": "ResourceRequirements",
+      "properties": {
+        "limits": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "(Optional)\n\nCloud Run fully managed: Only memory and CPU are supported. Note: The only\nsupported value for CPU is '1'.\n\nCloud Run for Anthos: supported\n\nLimits describes the maximum amount of compute resources allowed.\nThe values of the map is string form of the 'quantity' k8s type:\nhttps://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/resource/quantity.go",
+          "type": "object"
+        },
+        "requests": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "(Optional)\n\nCloud Run fully managed: Only memory and CPU are supported. Note: The only\nsupported value for CPU is '1'.\n\nCloud Run for Anthos: supported\n\nRequests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is\nexplicitly specified, otherwise to an implementation-defined value.\nThe values of the map is string form of the 'quantity' k8s type:\nhttps://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/resource/quantity.go",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Revision": {
+      "description": "Revision is an immutable snapshot of code and configuration.  A revision\nreferences a container image. Revisions are created by updates to a\nConfiguration.\n\nSee also:\nhttps://github.com/knative/serving/blob/master/docs/spec/overview.md#revision",
+      "id": "Revision",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case \"Revision\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Metadata associated with this Revision, including name, namespace, labels,\nand annotations."
+        },
+        "spec": {
+          "$ref": "RevisionSpec",
+          "description": "Spec holds the desired state of the Revision (from the client)."
+        },
+        "status": {
+          "$ref": "RevisionStatus",
+          "description": "Status communicates the observed state of the Revision (from the\ncontroller)."
+        }
+      },
+      "type": "object"
+    },
+    "RevisionSpec": {
+      "description": "RevisionSpec holds the desired state of the Revision (from the client).",
+      "id": "RevisionSpec",
+      "properties": {
+        "containerConcurrency": {
+          "description": "(Optional)\n\nContainerConcurrency specifies the maximum allowed in-flight (concurrent)\nrequests per container instance of the Revision.\n\nCloud Run fully managed: supported, defaults to 80\n\nCloud Run for Anthos: supported, defaults to 0, which means concurrency\nto the application is not limited, and the system decides the\ntarget concurrency for the autoscaler.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "containers": {
+          "description": "Containers holds the single container that defines the unit of execution\nfor this Revision. In the context of a Revision, we disallow a number of\nfields on this Container, including: name and lifecycle.\nIn Cloud Run, only a single container may be provided.\nThe runtime contract is documented here:\nhttps://github.com/knative/serving/blob/master/docs/runtime-contract.md",
+          "items": {
+            "$ref": "Container"
+          },
+          "type": "array"
+        },
+        "serviceAccountName": {
+          "description": "Email address of the IAM service account associated with the revision\nof the service. The service account represents the identity of the\nrunning revision, and determines what permissions the revision has. If\nnot provided, the revision will use the project's default service account.",
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "description": "TimeoutSeconds holds the max duration the instance is allowed for\nresponding to a request.\nNot currently used by Cloud Run.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "Volume"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "RevisionStatus": {
+      "description": "RevisionStatus communicates the observed state of the Revision (from the\ncontroller).",
+      "id": "RevisionStatus",
+      "properties": {
+        "conditions": {
+          "description": "Conditions communicates information about ongoing/complete\nreconciliation processes that bring the \"spec\" inline with the observed\nstate of the world.\n\nAs a Revision is being prepared, it will incrementally\nupdate conditions. Revision-specific conditions include:\n* \"ResourcesAvailable\": True when underlying resources have been\n   provisioned.\n* \"ContainerHealthy\": True when the Revision readiness check completes.\n* \"Active\": True when the Revision may receive traffic.",
+          "items": {
+            "$ref": "GoogleCloudRunV1Condition"
+          },
+          "type": "array"
+        },
+        "imageDigest": {
+          "description": "ImageDigest holds the resolved digest for the image specified\nwithin .Spec.Container.Image. The digest is resolved during the creation\nof Revision. This field holds the digest value regardless of whether\na tag or digest was originally specified in the Container object.",
+          "type": "string"
+        },
+        "logUrl": {
+          "description": "Specifies the generated logging url for this particular revision\nbased on the revision url template specified in the controller's config.\n+optional",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the 'Generation' of the Revision that\nwas last processed by the controller.\n\nClients polling for completed reconciliation should poll until\nobservedGeneration = metadata.generation, and the Ready condition's status\nis True or False.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "serviceName": {
+          "description": "Not currently used by Cloud Run.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RevisionTemplate": {
+      "description": "RevisionTemplateSpec describes the data a revision should have when created\nfrom a template. Based on:\nhttps://github.com/kubernetes/api/blob/e771f807/core/v1/types.go#L3179-L3190",
+      "id": "RevisionTemplate",
+      "properties": {
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Optional metadata for this Revision, including labels and annotations. Name\nwill be generated by the Configuration.\nTo set minimum instances for this revision, use the\n\"autoscaling.knative.dev/minScale\" annotation key.\nTo set maximum instances for this revision, use the\n\"autoscaling.knative.dev/maxScale\" annotation key.\nTo set Cloud SQL connections for the revision, use the\n\"run.googleapis.com/cloudsql-instances\" annotation key."
+        },
+        "spec": {
+          "$ref": "RevisionSpec",
+          "description": "RevisionSpec holds the desired state of the Revision (from the client)."
+        }
+      },
+      "type": "object"
+    },
+    "Route": {
+      "description": "Route is responsible for configuring ingress over a collection of Revisions.\nSome of the Revisions a Route distributes traffic over may be specified by\nreferencing the Configuration responsible for creating them; in these cases\nthe Route is additionally responsible for monitoring the Configuration for\n\"latest ready\" revision changes, and smoothly rolling out latest revisions.\nSee also:\nhttps://github.com/knative/serving/blob/master/docs/spec/overview.md#route\n\nCloud Run currently supports referencing a single Configuration to\nautomatically deploy the \"latest ready\" Revision from that Configuration.",
+      "id": "Route",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of this resource, in this case always \"Route\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Metadata associated with this Route, including name, namespace, labels,\nand annotations."
+        },
+        "spec": {
+          "$ref": "RouteSpec",
+          "description": "Spec holds the desired state of the Route (from the client)."
+        },
+        "status": {
+          "$ref": "RouteStatus",
+          "description": "Status communicates the observed state of the Route (from the controller)."
+        }
+      },
+      "type": "object"
+    },
+    "RouteSpec": {
+      "description": "RouteSpec holds the desired state of the Route (from the client).",
+      "id": "RouteSpec",
+      "properties": {
+        "traffic": {
+          "description": "Traffic specifies how to distribute traffic over a collection of Knative\nRevisions and Configurations.\nCloud Run currently supports a single configurationName.",
+          "items": {
+            "$ref": "TrafficTarget"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "RouteStatus": {
+      "description": "RouteStatus communicates the observed state of the Route (from the\ncontroller).",
+      "id": "RouteStatus",
+      "properties": {
+        "address": {
+          "$ref": "Addressable",
+          "description": "Similar to url, information on where the service is available on HTTP."
+        },
+        "conditions": {
+          "description": "Conditions communicates information about ongoing/complete\nreconciliation processes that bring the \"spec\" inline with the observed\nstate of the world.",
+          "items": {
+            "$ref": "GoogleCloudRunV1Condition"
+          },
+          "type": "array"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the 'Generation' of the Route that\nwas last processed by the controller.\n\nClients polling for completed reconciliation should poll until\nobservedGeneration = metadata.generation and the Ready condition's status\nis True or False.\n\nNote that providing a trafficTarget that only has a configurationName will\nresult in a Route that does not increment either its metadata.generation or\nits observedGeneration, as new \"latest ready\" revisions from the\nConfiguration are processed without an update to the Route's spec.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "traffic": {
+          "description": "Traffic holds the configured traffic distribution.\nThese entries will always contain RevisionName references.\nWhen ConfigurationName appears in the spec, this will hold the\nLatestReadyRevisionName that we last observed.",
+          "items": {
+            "$ref": "TrafficTarget"
+          },
+          "type": "array"
+        },
+        "url": {
+          "description": "URL holds the url that will distribute traffic over the provided traffic\ntargets. It generally has the form:\nhttps://{route-hash}-{project-hash}-{cluster-level-suffix}.a.run.app",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Secret": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run on GKE: supported\n\nSecret holds secret data of a certain type. The total bytes of the values in\nthe Data field must be less than MaxSecretSize bytes.",
+      "id": "Secret",
+      "properties": {
+        "data": {
+          "additionalProperties": {
+            "format": "byte",
+            "type": "string"
+          },
+          "description": "Data contains the secret data. Each key must consist of alphanumeric\ncharacters, '-', '_' or '.'. The serialized form of the secret data is a\nbase64 encoded string, representing the arbitrary (possibly non-string)\ndata value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
+          "type": "object"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Standard object's metadata.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
+        },
+        "stringData": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "stringData allows specifying non-binary secret data in string form.\nIt is provided as a write-only convenience method.\nAll keys and values are merged into the data field on write, overwriting\nany existing values. It is never output when reading from the API.\n+k8s:conversion-gen=false",
+          "type": "object"
+        },
+        "type": {
+          "description": "Used to facilitate programmatic handling of secret data.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SecretEnvSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSecretEnvSource selects a Secret to populate the environment\nvariables with.\n\nThe contents of the target Secret's Data field will represent the\nkey-value pairs as environment variables.",
+      "id": "SecretEnvSource",
+      "properties": {
+        "localObjectReference": {
+          "$ref": "LocalObjectReference",
+          "description": "This field should not be used directly as it is meant to be inlined\ndirectly into the message. Use the \"name\" field instead."
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe Secret to select from.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the Secret must be defined",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "SecretKeySelector": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSecretKeySelector selects a key of a Secret.",
+      "id": "SecretKeySelector",
+      "properties": {
+        "key": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe key of the secret to select from.  Must be a valid secret key.",
+          "type": "string"
+        },
+        "localObjectReference": {
+          "$ref": "LocalObjectReference",
+          "description": "This field should not be used directly as it is meant to be inlined\ndirectly into the message. Use the \"name\" field instead."
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe name of the secret in the pod's namespace to select from.",
+          "type": "string"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the Secret or its key must be defined",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "SecretVolumeSource": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe contents of the target Secret's Data field will be presented in a volume\nas files using the keys in the Data field as the file names.",
+      "id": "SecretVolumeSource",
+      "properties": {
+        "defaultMode": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nMode bits to use on created files by default. Must be a value between 0 and\n0777. Defaults to 0644. Directories within the path are not affected by\nthis setting. This might be in conflict with other options that affect the\nfile mode, like fsGroup, and the result can be other mode bits set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "items": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nIf unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional.",
+          "items": {
+            "$ref": "KeyToPath"
+          },
+          "type": "array"
+        },
+        "optional": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSpecify whether the Secret or its keys must be defined.",
+          "type": "boolean"
+        },
+        "secretName": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nName of the secret in the container's namespace to use.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SecurityContext": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nSecurityContext holds security configuration that will be applied to a\ncontainer. Some fields are present in both SecurityContext and\nPodSecurityContext.  When both are set, the values in SecurityContext take\nprecedence.",
+      "id": "SecurityContext",
+      "properties": {
+        "runAsUser": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThe UID to run the entrypoint of the container process.\nDefaults to user specified in image metadata if unspecified.\nMay also be set in PodSecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes\nprecedence.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Service": {
+      "description": "Service acts as a top-level container that manages a set of Routes and\nConfigurations which implement a network service. Service exists to provide a\nsingular abstraction which can be access controlled, reasoned about, and\nwhich encapsulates software lifecycle decisions such as rollout policy and\nteam resource ownership. Service acts only as an orchestrator of the\nunderlying Routes and Configurations (much as a kubernetes Deployment\norchestrates ReplicaSets).\n\nThe Service's controller will track the statuses of its owned Configuration\nand Route, reflecting their statuses and conditions as its own.\n\nSee also:\nhttps://github.com/knative/serving/blob/master/docs/spec/overview.md#service",
+      "id": "Service",
+      "properties": {
+        "apiVersion": {
+          "description": "The API version for this call such as \"serving.knative.dev/v1\".",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of resource, in this case \"Service\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ObjectMeta",
+          "description": "Metadata associated with this Service, including name, namespace, labels,\nand annotations."
+        },
+        "spec": {
+          "$ref": "ServiceSpec",
+          "description": "Spec holds the desired state of the Service (from the client)."
+        },
+        "status": {
+          "$ref": "ServiceStatus",
+          "description": "Status communicates the observed state of the Service (from the\ncontroller)."
+        }
+      },
+      "type": "object"
+    },
+    "ServiceSpec": {
+      "description": "ServiceSpec holds the desired state of the Route (from the client), which\nis used to manipulate the underlying Route and Configuration(s).",
+      "id": "ServiceSpec",
+      "properties": {
+        "template": {
+          "$ref": "RevisionTemplate",
+          "description": "Template holds the latest specification for the Revision to\nbe stamped out."
+        },
+        "traffic": {
+          "description": "Traffic specifies how to distribute traffic over a collection of Knative\nRevisions and Configurations.",
+          "items": {
+            "$ref": "TrafficTarget"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ServiceStatus": {
+      "description": "The current state of the Service. Output only.",
+      "id": "ServiceStatus",
+      "properties": {
+        "address": {
+          "$ref": "Addressable",
+          "description": "From RouteStatus.\nSimilar to url, information on where the service is available on HTTP."
+        },
+        "conditions": {
+          "description": "Conditions communicates information about ongoing/complete\nreconciliation processes that bring the \"spec\" inline with the observed\nstate of the world.\nService-specific conditions include:\n* \"ConfigurationsReady\": true when the underlying Configuration is ready.\n* \"RoutesReady\": true when the underlying Route is ready.\n* \"Ready\": true when both the underlying Route and Configuration are\nready.",
+          "items": {
+            "$ref": "GoogleCloudRunV1Condition"
+          },
+          "type": "array"
+        },
+        "latestCreatedRevisionName": {
+          "description": "From ConfigurationStatus.\nLatestCreatedRevisionName is the last revision that was created from this\nService's Configuration. It might not be ready yet, for that use\nLatestReadyRevisionName.",
+          "type": "string"
+        },
+        "latestReadyRevisionName": {
+          "description": "From ConfigurationStatus.\nLatestReadyRevisionName holds the name of the latest Revision stamped out\nfrom this Service's Configuration that has had its \"Ready\" condition become\n\"True\".",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the 'Generation' of the Route that\nwas last processed by the controller.\n\nClients polling for completed reconciliation should poll until\nobservedGeneration = metadata.generation and the Ready condition's status\nis True or False.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "traffic": {
+          "description": "From RouteStatus.\nTraffic holds the configured traffic distribution.\nThese entries will always contain RevisionName references.\nWhen ConfigurationName appears in the spec, this will hold the\nLatestReadyRevisionName that we last observed.",
+          "items": {
+            "$ref": "TrafficTarget"
+          },
+          "type": "array"
+        },
+        "url": {
+          "description": "From RouteStatus.\nURL holds the url that will distribute traffic over the provided traffic\ntargets. It generally has the form\nhttps://{route-hash}-{project-hash}-{cluster-level-suffix}.a.run.app",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SetIamPolicyRequest": {
+      "description": "Request message for `SetIamPolicy` method.",
+      "id": "SetIamPolicyRequest",
+      "properties": {
+        "policy": {
+          "$ref": "Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Cloud Platform services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "description": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:\npaths: \"bindings, etag\"\nThis field is only used by Cloud IAM.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "Status is a return value for calls that don't return other objects",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "Suggested HTTP return code for this status, 0 if not set.\n+optional",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "$ref": "StatusDetails",
+          "description": "Extended data associated with the reason.  Each reason may define its\nown extended details. This field is optional and the data returned\nis not guaranteed to conform to any schema except that defined by\nthe reason type.\n+optional"
+        },
+        "message": {
+          "description": "A human-readable description of the status of this operation.\n+optional",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "ListMeta",
+          "description": "Standard list metadata.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\n+optional"
+        },
+        "reason": {
+          "description": "A machine-readable description of why this operation is in the\n\"Failure\" status. If this value is empty there\nis no information available. A Reason clarifies an HTTP status\ncode but does not override it.\n+optional",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the operation.\nOne of: \"Success\" or \"Failure\".\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status\n+optional",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StatusCause": {
+      "description": "StatusCause provides more information about an api.Status failure, including\ncases when multiple errors are encountered.",
+      "id": "StatusCause",
+      "properties": {
+        "field": {
+          "description": "The field of the resource that has caused this error, as named by its JSON\nserialization. May include dot and postfix notation for nested attributes.\nArrays are zero-indexed.  Fields may appear more than once in an array of\ncauses due to fields having multiple errors.\nOptional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\"\n+optional",
+          "type": "string"
+        },
+        "message": {
+          "description": "A human-readable description of the cause of the error.  This field may be\npresented as-is to a reader.\n+optional",
+          "type": "string"
+        },
+        "reason": {
+          "description": "A machine-readable description of the cause of the error. If this value is\nempty there is no information available.\n+optional",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StatusDetails": {
+      "description": "StatusDetails is a set of additional properties that MAY be set by the\nserver to provide additional information about a response. The Reason\nfield of a Status object defines what attributes will be set. Clients\nmust ignore fields that do not match the defined type of each attribute,\nand should assume that any attribute may be empty, invalid, or under\ndefined.",
+      "id": "StatusDetails",
+      "properties": {
+        "causes": {
+          "description": "The Causes array includes more details associated with the StatusReason\nfailure. Not all StatusReasons may provide detailed causes.\n+optional",
+          "items": {
+            "$ref": "StatusCause"
+          },
+          "type": "array"
+        },
+        "group": {
+          "description": "The group attribute of the resource associated with the status\nStatusReason. +optional",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind attribute of the resource associated with the status StatusReason.\nOn some operations may differ from the requested resource Kind.\nMore info:\nhttps://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\n+optional",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name attribute of the resource associated with the status StatusReason\n(when there is a single name which can be described).\n+optional",
+          "type": "string"
+        },
+        "retryAfterSeconds": {
+          "description": "If specified, the time in seconds before the operation should be retried.\nSome errors may indicate the client must take an alternate action - for\nthose errors this field may indicate how long to wait before taking the\nalternate action. +optional",
+          "format": "int32",
+          "type": "integer"
+        },
+        "uid": {
+          "description": "UID of the resource.\n(when there is a single resource which can be described).\nMore info: http://kubernetes.io/docs/user-guide/identifiers#uids\n+optional",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TCPSocketAction": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nTCPSocketAction describes an action based on opening a socket",
+      "id": "TCPSocketAction",
+      "properties": {
+        "host": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nOptional: Host name to connect to, defaults to the pod IP.",
+          "type": "string"
+        },
+        "port": {
+          "$ref": "IntOrString",
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nNumber or name of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME."
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsRequest": {
+      "description": "Request message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsRequest",
+      "properties": {
+        "permissions": {
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsResponse": {
+      "description": "Response message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsResponse",
+      "properties": {
+        "permissions": {
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TrafficTarget": {
+      "description": "TrafficTarget holds a single entry of the routing table for a Route.",
+      "id": "TrafficTarget",
+      "properties": {
+        "configurationName": {
+          "description": "ConfigurationName of a configuration to whose latest revision we will\nsend this portion of traffic. When the \"status.latestReadyRevisionName\"\nof the referenced configuration changes, we will automatically migrate\ntraffic from the prior \"latest ready\" revision to the new one. This field\nis never set in Route's status, only its spec. This is mutually exclusive\nwith RevisionName.\n\nCloud Run currently supports a single ConfigurationName.",
+          "type": "string"
+        },
+        "latestRevision": {
+          "description": "LatestRevision may be optionally provided to indicate that the latest\nready Revision of the Configuration should be used for this traffic\ntarget. When provided LatestRevision must be true if RevisionName is\nempty; it must be false when RevisionName is non-empty.\n\n+optional",
+          "type": "boolean"
+        },
+        "percent": {
+          "description": "Percent specifies percent of the traffic to this Revision or Configuration.\nThis defaults to zero if unspecified.\n\nCloud Run currently requires 100 percent for a single ConfigurationName\nTrafficTarget entry.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "revisionName": {
+          "description": "RevisionName of a specific revision to which to send this portion of\ntraffic. This is mutually exclusive with ConfigurationName.\n\nProviding RevisionName in spec is not currently supported by Cloud Run.",
+          "type": "string"
+        },
+        "tag": {
+          "description": "Tag is optionally used to expose a dedicated url for referencing\nthis target exclusively.\n\nNot currently supported in Cloud Run.\n+optional",
+          "type": "string"
+        },
+        "url": {
+          "description": "Output only. URL displays the URL for accessing tagged traffic targets. URL\nis displayed in status, and is disallowed on spec. URL must contain a\nscheme (e.g. http://) and a hostname, but may not contain anything else\n(e.g. basic auth, url path, etc.\n\nNot currently supported in Cloud Run.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Volume": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nVolume represents a named volume in a container.",
+      "id": "Volume",
+      "properties": {
+        "configMap": {
+          "$ref": "ConfigMapVolumeSource",
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported"
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nVolume's name.",
+          "type": "string"
+        },
+        "secret": {
+          "$ref": "SecretVolumeSource",
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported"
+        }
+      },
+      "type": "object"
+    },
+    "VolumeMount": {
+      "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nVolumeMount describes a mounting of a Volume within a container.",
+      "id": "VolumeMount",
+      "properties": {
+        "mountPath": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPath within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Cloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nThis must match the Name of a Volume.",
+          "type": "string"
+        },
+        "readOnly": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nOnly true is accepted.\nDefaults to true.",
+          "type": "boolean"
+        },
+        "subPath": {
+          "description": "(Optional)\n\nCloud Run fully managed: not supported\n\nCloud Run for Anthos: supported\n\nPath within the volume from which the container's volume should be mounted.\nDefaults to \"\" (volume's root).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Run API",
+  "version": "v1",
+  "version_module": true
+}

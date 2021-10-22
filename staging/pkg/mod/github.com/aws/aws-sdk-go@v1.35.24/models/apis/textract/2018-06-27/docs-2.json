@@ -1,0 +1,514 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Textract detects and analyzes text in documents and converts it into machine-readable text. This is the API reference documentation for Amazon Textract.</p>",
+  "operations": {
+    "AnalyzeDocument": "<p>Analyzes an input document for relationships between detected items. </p> <p>The types of information returned are as follows: </p> <ul> <li> <p>Form data (key-value pairs). The related information is returned in two <a>Block</a> objects, each of type <code>KEY_VALUE_SET</code>: a KEY <code>Block</code> object and a VALUE <code>Block</code> object. For example, <i>Name: Ana Silva Carolina</i> contains a key and value. <i>Name:</i> is the key. <i>Ana Silva Carolina</i> is the value.</p> </li> <li> <p>Table and table cell data. A TABLE <code>Block</code> object contains information about a detected table. A CELL <code>Block</code> object is returned for each cell in a table.</p> </li> <li> <p>Lines and words of text. A LINE <code>Block</code> object contains one or more WORD <code>Block</code> objects. All lines and words that are detected in the document are returned (including text that doesn't have a relationship with the value of <code>FeatureTypes</code>). </p> </li> </ul> <p>Selection elements such as check boxes and option buttons (radio buttons) can be detected in form data and in tables. A SELECTION_ELEMENT <code>Block</code> object contains information about a selection element, including the selection status.</p> <p>You can choose which type of analysis to perform by specifying the <code>FeatureTypes</code> list. </p> <p>The output is returned in a list of <code>Block</code> objects.</p> <p> <code>AnalyzeDocument</code> is a synchronous operation. To analyze documents asynchronously, use <a>StartDocumentAnalysis</a>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-analyzing.html\">Document Text Analysis</a>.</p>",
+    "DetectDocumentText": "<p>Detects text in the input document. Amazon Textract can detect lines of text and the words that make up a line of text. The input document must be an image in JPEG or PNG format. <code>DetectDocumentText</code> returns the detected text in an array of <a>Block</a> objects. </p> <p>Each document page has as an associated <code>Block</code> of type PAGE. Each PAGE <code>Block</code> object is the parent of LINE <code>Block</code> objects that represent the lines of detected text on a page. A LINE <code>Block</code> object is a parent for each word that makes up the line. Words are represented by <code>Block</code> objects of type WORD.</p> <p> <code>DetectDocumentText</code> is a synchronous operation. To analyze documents asynchronously, use <a>StartDocumentTextDetection</a>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-detecting.html\">Document Text Detection</a>.</p>",
+    "GetDocumentAnalysis": "<p>Gets the results for an Amazon Textract asynchronous operation that analyzes text in a document.</p> <p>You start asynchronous text analysis by calling <a>StartDocumentAnalysis</a>, which returns a job identifier (<code>JobId</code>). When the text analysis operation finishes, Amazon Textract publishes a completion status to the Amazon Simple Notification Service (Amazon SNS) topic that's registered in the initial call to <code>StartDocumentAnalysis</code>. To get the results of the text-detection operation, first check that the status value published to the Amazon SNS topic is <code>SUCCEEDED</code>. If so, call <code>GetDocumentAnalysis</code>, and pass the job identifier (<code>JobId</code>) from the initial call to <code>StartDocumentAnalysis</code>.</p> <p> <code>GetDocumentAnalysis</code> returns an array of <a>Block</a> objects. The following types of information are returned: </p> <ul> <li> <p>Form data (key-value pairs). The related information is returned in two <a>Block</a> objects, each of type <code>KEY_VALUE_SET</code>: a KEY <code>Block</code> object and a VALUE <code>Block</code> object. For example, <i>Name: Ana Silva Carolina</i> contains a key and value. <i>Name:</i> is the key. <i>Ana Silva Carolina</i> is the value.</p> </li> <li> <p>Table and table cell data. A TABLE <code>Block</code> object contains information about a detected table. A CELL <code>Block</code> object is returned for each cell in a table.</p> </li> <li> <p>Lines and words of text. A LINE <code>Block</code> object contains one or more WORD <code>Block</code> objects. All lines and words that are detected in the document are returned (including text that doesn't have a relationship with the value of the <code>StartDocumentAnalysis</code> <code>FeatureTypes</code> input parameter). </p> </li> </ul> <p>Selection elements such as check boxes and option buttons (radio buttons) can be detected in form data and in tables. A SELECTION_ELEMENT <code>Block</code> object contains information about a selection element, including the selection status.</p> <p>Use the <code>MaxResults</code> parameter to limit the number of blocks that are returned. If there are more results than specified in <code>MaxResults</code>, the value of <code>NextToken</code> in the operation response contains a pagination token for getting the next set of results. To get the next page of results, call <code>GetDocumentAnalysis</code>, and populate the <code>NextToken</code> request parameter with the token value that's returned from the previous call to <code>GetDocumentAnalysis</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-analyzing.html\">Document Text Analysis</a>.</p>",
+    "GetDocumentTextDetection": "<p>Gets the results for an Amazon Textract asynchronous operation that detects text in a document. Amazon Textract can detect lines of text and the words that make up a line of text.</p> <p>You start asynchronous text detection by calling <a>StartDocumentTextDetection</a>, which returns a job identifier (<code>JobId</code>). When the text detection operation finishes, Amazon Textract publishes a completion status to the Amazon Simple Notification Service (Amazon SNS) topic that's registered in the initial call to <code>StartDocumentTextDetection</code>. To get the results of the text-detection operation, first check that the status value published to the Amazon SNS topic is <code>SUCCEEDED</code>. If so, call <code>GetDocumentTextDetection</code>, and pass the job identifier (<code>JobId</code>) from the initial call to <code>StartDocumentTextDetection</code>.</p> <p> <code>GetDocumentTextDetection</code> returns an array of <a>Block</a> objects. </p> <p>Each document page has as an associated <code>Block</code> of type PAGE. Each PAGE <code>Block</code> object is the parent of LINE <code>Block</code> objects that represent the lines of detected text on a page. A LINE <code>Block</code> object is a parent for each word that makes up the line. Words are represented by <code>Block</code> objects of type WORD.</p> <p>Use the MaxResults parameter to limit the number of blocks that are returned. If there are more results than specified in <code>MaxResults</code>, the value of <code>NextToken</code> in the operation response contains a pagination token for getting the next set of results. To get the next page of results, call <code>GetDocumentTextDetection</code>, and populate the <code>NextToken</code> request parameter with the token value that's returned from the previous call to <code>GetDocumentTextDetection</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-detecting.html\">Document Text Detection</a>.</p>",
+    "StartDocumentAnalysis": "<p>Starts the asynchronous analysis of an input document for relationships between detected items such as key-value pairs, tables, and selection elements.</p> <p> <code>StartDocumentAnalysis</code> can analyze text in documents that are in JPEG, PNG, and PDF format. The documents are stored in an Amazon S3 bucket. Use <a>DocumentLocation</a> to specify the bucket name and file name of the document. </p> <p> <code>StartDocumentAnalysis</code> returns a job identifier (<code>JobId</code>) that you use to get the results of the operation. When text analysis is finished, Amazon Textract publishes a completion status to the Amazon Simple Notification Service (Amazon SNS) topic that you specify in <code>NotificationChannel</code>. To get the results of the text analysis operation, first check that the status value published to the Amazon SNS topic is <code>SUCCEEDED</code>. If so, call <a>GetDocumentAnalysis</a>, and pass the job identifier (<code>JobId</code>) from the initial call to <code>StartDocumentAnalysis</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-analyzing.html\">Document Text Analysis</a>.</p>",
+    "StartDocumentTextDetection": "<p>Starts the asynchronous detection of text in a document. Amazon Textract can detect lines of text and the words that make up a line of text.</p> <p> <code>StartDocumentTextDetection</code> can analyze text in documents that are in JPEG, PNG, and PDF format. The documents are stored in an Amazon S3 bucket. Use <a>DocumentLocation</a> to specify the bucket name and file name of the document. </p> <p> <code>StartTextDetection</code> returns a job identifier (<code>JobId</code>) that you use to get the results of the operation. When text detection is finished, Amazon Textract publishes a completion status to the Amazon Simple Notification Service (Amazon SNS) topic that you specify in <code>NotificationChannel</code>. To get the results of the text detection operation, first check that the status value published to the Amazon SNS topic is <code>SUCCEEDED</code>. If so, call <a>GetDocumentTextDetection</a>, and pass the job identifier (<code>JobId</code>) from the initial call to <code>StartDocumentTextDetection</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works-detecting.html\">Document Text Detection</a>.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You aren't authorized to perform the action. Use the Amazon Resource Name (ARN) of an authorized user or IAM role to perform the operation.</p>",
+      "refs": {
+      }
+    },
+    "AnalyzeDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AnalyzeDocumentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BadDocumentException": {
+      "base": "<p>Amazon Textract isn't able to read the document. For more information on the document limits in Amazon Textract, see <a>limits</a>.</p>",
+      "refs": {
+      }
+    },
+    "Block": {
+      "base": "<p>A <code>Block</code> represents items that are recognized in a document within a group of pixels close to each other. The information returned in a <code>Block</code> object depends on the type of operation. In text detection for documents (for example <a>DetectDocumentText</a>), you get information about the detected words and lines of text. In text analysis (for example <a>AnalyzeDocument</a>), you can also get information about the fields, tables, and selection elements that are detected in the document.</p> <p>An array of <code>Block</code> objects is returned by both synchronous and asynchronous operations. In synchronous operations, such as <a>DetectDocumentText</a>, the array of <code>Block</code> objects is the entire set of results. In asynchronous operations, such as <a>GetDocumentAnalysis</a>, the array is returned over one or more responses.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/how-it-works.html\">How Amazon Textract Works</a>.</p>",
+      "refs": {
+        "BlockList$member": null
+      }
+    },
+    "BlockList": {
+      "base": null,
+      "refs": {
+        "AnalyzeDocumentResponse$Blocks": "<p>The items that are detected and analyzed by <code>AnalyzeDocument</code>.</p>",
+        "DetectDocumentTextResponse$Blocks": "<p>An array of <code>Block</code> objects that contain the text that's detected in the document.</p>",
+        "GetDocumentAnalysisResponse$Blocks": "<p>The results of the text-analysis operation.</p>",
+        "GetDocumentTextDetectionResponse$Blocks": "<p>The results of the text-detection operation.</p>"
+      }
+    },
+    "BlockType": {
+      "base": null,
+      "refs": {
+        "Block$BlockType": "<p>The type of text item that's recognized. In operations for text detection, the following types are returned:</p> <ul> <li> <p> <i>PAGE</i> - Contains a list of the LINE <code>Block</code> objects that are detected on a document page.</p> </li> <li> <p> <i>WORD</i> - A word detected on a document page. A word is one or more ISO basic Latin script characters that aren't separated by spaces.</p> </li> <li> <p> <i>LINE</i> - A string of tab-delimited, contiguous words that are detected on a document page.</p> </li> </ul> <p>In text analysis operations, the following types are returned:</p> <ul> <li> <p> <i>PAGE</i> - Contains a list of child <code>Block</code> objects that are detected on a document page.</p> </li> <li> <p> <i>KEY_VALUE_SET</i> - Stores the KEY and VALUE <code>Block</code> objects for linked text that's detected on a document page. Use the <code>EntityType</code> field to determine if a KEY_VALUE_SET object is a KEY <code>Block</code> object or a VALUE <code>Block</code> object. </p> </li> <li> <p> <i>WORD</i> - A word that's detected on a document page. A word is one or more ISO basic Latin script characters that aren't separated by spaces.</p> </li> <li> <p> <i>LINE</i> - A string of tab-delimited, contiguous words that are detected on a document page.</p> </li> <li> <p> <i>TABLE</i> - A table that's detected on a document page. A table is grid-based information with two or more rows or columns, with a cell span of one row and one column each. </p> </li> <li> <p> <i>CELL</i> - A cell within a detected table. The cell is the parent of the block that contains the text in the cell.</p> </li> <li> <p> <i>SELECTION_ELEMENT</i> - A selection element such as an option button (radio button) or a check box that's detected on a document page. Use the value of <code>SelectionStatus</code> to determine the status of the selection element.</p> </li> </ul>"
+      }
+    },
+    "BoundingBox": {
+      "base": "<p>The bounding box around the detected page, text, key-value pair, table, table cell, or selection element on a document page. The <code>left</code> (x-coordinate) and <code>top</code> (y-coordinate) are coordinates that represent the top and left sides of the bounding box. Note that the upper-left corner of the image is the origin (0,0). </p> <p>The <code>top</code> and <code>left</code> values returned are ratios of the overall document page size. For example, if the input image is 700 x 200 pixels, and the top-left coordinate of the bounding box is 350 x 50 pixels, the API returns a <code>left</code> value of 0.5 (350/700) and a <code>top</code> value of 0.25 (50/200).</p> <p>The <code>width</code> and <code>height</code> values represent the dimensions of the bounding box as a ratio of the overall document page dimension. For example, if the document page size is 700 x 200 pixels, and the bounding box width is 70 pixels, the width returned is 0.1. </p>",
+      "refs": {
+        "Geometry$BoundingBox": "<p>An axis-aligned coarse representation of the location of the recognized item on the document page.</p>"
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "StartDocumentAnalysisRequest$ClientRequestToken": "<p>The idempotent token that you use to identify the start request. If you use the same token with multiple <code>StartDocumentAnalysis</code> requests, the same <code>JobId</code> is returned. Use <code>ClientRequestToken</code> to prevent the same job from being accidentally started more than once. For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/api-async.html\">Calling Amazon Textract Asynchronous Operations</a>.</p>",
+        "StartDocumentTextDetectionRequest$ClientRequestToken": "<p>The idempotent token that's used to identify the start request. If you use the same token with multiple <code>StartDocumentTextDetection</code> requests, the same <code>JobId</code> is returned. Use <code>ClientRequestToken</code> to prevent the same job from being accidentally started more than once. For more information, see <a href=\"https://docs.aws.amazon.com/textract/latest/dg/api-async.html\">Calling Amazon Textract Asynchronous Operations</a>.</p>"
+      }
+    },
+    "ContentClassifier": {
+      "base": null,
+      "refs": {
+        "ContentClassifiers$member": null
+      }
+    },
+    "ContentClassifiers": {
+      "base": null,
+      "refs": {
+        "HumanLoopDataAttributes$ContentClassifiers": "<p>Sets whether the input image is free of personally identifiable information or adult content.</p>"
+      }
+    },
+    "DetectDocumentTextRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectDocumentTextResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Document": {
+      "base": "<p>The input document, either as bytes or as an S3 object.</p> <p>You pass image bytes to an Amazon Textract API operation by using the <code>Bytes</code> property. For example, you would use the <code>Bytes</code> property to pass a document loaded from a local file system. Image bytes passed by using the <code>Bytes</code> property must be base64 encoded. Your code might not need to encode document file bytes if you're using an AWS SDK to call Amazon Textract API operations. </p> <p>You pass images stored in an S3 bucket to an Amazon Textract API operation by using the <code>S3Object</code> property. Documents stored in an S3 bucket don't need to be base64 encoded.</p> <p>The AWS Region for the S3 bucket that contains the S3 object must match the AWS Region that you use for Amazon Textract operations.</p> <p>If you use the AWS CLI to call Amazon Textract operations, passing image bytes using the Bytes property isn't supported. You must first upload the document to an Amazon S3 bucket, and then call the operation using the S3Object property.</p> <p>For Amazon Textract to process an S3 object, the user must have permission to access the S3 object. </p>",
+      "refs": {
+        "AnalyzeDocumentRequest$Document": "<p>The input document as base64-encoded bytes or an Amazon S3 object. If you use the AWS CLI to call Amazon Textract operations, you can't pass image bytes. The document must be an image in JPEG or PNG format.</p> <p>If you're using an AWS SDK to call Amazon Textract, you might not need to base64-encode image bytes that are passed using the <code>Bytes</code> field. </p>",
+        "DetectDocumentTextRequest$Document": "<p>The input document as base64-encoded bytes or an Amazon S3 object. If you use the AWS CLI to call Amazon Textract operations, you can't pass image bytes. The document must be an image in JPEG or PNG format.</p> <p>If you're using an AWS SDK to call Amazon Textract, you might not need to base64-encode image bytes that are passed using the <code>Bytes</code> field. </p>"
+      }
+    },
+    "DocumentLocation": {
+      "base": "<p>The Amazon S3 bucket that contains the document to be processed. It's used by asynchronous operations such as <a>StartDocumentTextDetection</a>.</p> <p>The input document can be an image file in JPEG or PNG format. It can also be a file in PDF format.</p>",
+      "refs": {
+        "StartDocumentAnalysisRequest$DocumentLocation": "<p>The location of the document to be processed.</p>",
+        "StartDocumentTextDetectionRequest$DocumentLocation": "<p>The location of the document to be processed.</p>"
+      }
+    },
+    "DocumentMetadata": {
+      "base": "<p>Information about the input document.</p>",
+      "refs": {
+        "AnalyzeDocumentResponse$DocumentMetadata": "<p>Metadata about the analyzed document. An example is the number of pages.</p>",
+        "DetectDocumentTextResponse$DocumentMetadata": "<p>Metadata about the document. It contains the number of pages that are detected in the document.</p>",
+        "GetDocumentAnalysisResponse$DocumentMetadata": "<p>Information about a document that Amazon Textract processed. <code>DocumentMetadata</code> is returned in every page of paginated responses from an Amazon Textract video operation.</p>",
+        "GetDocumentTextDetectionResponse$DocumentMetadata": "<p>Information about a document that Amazon Textract processed. <code>DocumentMetadata</code> is returned in every page of paginated responses from an Amazon Textract video operation.</p>"
+      }
+    },
+    "DocumentTooLargeException": {
+      "base": "<p>The document can't be processed because it's too large. The maximum document size for synchronous operations 5 MB. The maximum document size for asynchronous operations is 500 MB for PDF files.</p>",
+      "refs": {
+      }
+    },
+    "EntityType": {
+      "base": null,
+      "refs": {
+        "EntityTypes$member": null
+      }
+    },
+    "EntityTypes": {
+      "base": null,
+      "refs": {
+        "Block$EntityTypes": "<p>The type of entity. The following can be returned:</p> <ul> <li> <p> <i>KEY</i> - An identifier for a field on the document.</p> </li> <li> <p> <i>VALUE</i> - The field text.</p> </li> </ul> <p> <code>EntityTypes</code> isn't returned by <code>DetectDocumentText</code> and <code>GetDocumentTextDetection</code>.</p>"
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "Warning$ErrorCode": "<p>The error code for the warning.</p>"
+      }
+    },
+    "FeatureType": {
+      "base": null,
+      "refs": {
+        "FeatureTypes$member": null
+      }
+    },
+    "FeatureTypes": {
+      "base": null,
+      "refs": {
+        "AnalyzeDocumentRequest$FeatureTypes": "<p>A list of the types of analysis to perform. Add TABLES to the list to return information about the tables that are detected in the input document. Add FORMS to return detected form data. To perform both types of analysis, add TABLES and FORMS to <code>FeatureTypes</code>. All lines and words detected in the document are included in the response (including text that isn't related to the value of <code>FeatureTypes</code>). </p>",
+        "StartDocumentAnalysisRequest$FeatureTypes": "<p>A list of the types of analysis to perform. Add TABLES to the list to return information about the tables that are detected in the input document. Add FORMS to return detected form data. To perform both types of analysis, add TABLES and FORMS to <code>FeatureTypes</code>. All lines and words detected in the document are included in the response (including text that isn't related to the value of <code>FeatureTypes</code>). </p>"
+      }
+    },
+    "Float": {
+      "base": null,
+      "refs": {
+        "BoundingBox$Width": "<p>The width of the bounding box as a ratio of the overall document page width.</p>",
+        "BoundingBox$Height": "<p>The height of the bounding box as a ratio of the overall document page height.</p>",
+        "BoundingBox$Left": "<p>The left coordinate of the bounding box as a ratio of overall document page width.</p>",
+        "BoundingBox$Top": "<p>The top coordinate of the bounding box as a ratio of overall document page height.</p>",
+        "Point$X": "<p>The value of the X coordinate for a point on a <code>Polygon</code>.</p>",
+        "Point$Y": "<p>The value of the Y coordinate for a point on a <code>Polygon</code>.</p>"
+      }
+    },
+    "FlowDefinitionArn": {
+      "base": null,
+      "refs": {
+        "HumanLoopConfig$FlowDefinitionArn": "<p>The Amazon Resource Name (ARN) of the flow definition.</p>"
+      }
+    },
+    "Geometry": {
+      "base": "<p>Information about where the following items are located on a document page: detected page, text, key-value pairs, tables, table cells, and selection elements.</p>",
+      "refs": {
+        "Block$Geometry": "<p>The location of the recognized text on the image. It includes an axis-aligned, coarse bounding box that surrounds the text, and a finer-grain polygon for more accurate spatial information. </p>"
+      }
+    },
+    "GetDocumentAnalysisRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDocumentAnalysisResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDocumentTextDetectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDocumentTextDetectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HumanLoopActivationConditionsEvaluationResults": {
+      "base": null,
+      "refs": {
+        "HumanLoopActivationOutput$HumanLoopActivationConditionsEvaluationResults": "<p>Shows the result of condition evaluations, including those conditions which activated a human review.</p>"
+      }
+    },
+    "HumanLoopActivationOutput": {
+      "base": "<p>Shows the results of the human in the loop evaluation. If there is no HumanLoopArn, the input did not trigger human review.</p>",
+      "refs": {
+        "AnalyzeDocumentResponse$HumanLoopActivationOutput": "<p>Shows the results of the human in the loop evaluation.</p>"
+      }
+    },
+    "HumanLoopActivationReason": {
+      "base": null,
+      "refs": {
+        "HumanLoopActivationReasons$member": null
+      }
+    },
+    "HumanLoopActivationReasons": {
+      "base": null,
+      "refs": {
+        "HumanLoopActivationOutput$HumanLoopActivationReasons": "<p>Shows if and why human review was needed.</p>"
+      }
+    },
+    "HumanLoopArn": {
+      "base": null,
+      "refs": {
+        "HumanLoopActivationOutput$HumanLoopArn": "<p>The Amazon Resource Name (ARN) of the HumanLoop created.</p>"
+      }
+    },
+    "HumanLoopConfig": {
+      "base": "<p>Sets up the human review workflow the document will be sent to if one of the conditions is met. You can also set certain attributes of the image before review. </p>",
+      "refs": {
+        "AnalyzeDocumentRequest$HumanLoopConfig": "<p>Sets the configuration for the human in the loop workflow for analyzing documents.</p>"
+      }
+    },
+    "HumanLoopDataAttributes": {
+      "base": "<p>Allows you to set attributes of the image. Currently, you can declare an image as free of personally identifiable information and adult content. </p>",
+      "refs": {
+        "HumanLoopConfig$DataAttributes": "<p>Sets attributes of the input data.</p>"
+      }
+    },
+    "HumanLoopName": {
+      "base": null,
+      "refs": {
+        "HumanLoopConfig$HumanLoopName": "<p>The name of the human workflow used for this image. This should be kept unique within a region.</p>"
+      }
+    },
+    "HumanLoopQuotaExceededException": {
+      "base": "<p>Indicates you have exceeded the maximum number of active human in the loop workflows available</p>",
+      "refs": {
+      }
+    },
+    "IdList": {
+      "base": null,
+      "refs": {
+        "Relationship$Ids": "<p>An array of IDs for related blocks. You can get the type of the relationship from the <code>Type</code> element.</p>"
+      }
+    },
+    "IdempotentParameterMismatchException": {
+      "base": "<p>A <code>ClientRequestToken</code> input parameter was reused with an operation, but at least one of the other input parameters is different from the previous call to the operation. </p>",
+      "refs": {
+      }
+    },
+    "ImageBlob": {
+      "base": null,
+      "refs": {
+        "Document$Bytes": "<p>A blob of base64-encoded document bytes. The maximum size of a document that's provided in a blob of bytes is 5 MB. The document bytes must be in PNG or JPEG format.</p> <p>If you're using an AWS SDK to call Amazon Textract, you might not need to base64-encode image bytes passed using the <code>Bytes</code> field. </p>"
+      }
+    },
+    "InternalServerError": {
+      "base": "<p>Amazon Textract experienced a service issue. Try your call again.</p>",
+      "refs": {
+      }
+    },
+    "InvalidJobIdException": {
+      "base": "<p>An invalid job identifier was passed to <a>GetDocumentAnalysis</a> or to <a>GetDocumentAnalysis</a>.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>An input parameter violated a constraint. For example, in synchronous operations, an <code>InvalidParameterException</code> exception occurs when neither of the <code>S3Object</code> or <code>Bytes</code> values are supplied in the <code>Document</code> request parameter. Validate your parameter before calling the API operation again.</p>",
+      "refs": {
+      }
+    },
+    "InvalidS3ObjectException": {
+      "base": "<p>Amazon Textract is unable to access the S3 object that's specified in the request. for more information, <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-access-control.html\">Configure Access to Amazon S3</a> For troubleshooting information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/troubleshooting.html\">Troubleshooting Amazon S3</a> </p>",
+      "refs": {
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisRequest$JobId": "<p>A unique identifier for the text-detection job. The <code>JobId</code> is returned from <code>StartDocumentAnalysis</code>. A <code>JobId</code> value is only valid for 7 days.</p>",
+        "GetDocumentTextDetectionRequest$JobId": "<p>A unique identifier for the text detection job. The <code>JobId</code> is returned from <code>StartDocumentTextDetection</code>. A <code>JobId</code> value is only valid for 7 days.</p>",
+        "StartDocumentAnalysisResponse$JobId": "<p>The identifier for the document text detection job. Use <code>JobId</code> to identify the job in a subsequent call to <code>GetDocumentAnalysis</code>. A <code>JobId</code> value is only valid for 7 days.</p>",
+        "StartDocumentTextDetectionResponse$JobId": "<p>The identifier of the text detection job for the document. Use <code>JobId</code> to identify the job in a subsequent call to <code>GetDocumentTextDetection</code>. A <code>JobId</code> value is only valid for 7 days.</p>"
+      }
+    },
+    "JobStatus": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisResponse$JobStatus": "<p>The current status of the text detection job.</p>",
+        "GetDocumentTextDetectionResponse$JobStatus": "<p>The current status of the text detection job.</p>"
+      }
+    },
+    "JobTag": {
+      "base": null,
+      "refs": {
+        "StartDocumentAnalysisRequest$JobTag": "<p>An identifier that you specify that's included in the completion notification published to the Amazon SNS topic. For example, you can use <code>JobTag</code> to identify the type of document that the completion notification corresponds to (such as a tax form or a receipt).</p>",
+        "StartDocumentTextDetectionRequest$JobTag": "<p>An identifier that you specify that's included in the completion notification published to the Amazon SNS topic. For example, you can use <code>JobTag</code> to identify the type of document that the completion notification corresponds to (such as a tax form or a receipt).</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>An Amazon Textract service limit was exceeded. For example, if you start too many asynchronous jobs concurrently, calls to start operations (<code>StartDocumentTextDetection</code>, for example) raise a LimitExceededException exception (HTTP status code: 400) until the number of concurrently running jobs is below the Amazon Textract service limit. </p>",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisRequest$MaxResults": "<p>The maximum number of results to return per paginated call. The largest value that you can specify is 1,000. If you specify a value greater than 1,000, a maximum of 1,000 results is returned. The default value is 1,000.</p>",
+        "GetDocumentTextDetectionRequest$MaxResults": "<p>The maximum number of results to return per paginated call. The largest value you can specify is 1,000. If you specify a value greater than 1,000, a maximum of 1,000 results is returned. The default value is 1,000.</p>"
+      }
+    },
+    "NonEmptyString": {
+      "base": null,
+      "refs": {
+        "Block$Id": "<p>The identifier for the recognized text. The identifier is only unique for a single operation. </p>",
+        "IdList$member": null
+      }
+    },
+    "NotificationChannel": {
+      "base": "<p>The Amazon Simple Notification Service (Amazon SNS) topic to which Amazon Textract publishes the completion status of an asynchronous document operation, such as <a>StartDocumentTextDetection</a>. </p>",
+      "refs": {
+        "StartDocumentAnalysisRequest$NotificationChannel": "<p>The Amazon SNS topic ARN that you want Amazon Textract to publish the completion status of the operation to. </p>",
+        "StartDocumentTextDetectionRequest$NotificationChannel": "<p>The Amazon SNS topic ARN that you want Amazon Textract to publish the completion status of the operation to. </p>"
+      }
+    },
+    "OutputConfig": {
+      "base": "<p>Sets whether or not your output will go to a user created bucket. Used to set the name of the bucket, and the prefix on the output file.</p>",
+      "refs": {
+        "StartDocumentAnalysisRequest$OutputConfig": "<p>Sets if the output will go to a customer defined bucket. By default, Amazon Textract will save the results internally to be accessed by the GetDocumentAnalysis operation.</p>",
+        "StartDocumentTextDetectionRequest$OutputConfig": "<p>Sets if the output will go to a customer defined bucket. By default Amazon Textract will save the results internally to be accessed with the GetDocumentTextDetection operation.</p>"
+      }
+    },
+    "Pages": {
+      "base": null,
+      "refs": {
+        "Warning$Pages": "<p>A list of the pages that the warning applies to.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisRequest$NextToken": "<p>If the previous response was incomplete (because there are more blocks to retrieve), Amazon Textract returns a pagination token in the response. You can use this pagination token to retrieve the next set of blocks.</p>",
+        "GetDocumentAnalysisResponse$NextToken": "<p>If the response is truncated, Amazon Textract returns this token. You can use this token in the subsequent request to retrieve the next set of text detection results.</p>",
+        "GetDocumentTextDetectionRequest$NextToken": "<p>If the previous response was incomplete (because there are more blocks to retrieve), Amazon Textract returns a pagination token in the response. You can use this pagination token to retrieve the next set of blocks.</p>",
+        "GetDocumentTextDetectionResponse$NextToken": "<p>If the response is truncated, Amazon Textract returns this token. You can use this token in the subsequent request to retrieve the next set of text-detection results.</p>"
+      }
+    },
+    "Percent": {
+      "base": null,
+      "refs": {
+        "Block$Confidence": "<p>The confidence score that Amazon Textract has in the accuracy of the recognized text and the accuracy of the geometry points around the recognized text.</p>"
+      }
+    },
+    "Point": {
+      "base": "<p>The X and Y coordinates of a point on a document page. The X and Y values that are returned are ratios of the overall document page size. For example, if the input document is 700 x 200 and the operation returns X=0.5 and Y=0.25, then the point is at the (350,50) pixel coordinate on the document page.</p> <p>An array of <code>Point</code> objects, <code>Polygon</code>, is returned by <a>DetectDocumentText</a>. <code>Polygon</code> represents a fine-grained polygon around detected text. For more information, see Geometry in the Amazon Textract Developer Guide. </p>",
+      "refs": {
+        "Polygon$member": null
+      }
+    },
+    "Polygon": {
+      "base": null,
+      "refs": {
+        "Geometry$Polygon": "<p>Within the bounding box, a fine-grained polygon around the recognized item.</p>"
+      }
+    },
+    "ProvisionedThroughputExceededException": {
+      "base": "<p>The number of requests exceeded your throughput limit. If you want to increase this limit, contact Amazon Textract.</p>",
+      "refs": {
+      }
+    },
+    "Relationship": {
+      "base": "<p>Information about how blocks are related to each other. A <code>Block</code> object contains 0 or more <code>Relation</code> objects in a list, <code>Relationships</code>. For more information, see <a>Block</a>.</p> <p>The <code>Type</code> element provides the type of the relationship for all blocks in the <code>IDs</code> array. </p>",
+      "refs": {
+        "RelationshipList$member": null
+      }
+    },
+    "RelationshipList": {
+      "base": null,
+      "refs": {
+        "Block$Relationships": "<p>A list of child blocks of the current block. For example, a LINE object has child blocks for each WORD block that's part of the line of text. There aren't Relationship objects in the list for relationships that don't exist, such as when the current block has no child blocks. The list size can be the following:</p> <ul> <li> <p>0 - The block has no child blocks.</p> </li> <li> <p>1 - The block has child blocks.</p> </li> </ul>"
+      }
+    },
+    "RelationshipType": {
+      "base": null,
+      "refs": {
+        "Relationship$Type": "<p>The type of relationship that the blocks in the IDs array have with the current block. The relationship can be <code>VALUE</code> or <code>CHILD</code>. A relationship of type VALUE is a list that contains the ID of the VALUE block that's associated with the KEY of a key-value pair. A relationship of type CHILD is a list of IDs that identify WORD blocks in the case of lines Cell blocks in the case of Tables, and WORD blocks in the case of Selection Elements.</p>"
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "NotificationChannel$RoleArn": "<p>The Amazon Resource Name (ARN) of an IAM role that gives Amazon Textract publishing permissions to the Amazon SNS topic. </p>"
+      }
+    },
+    "S3Bucket": {
+      "base": null,
+      "refs": {
+        "OutputConfig$S3Bucket": "<p>The name of the bucket your output will go to.</p>",
+        "S3Object$Bucket": "<p>The name of the S3 bucket.</p>"
+      }
+    },
+    "S3Object": {
+      "base": "<p>The S3 bucket name and file name that identifies the document.</p> <p>The AWS Region for the S3 bucket that contains the document must match the Region that you use for Amazon Textract operations.</p> <p>For Amazon Textract to process a file in an S3 bucket, the user must have permission to access the S3 bucket and file. </p>",
+      "refs": {
+        "Document$S3Object": "<p>Identifies an S3 object as the document source. The maximum size of a document that's stored in an S3 bucket is 5 MB.</p>",
+        "DocumentLocation$S3Object": "<p>The Amazon S3 bucket that contains the input document.</p>"
+      }
+    },
+    "S3ObjectName": {
+      "base": null,
+      "refs": {
+        "OutputConfig$S3Prefix": "<p>The prefix of the object key that the output will be saved to. When not enabled, the prefix will be “textract_output\".</p>",
+        "S3Object$Name": "<p>The file name of the input document. Synchronous operations can use image files that are in JPEG or PNG format. Asynchronous operations also support PDF format files.</p>"
+      }
+    },
+    "S3ObjectVersion": {
+      "base": null,
+      "refs": {
+        "S3Object$Version": "<p>If the bucket has versioning enabled, you can specify the object version. </p>"
+      }
+    },
+    "SNSTopicArn": {
+      "base": null,
+      "refs": {
+        "NotificationChannel$SNSTopicArn": "<p>The Amazon SNS topic that Amazon Textract posts the completion status to.</p>"
+      }
+    },
+    "SelectionStatus": {
+      "base": null,
+      "refs": {
+        "Block$SelectionStatus": "<p>The selection status of a selection element, such as an option button or check box. </p>"
+      }
+    },
+    "StartDocumentAnalysisRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartDocumentAnalysisResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartDocumentTextDetectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartDocumentTextDetectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StatusMessage": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisResponse$StatusMessage": "<p>Returns if the detection job could not be completed. Contains explanation for what error occured.</p>",
+        "GetDocumentTextDetectionResponse$StatusMessage": "<p>Returns if the detection job could not be completed. Contains explanation for what error occured. </p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AnalyzeDocumentResponse$AnalyzeDocumentModelVersion": "<p>The version of the model used to analyze the document.</p>",
+        "Block$Text": "<p>The word or line of text that's recognized by Amazon Textract. </p>",
+        "DetectDocumentTextResponse$DetectDocumentTextModelVersion": "<p/>",
+        "GetDocumentAnalysisResponse$AnalyzeDocumentModelVersion": "<p/>",
+        "GetDocumentTextDetectionResponse$DetectDocumentTextModelVersion": "<p/>",
+        "HumanLoopQuotaExceededException$ResourceType": "<p>The resource type.</p>",
+        "HumanLoopQuotaExceededException$QuotaCode": "<p>The quota code.</p>",
+        "HumanLoopQuotaExceededException$ServiceCode": "<p>The service code.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Amazon Textract is temporarily unable to process the request. Try your call again.</p>",
+      "refs": {
+      }
+    },
+    "UInteger": {
+      "base": null,
+      "refs": {
+        "Block$RowIndex": "<p>The row in which a table cell is located. The first row position is 1. <code>RowIndex</code> isn't returned by <code>DetectDocumentText</code> and <code>GetDocumentTextDetection</code>.</p>",
+        "Block$ColumnIndex": "<p>The column in which a table cell appears. The first column position is 1. <code>ColumnIndex</code> isn't returned by <code>DetectDocumentText</code> and <code>GetDocumentTextDetection</code>.</p>",
+        "Block$RowSpan": "<p>The number of rows that a table cell spans. Currently this value is always 1, even if the number of rows spanned is greater than 1. <code>RowSpan</code> isn't returned by <code>DetectDocumentText</code> and <code>GetDocumentTextDetection</code>.</p>",
+        "Block$ColumnSpan": "<p>The number of columns that a table cell spans. Currently this value is always 1, even if the number of columns spanned is greater than 1. <code>ColumnSpan</code> isn't returned by <code>DetectDocumentText</code> and <code>GetDocumentTextDetection</code>. </p>",
+        "Block$Page": "<p>The page on which a block was detected. <code>Page</code> is returned by asynchronous operations. Page values greater than 1 are only returned for multipage documents that are in PDF format. A scanned image (JPEG/PNG), even if it contains multiple document pages, is considered to be a single-page document. The value of <code>Page</code> is always 1. Synchronous operations don't return <code>Page</code> because every input document is considered to be a single-page document.</p>",
+        "DocumentMetadata$Pages": "<p>The number of pages that are detected in the document.</p>",
+        "Pages$member": null
+      }
+    },
+    "UnsupportedDocumentException": {
+      "base": "<p>The format of the input document isn't supported. Documents for synchronous operations can be in PNG or JPEG format. Documents for asynchronous operations can also be in PDF format.</p>",
+      "refs": {
+      }
+    },
+    "Warning": {
+      "base": "<p>A warning about an issue that occurred during asynchronous text analysis (<a>StartDocumentAnalysis</a>) or asynchronous document text detection (<a>StartDocumentTextDetection</a>). </p>",
+      "refs": {
+        "Warnings$member": null
+      }
+    },
+    "Warnings": {
+      "base": null,
+      "refs": {
+        "GetDocumentAnalysisResponse$Warnings": "<p>A list of warnings that occurred during the document-analysis operation.</p>",
+        "GetDocumentTextDetectionResponse$Warnings": "<p>A list of warnings that occurred during the text-detection operation for the document.</p>"
+      }
+    }
+  }
+}

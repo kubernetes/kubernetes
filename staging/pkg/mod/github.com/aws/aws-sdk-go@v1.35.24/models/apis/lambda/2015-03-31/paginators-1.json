@@ -1,0 +1,52 @@
+{
+  "pagination": {
+    "ListAliases": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "Aliases"
+    },
+    "ListEventSourceMappings": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "EventSourceMappings"
+    },
+    "ListFunctionEventInvokeConfigs": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "FunctionEventInvokeConfigs"
+    },
+    "ListFunctions": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "Functions"
+    },
+    "ListLayerVersions": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "LayerVersions"
+    },
+    "ListLayers": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "Layers"
+    },
+    "ListProvisionedConcurrencyConfigs": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "ProvisionedConcurrencyConfigs"
+    },
+    "ListVersionsByFunction": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "Versions"
+    }
+  }
+}

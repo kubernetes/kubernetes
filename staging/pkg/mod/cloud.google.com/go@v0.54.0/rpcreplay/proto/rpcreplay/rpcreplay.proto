@@ -1,0 +1,71 @@
+// Copyright 2017 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package rpcreplay;
+
+import "google/protobuf/any.proto";
+
+// An Entry represents a single RPC activity, typically a request or response.
+message Entry {
+  enum Kind {
+    TYPE_UNSPECIFIED = 0;
+
+    // A unary request.
+    // method: the full name of the method
+    // message: the request proto
+    // is_error: false
+    // ref_index: 0
+    REQUEST = 1;
+
+    // A unary response.
+    // method: the full name of the method
+    // message:
+    //   if is_error: a google.rpc.Status proto
+    //   else:        the response proto
+    // ref_index: index in the sequence of Entries of matching request (1-based)
+    RESPONSE = 2;
+
+    // A method that creates a stream.
+    // method: the full name of the method
+    // message:
+    //   if is_error: a google.rpc.Status proto
+    //   else:        nil
+    // ref_index: 0
+    CREATE_STREAM = 3;
+
+    // A call to Send on the client returned by a stream-creating method.
+    // method: unset
+    // message: the proto being sent
+    // is_error: false
+    // ref_index: index of matching CREATE_STREAM entry (1-based)
+    SEND = 4;   // message sent on stream
+
+    // A call to Recv on the client returned by a stream-creating method.
+    // method: unset
+    // message:
+    //   if is_error: a google.rpc.Status proto, or nil on EOF
+    //   else:        the received message
+    // ref_index: index of matching CREATE_STREAM entry
+    RECV = 5;   // message received from stream
+  }
+
+  Kind kind = 1;
+  string method = 2;                // method name
+  google.protobuf.Any message = 3;  // request, response or error status
+  bool is_error = 4;                // was response an error?
+  int32 ref_index = 5;              // for RESPONSE, index of matching request;
+                                    // for SEND/RECV, index of CREATE_STREAM
+}

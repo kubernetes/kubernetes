@@ -1,0 +1,96 @@
+parameters:
+  ServiceDirectory: ''
+
+stages:
+  - stage: Build
+    jobs:
+    - job: Build
+      displayName: Build on
+      variables:
+        - template: ../variables/globals.yml
+      strategy:
+        matrix:
+          Linux_Go115:
+            pool.name: azsdk-pool-mms-ubuntu-1804-general
+            image.name: MMSUbuntu18.04
+            go.version: '1.15'
+          Windows_Go115:
+            pool.name: azsdk-pool-mms-win-2019-general
+            image.name: MMS2019
+            go.version: '1.15'
+          Linux_Go114:
+            pool.name: azsdk-pool-mms-ubuntu-1804-general
+            image.name: MMSUbuntu18.04
+            go.version: '1.14'
+          Windows_Go114:
+            pool.name: azsdk-pool-mms-win-2019-general
+            image.name: MMS2019
+            go.version: '1.14'
+      pool:
+        name: $(pool.name)
+        vmImage: $(image.name)
+      steps:
+      - template: /eng/common/pipelines/templates/steps/verify-agent-os.yml
+        parameters:
+          AgentImage: $(image.name)
+
+      - task: GoTool@0
+        inputs:
+          version: '$(go.version)'
+        displayName: "Select Go Version"
+
+      - template: ../steps/create-go-workspace.yml
+
+      - template: ../steps/set-scope.yml
+        parameters: 
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          GoWorkspace: $(GO_WORKSPACE_PATH)
+
+      - template: ../steps/build.yml
+        parameters: 
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          GoWorkspace: $(GO_WORKSPACE_PATH)
+          Scope: $(SCOPE)
+          Image: $(vm.image)
+          GoVersion: $(go.version)
+
+    - job: Analyze
+      displayName: Analyze
+      variables:
+        - template: ../variables/globals.yml
+      pool:
+        name: azsdk-pool-mms-ubuntu-1804-general
+
+      steps:
+      - task: GoTool@0
+        inputs:
+          version: '1.15'
+        displayName: "Select Go Version"
+
+      - template: ../steps/create-go-workspace.yml
+
+      - template: ../steps/set-scope.yml
+        parameters: 
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          GoWorkspace: $(GO_WORKSPACE_PATH)
+
+      - template: ../steps/analyze.yml
+        parameters: 
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          GoWorkspace: $(GO_WORKSPACE_PATH)
+          Scope: $(SCOPE)
+          LintVersion: $(GoLintCLIVersion)
+
+# Below stage won't work until the release stage is added/necessary. 
+# "Releasing" is just the package in the repository on github, but there may be some other metadata related
+# tasks that become necessary later on.
+
+  # The Prerelease and Release stages are conditioned on whether we are building a pull request and the branch.
+  # - ${{if and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables['System.TeamProject'], 'internal'))}}:
+  #   - template: archetype-go-release.yml
+  #     parameters:
+  #       DependsOn: Build
+  #       ServiceDirectory: ${{parameters.ServiceDirectory}}
+  #       Artifacts: ${{parameters.Artifacts}}
+  #       ArtifactName: packages
+  #       DocArtifact: documentation

@@ -1,0 +1,16 @@
+{
+  "pagination": {
+    "ListAccountRoles": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "roleList"
+    },
+    "ListAccounts": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "accountList"
+    }
+  }
+}

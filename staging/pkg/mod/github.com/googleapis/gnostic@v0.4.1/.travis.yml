@@ -1,0 +1,34 @@
+# Travis CI build file for OpenAPI Compiler, including Go and Swift plugins
+
+# Use Ubuntu 14.04
+dist: trusty
+
+sudo: false
+
+language: go
+
+go:
+- "1.13"
+
+addons:
+  apt:
+    packages:
+    - clang-3.8
+    - lldb-3.8
+    - libicu-dev
+    - libtool
+    - libcurl4-openssl-dev
+    - libbsd-dev
+    - build-essential
+    - libssl-dev
+    - uuid-dev
+    - curl
+    - unzip
+
+install:
+  - ./.travis-install.sh
+  - export PATH=.:$HOME/local/bin:$PATH
+  - make
+
+script:
+  - make test

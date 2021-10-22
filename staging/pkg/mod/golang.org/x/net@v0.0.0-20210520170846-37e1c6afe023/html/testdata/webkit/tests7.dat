@@ -1,0 +1,418 @@
+#data
+<!doctype html><body><title>X</title>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <title>
+|       "X"
+
+#data
+<!doctype html><table><title>X</title></table>
+#errors
+(1,29): unexpected-start-tag-implies-table-voodoo
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <title>
+|       "X"
+|     <table>
+
+#data
+<!doctype html><head></head><title>X</title>
+#errors
+(1,35): unexpected-start-tag-out-of-my-head
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <title>
+|       "X"
+|   <body>
+
+#data
+<!doctype html></head><title>X</title>
+#errors
+(1,29): unexpected-start-tag-out-of-my-head
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <title>
+|       "X"
+|   <body>
+
+#data
+<!doctype html><table><meta></table>
+#errors
+(1,28): unexpected-start-tag-implies-table-voodoo
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <meta>
+|     <table>
+
+#data
+<!doctype html><table>X<tr><td><table> <meta></table></table>
+#errors
+unexpected text in table
+(1,45): unexpected-start-tag-implies-table-voodoo
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "X"
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <meta>
+|             <table>
+|               " "
+
+#data
+<!doctype html><html> <head>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!doctype html> <head>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!doctype html><table><style> <tr>x </style> </table>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <style>
+|         " <tr>x "
+|       " "
+
+#data
+<!doctype html><table><TBODY><script> <tr>x </script> </table>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <script>
+|           " <tr>x "
+|         " "
+
+#data
+<!doctype html><p><applet><p>X</p></applet>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <applet>
+|         <p>
+|           "X"
+
+#data
+<!doctype html><p><object type="application/x-non-existant-plugin"><p>X</p></object>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <object>
+|         type="application/x-non-existant-plugin"
+|         <p>
+|           "X"
+
+#data
+<!doctype html><listing>
+X</listing>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <listing>
+|       "X"
+
+#data
+<!doctype html><select><input>X
+#errors
+(1,30): unexpected-input-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|     <input>
+|     "X"
+
+#data
+<!doctype html><select><select>X
+#errors
+(1,31): unexpected-select-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|     "X"
+
+#data
+<!doctype html><table><input type=hidDEN></table>
+#errors
+(1,41): unexpected-hidden-input-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <input>
+|         type="hidDEN"
+
+#data
+<!doctype html><table>X<input type=hidDEN></table>
+#errors
+(1,23): foster-parenting-character
+(1,42): unexpected-hidden-input-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "X"
+|     <table>
+|       <input>
+|         type="hidDEN"
+
+#data
+<!doctype html><table>  <input type=hidDEN></table>
+#errors
+(1,43): unexpected-hidden-input-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       "  "
+|       <input>
+|         type="hidDEN"
+
+#data
+<!doctype html><table>  <input type='hidDEN'></table>
+#errors
+(1,45): unexpected-hidden-input-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       "  "
+|       <input>
+|         type="hidDEN"
+
+#data
+<!doctype html><table><input type=" hidden"><input type=hidDEN></table>
+#errors
+(1,44): unexpected-start-tag-implies-table-voodoo
+(1,63): unexpected-hidden-input-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <input>
+|       type=" hidden"
+|     <table>
+|       <input>
+|         type="hidDEN"
+
+#data
+<!doctype html><table><select>X<tr>
+#errors
+(1,30): unexpected-start-tag-implies-table-voodoo
+(1,35): unexpected-table-element-start-tag-in-select-in-table
+(1,35): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "X"
+|     <table>
+|       <tbody>
+|         <tr>
+
+#data
+<!doctype html><select>X</select>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "X"
+
+#data
+<!DOCTYPE hTmL><html></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE HTML><html></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<body>X</body></body>
+#errors
+(1,21): unexpected-end-tag-after-body
+#document-fragment
+html
+#document
+| <head>
+| <body>
+|   "X"
+
+#data
+<div><p>a</x> b
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,13): unexpected-end-tag
+(1,15): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <p>
+|         "a b"
+
+#data
+<table><tr><td><code></code> </table>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <code>
+|             " "
+
+#data
+<table><b><tr><td>aaa</td></tr>bbb</table>ccc
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,10): foster-parenting-start-tag
+(1,32): foster-parenting-character
+(1,33): foster-parenting-character
+(1,34): foster-parenting-character
+(1,45): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|     <b>
+|       "bbb"
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             "aaa"
+|     <b>
+|       "ccc"
+
+#data
+A<table><tr> B</tr> B</table>
+#errors
+(1,1): expected-doctype-but-got-chars
+(1,13): foster-parenting-character
+(1,14): foster-parenting-character
+(1,20): foster-parenting-character
+(1,21): foster-parenting-character
+#document
+| <html>
+|   <head>
+|   <body>
+|     "A B B"
+|     <table>
+|       <tbody>
+|         <tr>
+
+#data
+A<table><tr> B</tr> </em>C</table>
+#errors
+(1,1): expected-doctype-but-got-chars
+(1,13): foster-parenting-character
+(1,14): foster-parenting-character
+(1,20): foster-parenting-character
+(1,25): unexpected-end-tag
+(1,25): unexpected-end-tag-in-special-element
+(1,26): foster-parenting-character
+#document
+| <html>
+|   <head>
+|   <body>
+|     "A BC"
+|     <table>
+|       <tbody>
+|         <tr>
+|         " "
+
+#data
+<select><keygen>
+#errors
+(1,8): expected-doctype-but-got-start-tag
+(1,16): unexpected-input-in-select
+#document
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|     <keygen>

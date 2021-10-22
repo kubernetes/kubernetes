@@ -1,0 +1,14 @@
+{
+  "pagination": {
+    "ListSecretVersionIds": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListSecrets": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

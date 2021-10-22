@@ -1,0 +1,1072 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS IoT Things Graph</fullname> <p>AWS IoT Things Graph provides an integrated set of tools that enable developers to connect devices and services that use different standards, such as units of measure and communication protocols. AWS IoT Things Graph makes it possible to build IoT applications with little to no code by connecting devices and services and defining how they interact at an abstract level.</p> <p>For more information about how AWS IoT Things Graph works, see the <a href=\"https://docs.aws.amazon.com/thingsgraph/latest/ug/iot-tg-whatis.html\">User Guide</a>.</p>",
+  "operations": {
+    "AssociateEntityToThing": "<p>Associates a device with a concrete thing that is in the user's registry.</p> <p>A thing can be associated with only one device at a time. If you associate a thing with a new device id, its previous association will be removed.</p>",
+    "CreateFlowTemplate": "<p>Creates a workflow template. Workflows can be created only in the user's namespace. (The public namespace contains only entities.) The workflow can contain only entities in the specified namespace. The workflow is validated against the entities in the latest version of the user's namespace unless another namespace version is specified in the request.</p>",
+    "CreateSystemInstance": "<p>Creates a system instance. </p> <p>This action validates the system instance, prepares the deployment-related resources. For Greengrass deployments, it updates the Greengrass group that is specified by the <code>greengrassGroupName</code> parameter. It also adds a file to the S3 bucket specified by the <code>s3BucketName</code> parameter. You need to call <code>DeploySystemInstance</code> after running this action.</p> <p>For Greengrass deployments, since this action modifies and adds resources to a Greengrass group and an S3 bucket on the caller's behalf, the calling identity must have write permissions to both the specified Greengrass group and S3 bucket. Otherwise, the call will fail with an authorization error.</p> <p>For cloud deployments, this action requires a <code>flowActionsRoleArn</code> value. This is an IAM role that has permissions to access AWS services, such as AWS Lambda and AWS IoT, that the flow uses when it executes.</p> <p>If the definition document doesn't specify a version of the user's namespace, the latest version will be used by default.</p>",
+    "CreateSystemTemplate": "<p>Creates a system. The system is validated against the entities in the latest version of the user's namespace unless another namespace version is specified in the request.</p>",
+    "DeleteFlowTemplate": "<p>Deletes a workflow. Any new system or deployment that contains this workflow will fail to update or deploy. Existing deployments that contain the workflow will continue to run (since they use a snapshot of the workflow taken at the time of deployment).</p>",
+    "DeleteNamespace": "<p>Deletes the specified namespace. This action deletes all of the entities in the namespace. Delete the systems and flows that use entities in the namespace before performing this action.</p>",
+    "DeleteSystemInstance": "<p>Deletes a system instance. Only system instances that have never been deployed, or that have been undeployed can be deleted.</p> <p>Users can create a new system instance that has the same ID as a deleted system instance.</p>",
+    "DeleteSystemTemplate": "<p>Deletes a system. New deployments can't contain the system after its deletion. Existing deployments that contain the system will continue to work because they use a snapshot of the system that is taken when it is deployed.</p>",
+    "DeploySystemInstance": "<p> <b>Greengrass and Cloud Deployments</b> </p> <p>Deploys the system instance to the target specified in <code>CreateSystemInstance</code>. </p> <p> <b>Greengrass Deployments</b> </p> <p>If the system or any workflows and entities have been updated before this action is called, then the deployment will create a new Amazon Simple Storage Service resource file and then deploy it.</p> <p>Since this action creates a Greengrass deployment on the caller's behalf, the calling identity must have write permissions to the specified Greengrass group. Otherwise, the call will fail with an authorization error.</p> <p>For information about the artifacts that get added to your Greengrass core device when you use this API, see <a href=\"https://docs.aws.amazon.com/thingsgraph/latest/ug/iot-tg-greengrass.html\">AWS IoT Things Graph and AWS IoT Greengrass</a>.</p>",
+    "DeprecateFlowTemplate": "<p>Deprecates the specified workflow. This action marks the workflow for deletion. Deprecated flows can't be deployed, but existing deployments will continue to run.</p>",
+    "DeprecateSystemTemplate": "<p>Deprecates the specified system.</p>",
+    "DescribeNamespace": "<p>Gets the latest version of the user's namespace and the public version that it is tracking.</p>",
+    "DissociateEntityFromThing": "<p>Dissociates a device entity from a concrete thing. The action takes only the type of the entity that you need to dissociate because only one entity of a particular type can be associated with a thing.</p>",
+    "GetEntities": "<p>Gets definitions of the specified entities. Uses the latest version of the user's namespace by default. This API returns the following TDM entities.</p> <ul> <li> <p>Properties</p> </li> <li> <p>States</p> </li> <li> <p>Events</p> </li> <li> <p>Actions</p> </li> <li> <p>Capabilities</p> </li> <li> <p>Mappings</p> </li> <li> <p>Devices</p> </li> <li> <p>Device Models</p> </li> <li> <p>Services</p> </li> </ul> <p>This action doesn't return definitions for systems, flows, and deployments.</p>",
+    "GetFlowTemplate": "<p>Gets the latest version of the <code>DefinitionDocument</code> and <code>FlowTemplateSummary</code> for the specified workflow.</p>",
+    "GetFlowTemplateRevisions": "<p>Gets revisions of the specified workflow. Only the last 100 revisions are stored. If the workflow has been deprecated, this action will return revisions that occurred before the deprecation. This action won't work for workflows that have been deleted.</p>",
+    "GetNamespaceDeletionStatus": "<p>Gets the status of a namespace deletion task.</p>",
+    "GetSystemInstance": "<p>Gets a system instance.</p>",
+    "GetSystemTemplate": "<p>Gets a system.</p>",
+    "GetSystemTemplateRevisions": "<p>Gets revisions made to the specified system template. Only the previous 100 revisions are stored. If the system has been deprecated, this action will return the revisions that occurred before its deprecation. This action won't work with systems that have been deleted.</p>",
+    "GetUploadStatus": "<p>Gets the status of the specified upload.</p>",
+    "ListFlowExecutionMessages": "<p>Returns a list of objects that contain information about events in a flow execution.</p>",
+    "ListTagsForResource": "<p>Lists all tags on an AWS IoT Things Graph resource.</p>",
+    "SearchEntities": "<p>Searches for entities of the specified type. You can search for entities in your namespace and the public namespace that you're tracking.</p>",
+    "SearchFlowExecutions": "<p>Searches for AWS IoT Things Graph workflow execution instances.</p>",
+    "SearchFlowTemplates": "<p>Searches for summary information about workflows.</p>",
+    "SearchSystemInstances": "<p>Searches for system instances in the user's account.</p>",
+    "SearchSystemTemplates": "<p>Searches for summary information about systems in the user's account. You can filter by the ID of a workflow to return only systems that use the specified workflow.</p>",
+    "SearchThings": "<p>Searches for things associated with the specified entity. You can search by both device and device model.</p> <p>For example, if two different devices, camera1 and camera2, implement the camera device model, the user can associate thing1 to camera1 and thing2 to camera2. <code>SearchThings(camera2)</code> will return only thing2, but <code>SearchThings(camera)</code> will return both thing1 and thing2.</p> <p>This action searches for exact matches and doesn't perform partial text matching.</p>",
+    "TagResource": "<p>Creates a tag for the specified resource.</p>",
+    "UndeploySystemInstance": "<p>Removes a system instance from its target (Cloud or Greengrass).</p>",
+    "UntagResource": "<p>Removes a tag from the specified resource.</p>",
+    "UpdateFlowTemplate": "<p>Updates the specified workflow. All deployed systems and system instances that use the workflow will see the changes in the flow when it is redeployed. If you don't want this behavior, copy the workflow (creating a new workflow with a different ID), and update the copy. The workflow can contain only entities in the specified namespace. </p>",
+    "UpdateSystemTemplate": "<p>Updates the specified system. You don't need to run this action after updating a workflow. Any deployment that uses the system will see the changes in the system when it is redeployed.</p>",
+    "UploadEntityDefinitions": "<p>Asynchronously uploads one or more entity definitions to the user's namespace. The <code>document</code> parameter is required if <code>syncWithPublicNamespace</code> and <code>deleteExistingEntites</code> are false. If the <code>syncWithPublicNamespace</code> parameter is set to <code>true</code>, the user's namespace will synchronize with the latest version of the public namespace. If <code>deprecateExistingEntities</code> is set to true, all entities in the latest version will be deleted before the new <code>DefinitionDocument</code> is uploaded.</p> <p>When a user uploads entity definitions for the first time, the service creates a new namespace for the user. The new namespace tracks the public namespace. Currently users can have only one namespace. The namespace version increments whenever a user uploads entity definitions that are backwards-incompatible and whenever a user sets the <code>syncWithPublicNamespace</code> parameter or the <code>deprecateExistingEntities</code> parameter to <code>true</code>.</p> <p>The IDs for all of the entities should be in URN format. Each entity must be in the user's namespace. Users can't create entities in the public namespace, but entity definitions can refer to entities in the public namespace.</p> <p>Valid entities are <code>Device</code>, <code>DeviceModel</code>, <code>Service</code>, <code>Capability</code>, <code>State</code>, <code>Action</code>, <code>Event</code>, <code>Property</code>, <code>Mapping</code>, <code>Enum</code>. </p>"
+  },
+  "shapes": {
+    "Arn": {
+      "base": null,
+      "refs": {
+        "DeleteNamespaceResponse$namespaceArn": "<p>The ARN of the namespace to be deleted.</p>",
+        "DescribeNamespaceResponse$namespaceArn": "<p>The ARN of the namespace.</p>",
+        "EntityDescription$arn": "<p>The entity ARN.</p>",
+        "FlowTemplateSummary$arn": "<p>The ARN of the workflow.</p>",
+        "GetNamespaceDeletionStatusResponse$namespaceArn": "<p>The ARN of the namespace that is being deleted.</p>",
+        "GetUploadStatusResponse$namespaceArn": "<p>The ARN of the upload.</p>",
+        "SystemInstanceSummary$arn": "<p>The ARN of the system instance.</p>",
+        "SystemTemplateSummary$arn": "<p>The ARN of the system.</p>"
+      }
+    },
+    "AssociateEntityToThingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateEntityToThingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFlowTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFlowTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSystemInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSystemInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSystemTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSystemTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DefinitionDocument": {
+      "base": "<p>A document that defines an entity. </p>",
+      "refs": {
+        "CreateFlowTemplateRequest$definition": "<p>The workflow <code>DefinitionDocument</code>.</p>",
+        "CreateSystemInstanceRequest$definition": null,
+        "CreateSystemTemplateRequest$definition": "<p>The <code>DefinitionDocument</code> used to create the system.</p>",
+        "EntityDescription$definition": "<p>The definition document of the entity.</p>",
+        "FlowTemplateDescription$definition": "<p>A workflow's definition document.</p>",
+        "SystemInstanceDescription$definition": null,
+        "SystemTemplateDescription$definition": "<p>The definition document of a system.</p>",
+        "UpdateFlowTemplateRequest$definition": "<p>The <code>DefinitionDocument</code> that contains the updated workflow definition.</p>",
+        "UpdateSystemTemplateRequest$definition": "<p>The <code>DefinitionDocument</code> that contains the updated system definition.</p>",
+        "UploadEntityDefinitionsRequest$document": "<p>The <code>DefinitionDocument</code> that defines the updated entities.</p>"
+      }
+    },
+    "DefinitionLanguage": {
+      "base": null,
+      "refs": {
+        "DefinitionDocument$language": "<p>The language used to define the entity. <code>GRAPHQL</code> is the only valid value.</p>"
+      }
+    },
+    "DefinitionText": {
+      "base": null,
+      "refs": {
+        "DefinitionDocument$text": "<p>The GraphQL text that defines the entity.</p>"
+      }
+    },
+    "DeleteFlowTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFlowTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNamespaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNamespaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSystemInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSystemInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSystemTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSystemTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DependencyRevision": {
+      "base": "<p>An object that contains the ID and revision number of a workflow or system that is part of a deployment.</p>",
+      "refs": {
+        "DependencyRevisions$member": null
+      }
+    },
+    "DependencyRevisions": {
+      "base": null,
+      "refs": {
+        "SystemInstanceDescription$validatedDependencyRevisions": "<p>A list of objects that contain all of the IDs and revision numbers of workflows and systems that are used in a system instance.</p>"
+      }
+    },
+    "DeploySystemInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeploySystemInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeploymentTarget": {
+      "base": null,
+      "refs": {
+        "CreateSystemInstanceRequest$target": "<p>The target type of the deployment. Valid values are <code>GREENGRASS</code> and <code>CLOUD</code>.</p>",
+        "SystemInstanceSummary$target": "<p>The target of the system instance.</p>"
+      }
+    },
+    "DeprecateExistingEntities": {
+      "base": null,
+      "refs": {
+        "UploadEntityDefinitionsRequest$deprecateExistingEntities": "<p>A Boolean that specifies whether to deprecate all entities in the latest version before uploading the new <code>DefinitionDocument</code>. If set to <code>true</code>, the upload will create a new namespace version.</p>"
+      }
+    },
+    "DeprecateFlowTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeprecateFlowTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeprecateSystemTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeprecateSystemTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeNamespaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeNamespaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DissociateEntityFromThingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DissociateEntityFromThingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Enabled": {
+      "base": null,
+      "refs": {
+        "MetricsConfiguration$cloudMetricEnabled": "<p>A Boolean that specifies whether cloud metrics are collected.</p>"
+      }
+    },
+    "EntityDescription": {
+      "base": "<p>Describes the properties of an entity.</p>",
+      "refs": {
+        "EntityDescriptions$member": null
+      }
+    },
+    "EntityDescriptions": {
+      "base": null,
+      "refs": {
+        "GetEntitiesResponse$descriptions": "<p>An array of descriptions for the specified entities.</p>",
+        "SearchEntitiesResponse$descriptions": "<p>An array of descriptions for each entity returned in the search result.</p>"
+      }
+    },
+    "EntityFilter": {
+      "base": "<p>An object that filters an entity search. Multiple filters function as OR criteria in the search. For example a search that includes a <code>NAMESPACE</code> and a <code>REFERENCED_ENTITY_ID</code> filter searches for entities in the specified namespace that use the entity specified by the value of <code>REFERENCED_ENTITY_ID</code>.</p>",
+      "refs": {
+        "EntityFilters$member": null
+      }
+    },
+    "EntityFilterName": {
+      "base": null,
+      "refs": {
+        "EntityFilter$name": "<p>The name of the entity search filter field. <code>REFERENCED_ENTITY_ID</code> filters on entities that are used by the entity in the result set. For example, you can filter on the ID of a property that is used in a state.</p>"
+      }
+    },
+    "EntityFilterValue": {
+      "base": null,
+      "refs": {
+        "EntityFilterValues$member": null
+      }
+    },
+    "EntityFilterValues": {
+      "base": null,
+      "refs": {
+        "EntityFilter$value": "<p>An array of string values for the search filter field. Multiple values function as AND criteria in the search.</p>"
+      }
+    },
+    "EntityFilters": {
+      "base": null,
+      "refs": {
+        "SearchEntitiesRequest$filters": "<p>Optional filter to apply to the search. Valid filters are <code>NAME</code> <code>NAMESPACE</code>, <code>SEMANTIC_TYPE_PATH</code> and <code>REFERENCED_ENTITY_ID</code>. <code>REFERENCED_ENTITY_ID</code> filters on entities that are used by the entity in the result set. For example, you can filter on the ID of a property that is used in a state.</p> <p>Multiple filters function as OR criteria in the query. Multiple values passed inside the filter function as AND criteria.</p>"
+      }
+    },
+    "EntityType": {
+      "base": null,
+      "refs": {
+        "DissociateEntityFromThingRequest$entityType": "<p>The entity type from which to disassociate the thing.</p>",
+        "EntityDescription$type": "<p>The entity type.</p>",
+        "EntityTypes$member": null
+      }
+    },
+    "EntityTypes": {
+      "base": null,
+      "refs": {
+        "SearchEntitiesRequest$entityTypes": "<p>The entity types for which to search.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InternalFailureException$message": null,
+        "InvalidRequestException$message": null,
+        "LimitExceededException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceInUseException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ThrottlingException$message": null
+      }
+    },
+    "FlowExecutionEventType": {
+      "base": null,
+      "refs": {
+        "FlowExecutionMessage$eventType": "<p>The type of flow event .</p>"
+      }
+    },
+    "FlowExecutionId": {
+      "base": null,
+      "refs": {
+        "FlowExecutionSummary$flowExecutionId": "<p>The ID of the flow execution.</p>",
+        "ListFlowExecutionMessagesRequest$flowExecutionId": "<p>The ID of the flow execution.</p>",
+        "SearchFlowExecutionsRequest$flowExecutionId": "<p>The ID of a flow execution.</p>"
+      }
+    },
+    "FlowExecutionMessage": {
+      "base": "<p>An object that contains information about a flow event.</p>",
+      "refs": {
+        "FlowExecutionMessages$member": null
+      }
+    },
+    "FlowExecutionMessageId": {
+      "base": null,
+      "refs": {
+        "FlowExecutionMessage$messageId": "<p>The unique identifier of the message.</p>"
+      }
+    },
+    "FlowExecutionMessagePayload": {
+      "base": null,
+      "refs": {
+        "FlowExecutionMessage$payload": "<p>A string containing information about the flow event.</p>"
+      }
+    },
+    "FlowExecutionMessages": {
+      "base": null,
+      "refs": {
+        "ListFlowExecutionMessagesResponse$messages": "<p>A list of objects that contain information about events in the specified flow execution.</p>"
+      }
+    },
+    "FlowExecutionStatus": {
+      "base": null,
+      "refs": {
+        "FlowExecutionSummary$status": "<p>The current status of the flow execution.</p>"
+      }
+    },
+    "FlowExecutionSummaries": {
+      "base": null,
+      "refs": {
+        "SearchFlowExecutionsResponse$summaries": "<p>An array of objects that contain summary information about each workflow execution in the result set.</p>"
+      }
+    },
+    "FlowExecutionSummary": {
+      "base": "<p>An object that contains summary information about a flow execution.</p>",
+      "refs": {
+        "FlowExecutionSummaries$member": null
+      }
+    },
+    "FlowTemplateDescription": {
+      "base": "<p>An object that contains a workflow's definition and summary information.</p>",
+      "refs": {
+        "GetFlowTemplateResponse$description": "<p>The object that describes the specified workflow.</p>"
+      }
+    },
+    "FlowTemplateFilter": {
+      "base": "<p>An object that filters a workflow search.</p>",
+      "refs": {
+        "FlowTemplateFilters$member": null
+      }
+    },
+    "FlowTemplateFilterName": {
+      "base": null,
+      "refs": {
+        "FlowTemplateFilter$name": "<p>The name of the search filter field.</p>"
+      }
+    },
+    "FlowTemplateFilterValue": {
+      "base": null,
+      "refs": {
+        "FlowTemplateFilterValues$member": null
+      }
+    },
+    "FlowTemplateFilterValues": {
+      "base": null,
+      "refs": {
+        "FlowTemplateFilter$value": "<p>An array of string values for the search filter field. Multiple values function as AND criteria in the search.</p>"
+      }
+    },
+    "FlowTemplateFilters": {
+      "base": null,
+      "refs": {
+        "SearchFlowTemplatesRequest$filters": "<p>An array of objects that limit the result set. The only valid filter is <code>DEVICE_MODEL_ID</code>.</p>"
+      }
+    },
+    "FlowTemplateSummaries": {
+      "base": null,
+      "refs": {
+        "GetFlowTemplateRevisionsResponse$summaries": "<p>An array of objects that provide summary data about each revision.</p>",
+        "SearchFlowTemplatesResponse$summaries": "<p>An array of objects that contain summary information about each workflow in the result set.</p>"
+      }
+    },
+    "FlowTemplateSummary": {
+      "base": "<p>An object that contains summary information about a workflow.</p>",
+      "refs": {
+        "CreateFlowTemplateResponse$summary": "<p>The summary object that describes the created workflow.</p>",
+        "FlowTemplateDescription$summary": "<p>An object that contains summary information about a workflow.</p>",
+        "FlowTemplateSummaries$member": null,
+        "UpdateFlowTemplateResponse$summary": "<p>An object containing summary information about the updated workflow.</p>"
+      }
+    },
+    "GetEntitiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEntitiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFlowTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFlowTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFlowTemplateRevisionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFlowTemplateRevisionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNamespaceDeletionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNamespaceDeletionStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemTemplateRevisionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSystemTemplateRevisionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetUploadStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetUploadStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GreengrassDeploymentId": {
+      "base": null,
+      "refs": {
+        "DeploySystemInstanceResponse$greengrassDeploymentId": "<p>The ID of the Greengrass deployment used to deploy the system instance.</p>"
+      }
+    },
+    "GreengrassGroupId": {
+      "base": null,
+      "refs": {
+        "SystemInstanceSummary$greengrassGroupId": "<p>The ID of the Greengrass group where the system instance is deployed.</p>"
+      }
+    },
+    "GreengrassGroupVersionId": {
+      "base": null,
+      "refs": {
+        "SystemInstanceSummary$greengrassGroupVersionId": "<p>The version of the Greengrass group where the system instance is deployed.</p>"
+      }
+    },
+    "GroupName": {
+      "base": null,
+      "refs": {
+        "CreateSystemInstanceRequest$greengrassGroupName": "<p>The name of the Greengrass group where the system instance will be deployed. This value is required if the value of the <code>target</code> parameter is <code>GREENGRASS</code>.</p>",
+        "SystemInstanceSummary$greengrassGroupName": "<p>The ID of the Greengrass group where the system instance is deployed.</p>"
+      }
+    },
+    "InternalFailureException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ListFlowExecutionMessagesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFlowExecutionMessagesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetFlowTemplateRevisionsRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "GetSystemTemplateRevisionsRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "ListFlowExecutionMessagesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "ListTagsForResourceRequest$maxResults": "<p>The maximum number of tags to return.</p>",
+        "SearchEntitiesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "SearchFlowExecutionsRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "SearchFlowTemplatesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "SearchSystemInstancesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "SearchSystemTemplatesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>",
+        "SearchThingsRequest$maxResults": "<p>The maximum number of results to return in the response.</p>"
+      }
+    },
+    "MetricsConfiguration": {
+      "base": "<p>An object that specifies whether cloud metrics are collected in a deployment and, if so, what role is used to collect metrics.</p>",
+      "refs": {
+        "CreateSystemInstanceRequest$metricsConfiguration": null,
+        "SystemInstanceDescription$metricsConfiguration": null
+      }
+    },
+    "NamespaceDeletionStatus": {
+      "base": null,
+      "refs": {
+        "GetNamespaceDeletionStatusResponse$status": "<p>The status of the deletion request.</p>"
+      }
+    },
+    "NamespaceDeletionStatusErrorCodes": {
+      "base": null,
+      "refs": {
+        "GetNamespaceDeletionStatusResponse$errorCode": "<p>An error code returned by the namespace deletion task.</p>"
+      }
+    },
+    "NamespaceName": {
+      "base": null,
+      "refs": {
+        "DeleteNamespaceResponse$namespaceName": "<p>The name of the namespace to be deleted.</p>",
+        "DescribeNamespaceRequest$namespaceName": "<p>The name of the user's namespace. Set this to <code>aws</code> to get the public namespace.</p>",
+        "DescribeNamespaceResponse$namespaceName": "<p>The name of the namespace.</p>",
+        "DescribeNamespaceResponse$trackingNamespaceName": "<p>The name of the public namespace that the latest namespace version is tracking.</p>",
+        "GetNamespaceDeletionStatusResponse$namespaceName": "<p>The name of the namespace that is being deleted.</p>",
+        "GetUploadStatusResponse$namespaceName": "<p>The name of the upload's namespace.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "GetFlowTemplateRevisionsRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "GetFlowTemplateRevisionsResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>",
+        "GetSystemTemplateRevisionsRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "GetSystemTemplateRevisionsResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results. </p>",
+        "ListFlowExecutionMessagesRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "ListFlowExecutionMessagesResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results. </p>",
+        "ListTagsForResourceRequest$nextToken": "<p>The token that specifies the next page of results to return.</p>",
+        "ListTagsForResourceResponse$nextToken": "<p>The token that specifies the next page of results to return.</p>",
+        "SearchEntitiesRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchEntitiesResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>",
+        "SearchFlowExecutionsRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchFlowExecutionsResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>",
+        "SearchFlowTemplatesRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchFlowTemplatesResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>",
+        "SearchSystemInstancesRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchSystemInstancesResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results. </p>",
+        "SearchSystemTemplatesRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchSystemTemplatesResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>",
+        "SearchThingsRequest$nextToken": "<p>The string that specifies the next page of results. Use this when you're paginating results.</p>",
+        "SearchThingsResponse$nextToken": "<p>The string to specify as <code>nextToken</code> when you request the next page of results.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource whose tags are to be returned.</p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource whose tags are returned.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource whose tags are to be removed.</p>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "CreateSystemInstanceRequest$flowActionsRoleArn": "<p>The ARN of the IAM role that AWS IoT Things Graph will assume when it executes the flow. This role must have read and write access to AWS Lambda and AWS IoT and any other AWS services that the flow uses when it executes. This value is required if the value of the <code>target</code> parameter is <code>CLOUD</code>.</p>",
+        "MetricsConfiguration$metricRuleRoleArn": "<p>The ARN of the role that is used to collect cloud metrics.</p>",
+        "SystemInstanceDescription$flowActionsRoleArn": "<p>The AWS Identity and Access Management (IAM) role that AWS IoT Things Graph assumes during flow execution in a cloud deployment. This role must have read and write permissionss to AWS Lambda and AWS IoT and to any other AWS services that the flow uses.</p>"
+      }
+    },
+    "S3BucketName": {
+      "base": null,
+      "refs": {
+        "CreateSystemInstanceRequest$s3BucketName": "<p>The name of the Amazon Simple Storage Service bucket that will be used to store and deploy the system instance's resource file. This value is required if the value of the <code>target</code> parameter is <code>GREENGRASS</code>.</p>",
+        "SystemInstanceDescription$s3BucketName": "<p>The Amazon Simple Storage Service bucket where information about a system instance is stored.</p>"
+      }
+    },
+    "SearchEntitiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchEntitiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchFlowExecutionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchFlowExecutionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchFlowTemplatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchFlowTemplatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchSystemInstancesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchSystemInstancesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchSystemTemplatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchSystemTemplatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchThingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchThingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "GetNamespaceDeletionStatusResponse$errorMessage": "<p>An error code returned by the namespace deletion task.</p>",
+        "StringList$member": null
+      }
+    },
+    "StringList": {
+      "base": null,
+      "refs": {
+        "GetUploadStatusResponse$failureReason": "<p>The reason for an upload failure.</p>"
+      }
+    },
+    "SyncWithPublicNamespace": {
+      "base": null,
+      "refs": {
+        "UploadEntityDefinitionsRequest$syncWithPublicNamespace": "<p>A Boolean that specifies whether to synchronize with the latest version of the public namespace. If set to <code>true</code>, the upload will create a new namespace version.</p>"
+      }
+    },
+    "SystemInstanceDeploymentStatus": {
+      "base": null,
+      "refs": {
+        "SystemInstanceSummary$status": "<p>The status of the system instance.</p>"
+      }
+    },
+    "SystemInstanceDescription": {
+      "base": "<p>An object that contains a system instance definition and summary information.</p>",
+      "refs": {
+        "GetSystemInstanceResponse$description": "<p>An object that describes the system instance.</p>"
+      }
+    },
+    "SystemInstanceFilter": {
+      "base": "<p>An object that filters a system instance search. Multiple filters function as OR criteria in the search. For example a search that includes a GREENGRASS_GROUP_NAME and a STATUS filter searches for system instances in the specified Greengrass group that have the specified status.</p>",
+      "refs": {
+        "SystemInstanceFilters$member": null
+      }
+    },
+    "SystemInstanceFilterName": {
+      "base": null,
+      "refs": {
+        "SystemInstanceFilter$name": "<p>The name of the search filter field.</p>"
+      }
+    },
+    "SystemInstanceFilterValue": {
+      "base": null,
+      "refs": {
+        "SystemInstanceFilterValues$member": null
+      }
+    },
+    "SystemInstanceFilterValues": {
+      "base": null,
+      "refs": {
+        "SystemInstanceFilter$value": "<p>An array of string values for the search filter field. Multiple values function as AND criteria in the search. </p>"
+      }
+    },
+    "SystemInstanceFilters": {
+      "base": null,
+      "refs": {
+        "SearchSystemInstancesRequest$filters": "<p>Optional filter to apply to the search. Valid filters are <code>SYSTEM_TEMPLATE_ID</code>, <code>STATUS</code>, and <code>GREENGRASS_GROUP_NAME</code>.</p> <p>Multiple filters function as OR criteria in the query. Multiple values passed inside the filter function as AND criteria.</p>"
+      }
+    },
+    "SystemInstanceSummaries": {
+      "base": null,
+      "refs": {
+        "SearchSystemInstancesResponse$summaries": "<p>An array of objects that contain summary data abour the system instances in the result set.</p>"
+      }
+    },
+    "SystemInstanceSummary": {
+      "base": "<p>An object that contains summary information about a system instance.</p>",
+      "refs": {
+        "CreateSystemInstanceResponse$summary": "<p>The summary object that describes the new system instance.</p>",
+        "DeploySystemInstanceResponse$summary": "<p>An object that contains summary information about a system instance that was deployed. </p>",
+        "SystemInstanceDescription$summary": "<p>An object that contains summary information about a system instance.</p>",
+        "SystemInstanceSummaries$member": null,
+        "UndeploySystemInstanceResponse$summary": "<p>An object that contains summary information about the system instance that was removed from its target.</p>"
+      }
+    },
+    "SystemTemplateDescription": {
+      "base": "<p>An object that contains a system's definition document and summary information.</p>",
+      "refs": {
+        "GetSystemTemplateResponse$description": "<p>An object that contains summary data about the system.</p>"
+      }
+    },
+    "SystemTemplateFilter": {
+      "base": "<p>An object that filters a system search.</p>",
+      "refs": {
+        "SystemTemplateFilters$member": null
+      }
+    },
+    "SystemTemplateFilterName": {
+      "base": null,
+      "refs": {
+        "SystemTemplateFilter$name": "<p>The name of the system search filter field.</p>"
+      }
+    },
+    "SystemTemplateFilterValue": {
+      "base": null,
+      "refs": {
+        "SystemTemplateFilterValues$member": null
+      }
+    },
+    "SystemTemplateFilterValues": {
+      "base": null,
+      "refs": {
+        "SystemTemplateFilter$value": "<p>An array of string values for the search filter field. Multiple values function as AND criteria in the search.</p>"
+      }
+    },
+    "SystemTemplateFilters": {
+      "base": null,
+      "refs": {
+        "SearchSystemTemplatesRequest$filters": "<p>An array of filters that limit the result set. The only valid filter is <code>FLOW_TEMPLATE_ID</code>.</p>"
+      }
+    },
+    "SystemTemplateSummaries": {
+      "base": null,
+      "refs": {
+        "GetSystemTemplateRevisionsResponse$summaries": "<p>An array of objects that contain summary data about the system template revisions.</p>",
+        "SearchSystemTemplatesResponse$summaries": "<p>An array of objects that contain summary information about each system deployment in the result set.</p>"
+      }
+    },
+    "SystemTemplateSummary": {
+      "base": "<p>An object that contains information about a system.</p>",
+      "refs": {
+        "CreateSystemTemplateResponse$summary": "<p>The summary object that describes the created system.</p>",
+        "SystemTemplateDescription$summary": "<p>An object that contains summary information about a system.</p>",
+        "SystemTemplateSummaries$member": null,
+        "UpdateSystemTemplateResponse$summary": "<p>An object containing summary information about the updated system.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Metadata assigned to an AWS IoT Things Graph resource consisting of a key-value pair.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>The required name of the tag. The string value can be from 1 to 128 Unicode characters in length.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>A list of tag key names to remove from the resource. You don't specify the value. Both the key and its associated value are removed. </p> <p>This parameter to the API requires a JSON text string argument. For information on how to format a JSON parameter for the various command line tool environments, see <a href=\"https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-parameters.html#cli-using-param-json\">Using JSON for Parameters</a> in the <i>AWS CLI User Guide</i>. </p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateSystemInstanceRequest$tags": "<p>Metadata, consisting of key-value pairs, that can be used to categorize your system instances.</p>",
+        "ListTagsForResourceResponse$tags": "<p>List of tags returned by the <code>ListTagsForResource</code> operation.</p>",
+        "TagResourceRequest$tags": "<p>A list of tags to add to the resource.&gt;</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>The optional value of the tag. The string value can be from 1 to 256 Unicode characters in length.</p>"
+      }
+    },
+    "Thing": {
+      "base": "<p>An AWS IoT thing.</p>",
+      "refs": {
+        "Things$member": null
+      }
+    },
+    "ThingArn": {
+      "base": null,
+      "refs": {
+        "Thing$thingArn": "<p>The ARN of the thing.</p>"
+      }
+    },
+    "ThingName": {
+      "base": null,
+      "refs": {
+        "AssociateEntityToThingRequest$thingName": "<p>The name of the thing to which the entity is to be associated.</p>",
+        "DissociateEntityFromThingRequest$thingName": "<p>The name of the thing to disassociate.</p>",
+        "Thing$thingName": "<p>The name of the thing.</p>"
+      }
+    },
+    "Things": {
+      "base": null,
+      "refs": {
+        "SearchThingsResponse$things": "<p>An array of things in the result set.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "EntityDescription$createdAt": "<p>The time at which the entity was created.</p>",
+        "FlowExecutionMessage$timestamp": "<p>The date and time when the message was last updated.</p>",
+        "FlowExecutionSummary$createdAt": "<p>The date and time when the flow execution summary was created.</p>",
+        "FlowExecutionSummary$updatedAt": "<p>The date and time when the flow execution summary was last updated.</p>",
+        "FlowTemplateSummary$createdAt": "<p>The date when the workflow was created.</p>",
+        "GetUploadStatusResponse$createdDate": "<p>The date at which the upload was created.</p>",
+        "SearchFlowExecutionsRequest$startTime": "<p>The date and time of the earliest flow execution to return.</p>",
+        "SearchFlowExecutionsRequest$endTime": "<p>The date and time of the latest flow execution to return.</p>",
+        "SystemInstanceSummary$createdAt": "<p>The date when the system instance was created.</p>",
+        "SystemInstanceSummary$updatedAt": "<p> The date and time when the system instance was last updated.</p>",
+        "SystemTemplateSummary$createdAt": "<p>The date when the system was created.</p>"
+      }
+    },
+    "UndeploySystemInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UndeploySystemInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFlowTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFlowTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSystemTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSystemTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UploadEntityDefinitionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UploadEntityDefinitionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UploadId": {
+      "base": null,
+      "refs": {
+        "GetUploadStatusRequest$uploadId": "<p>The ID of the upload. This value is returned by the <code>UploadEntityDefinitions</code> action.</p>",
+        "GetUploadStatusResponse$uploadId": "<p>The ID of the upload.</p>",
+        "UploadEntityDefinitionsResponse$uploadId": "<p>The ID that specifies the upload action. You can use this to track the status of the upload.</p>"
+      }
+    },
+    "UploadStatus": {
+      "base": null,
+      "refs": {
+        "GetUploadStatusResponse$uploadStatus": "<p>The status of the upload. The initial status is <code>IN_PROGRESS</code>. The response show all validation failures if the upload fails.</p>"
+      }
+    },
+    "Urn": {
+      "base": null,
+      "refs": {
+        "AssociateEntityToThingRequest$entityId": "<p>The ID of the device to be associated with the thing.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:device:DEVICENAME</code> </p>",
+        "DeleteFlowTemplateRequest$id": "<p>The ID of the workflow to be deleted.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:workflow:WORKFLOWNAME</code> </p>",
+        "DeleteSystemInstanceRequest$id": "<p>The ID of the system instance to be deleted.</p>",
+        "DeleteSystemTemplateRequest$id": "<p>The ID of the system to be deleted.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:system:SYSTEMNAME</code> </p>",
+        "DependencyRevision$id": "<p>The ID of the workflow or system.</p>",
+        "DeploySystemInstanceRequest$id": "<p>The ID of the system instance. This value is returned by the <code>CreateSystemInstance</code> action.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:deployment:DEPLOYMENTNAME</code> </p>",
+        "DeprecateFlowTemplateRequest$id": "<p>The ID of the workflow to be deleted.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:workflow:WORKFLOWNAME</code> </p>",
+        "DeprecateSystemTemplateRequest$id": "<p>The ID of the system to delete.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:system:SYSTEMNAME</code> </p>",
+        "EntityDescription$id": "<p>The entity ID.</p>",
+        "FlowExecutionSummary$systemInstanceId": "<p>The ID of the system instance that contains the flow.</p>",
+        "FlowExecutionSummary$flowTemplateId": "<p>The ID of the flow.</p>",
+        "FlowTemplateSummary$id": "<p>The ID of the workflow.</p>",
+        "GetFlowTemplateRequest$id": "<p>The ID of the workflow.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:workflow:WORKFLOWNAME</code> </p>",
+        "GetFlowTemplateRevisionsRequest$id": "<p>The ID of the workflow.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:workflow:WORKFLOWNAME</code> </p>",
+        "GetSystemInstanceRequest$id": "<p>The ID of the system deployment instance. This value is returned by <code>CreateSystemInstance</code>.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:deployment:DEPLOYMENTNAME</code> </p>",
+        "GetSystemTemplateRequest$id": "<p>The ID of the system to get. This ID must be in the user's namespace.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:system:SYSTEMNAME</code> </p>",
+        "GetSystemTemplateRevisionsRequest$id": "<p>The ID of the system template.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:system:SYSTEMNAME</code> </p>",
+        "SearchFlowExecutionsRequest$systemInstanceId": "<p>The ID of the system instance that contains the flow.</p>",
+        "SearchThingsRequest$entityId": "<p>The ID of the entity to which the things are associated.</p> <p>The IDs should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:device:DEVICENAME</code> </p>",
+        "SystemInstanceSummary$id": "<p>The ID of the system instance.</p>",
+        "SystemTemplateSummary$id": "<p>The ID of the system.</p>",
+        "UndeploySystemInstanceRequest$id": "<p>The ID of the system instance to remove from its target.</p>",
+        "UpdateFlowTemplateRequest$id": "<p>The ID of the workflow to be updated.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:workflow:WORKFLOWNAME</code> </p>",
+        "UpdateSystemTemplateRequest$id": "<p>The ID of the system to be updated.</p> <p>The ID should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:system:SYSTEMNAME</code> </p>",
+        "Urns$member": null
+      }
+    },
+    "Urns": {
+      "base": null,
+      "refs": {
+        "GetEntitiesRequest$ids": "<p>An array of entity IDs.</p> <p>The IDs should be in the following format.</p> <p> <code>urn:tdm:REGION/ACCOUNT ID/default:device:DEVICENAME</code> </p>"
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "AssociateEntityToThingRequest$namespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p>",
+        "CreateFlowTemplateRequest$compatibleNamespaceVersion": "<p>The namespace version in which the workflow is to be created.</p> <p>If no value is specified, the latest version is used by default.</p>",
+        "CreateSystemTemplateRequest$compatibleNamespaceVersion": "<p>The namespace version in which the system is to be created.</p> <p>If no value is specified, the latest version is used by default.</p>",
+        "DependencyRevision$revisionNumber": "<p>The revision number of the workflow or system.</p>",
+        "DescribeNamespaceResponse$trackingNamespaceVersion": "<p>The version of the public namespace that the latest version is tracking.</p>",
+        "DescribeNamespaceResponse$namespaceVersion": "<p>The version of the user's namespace to describe.</p>",
+        "FlowTemplateDescription$validatedNamespaceVersion": "<p>The version of the user's namespace against which the workflow was validated. Use this value in your system instance.</p>",
+        "FlowTemplateSummary$revisionNumber": "<p>The revision number of the workflow.</p>",
+        "GetEntitiesRequest$namespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p>",
+        "GetFlowTemplateRequest$revisionNumber": "<p>The number of the workflow revision to retrieve.</p>",
+        "GetSystemTemplateRequest$revisionNumber": "<p>The number that specifies the revision of the system to get.</p>",
+        "GetUploadStatusResponse$namespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p>",
+        "SearchEntitiesRequest$namespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p>",
+        "SearchThingsRequest$namespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p>",
+        "SystemInstanceDescription$validatedNamespaceVersion": "<p>The version of the user's namespace against which the system instance was validated.</p>",
+        "SystemTemplateDescription$validatedNamespaceVersion": "<p>The namespace version against which the system was validated. Use this value in your system instance.</p>",
+        "SystemTemplateSummary$revisionNumber": "<p>The revision number of the system.</p>",
+        "UpdateFlowTemplateRequest$compatibleNamespaceVersion": "<p>The version of the user's namespace.</p> <p>If no value is specified, the latest version is used by default. Use the <code>GetFlowTemplateRevisions</code> if you want to find earlier revisions of the flow to update.</p>",
+        "UpdateSystemTemplateRequest$compatibleNamespaceVersion": "<p>The version of the user's namespace. Defaults to the latest version of the user's namespace.</p> <p>If no value is specified, the latest version is used by default.</p>"
+      }
+    }
+  }
+}

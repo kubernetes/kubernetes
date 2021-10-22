@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeConnections",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeConnections",
+            "input": {
+                "connectionId": "fake-connection"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

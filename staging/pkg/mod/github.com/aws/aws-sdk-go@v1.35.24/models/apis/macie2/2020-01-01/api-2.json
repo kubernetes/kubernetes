@@ -1,0 +1,5710 @@
+{
+  "metadata": {
+    "apiVersion": "2020-01-01",
+    "endpointPrefix": "macie2",
+    "signingName": "macie2",
+    "serviceFullName": "Amazon Macie 2",
+    "serviceId": "Macie2",
+    "protocol": "rest-json",
+    "jsonVersion": "1.1",
+    "uid": "macie2-2020-01-01",
+    "signatureVersion": "v4"
+  },
+  "operations": {
+    "AcceptInvitation": {
+      "name": "AcceptInvitation",
+      "http": {
+        "method": "POST",
+        "requestUri": "/invitations/accept",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "AcceptInvitationRequest"
+      },
+      "output": {
+        "shape": "AcceptInvitationResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "BatchGetCustomDataIdentifiers": {
+      "name": "BatchGetCustomDataIdentifiers",
+      "http": {
+        "method": "POST",
+        "requestUri": "/custom-data-identifiers/get",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "BatchGetCustomDataIdentifiersRequest"
+      },
+      "output": {
+        "shape": "BatchGetCustomDataIdentifiersResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateClassificationJob": {
+      "name": "CreateClassificationJob",
+      "http": {
+        "method": "POST",
+        "requestUri": "/jobs",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateClassificationJobRequest"
+      },
+      "output": {
+        "shape": "CreateClassificationJobResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateCustomDataIdentifier": {
+      "name": "CreateCustomDataIdentifier",
+      "http": {
+        "method": "POST",
+        "requestUri": "/custom-data-identifiers",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateCustomDataIdentifierRequest"
+      },
+      "output": {
+        "shape": "CreateCustomDataIdentifierResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateFindingsFilter": {
+      "name": "CreateFindingsFilter",
+      "http": {
+        "method": "POST",
+        "requestUri": "/findingsfilters",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateFindingsFilterRequest"
+      },
+      "output": {
+        "shape": "CreateFindingsFilterResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateInvitations": {
+      "name": "CreateInvitations",
+      "http": {
+        "method": "POST",
+        "requestUri": "/invitations",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateInvitationsRequest"
+      },
+      "output": {
+        "shape": "CreateInvitationsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateMember": {
+      "name": "CreateMember",
+      "http": {
+        "method": "POST",
+        "requestUri": "/members",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateMemberRequest"
+      },
+      "output": {
+        "shape": "CreateMemberResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "CreateSampleFindings": {
+      "name": "CreateSampleFindings",
+      "http": {
+        "method": "POST",
+        "requestUri": "/findings/sample",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "CreateSampleFindingsRequest"
+      },
+      "output": {
+        "shape": "CreateSampleFindingsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DeclineInvitations": {
+      "name": "DeclineInvitations",
+      "http": {
+        "method": "POST",
+        "requestUri": "/invitations/decline",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DeclineInvitationsRequest"
+      },
+      "output": {
+        "shape": "DeclineInvitationsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DeleteCustomDataIdentifier": {
+      "name": "DeleteCustomDataIdentifier",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/custom-data-identifiers/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DeleteCustomDataIdentifierRequest"
+      },
+      "output": {
+        "shape": "DeleteCustomDataIdentifierResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DeleteFindingsFilter": {
+      "name": "DeleteFindingsFilter",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/findingsfilters/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DeleteFindingsFilterRequest"
+      },
+      "output": {
+        "shape": "DeleteFindingsFilterResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DeleteInvitations": {
+      "name": "DeleteInvitations",
+      "http": {
+        "method": "POST",
+        "requestUri": "/invitations/delete",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DeleteInvitationsRequest"
+      },
+      "output": {
+        "shape": "DeleteInvitationsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DeleteMember": {
+      "name": "DeleteMember",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/members/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DeleteMemberRequest"
+      },
+      "output": {
+        "shape": "DeleteMemberResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DescribeBuckets": {
+      "name": "DescribeBuckets",
+      "http": {
+        "method": "POST",
+        "requestUri": "/datasources/s3",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeBucketsRequest"
+      },
+      "output": {
+        "shape": "DescribeBucketsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DescribeClassificationJob": {
+      "name": "DescribeClassificationJob",
+      "http": {
+        "method": "GET",
+        "requestUri": "/jobs/{jobId}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeClassificationJobRequest"
+      },
+      "output": {
+        "shape": "DescribeClassificationJobResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DescribeOrganizationConfiguration": {
+      "name": "DescribeOrganizationConfiguration",
+      "http": {
+        "method": "GET",
+        "requestUri": "/admin/configuration",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeOrganizationConfigurationRequest"
+      },
+      "output": {
+        "shape": "DescribeOrganizationConfigurationResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DisableMacie": {
+      "name": "DisableMacie",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/macie",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DisableMacieRequest"
+      },
+      "output": {
+        "shape": "DisableMacieResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DisableOrganizationAdminAccount": {
+      "name": "DisableOrganizationAdminAccount",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/admin",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DisableOrganizationAdminAccountRequest"
+      },
+      "output": {
+        "shape": "DisableOrganizationAdminAccountResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DisassociateFromMasterAccount": {
+      "name": "DisassociateFromMasterAccount",
+      "http": {
+        "method": "POST",
+        "requestUri": "/master/disassociate",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DisassociateFromMasterAccountRequest"
+      },
+      "output": {
+        "shape": "DisassociateFromMasterAccountResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "DisassociateMember": {
+      "name": "DisassociateMember",
+      "http": {
+        "method": "POST",
+        "requestUri": "/members/disassociate/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DisassociateMemberRequest"
+      },
+      "output": {
+        "shape": "DisassociateMemberResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "EnableMacie": {
+      "name": "EnableMacie",
+      "http": {
+        "method": "POST",
+        "requestUri": "/macie",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "EnableMacieRequest"
+      },
+      "output": {
+        "shape": "EnableMacieResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "EnableOrganizationAdminAccount": {
+      "name": "EnableOrganizationAdminAccount",
+      "http": {
+        "method": "POST",
+        "requestUri": "/admin",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "EnableOrganizationAdminAccountRequest"
+      },
+      "output": {
+        "shape": "EnableOrganizationAdminAccountResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetBucketStatistics": {
+      "name": "GetBucketStatistics",
+      "http": {
+        "method": "POST",
+        "requestUri": "/datasources/s3/statistics",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetBucketStatisticsRequest"
+      },
+      "output": {
+        "shape": "GetBucketStatisticsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetClassificationExportConfiguration": {
+      "name": "GetClassificationExportConfiguration",
+      "http": {
+        "method": "GET",
+        "requestUri": "/classification-export-configuration",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetClassificationExportConfigurationRequest"
+      },
+      "output": {
+        "shape": "GetClassificationExportConfigurationResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetCustomDataIdentifier": {
+      "name": "GetCustomDataIdentifier",
+      "http": {
+        "method": "GET",
+        "requestUri": "/custom-data-identifiers/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetCustomDataIdentifierRequest"
+      },
+      "output": {
+        "shape": "GetCustomDataIdentifierResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetFindingStatistics": {
+      "name": "GetFindingStatistics",
+      "http": {
+        "method": "POST",
+        "requestUri": "/findings/statistics",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetFindingStatisticsRequest"
+      },
+      "output": {
+        "shape": "GetFindingStatisticsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetFindings": {
+      "name": "GetFindings",
+      "http": {
+        "method": "POST",
+        "requestUri": "/findings/describe",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetFindingsRequest"
+      },
+      "output": {
+        "shape": "GetFindingsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetFindingsFilter": {
+      "name": "GetFindingsFilter",
+      "http": {
+        "method": "GET",
+        "requestUri": "/findingsfilters/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetFindingsFilterRequest"
+      },
+      "output": {
+        "shape": "GetFindingsFilterResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetInvitationsCount": {
+      "name": "GetInvitationsCount",
+      "http": {
+        "method": "GET",
+        "requestUri": "/invitations/count",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetInvitationsCountRequest"
+      },
+      "output": {
+        "shape": "GetInvitationsCountResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetMacieSession": {
+      "name": "GetMacieSession",
+      "http": {
+        "method": "GET",
+        "requestUri": "/macie",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetMacieSessionRequest"
+      },
+      "output": {
+        "shape": "GetMacieSessionResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetMasterAccount": {
+      "name": "GetMasterAccount",
+      "http": {
+        "method": "GET",
+        "requestUri": "/master",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetMasterAccountRequest"
+      },
+      "output": {
+        "shape": "GetMasterAccountResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetMember": {
+      "name": "GetMember",
+      "http": {
+        "method": "GET",
+        "requestUri": "/members/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetMemberRequest"
+      },
+      "output": {
+        "shape": "GetMemberResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetUsageStatistics": {
+      "name": "GetUsageStatistics",
+      "http": {
+        "method": "POST",
+        "requestUri": "/usage/statistics",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetUsageStatisticsRequest"
+      },
+      "output": {
+        "shape": "GetUsageStatisticsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "GetUsageTotals": {
+      "name": "GetUsageTotals",
+      "http": {
+        "method": "GET",
+        "requestUri": "/usage",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GetUsageTotalsRequest"
+      },
+      "output": {
+        "shape": "GetUsageTotalsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListClassificationJobs": {
+      "name": "ListClassificationJobs",
+      "http": {
+        "method": "POST",
+        "requestUri": "/jobs/list",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListClassificationJobsRequest"
+      },
+      "output": {
+        "shape": "ListClassificationJobsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListCustomDataIdentifiers": {
+      "name": "ListCustomDataIdentifiers",
+      "http": {
+        "method": "POST",
+        "requestUri": "/custom-data-identifiers/list",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListCustomDataIdentifiersRequest"
+      },
+      "output": {
+        "shape": "ListCustomDataIdentifiersResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListFindings": {
+      "name": "ListFindings",
+      "http": {
+        "method": "POST",
+        "requestUri": "/findings",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListFindingsRequest"
+      },
+      "output": {
+        "shape": "ListFindingsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListFindingsFilters": {
+      "name": "ListFindingsFilters",
+      "http": {
+        "method": "GET",
+        "requestUri": "/findingsfilters",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListFindingsFiltersRequest"
+      },
+      "output": {
+        "shape": "ListFindingsFiltersResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListInvitations": {
+      "name": "ListInvitations",
+      "http": {
+        "method": "GET",
+        "requestUri": "/invitations",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListInvitationsRequest"
+      },
+      "output": {
+        "shape": "ListInvitationsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListMembers": {
+      "name": "ListMembers",
+      "http": {
+        "method": "GET",
+        "requestUri": "/members",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListMembersRequest"
+      },
+      "output": {
+        "shape": "ListMembersResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListOrganizationAdminAccounts": {
+      "name": "ListOrganizationAdminAccounts",
+      "http": {
+        "method": "GET",
+        "requestUri": "/admin",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListOrganizationAdminAccountsRequest"
+      },
+      "output": {
+        "shape": "ListOrganizationAdminAccountsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "ListTagsForResource": {
+      "name": "ListTagsForResource",
+      "http": {
+        "method": "GET",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListTagsForResourceRequest"
+      },
+      "output": {
+        "shape": "ListTagsForResourceResponse"
+      },
+      "errors": []
+    },
+    "PutClassificationExportConfiguration": {
+      "name": "PutClassificationExportConfiguration",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/classification-export-configuration",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "PutClassificationExportConfigurationRequest"
+      },
+      "output": {
+        "shape": "PutClassificationExportConfigurationResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "TagResource": {
+      "name": "TagResource",
+      "http": {
+        "method": "POST",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "TagResourceRequest"
+      },
+      "output": {
+        "shape": "TagResourceResponse"
+      },
+      "errors": []
+    },
+    "TestCustomDataIdentifier": {
+      "name": "TestCustomDataIdentifier",
+      "http": {
+        "method": "POST",
+        "requestUri": "/custom-data-identifiers/test",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "TestCustomDataIdentifierRequest"
+      },
+      "output": {
+        "shape": "TestCustomDataIdentifierResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "UntagResource": {
+      "name": "UntagResource",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "UntagResourceRequest"
+      },
+      "output": {
+        "shape": "UntagResourceResponse"
+      },
+      "errors": []
+    },
+    "UpdateClassificationJob": {
+      "name": "UpdateClassificationJob",
+      "http": {
+        "method": "PATCH",
+        "requestUri": "/jobs/{jobId}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateClassificationJobRequest"
+      },
+      "output": {
+        "shape": "UpdateClassificationJobResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "UpdateFindingsFilter": {
+      "name": "UpdateFindingsFilter",
+      "http": {
+        "method": "PATCH",
+        "requestUri": "/findingsfilters/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateFindingsFilterRequest"
+      },
+      "output": {
+        "shape": "UpdateFindingsFilterResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "UpdateMacieSession": {
+      "name": "UpdateMacieSession",
+      "http": {
+        "method": "PATCH",
+        "requestUri": "/macie",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateMacieSessionRequest"
+      },
+      "output": {
+        "shape": "UpdateMacieSessionResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "UpdateMemberSession": {
+      "name": "UpdateMemberSession",
+      "http": {
+        "method": "PATCH",
+        "requestUri": "/macie/members/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateMemberSessionRequest"
+      },
+      "output": {
+        "shape": "UpdateMemberSessionResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    },
+    "UpdateOrganizationConfiguration": {
+      "name": "UpdateOrganizationConfiguration",
+      "http": {
+        "method": "PATCH",
+        "requestUri": "/admin/configuration",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdateOrganizationConfigurationRequest"
+      },
+      "output": {
+        "shape": "UpdateOrganizationConfigurationResponse"
+      },
+      "errors": [
+        {
+          "shape": "ValidationException"
+        },
+        {
+          "shape": "InternalServerException"
+        },
+        {
+          "shape": "ServiceQuotaExceededException"
+        },
+        {
+          "shape": "AccessDeniedException"
+        },
+        {
+          "shape": "ResourceNotFoundException"
+        },
+        {
+          "shape": "ThrottlingException"
+        },
+        {
+          "shape": "ConflictException"
+        }
+      ]
+    }
+  },
+  "shapes": {
+    "AcceptInvitationRequest": {
+      "type": "structure",
+      "members": {
+        "invitationId": {
+          "shape": "__string",
+          "locationName": "invitationId"
+        },
+        "masterAccount": {
+          "shape": "__string",
+          "locationName": "masterAccount"
+        }
+      },
+      "required": [
+        "masterAccount",
+        "invitationId"
+      ]
+    },
+    "AcceptInvitationResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "AccessControlList": {
+      "type": "structure",
+      "members": {
+        "allowsPublicReadAccess": {
+          "shape": "__boolean",
+          "locationName": "allowsPublicReadAccess"
+        },
+        "allowsPublicWriteAccess": {
+          "shape": "__boolean",
+          "locationName": "allowsPublicWriteAccess"
+        }
+      }
+    },
+    "AccessDeniedException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 403
+      }
+    },
+    "AccountDetail": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "email": {
+          "shape": "__string",
+          "locationName": "email"
+        }
+      },
+      "required": [
+        "email",
+        "accountId"
+      ]
+    },
+    "AccountLevelPermissions": {
+      "type": "structure",
+      "members": {
+        "blockPublicAccess": {
+          "shape": "BlockPublicAccess",
+          "locationName": "blockPublicAccess"
+        }
+      }
+    },
+    "AdminAccount": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "status": {
+          "shape": "AdminStatus",
+          "locationName": "status"
+        }
+      }
+    },
+    "AdminStatus": {
+      "type": "string",
+      "enum": [
+        "ENABLED",
+        "DISABLING_IN_PROGRESS"
+      ]
+    },
+    "ApiCallDetails": {
+      "type": "structure",
+      "members": {
+        "api": {
+          "shape": "__string",
+          "locationName": "api"
+        },
+        "apiServiceName": {
+          "shape": "__string",
+          "locationName": "apiServiceName"
+        },
+        "firstSeen": {
+          "shape": "__timestampIso8601",
+          "locationName": "firstSeen"
+        },
+        "lastSeen": {
+          "shape": "__timestampIso8601",
+          "locationName": "lastSeen"
+        }
+      }
+    },
+    "AssumedRole": {
+      "type": "structure",
+      "members": {
+        "accessKeyId": {
+          "shape": "__string",
+          "locationName": "accessKeyId"
+        },
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        },
+        "sessionContext": {
+          "shape": "SessionContext",
+          "locationName": "sessionContext"
+        }
+      }
+    },
+    "AwsAccount": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        }
+      }
+    },
+    "AwsService": {
+      "type": "structure",
+      "members": {
+        "invokedBy": {
+          "shape": "__string",
+          "locationName": "invokedBy"
+        }
+      }
+    },
+    "BatchGetCustomDataIdentifierSummary": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "deleted": {
+          "shape": "__boolean",
+          "locationName": "deleted"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        }
+      }
+    },
+    "BatchGetCustomDataIdentifiersRequest": {
+      "type": "structure",
+      "members": {
+        "ids": {
+          "shape": "__listOf__string",
+          "locationName": "ids"
+        }
+      }
+    },
+    "BatchGetCustomDataIdentifiersResponse": {
+      "type": "structure",
+      "members": {
+        "customDataIdentifiers": {
+          "shape": "__listOfBatchGetCustomDataIdentifierSummary",
+          "locationName": "customDataIdentifiers"
+        },
+        "notFoundIdentifierIds": {
+          "shape": "__listOf__string",
+          "locationName": "notFoundIdentifierIds"
+        }
+      }
+    },
+    "BlockPublicAccess": {
+      "type": "structure",
+      "members": {
+        "blockPublicAcls": {
+          "shape": "__boolean",
+          "locationName": "blockPublicAcls"
+        },
+        "blockPublicPolicy": {
+          "shape": "__boolean",
+          "locationName": "blockPublicPolicy"
+        },
+        "ignorePublicAcls": {
+          "shape": "__boolean",
+          "locationName": "ignorePublicAcls"
+        },
+        "restrictPublicBuckets": {
+          "shape": "__boolean",
+          "locationName": "restrictPublicBuckets"
+        }
+      }
+    },
+    "BucketCountByEffectivePermission": {
+      "type": "structure",
+      "members": {
+        "publiclyAccessible": {
+          "shape": "__long",
+          "locationName": "publiclyAccessible"
+        },
+        "publiclyReadable": {
+          "shape": "__long",
+          "locationName": "publiclyReadable"
+        },
+        "publiclyWritable": {
+          "shape": "__long",
+          "locationName": "publiclyWritable"
+        },
+        "unknown": {
+          "shape": "__long",
+          "locationName": "unknown"
+        }
+      }
+    },
+    "BucketCountByEncryptionType": {
+      "type": "structure",
+      "members": {
+        "kmsManaged": {
+          "shape": "__long",
+          "locationName": "kmsManaged"
+        },
+        "s3Managed": {
+          "shape": "__long",
+          "locationName": "s3Managed"
+        },
+        "unencrypted": {
+          "shape": "__long",
+          "locationName": "unencrypted"
+        }
+      }
+    },
+    "BucketCountBySharedAccessType": {
+      "type": "structure",
+      "members": {
+        "external": {
+          "shape": "__long",
+          "locationName": "external"
+        },
+        "internal": {
+          "shape": "__long",
+          "locationName": "internal"
+        },
+        "notShared": {
+          "shape": "__long",
+          "locationName": "notShared"
+        },
+        "unknown": {
+          "shape": "__long",
+          "locationName": "unknown"
+        }
+      }
+    },
+    "BucketCriteria": {
+      "type": "map",
+      "key": {
+        "shape": "__string"
+      },
+      "value": {
+        "shape": "BucketCriteriaAdditionalProperties"
+      }
+    },
+    "BucketCriteriaAdditionalProperties": {
+      "type": "structure",
+      "members": {
+        "eq": {
+          "shape": "__listOf__string",
+          "locationName": "eq"
+        },
+        "gt": {
+          "shape": "__long",
+          "locationName": "gt"
+        },
+        "gte": {
+          "shape": "__long",
+          "locationName": "gte"
+        },
+        "lt": {
+          "shape": "__long",
+          "locationName": "lt"
+        },
+        "lte": {
+          "shape": "__long",
+          "locationName": "lte"
+        },
+        "neq": {
+          "shape": "__listOf__string",
+          "locationName": "neq"
+        },
+        "prefix": {
+          "shape": "__string",
+          "locationName": "prefix"
+        }
+      }
+    },
+    "BucketLevelPermissions": {
+      "type": "structure",
+      "members": {
+        "accessControlList": {
+          "shape": "AccessControlList",
+          "locationName": "accessControlList"
+        },
+        "blockPublicAccess": {
+          "shape": "BlockPublicAccess",
+          "locationName": "blockPublicAccess"
+        },
+        "bucketPolicy": {
+          "shape": "BucketPolicy",
+          "locationName": "bucketPolicy"
+        }
+      }
+    },
+    "BucketMetadata": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "bucketArn": {
+          "shape": "__string",
+          "locationName": "bucketArn"
+        },
+        "bucketCreatedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "bucketCreatedAt"
+        },
+        "bucketName": {
+          "shape": "__string",
+          "locationName": "bucketName"
+        },
+        "classifiableObjectCount": {
+          "shape": "__long",
+          "locationName": "classifiableObjectCount"
+        },
+        "classifiableSizeInBytes": {
+          "shape": "__long",
+          "locationName": "classifiableSizeInBytes"
+        },
+        "lastUpdated": {
+          "shape": "__timestampIso8601",
+          "locationName": "lastUpdated"
+        },
+        "objectCount": {
+          "shape": "__long",
+          "locationName": "objectCount"
+        },
+        "objectCountByEncryptionType": {
+          "shape": "ObjectCountByEncryptionType",
+          "locationName": "objectCountByEncryptionType"
+        },
+        "publicAccess": {
+          "shape": "BucketPublicAccess",
+          "locationName": "publicAccess"
+        },
+        "region": {
+          "shape": "__string",
+          "locationName": "region"
+        },
+        "replicationDetails": {
+          "shape": "ReplicationDetails",
+          "locationName": "replicationDetails"
+        },
+        "sharedAccess": {
+          "shape": "SharedAccess",
+          "locationName": "sharedAccess"
+        },
+        "sizeInBytes": {
+          "shape": "__long",
+          "locationName": "sizeInBytes"
+        },
+        "sizeInBytesCompressed": {
+          "shape": "__long",
+          "locationName": "sizeInBytesCompressed"
+        },
+        "tags": {
+          "shape": "__listOfKeyValuePair",
+          "locationName": "tags"
+        },
+        "unclassifiableObjectCount": {
+          "shape": "ObjectLevelStatistics",
+          "locationName": "unclassifiableObjectCount"
+        },
+        "unclassifiableObjectSizeInBytes": {
+          "shape": "ObjectLevelStatistics",
+          "locationName": "unclassifiableObjectSizeInBytes"
+        },
+        "versioning": {
+          "shape": "__boolean",
+          "locationName": "versioning"
+        }
+      }
+    },
+    "BucketPermissionConfiguration": {
+      "type": "structure",
+      "members": {
+        "accountLevelPermissions": {
+          "shape": "AccountLevelPermissions",
+          "locationName": "accountLevelPermissions"
+        },
+        "bucketLevelPermissions": {
+          "shape": "BucketLevelPermissions",
+          "locationName": "bucketLevelPermissions"
+        }
+      }
+    },
+    "BucketPolicy": {
+      "type": "structure",
+      "members": {
+        "allowsPublicReadAccess": {
+          "shape": "__boolean",
+          "locationName": "allowsPublicReadAccess"
+        },
+        "allowsPublicWriteAccess": {
+          "shape": "__boolean",
+          "locationName": "allowsPublicWriteAccess"
+        }
+      }
+    },
+    "BucketPublicAccess": {
+      "type": "structure",
+      "members": {
+        "effectivePermission": {
+          "shape": "EffectivePermission",
+          "locationName": "effectivePermission"
+        },
+        "permissionConfiguration": {
+          "shape": "BucketPermissionConfiguration",
+          "locationName": "permissionConfiguration"
+        }
+      }
+    },
+    "BucketSortCriteria": {
+      "type": "structure",
+      "members": {
+        "attributeName": {
+          "shape": "__string",
+          "locationName": "attributeName"
+        },
+        "orderBy": {
+          "shape": "OrderBy",
+          "locationName": "orderBy"
+        }
+      }
+    },
+    "Cell": {
+      "type": "structure",
+      "members": {
+        "cellReference": {
+          "shape": "__string",
+          "locationName": "cellReference"
+        },
+        "column": {
+          "shape": "__long",
+          "locationName": "column"
+        },
+        "columnName": {
+          "shape": "__string",
+          "locationName": "columnName"
+        },
+        "row": {
+          "shape": "__long",
+          "locationName": "row"
+        }
+      }
+    },
+    "Cells": {
+      "type": "list",
+      "member": {
+        "shape": "Cell"
+      }
+    },
+    "ClassificationDetails": {
+      "type": "structure",
+      "members": {
+        "detailedResultsLocation": {
+          "shape": "__string",
+          "locationName": "detailedResultsLocation"
+        },
+        "jobArn": {
+          "shape": "__string",
+          "locationName": "jobArn"
+        },
+        "jobId": {
+          "shape": "__string",
+          "locationName": "jobId"
+        },
+        "result": {
+          "shape": "ClassificationResult",
+          "locationName": "result"
+        }
+      }
+    },
+    "ClassificationExportConfiguration": {
+      "type": "structure",
+      "members": {
+        "s3Destination": {
+          "shape": "S3Destination",
+          "locationName": "s3Destination"
+        }
+      }
+    },
+    "ClassificationResult": {
+      "type": "structure",
+      "members": {
+        "additionalOccurrences": {
+          "shape": "__boolean",
+          "locationName": "additionalOccurrences"
+        },
+        "customDataIdentifiers": {
+          "shape": "CustomDataIdentifiers",
+          "locationName": "customDataIdentifiers"
+        },
+        "mimeType": {
+          "shape": "__string",
+          "locationName": "mimeType"
+        },
+        "sensitiveData": {
+          "shape": "SensitiveData",
+          "locationName": "sensitiveData"
+        },
+        "sizeClassified": {
+          "shape": "__long",
+          "locationName": "sizeClassified"
+        },
+        "status": {
+          "shape": "ClassificationResultStatus",
+          "locationName": "status"
+        }
+      }
+    },
+    "ClassificationResultStatus": {
+      "type": "structure",
+      "members": {
+        "code": {
+          "shape": "__string",
+          "locationName": "code"
+        },
+        "reason": {
+          "shape": "__string",
+          "locationName": "reason"
+        }
+      }
+    },
+    "ConflictException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 409
+      }
+    },
+    "CreateClassificationJobRequest": {
+      "type": "structure",
+      "members": {
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        },
+        "customDataIdentifierIds": {
+          "shape": "__listOf__string",
+          "locationName": "customDataIdentifierIds"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "initialRun": {
+          "shape": "__boolean",
+          "locationName": "initialRun"
+        },
+        "jobType": {
+          "shape": "JobType",
+          "locationName": "jobType"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "s3JobDefinition": {
+          "shape": "S3JobDefinition",
+          "locationName": "s3JobDefinition"
+        },
+        "samplingPercentage": {
+          "shape": "__integer",
+          "locationName": "samplingPercentage"
+        },
+        "scheduleFrequency": {
+          "shape": "JobScheduleFrequency",
+          "locationName": "scheduleFrequency"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "s3JobDefinition",
+        "jobType",
+        "clientToken",
+        "name"
+      ]
+    },
+    "CreateClassificationJobResponse": {
+      "type": "structure",
+      "members": {
+        "jobArn": {
+          "shape": "__string",
+          "locationName": "jobArn"
+        },
+        "jobId": {
+          "shape": "__string",
+          "locationName": "jobId"
+        }
+      }
+    },
+    "CreateCustomDataIdentifierRequest": {
+      "type": "structure",
+      "members": {
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "ignoreWords": {
+          "shape": "__listOf__string",
+          "locationName": "ignoreWords"
+        },
+        "keywords": {
+          "shape": "__listOf__string",
+          "locationName": "keywords"
+        },
+        "maximumMatchDistance": {
+          "shape": "__integer",
+          "locationName": "maximumMatchDistance"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "regex": {
+          "shape": "__string",
+          "locationName": "regex"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      }
+    },
+    "CreateCustomDataIdentifierResponse": {
+      "type": "structure",
+      "members": {
+        "customDataIdentifierId": {
+          "shape": "__string",
+          "locationName": "customDataIdentifierId"
+        }
+      }
+    },
+    "CreateFindingsFilterRequest": {
+      "type": "structure",
+      "members": {
+        "action": {
+          "shape": "FindingsFilterAction",
+          "locationName": "action"
+        },
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "findingCriteria": {
+          "shape": "FindingCriteria",
+          "locationName": "findingCriteria"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "position": {
+          "shape": "__integer",
+          "locationName": "position"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "action",
+        "findingCriteria",
+        "name"
+      ]
+    },
+    "CreateFindingsFilterResponse": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        }
+      }
+    },
+    "CreateInvitationsRequest": {
+      "type": "structure",
+      "members": {
+        "accountIds": {
+          "shape": "__listOf__string",
+          "locationName": "accountIds"
+        },
+        "disableEmailNotification": {
+          "shape": "__boolean",
+          "locationName": "disableEmailNotification"
+        },
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "accountIds"
+      ]
+    },
+    "CreateInvitationsResponse": {
+      "type": "structure",
+      "members": {
+        "unprocessedAccounts": {
+          "shape": "__listOfUnprocessedAccount",
+          "locationName": "unprocessedAccounts"
+        }
+      }
+    },
+    "CreateMemberRequest": {
+      "type": "structure",
+      "members": {
+        "account": {
+          "shape": "AccountDetail",
+          "locationName": "account"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "account"
+      ]
+    },
+    "CreateMemberResponse": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        }
+      }
+    },
+    "CreateSampleFindingsRequest": {
+      "type": "structure",
+      "members": {
+        "findingTypes": {
+          "shape": "__listOfFindingType",
+          "locationName": "findingTypes"
+        }
+      }
+    },
+    "CreateSampleFindingsResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "Criterion": {
+      "type": "map",
+      "key": {
+        "shape": "__string"
+      },
+      "value": {
+        "shape": "CriterionAdditionalProperties"
+      }
+    },
+    "CriterionAdditionalProperties": {
+      "type": "structure",
+      "members": {
+        "eq": {
+          "shape": "__listOf__string",
+          "locationName": "eq"
+        },
+        "eqExactMatch": {
+          "shape": "__listOf__string",
+          "locationName": "eqExactMatch"
+        },
+        "gt": {
+          "shape": "__long",
+          "locationName": "gt"
+        },
+        "gte": {
+          "shape": "__long",
+          "locationName": "gte"
+        },
+        "lt": {
+          "shape": "__long",
+          "locationName": "lt"
+        },
+        "lte": {
+          "shape": "__long",
+          "locationName": "lte"
+        },
+        "neq": {
+          "shape": "__listOf__string",
+          "locationName": "neq"
+        }
+      }
+    },
+    "Currency": {
+      "type": "string",
+      "enum": [
+        "USD"
+      ]
+    },
+    "CustomDataIdentifierSummary": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        }
+      }
+    },
+    "CustomDataIdentifiers": {
+      "type": "structure",
+      "members": {
+        "detections": {
+          "shape": "CustomDetections",
+          "locationName": "detections"
+        },
+        "totalCount": {
+          "shape": "__long",
+          "locationName": "totalCount"
+        }
+      }
+    },
+    "CustomDetection": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "count": {
+          "shape": "__long",
+          "locationName": "count"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "occurrences": {
+          "shape": "Occurrences",
+          "locationName": "occurrences"
+        }
+      }
+    },
+    "CustomDetections": {
+      "type": "list",
+      "member": {
+        "shape": "CustomDetection"
+      }
+    },
+    "DailySchedule": {
+      "type": "structure",
+      "members": {}
+    },
+    "DayOfWeek": {
+      "type": "string",
+      "enum": [
+        "SUNDAY",
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY"
+      ]
+    },
+    "DeclineInvitationsRequest": {
+      "type": "structure",
+      "members": {
+        "accountIds": {
+          "shape": "__listOf__string",
+          "locationName": "accountIds"
+        }
+      },
+      "required": [
+        "accountIds"
+      ]
+    },
+    "DeclineInvitationsResponse": {
+      "type": "structure",
+      "members": {
+        "unprocessedAccounts": {
+          "shape": "__listOfUnprocessedAccount",
+          "locationName": "unprocessedAccounts"
+        }
+      }
+    },
+    "DefaultDetection": {
+      "type": "structure",
+      "members": {
+        "count": {
+          "shape": "__long",
+          "locationName": "count"
+        },
+        "occurrences": {
+          "shape": "Occurrences",
+          "locationName": "occurrences"
+        },
+        "type": {
+          "shape": "__string",
+          "locationName": "type"
+        }
+      }
+    },
+    "DefaultDetections": {
+      "type": "list",
+      "member": {
+        "shape": "DefaultDetection"
+      }
+    },
+    "DeleteCustomDataIdentifierRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "DeleteCustomDataIdentifierResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DeleteFindingsFilterRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "DeleteFindingsFilterResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DeleteInvitationsRequest": {
+      "type": "structure",
+      "members": {
+        "accountIds": {
+          "shape": "__listOf__string",
+          "locationName": "accountIds"
+        }
+      },
+      "required": [
+        "accountIds"
+      ]
+    },
+    "DeleteInvitationsResponse": {
+      "type": "structure",
+      "members": {
+        "unprocessedAccounts": {
+          "shape": "__listOfUnprocessedAccount",
+          "locationName": "unprocessedAccounts"
+        }
+      }
+    },
+    "DeleteMemberRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "DeleteMemberResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DescribeBucketsRequest": {
+      "type": "structure",
+      "members": {
+        "criteria": {
+          "shape": "BucketCriteria",
+          "locationName": "criteria"
+        },
+        "maxResults": {
+          "shape": "__integer",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "sortCriteria": {
+          "shape": "BucketSortCriteria",
+          "locationName": "sortCriteria"
+        }
+      }
+    },
+    "DescribeBucketsResponse": {
+      "type": "structure",
+      "members": {
+        "buckets": {
+          "shape": "__listOfBucketMetadata",
+          "locationName": "buckets"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "DescribeClassificationJobRequest": {
+      "type": "structure",
+      "members": {
+        "jobId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "jobId"
+        }
+      },
+      "required": [
+        "jobId"
+      ]
+    },
+    "DescribeClassificationJobResponse": {
+      "type": "structure",
+      "members": {
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "customDataIdentifierIds": {
+          "shape": "__listOf__string",
+          "locationName": "customDataIdentifierIds"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "initialRun": {
+          "shape": "__boolean",
+          "locationName": "initialRun"
+        },
+        "jobArn": {
+          "shape": "__string",
+          "locationName": "jobArn"
+        },
+        "jobId": {
+          "shape": "__string",
+          "locationName": "jobId"
+        },
+        "jobStatus": {
+          "shape": "JobStatus",
+          "locationName": "jobStatus"
+        },
+        "jobType": {
+          "shape": "JobType",
+          "locationName": "jobType"
+        },
+        "lastRunTime": {
+          "shape": "__timestampIso8601",
+          "locationName": "lastRunTime"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "s3JobDefinition": {
+          "shape": "S3JobDefinition",
+          "locationName": "s3JobDefinition"
+        },
+        "samplingPercentage": {
+          "shape": "__integer",
+          "locationName": "samplingPercentage"
+        },
+        "scheduleFrequency": {
+          "shape": "JobScheduleFrequency",
+          "locationName": "scheduleFrequency"
+        },
+        "statistics": {
+          "shape": "Statistics",
+          "locationName": "statistics"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        },
+        "userPausedDetails": {
+          "shape": "UserPausedDetails",
+          "locationName": "userPausedDetails"
+        }
+      }
+    },
+    "DescribeOrganizationConfigurationRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "DescribeOrganizationConfigurationResponse": {
+      "type": "structure",
+      "members": {
+        "autoEnable": {
+          "shape": "__boolean",
+          "locationName": "autoEnable"
+        },
+        "maxAccountLimitReached": {
+          "shape": "__boolean",
+          "locationName": "maxAccountLimitReached"
+        }
+      }
+    },
+    "DisableMacieRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "DisableMacieResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DisableOrganizationAdminAccountRequest": {
+      "type": "structure",
+      "members": {
+        "adminAccountId": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "adminAccountId"
+        }
+      },
+      "required": [
+        "adminAccountId"
+      ]
+    },
+    "DisableOrganizationAdminAccountResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DisassociateFromMasterAccountRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "DisassociateFromMasterAccountResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DisassociateMemberRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "DisassociateMemberResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "DomainDetails": {
+      "type": "structure",
+      "members": {
+        "domainName": {
+          "shape": "__string",
+          "locationName": "domainName"
+        }
+      }
+    },
+    "EffectivePermission": {
+      "type": "string",
+      "enum": [
+        "PUBLIC",
+        "NOT_PUBLIC",
+        "UNKNOWN"
+      ]
+    },
+    "Empty": {
+      "type": "structure",
+      "members": {}
+    },
+    "EnableMacieRequest": {
+      "type": "structure",
+      "members": {
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        },
+        "findingPublishingFrequency": {
+          "shape": "FindingPublishingFrequency",
+          "locationName": "findingPublishingFrequency"
+        },
+        "status": {
+          "shape": "MacieStatus",
+          "locationName": "status"
+        }
+      }
+    },
+    "EnableMacieResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "EnableOrganizationAdminAccountRequest": {
+      "type": "structure",
+      "members": {
+        "adminAccountId": {
+          "shape": "__string",
+          "locationName": "adminAccountId"
+        },
+        "clientToken": {
+          "shape": "__string",
+          "locationName": "clientToken",
+          "idempotencyToken": true
+        }
+      },
+      "required": [
+        "adminAccountId"
+      ]
+    },
+    "EnableOrganizationAdminAccountResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "EncryptionType": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "AES256",
+        "aws:kms",
+        "UNKNOWN"
+      ]
+    },
+    "ErrorCode": {
+      "type": "string",
+      "enum": [
+        "ClientError",
+        "InternalError"
+      ]
+    },
+    "FederatedUser": {
+      "type": "structure",
+      "members": {
+        "accessKeyId": {
+          "shape": "__string",
+          "locationName": "accessKeyId"
+        },
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        },
+        "sessionContext": {
+          "shape": "SessionContext",
+          "locationName": "sessionContext"
+        }
+      }
+    },
+    "Finding": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "archived": {
+          "shape": "__boolean",
+          "locationName": "archived"
+        },
+        "category": {
+          "shape": "FindingCategory",
+          "locationName": "category"
+        },
+        "classificationDetails": {
+          "shape": "ClassificationDetails",
+          "locationName": "classificationDetails"
+        },
+        "count": {
+          "shape": "__long",
+          "locationName": "count"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "partition": {
+          "shape": "__string",
+          "locationName": "partition"
+        },
+        "policyDetails": {
+          "shape": "PolicyDetails",
+          "locationName": "policyDetails"
+        },
+        "region": {
+          "shape": "__string",
+          "locationName": "region"
+        },
+        "resourcesAffected": {
+          "shape": "ResourcesAffected",
+          "locationName": "resourcesAffected"
+        },
+        "sample": {
+          "shape": "__boolean",
+          "locationName": "sample"
+        },
+        "schemaVersion": {
+          "shape": "__string",
+          "locationName": "schemaVersion"
+        },
+        "severity": {
+          "shape": "Severity",
+          "locationName": "severity"
+        },
+        "title": {
+          "shape": "__string",
+          "locationName": "title"
+        },
+        "type": {
+          "shape": "FindingType",
+          "locationName": "type"
+        },
+        "updatedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "updatedAt"
+        }
+      }
+    },
+    "FindingAction": {
+      "type": "structure",
+      "members": {
+        "actionType": {
+          "shape": "FindingActionType",
+          "locationName": "actionType"
+        },
+        "apiCallDetails": {
+          "shape": "ApiCallDetails",
+          "locationName": "apiCallDetails"
+        }
+      }
+    },
+    "FindingActionType": {
+      "type": "string",
+      "enum": [
+        "AWS_API_CALL"
+      ]
+    },
+    "FindingActor": {
+      "type": "structure",
+      "members": {
+        "domainDetails": {
+          "shape": "DomainDetails",
+          "locationName": "domainDetails"
+        },
+        "ipAddressDetails": {
+          "shape": "IpAddressDetails",
+          "locationName": "ipAddressDetails"
+        },
+        "userIdentity": {
+          "shape": "UserIdentity",
+          "locationName": "userIdentity"
+        }
+      }
+    },
+    "FindingCategory": {
+      "type": "string",
+      "enum": [
+        "CLASSIFICATION",
+        "POLICY"
+      ]
+    },
+    "FindingCriteria": {
+      "type": "structure",
+      "members": {
+        "criterion": {
+          "shape": "Criterion",
+          "locationName": "criterion"
+        }
+      }
+    },
+    "FindingPublishingFrequency": {
+      "type": "string",
+      "enum": [
+        "FIFTEEN_MINUTES",
+        "ONE_HOUR",
+        "SIX_HOURS"
+      ]
+    },
+    "FindingStatisticsSortAttributeName": {
+      "type": "string",
+      "enum": [
+        "groupKey",
+        "count"
+      ]
+    },
+    "FindingStatisticsSortCriteria": {
+      "type": "structure",
+      "members": {
+        "attributeName": {
+          "shape": "FindingStatisticsSortAttributeName",
+          "locationName": "attributeName"
+        },
+        "orderBy": {
+          "shape": "OrderBy",
+          "locationName": "orderBy"
+        }
+      }
+    },
+    "FindingType": {
+      "type": "string",
+      "enum": [
+        "SensitiveData:S3Object/Multiple",
+        "SensitiveData:S3Object/Financial",
+        "SensitiveData:S3Object/Personal",
+        "SensitiveData:S3Object/Credentials",
+        "SensitiveData:S3Object/CustomIdentifier",
+        "Policy:IAMUser/S3BucketPublic",
+        "Policy:IAMUser/S3BucketSharedExternally",
+        "Policy:IAMUser/S3BucketReplicatedExternally",
+        "Policy:IAMUser/S3BucketEncryptionDisabled",
+        "Policy:IAMUser/S3BlockPublicAccessDisabled"
+      ]
+    },
+    "FindingsFilterAction": {
+      "type": "string",
+      "enum": [
+        "ARCHIVE",
+        "NOOP"
+      ]
+    },
+    "FindingsFilterListItem": {
+      "type": "structure",
+      "members": {
+        "action": {
+          "shape": "FindingsFilterAction",
+          "locationName": "action"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      }
+    },
+    "GetBucketStatisticsRequest": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        }
+      }
+    },
+    "GetBucketStatisticsResponse": {
+      "type": "structure",
+      "members": {
+        "bucketCount": {
+          "shape": "__long",
+          "locationName": "bucketCount"
+        },
+        "bucketCountByEffectivePermission": {
+          "shape": "BucketCountByEffectivePermission",
+          "locationName": "bucketCountByEffectivePermission"
+        },
+        "bucketCountByEncryptionType": {
+          "shape": "BucketCountByEncryptionType",
+          "locationName": "bucketCountByEncryptionType"
+        },
+        "bucketCountBySharedAccessType": {
+          "shape": "BucketCountBySharedAccessType",
+          "locationName": "bucketCountBySharedAccessType"
+        },
+        "classifiableObjectCount": {
+          "shape": "__long",
+          "locationName": "classifiableObjectCount"
+        },
+        "classifiableSizeInBytes": {
+          "shape": "__long",
+          "locationName": "classifiableSizeInBytes"
+        },
+        "lastUpdated": {
+          "shape": "__timestampIso8601",
+          "locationName": "lastUpdated"
+        },
+        "objectCount": {
+          "shape": "__long",
+          "locationName": "objectCount"
+        },
+        "sizeInBytes": {
+          "shape": "__long",
+          "locationName": "sizeInBytes"
+        },
+        "sizeInBytesCompressed": {
+          "shape": "__long",
+          "locationName": "sizeInBytesCompressed"
+        },
+        "unclassifiableObjectCount": {
+          "shape": "ObjectLevelStatistics",
+          "locationName": "unclassifiableObjectCount"
+        },
+        "unclassifiableObjectSizeInBytes": {
+          "shape": "ObjectLevelStatistics",
+          "locationName": "unclassifiableObjectSizeInBytes"
+        }
+      }
+    },
+    "GetClassificationExportConfigurationRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "GetClassificationExportConfigurationResponse": {
+      "type": "structure",
+      "members": {
+        "configuration": {
+          "shape": "ClassificationExportConfiguration",
+          "locationName": "configuration"
+        }
+      }
+    },
+    "GetCustomDataIdentifierRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "GetCustomDataIdentifierResponse": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "deleted": {
+          "shape": "__boolean",
+          "locationName": "deleted"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "ignoreWords": {
+          "shape": "__listOf__string",
+          "locationName": "ignoreWords"
+        },
+        "keywords": {
+          "shape": "__listOf__string",
+          "locationName": "keywords"
+        },
+        "maximumMatchDistance": {
+          "shape": "__integer",
+          "locationName": "maximumMatchDistance"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "regex": {
+          "shape": "__string",
+          "locationName": "regex"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      }
+    },
+    "GetFindingStatisticsRequest": {
+      "type": "structure",
+      "members": {
+        "findingCriteria": {
+          "shape": "FindingCriteria",
+          "locationName": "findingCriteria"
+        },
+        "groupBy": {
+          "shape": "GroupBy",
+          "locationName": "groupBy"
+        },
+        "size": {
+          "shape": "__integer",
+          "locationName": "size"
+        },
+        "sortCriteria": {
+          "shape": "FindingStatisticsSortCriteria",
+          "locationName": "sortCriteria"
+        }
+      },
+      "required": [
+        "groupBy"
+      ]
+    },
+    "GetFindingStatisticsResponse": {
+      "type": "structure",
+      "members": {
+        "countsByGroup": {
+          "shape": "__listOfGroupCount",
+          "locationName": "countsByGroup"
+        }
+      }
+    },
+    "GetFindingsFilterRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "GetFindingsFilterResponse": {
+      "type": "structure",
+      "members": {
+        "action": {
+          "shape": "FindingsFilterAction",
+          "locationName": "action"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "findingCriteria": {
+          "shape": "FindingCriteria",
+          "locationName": "findingCriteria"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "position": {
+          "shape": "__integer",
+          "locationName": "position"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      }
+    },
+    "GetFindingsRequest": {
+      "type": "structure",
+      "members": {
+        "findingIds": {
+          "shape": "__listOf__string",
+          "locationName": "findingIds"
+        },
+        "sortCriteria": {
+          "shape": "SortCriteria",
+          "locationName": "sortCriteria"
+        }
+      },
+      "required": [
+        "findingIds"
+      ]
+    },
+    "GetFindingsResponse": {
+      "type": "structure",
+      "members": {
+        "findings": {
+          "shape": "__listOfFinding",
+          "locationName": "findings"
+        }
+      }
+    },
+    "GetInvitationsCountRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "GetInvitationsCountResponse": {
+      "type": "structure",
+      "members": {
+        "invitationsCount": {
+          "shape": "__long",
+          "locationName": "invitationsCount"
+        }
+      }
+    },
+    "GetMacieSessionRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "GetMacieSessionResponse": {
+      "type": "structure",
+      "members": {
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "findingPublishingFrequency": {
+          "shape": "FindingPublishingFrequency",
+          "locationName": "findingPublishingFrequency"
+        },
+        "serviceRole": {
+          "shape": "__string",
+          "locationName": "serviceRole"
+        },
+        "status": {
+          "shape": "MacieStatus",
+          "locationName": "status"
+        },
+        "updatedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "updatedAt"
+        }
+      }
+    },
+    "GetMasterAccountRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "GetMasterAccountResponse": {
+      "type": "structure",
+      "members": {
+        "master": {
+          "shape": "Invitation",
+          "locationName": "master"
+        }
+      }
+    },
+    "GetMemberRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "GetMemberResponse": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "email": {
+          "shape": "__string",
+          "locationName": "email"
+        },
+        "invitedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "invitedAt"
+        },
+        "masterAccountId": {
+          "shape": "__string",
+          "locationName": "masterAccountId"
+        },
+        "relationshipStatus": {
+          "shape": "RelationshipStatus",
+          "locationName": "relationshipStatus"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        },
+        "updatedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "updatedAt"
+        }
+      }
+    },
+    "GetUsageStatisticsRequest": {
+      "type": "structure",
+      "members": {
+        "filterBy": {
+          "shape": "__listOfUsageStatisticsFilter",
+          "locationName": "filterBy"
+        },
+        "maxResults": {
+          "shape": "__integer",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "sortBy": {
+          "shape": "UsageStatisticsSortBy",
+          "locationName": "sortBy"
+        }
+      }
+    },
+    "GetUsageStatisticsResponse": {
+      "type": "structure",
+      "members": {
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "records": {
+          "shape": "__listOfUsageRecord",
+          "locationName": "records"
+        }
+      }
+    },
+    "GetUsageTotalsRequest": {
+      "type": "structure",
+      "members": {}
+    },
+    "GetUsageTotalsResponse": {
+      "type": "structure",
+      "members": {
+        "usageTotals": {
+          "shape": "__listOfUsageTotal",
+          "locationName": "usageTotals"
+        }
+      }
+    },
+    "GroupBy": {
+      "type": "string",
+      "enum": [
+        "resourcesAffected.s3Bucket.name",
+        "type",
+        "classificationDetails.jobId",
+        "severity.description"
+      ]
+    },
+    "GroupCount": {
+      "type": "structure",
+      "members": {
+        "count": {
+          "shape": "__long",
+          "locationName": "count"
+        },
+        "groupKey": {
+          "shape": "__string",
+          "locationName": "groupKey"
+        }
+      }
+    },
+    "IamUser": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        },
+        "userName": {
+          "shape": "__string",
+          "locationName": "userName"
+        }
+      }
+    },
+    "InternalServerException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 500
+      }
+    },
+    "Invitation": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "invitationId": {
+          "shape": "__string",
+          "locationName": "invitationId"
+        },
+        "invitedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "invitedAt"
+        },
+        "relationshipStatus": {
+          "shape": "RelationshipStatus",
+          "locationName": "relationshipStatus"
+        }
+      }
+    },
+    "IpAddressDetails": {
+      "type": "structure",
+      "members": {
+        "ipAddressV4": {
+          "shape": "__string",
+          "locationName": "ipAddressV4"
+        },
+        "ipCity": {
+          "shape": "IpCity",
+          "locationName": "ipCity"
+        },
+        "ipCountry": {
+          "shape": "IpCountry",
+          "locationName": "ipCountry"
+        },
+        "ipGeoLocation": {
+          "shape": "IpGeoLocation",
+          "locationName": "ipGeoLocation"
+        },
+        "ipOwner": {
+          "shape": "IpOwner",
+          "locationName": "ipOwner"
+        }
+      }
+    },
+    "IpCity": {
+      "type": "structure",
+      "members": {
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        }
+      }
+    },
+    "IpCountry": {
+      "type": "structure",
+      "members": {
+        "code": {
+          "shape": "__string",
+          "locationName": "code"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        }
+      }
+    },
+    "IpGeoLocation": {
+      "type": "structure",
+      "members": {
+        "lat": {
+          "shape": "__double",
+          "locationName": "lat"
+        },
+        "lon": {
+          "shape": "__double",
+          "locationName": "lon"
+        }
+      }
+    },
+    "IpOwner": {
+      "type": "structure",
+      "members": {
+        "asn": {
+          "shape": "__string",
+          "locationName": "asn"
+        },
+        "asnOrg": {
+          "shape": "__string",
+          "locationName": "asnOrg"
+        },
+        "isp": {
+          "shape": "__string",
+          "locationName": "isp"
+        },
+        "org": {
+          "shape": "__string",
+          "locationName": "org"
+        }
+      }
+    },
+    "JobComparator": {
+      "type": "string",
+      "enum": [
+        "EQ",
+        "GT",
+        "GTE",
+        "LT",
+        "LTE",
+        "NE",
+        "CONTAINS"
+      ]
+    },
+    "JobScheduleFrequency": {
+      "type": "structure",
+      "members": {
+        "dailySchedule": {
+          "shape": "DailySchedule",
+          "locationName": "dailySchedule"
+        },
+        "monthlySchedule": {
+          "shape": "MonthlySchedule",
+          "locationName": "monthlySchedule"
+        },
+        "weeklySchedule": {
+          "shape": "WeeklySchedule",
+          "locationName": "weeklySchedule"
+        }
+      }
+    },
+    "JobScopeTerm": {
+      "type": "structure",
+      "members": {
+        "simpleScopeTerm": {
+          "shape": "SimpleScopeTerm",
+          "locationName": "simpleScopeTerm"
+        },
+        "tagScopeTerm": {
+          "shape": "TagScopeTerm",
+          "locationName": "tagScopeTerm"
+        }
+      }
+    },
+    "JobScopingBlock": {
+      "type": "structure",
+      "members": {
+        "and": {
+          "shape": "__listOfJobScopeTerm",
+          "locationName": "and"
+        }
+      }
+    },
+    "JobStatus": {
+      "type": "string",
+      "enum": [
+        "RUNNING",
+        "PAUSED",
+        "CANCELLED",
+        "COMPLETE",
+        "IDLE",
+        "USER_PAUSED"
+      ]
+    },
+    "JobSummary": {
+      "type": "structure",
+      "members": {
+        "bucketDefinitions": {
+          "shape": "__listOfS3BucketDefinitionForJob",
+          "locationName": "bucketDefinitions"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "jobId": {
+          "shape": "__string",
+          "locationName": "jobId"
+        },
+        "jobStatus": {
+          "shape": "JobStatus",
+          "locationName": "jobStatus"
+        },
+        "jobType": {
+          "shape": "JobType",
+          "locationName": "jobType"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "userPausedDetails": {
+          "shape": "UserPausedDetails",
+          "locationName": "userPausedDetails"
+        }
+      }
+    },
+    "JobType": {
+      "type": "string",
+      "enum": [
+        "ONE_TIME",
+        "SCHEDULED"
+      ]
+    },
+    "KeyValuePair": {
+      "type": "structure",
+      "members": {
+        "key": {
+          "shape": "__string",
+          "locationName": "key"
+        },
+        "value": {
+          "shape": "__string",
+          "locationName": "value"
+        }
+      }
+    },
+    "KeyValuePairList": {
+      "type": "list",
+      "member": {
+        "shape": "KeyValuePair"
+      }
+    },
+    "ListClassificationJobsRequest": {
+      "type": "structure",
+      "members": {
+        "filterCriteria": {
+          "shape": "ListJobsFilterCriteria",
+          "locationName": "filterCriteria"
+        },
+        "maxResults": {
+          "shape": "__integer",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "sortCriteria": {
+          "shape": "ListJobsSortCriteria",
+          "locationName": "sortCriteria"
+        }
+      }
+    },
+    "ListClassificationJobsResponse": {
+      "type": "structure",
+      "members": {
+        "items": {
+          "shape": "__listOfJobSummary",
+          "locationName": "items"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListCustomDataIdentifiersRequest": {
+      "type": "structure",
+      "members": {
+        "maxResults": {
+          "shape": "__integer",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListCustomDataIdentifiersResponse": {
+      "type": "structure",
+      "members": {
+        "items": {
+          "shape": "__listOfCustomDataIdentifierSummary",
+          "locationName": "items"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListFindingsFiltersRequest": {
+      "type": "structure",
+      "members": {
+        "maxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListFindingsFiltersResponse": {
+      "type": "structure",
+      "members": {
+        "findingsFilterListItems": {
+          "shape": "__listOfFindingsFilterListItem",
+          "locationName": "findingsFilterListItems"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListFindingsRequest": {
+      "type": "structure",
+      "members": {
+        "findingCriteria": {
+          "shape": "FindingCriteria",
+          "locationName": "findingCriteria"
+        },
+        "maxResults": {
+          "shape": "__integer",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "sortCriteria": {
+          "shape": "SortCriteria",
+          "locationName": "sortCriteria"
+        }
+      }
+    },
+    "ListFindingsResponse": {
+      "type": "structure",
+      "members": {
+        "findingIds": {
+          "shape": "__listOf__string",
+          "locationName": "findingIds"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListInvitationsRequest": {
+      "type": "structure",
+      "members": {
+        "maxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListInvitationsResponse": {
+      "type": "structure",
+      "members": {
+        "invitations": {
+          "shape": "__listOfInvitation",
+          "locationName": "invitations"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListJobsFilterCriteria": {
+      "type": "structure",
+      "members": {
+        "excludes": {
+          "shape": "__listOfListJobsFilterTerm",
+          "locationName": "excludes"
+        },
+        "includes": {
+          "shape": "__listOfListJobsFilterTerm",
+          "locationName": "includes"
+        }
+      }
+    },
+    "ListJobsFilterKey": {
+      "type": "string",
+      "enum": [
+        "jobType",
+        "jobStatus",
+        "createdAt",
+        "name"
+      ]
+    },
+    "ListJobsFilterTerm": {
+      "type": "structure",
+      "members": {
+        "comparator": {
+          "shape": "JobComparator",
+          "locationName": "comparator"
+        },
+        "key": {
+          "shape": "ListJobsFilterKey",
+          "locationName": "key"
+        },
+        "values": {
+          "shape": "__listOf__string",
+          "locationName": "values"
+        }
+      }
+    },
+    "ListJobsSortAttributeName": {
+      "type": "string",
+      "enum": [
+        "createdAt",
+        "jobStatus",
+        "name",
+        "jobType"
+      ]
+    },
+    "ListJobsSortCriteria": {
+      "type": "structure",
+      "members": {
+        "attributeName": {
+          "shape": "ListJobsSortAttributeName",
+          "locationName": "attributeName"
+        },
+        "orderBy": {
+          "shape": "OrderBy",
+          "locationName": "orderBy"
+        }
+      }
+    },
+    "ListMembersRequest": {
+      "type": "structure",
+      "members": {
+        "maxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        },
+        "onlyAssociated": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "onlyAssociated"
+        }
+      }
+    },
+    "ListMembersResponse": {
+      "type": "structure",
+      "members": {
+        "members": {
+          "shape": "__listOfMember",
+          "locationName": "members"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListOrganizationAdminAccountsRequest": {
+      "type": "structure",
+      "members": {
+        "maxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListOrganizationAdminAccountsResponse": {
+      "type": "structure",
+      "members": {
+        "adminAccounts": {
+          "shape": "__listOfAdminAccount",
+          "locationName": "adminAccounts"
+        },
+        "nextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "type": "structure",
+      "members": {
+        "resourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        }
+      },
+      "required": [
+        "resourceArn"
+      ]
+    },
+    "ListTagsForResourceResponse": {
+      "type": "structure",
+      "members": {
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      }
+    },
+    "MacieStatus": {
+      "type": "string",
+      "enum": [
+        "PAUSED",
+        "ENABLED"
+      ]
+    },
+    "MaxResults": {
+      "type": "integer",
+      "min": 1,
+      "max": 25
+    },
+    "Member": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "email": {
+          "shape": "__string",
+          "locationName": "email"
+        },
+        "invitedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "invitedAt"
+        },
+        "masterAccountId": {
+          "shape": "__string",
+          "locationName": "masterAccountId"
+        },
+        "relationshipStatus": {
+          "shape": "RelationshipStatus",
+          "locationName": "relationshipStatus"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        },
+        "updatedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "updatedAt"
+        }
+      }
+    },
+    "MonthlySchedule": {
+      "type": "structure",
+      "members": {
+        "dayOfMonth": {
+          "shape": "__integer",
+          "locationName": "dayOfMonth"
+        }
+      }
+    },
+    "ObjectCountByEncryptionType": {
+      "type": "structure",
+      "members": {
+        "customerManaged": {
+          "shape": "__long",
+          "locationName": "customerManaged"
+        },
+        "kmsManaged": {
+          "shape": "__long",
+          "locationName": "kmsManaged"
+        },
+        "s3Managed": {
+          "shape": "__long",
+          "locationName": "s3Managed"
+        },
+        "unencrypted": {
+          "shape": "__long",
+          "locationName": "unencrypted"
+        }
+      }
+    },
+    "ObjectLevelStatistics": {
+      "type": "structure",
+      "members": {
+        "fileType": {
+          "shape": "__long",
+          "locationName": "fileType"
+        },
+        "storageClass": {
+          "shape": "__long",
+          "locationName": "storageClass"
+        },
+        "total": {
+          "shape": "__long",
+          "locationName": "total"
+        }
+      }
+    },
+    "Occurrences": {
+      "type": "structure",
+      "members": {
+        "cells": {
+          "shape": "Cells",
+          "locationName": "cells"
+        },
+        "lineRanges": {
+          "shape": "Ranges",
+          "locationName": "lineRanges"
+        },
+        "offsetRanges": {
+          "shape": "Ranges",
+          "locationName": "offsetRanges"
+        },
+        "pages": {
+          "shape": "Pages",
+          "locationName": "pages"
+        },
+        "records": {
+          "shape": "Records",
+          "locationName": "records"
+        }
+      }
+    },
+    "OrderBy": {
+      "type": "string",
+      "enum": [
+        "ASC",
+        "DESC"
+      ]
+    },
+    "Page": {
+      "type": "structure",
+      "members": {
+        "lineRange": {
+          "shape": "Range",
+          "locationName": "lineRange"
+        },
+        "offsetRange": {
+          "shape": "Range",
+          "locationName": "offsetRange"
+        },
+        "pageNumber": {
+          "shape": "__long",
+          "locationName": "pageNumber"
+        }
+      }
+    },
+    "Pages": {
+      "type": "list",
+      "member": {
+        "shape": "Page"
+      }
+    },
+    "PolicyDetails": {
+      "type": "structure",
+      "members": {
+        "action": {
+          "shape": "FindingAction",
+          "locationName": "action"
+        },
+        "actor": {
+          "shape": "FindingActor",
+          "locationName": "actor"
+        }
+      }
+    },
+    "PutClassificationExportConfigurationRequest": {
+      "type": "structure",
+      "members": {
+        "configuration": {
+          "shape": "ClassificationExportConfiguration",
+          "locationName": "configuration"
+        }
+      },
+      "required": [
+        "configuration"
+      ]
+    },
+    "PutClassificationExportConfigurationResponse": {
+      "type": "structure",
+      "members": {
+        "configuration": {
+          "shape": "ClassificationExportConfiguration",
+          "locationName": "configuration"
+        }
+      }
+    },
+    "Range": {
+      "type": "structure",
+      "members": {
+        "end": {
+          "shape": "__long",
+          "locationName": "end"
+        },
+        "start": {
+          "shape": "__long",
+          "locationName": "start"
+        },
+        "startColumn": {
+          "shape": "__long",
+          "locationName": "startColumn"
+        }
+      }
+    },
+    "Ranges": {
+      "type": "list",
+      "member": {
+        "shape": "Range"
+      }
+    },
+    "Record": {
+      "type": "structure",
+      "members": {
+        "jsonPath": {
+          "shape": "__string",
+          "locationName": "jsonPath"
+        },
+        "recordIndex": {
+          "shape": "__long",
+          "locationName": "recordIndex"
+        }
+      }
+    },
+    "Records": {
+      "type": "list",
+      "member": {
+        "shape": "Record"
+      }
+    },
+    "RelationshipStatus": {
+      "type": "string",
+      "enum": [
+        "Enabled",
+        "Paused",
+        "Invited",
+        "Created",
+        "Removed",
+        "Resigned",
+        "EmailVerificationInProgress",
+        "EmailVerificationFailed",
+        "RegionDisabled",
+        "AccountSuspended"
+      ]
+    },
+    "ReplicationDetails": {
+      "type": "structure",
+      "members": {
+        "replicated": {
+          "shape": "__boolean",
+          "locationName": "replicated"
+        },
+        "replicatedExternally": {
+          "shape": "__boolean",
+          "locationName": "replicatedExternally"
+        },
+        "replicationAccounts": {
+          "shape": "__listOf__string",
+          "locationName": "replicationAccounts"
+        }
+      }
+    },
+    "ResourceNotFoundException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 404
+      }
+    },
+    "ResourcesAffected": {
+      "type": "structure",
+      "members": {
+        "s3Bucket": {
+          "shape": "S3Bucket",
+          "locationName": "s3Bucket"
+        },
+        "s3Object": {
+          "shape": "S3Object",
+          "locationName": "s3Object"
+        }
+      }
+    },
+    "S3Bucket": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "createdAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "createdAt"
+        },
+        "defaultServerSideEncryption": {
+          "shape": "ServerSideEncryption",
+          "locationName": "defaultServerSideEncryption"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "owner": {
+          "shape": "S3BucketOwner",
+          "locationName": "owner"
+        },
+        "publicAccess": {
+          "shape": "BucketPublicAccess",
+          "locationName": "publicAccess"
+        },
+        "tags": {
+          "shape": "KeyValuePairList",
+          "locationName": "tags"
+        }
+      }
+    },
+    "S3BucketDefinitionForJob": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "buckets": {
+          "shape": "__listOf__string",
+          "locationName": "buckets"
+        }
+      }
+    },
+    "S3BucketOwner": {
+      "type": "structure",
+      "members": {
+        "displayName": {
+          "shape": "__string",
+          "locationName": "displayName"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        }
+      }
+    },
+    "S3Destination": {
+      "type": "structure",
+      "members": {
+        "bucketName": {
+          "shape": "__string",
+          "locationName": "bucketName"
+        },
+        "keyPrefix": {
+          "shape": "__string",
+          "locationName": "keyPrefix"
+        },
+        "kmsKeyArn": {
+          "shape": "__string",
+          "locationName": "kmsKeyArn"
+        }
+      },
+      "required": [
+        "bucketName",
+        "kmsKeyArn"
+      ]
+    },
+    "S3JobDefinition": {
+      "type": "structure",
+      "members": {
+        "bucketDefinitions": {
+          "shape": "__listOfS3BucketDefinitionForJob",
+          "locationName": "bucketDefinitions"
+        },
+        "scoping": {
+          "shape": "Scoping",
+          "locationName": "scoping"
+        }
+      }
+    },
+    "S3Object": {
+      "type": "structure",
+      "members": {
+        "bucketArn": {
+          "shape": "__string",
+          "locationName": "bucketArn"
+        },
+        "eTag": {
+          "shape": "__string",
+          "locationName": "eTag"
+        },
+        "extension": {
+          "shape": "__string",
+          "locationName": "extension"
+        },
+        "key": {
+          "shape": "__string",
+          "locationName": "key"
+        },
+        "lastModified": {
+          "shape": "__timestampIso8601",
+          "locationName": "lastModified"
+        },
+        "path": {
+          "shape": "__string",
+          "locationName": "path"
+        },
+        "publicAccess": {
+          "shape": "__boolean",
+          "locationName": "publicAccess"
+        },
+        "serverSideEncryption": {
+          "shape": "ServerSideEncryption",
+          "locationName": "serverSideEncryption"
+        },
+        "size": {
+          "shape": "__long",
+          "locationName": "size"
+        },
+        "storageClass": {
+          "shape": "StorageClass",
+          "locationName": "storageClass"
+        },
+        "tags": {
+          "shape": "KeyValuePairList",
+          "locationName": "tags"
+        },
+        "versionId": {
+          "shape": "__string",
+          "locationName": "versionId"
+        }
+      }
+    },
+    "ScopeFilterKey": {
+      "type": "string",
+      "enum": [
+        "BUCKET_CREATION_DATE",
+        "OBJECT_EXTENSION",
+        "OBJECT_LAST_MODIFIED_DATE",
+        "OBJECT_SIZE",
+        "TAG"
+      ]
+    },
+    "Scoping": {
+      "type": "structure",
+      "members": {
+        "excludes": {
+          "shape": "JobScopingBlock",
+          "locationName": "excludes"
+        },
+        "includes": {
+          "shape": "JobScopingBlock",
+          "locationName": "includes"
+        }
+      }
+    },
+    "SensitiveData": {
+      "type": "list",
+      "member": {
+        "shape": "SensitiveDataItem"
+      }
+    },
+    "SensitiveDataItem": {
+      "type": "structure",
+      "members": {
+        "category": {
+          "shape": "SensitiveDataItemCategory",
+          "locationName": "category"
+        },
+        "detections": {
+          "shape": "DefaultDetections",
+          "locationName": "detections"
+        },
+        "totalCount": {
+          "shape": "__long",
+          "locationName": "totalCount"
+        }
+      }
+    },
+    "SensitiveDataItemCategory": {
+      "type": "string",
+      "enum": [
+        "FINANCIAL_INFORMATION",
+        "PERSONAL_INFORMATION",
+        "CREDENTIALS",
+        "CUSTOM_IDENTIFIER"
+      ]
+    },
+    "ServerSideEncryption": {
+      "type": "structure",
+      "members": {
+        "encryptionType": {
+          "shape": "EncryptionType",
+          "locationName": "encryptionType"
+        },
+        "kmsMasterKeyId": {
+          "shape": "__string",
+          "locationName": "kmsMasterKeyId"
+        }
+      }
+    },
+    "ServiceLimit": {
+      "type": "structure",
+      "members": {
+        "isServiceLimited": {
+          "shape": "__boolean",
+          "locationName": "isServiceLimited"
+        },
+        "unit": {
+          "shape": "Unit",
+          "locationName": "unit"
+        },
+        "value": {
+          "shape": "__long",
+          "locationName": "value"
+        }
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 402
+      }
+    },
+    "SessionContext": {
+      "type": "structure",
+      "members": {
+        "attributes": {
+          "shape": "SessionContextAttributes",
+          "locationName": "attributes"
+        },
+        "sessionIssuer": {
+          "shape": "SessionIssuer",
+          "locationName": "sessionIssuer"
+        }
+      }
+    },
+    "SessionContextAttributes": {
+      "type": "structure",
+      "members": {
+        "creationDate": {
+          "shape": "__timestampIso8601",
+          "locationName": "creationDate"
+        },
+        "mfaAuthenticated": {
+          "shape": "__boolean",
+          "locationName": "mfaAuthenticated"
+        }
+      }
+    },
+    "SessionIssuer": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        },
+        "type": {
+          "shape": "__string",
+          "locationName": "type"
+        },
+        "userName": {
+          "shape": "__string",
+          "locationName": "userName"
+        }
+      }
+    },
+    "Severity": {
+      "type": "structure",
+      "members": {
+        "description": {
+          "shape": "SeverityDescription",
+          "locationName": "description"
+        },
+        "score": {
+          "shape": "__long",
+          "locationName": "score"
+        }
+      }
+    },
+    "SeverityDescription": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    "SharedAccess": {
+      "type": "string",
+      "enum": [
+        "EXTERNAL",
+        "INTERNAL",
+        "NOT_SHARED",
+        "UNKNOWN"
+      ]
+    },
+    "SimpleScopeTerm": {
+      "type": "structure",
+      "members": {
+        "comparator": {
+          "shape": "JobComparator",
+          "locationName": "comparator"
+        },
+        "key": {
+          "shape": "ScopeFilterKey",
+          "locationName": "key"
+        },
+        "values": {
+          "shape": "__listOf__string",
+          "locationName": "values"
+        }
+      }
+    },
+    "SortCriteria": {
+      "type": "structure",
+      "members": {
+        "attributeName": {
+          "shape": "__string",
+          "locationName": "attributeName"
+        },
+        "orderBy": {
+          "shape": "OrderBy",
+          "locationName": "orderBy"
+        }
+      }
+    },
+    "Statistics": {
+      "type": "structure",
+      "members": {
+        "approximateNumberOfObjectsToProcess": {
+          "shape": "__double",
+          "locationName": "approximateNumberOfObjectsToProcess"
+        },
+        "numberOfRuns": {
+          "shape": "__double",
+          "locationName": "numberOfRuns"
+        }
+      }
+    },
+    "StorageClass": {
+      "type": "string",
+      "enum": [
+        "STANDARD",
+        "REDUCED_REDUNDANCY",
+        "STANDARD_IA",
+        "INTELLIGENT_TIERING",
+        "DEEP_ARCHIVE",
+        "ONEZONE_IA",
+        "GLACIER"
+      ]
+    },
+    "TagMap": {
+      "type": "map",
+      "key": {
+        "shape": "__string"
+      },
+      "value": {
+        "shape": "__string"
+      }
+    },
+    "TagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "resourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        },
+        "tags": {
+          "shape": "TagMap",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "resourceArn",
+        "tags"
+      ]
+    },
+    "TagResourceResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "TagScopeTerm": {
+      "type": "structure",
+      "members": {
+        "comparator": {
+          "shape": "JobComparator",
+          "locationName": "comparator"
+        },
+        "key": {
+          "shape": "__string",
+          "locationName": "key"
+        },
+        "tagValues": {
+          "shape": "__listOfTagValuePair",
+          "locationName": "tagValues"
+        },
+        "target": {
+          "shape": "TagTarget",
+          "locationName": "target"
+        }
+      }
+    },
+    "TagTarget": {
+      "type": "string",
+      "enum": [
+        "S3_OBJECT"
+      ]
+    },
+    "TagValuePair": {
+      "type": "structure",
+      "members": {
+        "key": {
+          "shape": "__string",
+          "locationName": "key"
+        },
+        "value": {
+          "shape": "__string",
+          "locationName": "value"
+        }
+      }
+    },
+    "TestCustomDataIdentifierRequest": {
+      "type": "structure",
+      "members": {
+        "ignoreWords": {
+          "shape": "__listOf__string",
+          "locationName": "ignoreWords"
+        },
+        "keywords": {
+          "shape": "__listOf__string",
+          "locationName": "keywords"
+        },
+        "maximumMatchDistance": {
+          "shape": "__integer",
+          "locationName": "maximumMatchDistance"
+        },
+        "regex": {
+          "shape": "__string",
+          "locationName": "regex"
+        },
+        "sampleText": {
+          "shape": "__string",
+          "locationName": "sampleText"
+        }
+      },
+      "required": [
+        "regex",
+        "sampleText"
+      ]
+    },
+    "TestCustomDataIdentifierResponse": {
+      "type": "structure",
+      "members": {
+        "matchCount": {
+          "shape": "__integer",
+          "locationName": "matchCount"
+        }
+      }
+    },
+    "ThrottlingException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 429
+      }
+    },
+    "Unit": {
+      "type": "string",
+      "enum": [
+        "TERABYTES"
+      ]
+    },
+    "UnprocessedAccount": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "errorCode": {
+          "shape": "ErrorCode",
+          "locationName": "errorCode"
+        },
+        "errorMessage": {
+          "shape": "__string",
+          "locationName": "errorMessage"
+        }
+      }
+    },
+    "UntagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "resourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        },
+        "tagKeys": {
+          "shape": "__listOf__string",
+          "location": "querystring",
+          "locationName": "tagKeys"
+        }
+      },
+      "required": [
+        "tagKeys",
+        "resourceArn"
+      ]
+    },
+    "UntagResourceResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UpdateClassificationJobRequest": {
+      "type": "structure",
+      "members": {
+        "jobId": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "jobId"
+        },
+        "jobStatus": {
+          "shape": "JobStatus",
+          "locationName": "jobStatus"
+        }
+      },
+      "required": [
+        "jobId",
+        "jobStatus"
+      ]
+    },
+    "UpdateClassificationJobResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UpdateFindingsFilterRequest": {
+      "type": "structure",
+      "members": {
+        "action": {
+          "shape": "FindingsFilterAction",
+          "locationName": "action"
+        },
+        "description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "findingCriteria": {
+          "shape": "FindingCriteria",
+          "locationName": "findingCriteria"
+        },
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        },
+        "name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "position": {
+          "shape": "__integer",
+          "locationName": "position"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "UpdateFindingsFilterResponse": {
+      "type": "structure",
+      "members": {
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "id": {
+          "shape": "__string",
+          "locationName": "id"
+        }
+      }
+    },
+    "UpdateMacieSessionRequest": {
+      "type": "structure",
+      "members": {
+        "findingPublishingFrequency": {
+          "shape": "FindingPublishingFrequency",
+          "locationName": "findingPublishingFrequency"
+        },
+        "status": {
+          "shape": "MacieStatus",
+          "locationName": "status"
+        }
+      }
+    },
+    "UpdateMacieSessionResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UpdateMemberSessionRequest": {
+      "type": "structure",
+      "members": {
+        "id": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "id"
+        },
+        "status": {
+          "shape": "MacieStatus",
+          "locationName": "status"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ]
+    },
+    "UpdateMemberSessionResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UpdateOrganizationConfigurationRequest": {
+      "type": "structure",
+      "members": {
+        "autoEnable": {
+          "shape": "__boolean",
+          "locationName": "autoEnable"
+        }
+      },
+      "required": [
+        "autoEnable"
+      ]
+    },
+    "UpdateOrganizationConfigurationResponse": {
+      "type": "structure",
+      "members": {}
+    },
+    "UsageByAccount": {
+      "type": "structure",
+      "members": {
+        "currency": {
+          "shape": "Currency",
+          "locationName": "currency"
+        },
+        "estimatedCost": {
+          "shape": "__string",
+          "locationName": "estimatedCost"
+        },
+        "serviceLimit": {
+          "shape": "ServiceLimit",
+          "locationName": "serviceLimit"
+        },
+        "type": {
+          "shape": "UsageType",
+          "locationName": "type"
+        }
+      }
+    },
+    "UsageRecord": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "freeTrialStartDate": {
+          "shape": "__timestampIso8601",
+          "locationName": "freeTrialStartDate"
+        },
+        "usage": {
+          "shape": "__listOfUsageByAccount",
+          "locationName": "usage"
+        }
+      }
+    },
+    "UsageStatisticsFilter": {
+      "type": "structure",
+      "members": {
+        "comparator": {
+          "shape": "UsageStatisticsFilterComparator",
+          "locationName": "comparator"
+        },
+        "key": {
+          "shape": "UsageStatisticsFilterKey",
+          "locationName": "key"
+        },
+        "values": {
+          "shape": "__listOf__string",
+          "locationName": "values"
+        }
+      }
+    },
+    "UsageStatisticsFilterComparator": {
+      "type": "string",
+      "enum": [
+        "GT",
+        "GTE",
+        "LT",
+        "LTE",
+        "EQ",
+        "NE",
+        "CONTAINS"
+      ]
+    },
+    "UsageStatisticsFilterKey": {
+      "type": "string",
+      "enum": [
+        "accountId",
+        "serviceLimit",
+        "freeTrialStartDate",
+        "total"
+      ]
+    },
+    "UsageStatisticsSortBy": {
+      "type": "structure",
+      "members": {
+        "key": {
+          "shape": "UsageStatisticsSortKey",
+          "locationName": "key"
+        },
+        "orderBy": {
+          "shape": "OrderBy",
+          "locationName": "orderBy"
+        }
+      }
+    },
+    "UsageStatisticsSortKey": {
+      "type": "string",
+      "enum": [
+        "accountId",
+        "total",
+        "serviceLimitValue",
+        "freeTrialStartDate"
+      ]
+    },
+    "UsageTotal": {
+      "type": "structure",
+      "members": {
+        "currency": {
+          "shape": "Currency",
+          "locationName": "currency"
+        },
+        "estimatedCost": {
+          "shape": "__string",
+          "locationName": "estimatedCost"
+        },
+        "type": {
+          "shape": "UsageType",
+          "locationName": "type"
+        }
+      }
+    },
+    "UsageType": {
+      "type": "string",
+      "enum": [
+        "DATA_INVENTORY_EVALUATION",
+        "SENSITIVE_DATA_DISCOVERY"
+      ]
+    },
+    "UserIdentity": {
+      "type": "structure",
+      "members": {
+        "assumedRole": {
+          "shape": "AssumedRole",
+          "locationName": "assumedRole"
+        },
+        "awsAccount": {
+          "shape": "AwsAccount",
+          "locationName": "awsAccount"
+        },
+        "awsService": {
+          "shape": "AwsService",
+          "locationName": "awsService"
+        },
+        "federatedUser": {
+          "shape": "FederatedUser",
+          "locationName": "federatedUser"
+        },
+        "iamUser": {
+          "shape": "IamUser",
+          "locationName": "iamUser"
+        },
+        "root": {
+          "shape": "UserIdentityRoot",
+          "locationName": "root"
+        },
+        "type": {
+          "shape": "UserIdentityType",
+          "locationName": "type"
+        }
+      }
+    },
+    "UserIdentityRoot": {
+      "type": "structure",
+      "members": {
+        "accountId": {
+          "shape": "__string",
+          "locationName": "accountId"
+        },
+        "arn": {
+          "shape": "__string",
+          "locationName": "arn"
+        },
+        "principalId": {
+          "shape": "__string",
+          "locationName": "principalId"
+        }
+      }
+    },
+    "UserIdentityType": {
+      "type": "string",
+      "enum": [
+        "AssumedRole",
+        "IAMUser",
+        "FederatedUser",
+        "Root",
+        "AWSAccount",
+        "AWSService"
+      ]
+    },
+    "UserPausedDetails": {
+      "type": "structure",
+      "members": {
+        "jobExpiresAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "jobExpiresAt"
+        },
+        "jobImminentExpirationHealthEventArn": {
+          "shape": "__string",
+          "locationName": "jobImminentExpirationHealthEventArn"
+        },
+        "jobPausedAt": {
+          "shape": "__timestampIso8601",
+          "locationName": "jobPausedAt"
+        }
+      }
+    },
+    "ValidationException": {
+      "type": "structure",
+      "members": {
+        "message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "exception": true,
+      "error": {
+        "httpStatusCode": 400
+      }
+    },
+    "WeeklySchedule": {
+      "type": "structure",
+      "members": {
+        "dayOfWeek": {
+          "shape": "DayOfWeek",
+          "locationName": "dayOfWeek"
+        }
+      }
+    },
+    "__boolean": {
+      "type": "boolean"
+    },
+    "__double": {
+      "type": "double"
+    },
+    "__integer": {
+      "type": "integer"
+    },
+    "__listOfAdminAccount": {
+      "type": "list",
+      "member": {
+        "shape": "AdminAccount"
+      }
+    },
+    "__listOfBatchGetCustomDataIdentifierSummary": {
+      "type": "list",
+      "member": {
+        "shape": "BatchGetCustomDataIdentifierSummary"
+      }
+    },
+    "__listOfBucketMetadata": {
+      "type": "list",
+      "member": {
+        "shape": "BucketMetadata"
+      }
+    },
+    "__listOfCustomDataIdentifierSummary": {
+      "type": "list",
+      "member": {
+        "shape": "CustomDataIdentifierSummary"
+      }
+    },
+    "__listOfFinding": {
+      "type": "list",
+      "member": {
+        "shape": "Finding"
+      }
+    },
+    "__listOfFindingType": {
+      "type": "list",
+      "member": {
+        "shape": "FindingType"
+      }
+    },
+    "__listOfFindingsFilterListItem": {
+      "type": "list",
+      "member": {
+        "shape": "FindingsFilterListItem"
+      }
+    },
+    "__listOfGroupCount": {
+      "type": "list",
+      "member": {
+        "shape": "GroupCount"
+      }
+    },
+    "__listOfInvitation": {
+      "type": "list",
+      "member": {
+        "shape": "Invitation"
+      }
+    },
+    "__listOfJobScopeTerm": {
+      "type": "list",
+      "member": {
+        "shape": "JobScopeTerm"
+      }
+    },
+    "__listOfJobSummary": {
+      "type": "list",
+      "member": {
+        "shape": "JobSummary"
+      }
+    },
+    "__listOfKeyValuePair": {
+      "type": "list",
+      "member": {
+        "shape": "KeyValuePair"
+      }
+    },
+    "__listOfListJobsFilterTerm": {
+      "type": "list",
+      "member": {
+        "shape": "ListJobsFilterTerm"
+      }
+    },
+    "__listOfMember": {
+      "type": "list",
+      "member": {
+        "shape": "Member"
+      }
+    },
+    "__listOfS3BucketDefinitionForJob": {
+      "type": "list",
+      "member": {
+        "shape": "S3BucketDefinitionForJob"
+      }
+    },
+    "__listOfTagValuePair": {
+      "type": "list",
+      "member": {
+        "shape": "TagValuePair"
+      }
+    },
+    "__listOfUnprocessedAccount": {
+      "type": "list",
+      "member": {
+        "shape": "UnprocessedAccount"
+      }
+    },
+    "__listOfUsageByAccount": {
+      "type": "list",
+      "member": {
+        "shape": "UsageByAccount"
+      }
+    },
+    "__listOfUsageRecord": {
+      "type": "list",
+      "member": {
+        "shape": "UsageRecord"
+      }
+    },
+    "__listOfUsageStatisticsFilter": {
+      "type": "list",
+      "member": {
+        "shape": "UsageStatisticsFilter"
+      }
+    },
+    "__listOfUsageTotal": {
+      "type": "list",
+      "member": {
+        "shape": "UsageTotal"
+      }
+    },
+    "__listOf__string": {
+      "type": "list",
+      "member": {
+        "shape": "__string"
+      }
+    },
+    "__long": {
+      "type": "long"
+    },
+    "__string": {
+      "type": "string"
+    },
+    "__timestampIso8601": {
+      "type": "timestamp",
+      "timestampFormat": "iso8601"
+    },
+    "__timestampUnix": {
+      "type": "timestamp",
+      "timestampFormat": "unixTimestamp"
+    }
+  }
+}

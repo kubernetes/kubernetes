@@ -1,0 +1,152 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Personalize can consume real-time user event data, such as <i>stream</i> or <i>click</i> data, and use it for model training either alone or combined with historical data. For more information see <a>recording-events</a>.</p>",
+  "operations": {
+    "PutEvents": "<p>Records user interaction event data. For more information see <a>event-record-api</a>.</p>",
+    "PutItems": "<p>Adds one or more items to an Items dataset. For more information see <a>importing-items</a>.</p>",
+    "PutUsers": "<p>Adds one or more users to a Users dataset. For more information see <a>importing-users</a>.</p>"
+  },
+  "shapes": {
+    "Arn": {
+      "base": null,
+      "refs": {
+        "PutItemsRequest$datasetArn": "<p>The Amazon Resource Number (ARN) of the Items dataset you are adding the item or items to.</p>",
+        "PutUsersRequest$datasetArn": "<p>The Amazon Resource Number (ARN) of the Users dataset you are adding the user or users to.</p>"
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "Event$sentAt": "<p>The timestamp (in Unix time) on the client side when the event occurred.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InvalidInputException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "Event": {
+      "base": "<p>Represents user interaction event information sent using the <code>PutEvents</code> API.</p>",
+      "refs": {
+        "EventList$member": null
+      }
+    },
+    "EventList": {
+      "base": null,
+      "refs": {
+        "PutEventsRequest$eventList": "<p>A list of event data from the session.</p>"
+      }
+    },
+    "EventPropertiesJSON": {
+      "base": null,
+      "refs": {
+        "Event$properties": "<p>A string map of event-specific data that you might choose to record. For example, if a user rates a movie on your site, other than movie ID (<code>itemId</code>) and rating (<code>eventValue</code>) , you might also send the number of movie ratings made by the user.</p> <p>Each item in the map consists of a key-value pair. For example,</p> <p> <code>{\"numberOfRatings\": \"12\"}</code> </p> <p>The keys use camel case names that match the fields in the Interactions schema. In the above example, the <code>numberOfRatings</code> would match the 'NUMBER_OF_RATINGS' field defined in the Interactions schema.</p>"
+      }
+    },
+    "FloatType": {
+      "base": null,
+      "refs": {
+        "Event$eventValue": "<p>The event value that corresponds to the <code>EVENT_VALUE</code> field of the Interactions schema.</p>"
+      }
+    },
+    "Impression": {
+      "base": null,
+      "refs": {
+        "Event$impression": "<p>A list of item IDs that represents the sequence of items you have shown the user. For example, <code>[\"itemId1\", \"itemId2\", \"itemId3\"]</code>.</p>"
+      }
+    },
+    "InvalidInputException": {
+      "base": "<p>Provide a valid value for the field or parameter.</p>",
+      "refs": {
+      }
+    },
+    "Item": {
+      "base": "<p>Represents item metadata added to an Items dataset using the <code>PutItems</code> API.</p>",
+      "refs": {
+        "ItemList$member": null
+      }
+    },
+    "ItemId": {
+      "base": null,
+      "refs": {
+        "Event$itemId": "<p>The item ID key that corresponds to the <code>ITEM_ID</code> field of the Interactions schema.</p>",
+        "Impression$member": null
+      }
+    },
+    "ItemList": {
+      "base": null,
+      "refs": {
+        "PutItemsRequest$items": "<p>A list of item data.</p>"
+      }
+    },
+    "ItemProperties": {
+      "base": null,
+      "refs": {
+        "Item$properties": "<p>A string map of item-specific metadata. Each element in the map consists of a key-value pair. For example, </p> <p> <code>{\"numberOfRatings\": \"12\"}</code> </p> <p>The keys use camel case names that match the fields in the Items schema. In the above example, the <code>numberOfRatings</code> would match the 'NUMBER_OF_RATINGS' field defined in the Items schema.</p>"
+      }
+    },
+    "PutEventsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutItemsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutUsersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RecommendationId": {
+      "base": null,
+      "refs": {
+        "Event$recommendationId": "<p>The ID of the recommendation.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Could not find the specified resource.</p>",
+      "refs": {
+      }
+    },
+    "StringType": {
+      "base": null,
+      "refs": {
+        "Event$eventId": "<p>An ID associated with the event. If an event ID is not provided, Amazon Personalize generates a unique ID for the event. An event ID is not used as an input to the model. Amazon Personalize uses the event ID to distinquish unique events. Any subsequent events after the first with the same event ID are not used in model training.</p>",
+        "Event$eventType": "<p>The type of event, such as click or download. This property corresponds to the <code>EVENT_TYPE</code> field of your Interactions schema and depends on the types of events you are tracking.</p>",
+        "Item$itemId": "<p>The ID associated with the item.</p>",
+        "PutEventsRequest$trackingId": "<p>The tracking ID for the event. The ID is generated by a call to the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_CreateEventTracker.html\">CreateEventTracker</a> API.</p>",
+        "PutEventsRequest$sessionId": "<p>The session ID associated with the user's visit. Your application generates the sessionId when a user first visits your website or uses your application. Amazon Personalize uses the sessionId to associate events with the user before they log in. For more information see <a>event-record-api</a>.</p>",
+        "User$userId": "<p>The ID associated with the user.</p>"
+      }
+    },
+    "User": {
+      "base": "<p>Represents user metadata added to a Users dataset using the <code>PutUsers</code> API.</p>",
+      "refs": {
+        "UserList$member": null
+      }
+    },
+    "UserId": {
+      "base": null,
+      "refs": {
+        "PutEventsRequest$userId": "<p>The user associated with the event.</p>"
+      }
+    },
+    "UserList": {
+      "base": null,
+      "refs": {
+        "PutUsersRequest$users": "<p>A list of user data.</p>"
+      }
+    },
+    "UserProperties": {
+      "base": null,
+      "refs": {
+        "User$properties": "<p>A string map of user-specific metadata. Each element in the map consists of a key-value pair. For example, </p> <p> <code>{\"numberOfVideosWatched\": \"45\"}</code> </p> <p>The keys use camel case names that match the fields in the Users schema. In the above example, the <code>numberOfVideosWatched</code> would match the 'NUMBER_OF_VIDEOS_WATCHED' field defined in the Users schema.</p>"
+      }
+    }
+  }
+}

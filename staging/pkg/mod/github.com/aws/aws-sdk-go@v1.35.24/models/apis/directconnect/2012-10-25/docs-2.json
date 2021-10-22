@@ -1,0 +1,1522 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS Direct Connect links your internal network to an AWS Direct Connect location over a standard Ethernet fiber-optic cable. One end of the cable is connected to your router, the other to an AWS Direct Connect router. With this connection in place, you can create virtual interfaces directly to the AWS cloud (for example, to Amazon EC2 and Amazon S3) and to Amazon VPC, bypassing Internet service providers in your network path. A connection provides access to all AWS Regions except the China (Beijing) and (China) Ningxia Regions. AWS resources in the China Regions can only be accessed through locations associated with those Regions.</p>",
+  "operations": {
+    "AcceptDirectConnectGatewayAssociationProposal": "<p>Accepts a proposal request to attach a virtual private gateway or transit gateway to a Direct Connect gateway.</p>",
+    "AllocateConnectionOnInterconnect": "<p>Deprecated. Use <a>AllocateHostedConnection</a> instead.</p> <p>Creates a hosted connection on an interconnect.</p> <p>Allocates a VLAN number and a specified amount of bandwidth for use by a hosted connection on the specified interconnect.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "AllocateHostedConnection": "<p>Creates a hosted connection on the specified interconnect or a link aggregation group (LAG) of interconnects.</p> <p>Allocates a VLAN number and a specified amount of capacity (bandwidth) for use by a hosted connection on the specified interconnect or LAG of interconnects. AWS polices the hosted connection for the specified capacity and the AWS Direct Connect Partner must also police the hosted connection for the specified capacity.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "AllocatePrivateVirtualInterface": "<p>Provisions a private virtual interface to be owned by the specified AWS account.</p> <p>Virtual interfaces created using this action must be confirmed by the owner using <a>ConfirmPrivateVirtualInterface</a>. Until then, the virtual interface is in the <code>Confirming</code> state and is not available to handle traffic.</p>",
+    "AllocatePublicVirtualInterface": "<p>Provisions a public virtual interface to be owned by the specified AWS account.</p> <p>The owner of a connection calls this function to provision a public virtual interface to be owned by the specified AWS account.</p> <p>Virtual interfaces created using this function must be confirmed by the owner using <a>ConfirmPublicVirtualInterface</a>. Until this step has been completed, the virtual interface is in the <code>confirming</code> state and is not available to handle traffic.</p> <p>When creating an IPv6 public virtual interface, omit the Amazon address and customer address. IPv6 addresses are automatically assigned from the Amazon pool of IPv6 addresses; you cannot specify custom IPv6 addresses.</p>",
+    "AllocateTransitVirtualInterface": "<p>Provisions a transit virtual interface to be owned by the specified AWS account. Use this type of interface to connect a transit gateway to your Direct Connect gateway.</p> <p>The owner of a connection provisions a transit virtual interface to be owned by the specified AWS account.</p> <p>After you create a transit virtual interface, it must be confirmed by the owner using <a>ConfirmTransitVirtualInterface</a>. Until this step has been completed, the transit virtual interface is in the <code>requested</code> state and is not available to handle traffic.</p>",
+    "AssociateConnectionWithLag": "<p>Associates an existing connection with a link aggregation group (LAG). The connection is interrupted and re-established as a member of the LAG (connectivity to AWS is interrupted). The connection must be hosted on the same AWS Direct Connect endpoint as the LAG, and its bandwidth must match the bandwidth for the LAG. You can re-associate a connection that's currently associated with a different LAG; however, if removing the connection would cause the original LAG to fall below its setting for minimum number of operational connections, the request fails.</p> <p>Any virtual interfaces that are directly associated with the connection are automatically re-associated with the LAG. If the connection was originally associated with a different LAG, the virtual interfaces remain associated with the original LAG.</p> <p>For interconnects, any hosted connections are automatically re-associated with the LAG. If the interconnect was originally associated with a different LAG, the hosted connections remain associated with the original LAG.</p>",
+    "AssociateHostedConnection": "<p>Associates a hosted connection and its virtual interfaces with a link aggregation group (LAG) or interconnect. If the target interconnect or LAG has an existing hosted connection with a conflicting VLAN number or IP address, the operation fails. This action temporarily interrupts the hosted connection's connectivity to AWS as it is being migrated.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "AssociateVirtualInterface": "<p>Associates a virtual interface with a specified link aggregation group (LAG) or connection. Connectivity to AWS is temporarily interrupted as the virtual interface is being migrated. If the target connection or LAG has an associated virtual interface with a conflicting VLAN number or a conflicting IP address, the operation fails.</p> <p>Virtual interfaces associated with a hosted connection cannot be associated with a LAG; hosted connections must be migrated along with their virtual interfaces using <a>AssociateHostedConnection</a>.</p> <p>To reassociate a virtual interface to a new connection or LAG, the requester must own either the virtual interface itself or the connection to which the virtual interface is currently associated. Additionally, the requester must own the connection or LAG for the association.</p>",
+    "ConfirmConnection": "<p>Confirms the creation of the specified hosted connection on an interconnect.</p> <p>Upon creation, the hosted connection is initially in the <code>Ordering</code> state, and remains in this state until the owner confirms creation of the hosted connection.</p>",
+    "ConfirmPrivateVirtualInterface": "<p>Accepts ownership of a private virtual interface created by another AWS account.</p> <p>After the virtual interface owner makes this call, the virtual interface is created and attached to the specified virtual private gateway or Direct Connect gateway, and is made available to handle traffic.</p>",
+    "ConfirmPublicVirtualInterface": "<p>Accepts ownership of a public virtual interface created by another AWS account.</p> <p>After the virtual interface owner makes this call, the specified virtual interface is created and made available to handle traffic.</p>",
+    "ConfirmTransitVirtualInterface": "<p>Accepts ownership of a transit virtual interface created by another AWS account.</p> <p> After the owner of the transit virtual interface makes this call, the specified transit virtual interface is created and made available to handle traffic.</p>",
+    "CreateBGPPeer": "<p>Creates a BGP peer on the specified virtual interface.</p> <p>You must create a BGP peer for the corresponding address family (IPv4/IPv6) in order to access AWS resources that also use that address family.</p> <p>If logical redundancy is not supported by the connection, interconnect, or LAG, the BGP peer cannot be in the same address family as an existing BGP peer on the virtual interface.</p> <p>When creating a IPv6 BGP peer, omit the Amazon address and customer address. IPv6 addresses are automatically assigned from the Amazon pool of IPv6 addresses; you cannot specify custom IPv6 addresses.</p> <p>For a public virtual interface, the Autonomous System Number (ASN) must be private or already whitelisted for the virtual interface.</p>",
+    "CreateConnection": "<p>Creates a connection between a customer network and a specific AWS Direct Connect location.</p> <p>A connection links your internal network to an AWS Direct Connect location over a standard Ethernet fiber-optic cable. One end of the cable is connected to your router, the other to an AWS Direct Connect router.</p> <p>To find the locations for your Region, use <a>DescribeLocations</a>.</p> <p>You can automatically add the new connection to a link aggregation group (LAG) by specifying a LAG ID in the request. This ensures that the new connection is allocated on the same AWS Direct Connect endpoint that hosts the specified LAG. If there are no available ports on the endpoint, the request fails and no connection is created.</p>",
+    "CreateDirectConnectGateway": "<p>Creates a Direct Connect gateway, which is an intermediate object that enables you to connect a set of virtual interfaces and virtual private gateways. A Direct Connect gateway is global and visible in any AWS Region after it is created. The virtual interfaces and virtual private gateways that are connected through a Direct Connect gateway can be in different AWS Regions. This enables you to connect to a VPC in any Region, regardless of the Region in which the virtual interfaces are located, and pass traffic between them.</p>",
+    "CreateDirectConnectGatewayAssociation": "<p>Creates an association between a Direct Connect gateway and a virtual private gateway. The virtual private gateway must be attached to a VPC and must not be associated with another Direct Connect gateway.</p>",
+    "CreateDirectConnectGatewayAssociationProposal": "<p>Creates a proposal to associate the specified virtual private gateway or transit gateway with the specified Direct Connect gateway.</p> <p>You can associate a Direct Connect gateway and virtual private gateway or transit gateway that is owned by any AWS account. </p>",
+    "CreateInterconnect": "<p>Creates an interconnect between an AWS Direct Connect Partner's network and a specific AWS Direct Connect location.</p> <p>An interconnect is a connection that is capable of hosting other connections. The AWS Direct Connect partner can use an interconnect to provide AWS Direct Connect hosted connections to customers through their own network services. Like a standard connection, an interconnect links the partner's network to an AWS Direct Connect location over a standard Ethernet fiber-optic cable. One end is connected to the partner's router, the other to an AWS Direct Connect router.</p> <p>You can automatically add the new interconnect to a link aggregation group (LAG) by specifying a LAG ID in the request. This ensures that the new interconnect is allocated on the same AWS Direct Connect endpoint that hosts the specified LAG. If there are no available ports on the endpoint, the request fails and no interconnect is created.</p> <p>For each end customer, the AWS Direct Connect Partner provisions a connection on their interconnect by calling <a>AllocateHostedConnection</a>. The end customer can then connect to AWS resources by creating a virtual interface on their connection, using the VLAN assigned to them by the AWS Direct Connect Partner.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "CreateLag": "<p>Creates a link aggregation group (LAG) with the specified number of bundled physical dedicated connections between the customer network and a specific AWS Direct Connect location. A LAG is a logical interface that uses the Link Aggregation Control Protocol (LACP) to aggregate multiple interfaces, enabling you to treat them as a single interface.</p> <p>All connections in a LAG must use the same bandwidth (either 1Gbps or 10Gbps) and must terminate at the same AWS Direct Connect endpoint.</p> <p>You can have up to 10 dedicated connections per LAG. Regardless of this limit, if you request more connections for the LAG than AWS Direct Connect can allocate on a single endpoint, no LAG is created.</p> <p>You can specify an existing physical dedicated connection or interconnect to include in the LAG (which counts towards the total number of connections). Doing so interrupts the current physical dedicated connection, and re-establishes them as a member of the LAG. The LAG will be created on the same AWS Direct Connect endpoint to which the dedicated connection terminates. Any virtual interfaces associated with the dedicated connection are automatically disassociated and re-associated with the LAG. The connection ID does not change.</p> <p>If the AWS account used to create a LAG is a registered AWS Direct Connect Partner, the LAG is automatically enabled to host sub-connections. For a LAG owned by a partner, any associated virtual interfaces cannot be directly configured.</p>",
+    "CreatePrivateVirtualInterface": "<p>Creates a private virtual interface. A virtual interface is the VLAN that transports AWS Direct Connect traffic. A private virtual interface can be connected to either a Direct Connect gateway or a Virtual Private Gateway (VGW). Connecting the private virtual interface to a Direct Connect gateway enables the possibility for connecting to multiple VPCs, including VPCs in different AWS Regions. Connecting the private virtual interface to a VGW only provides access to a single VPC within the same Region.</p> <p>Setting the MTU of a virtual interface to 9001 (jumbo frames) can cause an update to the underlying physical connection if it wasn't updated to support jumbo frames. Updating the connection disrupts network connectivity for all virtual interfaces associated with the connection for up to 30 seconds. To check whether your connection supports jumbo frames, call <a>DescribeConnections</a>. To check whether your virtual interface supports jumbo frames, call <a>DescribeVirtualInterfaces</a>.</p>",
+    "CreatePublicVirtualInterface": "<p>Creates a public virtual interface. A virtual interface is the VLAN that transports AWS Direct Connect traffic. A public virtual interface supports sending traffic to public services of AWS such as Amazon S3.</p> <p>When creating an IPv6 public virtual interface (<code>addressFamily</code> is <code>ipv6</code>), leave the <code>customer</code> and <code>amazon</code> address fields blank to use auto-assigned IPv6 space. Custom IPv6 addresses are not supported.</p>",
+    "CreateTransitVirtualInterface": "<p>Creates a transit virtual interface. A transit virtual interface should be used to access one or more transit gateways associated with Direct Connect gateways. A transit virtual interface enables the connection of multiple VPCs attached to a transit gateway to a Direct Connect gateway.</p> <important> <p>If you associate your transit gateway with one or more Direct Connect gateways, the Autonomous System Number (ASN) used by the transit gateway and the Direct Connect gateway must be different. For example, if you use the default ASN 64512 for both your the transit gateway and Direct Connect gateway, the association request fails.</p> </important> <p>Setting the MTU of a virtual interface to 8500 (jumbo frames) can cause an update to the underlying physical connection if it wasn't updated to support jumbo frames. Updating the connection disrupts network connectivity for all virtual interfaces associated with the connection for up to 30 seconds. To check whether your connection supports jumbo frames, call <a>DescribeConnections</a>. To check whether your virtual interface supports jumbo frames, call <a>DescribeVirtualInterfaces</a>.</p>",
+    "DeleteBGPPeer": "<p>Deletes the specified BGP peer on the specified virtual interface with the specified customer address and ASN.</p> <p>You cannot delete the last BGP peer from a virtual interface.</p>",
+    "DeleteConnection": "<p>Deletes the specified connection.</p> <p>Deleting a connection only stops the AWS Direct Connect port hour and data transfer charges. If you are partnering with any third parties to connect with the AWS Direct Connect location, you must cancel your service with them separately.</p>",
+    "DeleteDirectConnectGateway": "<p>Deletes the specified Direct Connect gateway. You must first delete all virtual interfaces that are attached to the Direct Connect gateway and disassociate all virtual private gateways associated with the Direct Connect gateway.</p>",
+    "DeleteDirectConnectGatewayAssociation": "<p>Deletes the association between the specified Direct Connect gateway and virtual private gateway.</p> <p>We recommend that you specify the <code>associationID</code> to delete the association. Alternatively, if you own virtual gateway and a Direct Connect gateway association, you can specify the <code>virtualGatewayId</code> and <code>directConnectGatewayId</code> to delete an association.</p>",
+    "DeleteDirectConnectGatewayAssociationProposal": "<p>Deletes the association proposal request between the specified Direct Connect gateway and virtual private gateway or transit gateway.</p>",
+    "DeleteInterconnect": "<p>Deletes the specified interconnect.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "DeleteLag": "<p>Deletes the specified link aggregation group (LAG). You cannot delete a LAG if it has active virtual interfaces or hosted connections.</p>",
+    "DeleteVirtualInterface": "<p>Deletes a virtual interface.</p>",
+    "DescribeConnectionLoa": "<p>Deprecated. Use <a>DescribeLoa</a> instead.</p> <p>Gets the LOA-CFA for a connection.</p> <p>The Letter of Authorization - Connecting Facility Assignment (LOA-CFA) is a document that your APN partner or service provider uses when establishing your cross connect to AWS at the colocation facility. For more information, see <a href=\"https://docs.aws.amazon.com/directconnect/latest/UserGuide/Colocation.html\">Requesting Cross Connects at AWS Direct Connect Locations</a> in the <i>AWS Direct Connect User Guide</i>.</p>",
+    "DescribeConnections": "<p>Displays the specified connection or all connections in this Region.</p>",
+    "DescribeConnectionsOnInterconnect": "<p>Deprecated. Use <a>DescribeHostedConnections</a> instead.</p> <p>Lists the connections that have been provisioned on the specified interconnect.</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "DescribeDirectConnectGatewayAssociationProposals": "<p>Describes one or more association proposals for connection between a virtual private gateway or transit gateway and a Direct Connect gateway. </p>",
+    "DescribeDirectConnectGatewayAssociations": "<p>Lists the associations between your Direct Connect gateways and virtual private gateways. You must specify a Direct Connect gateway, a virtual private gateway, or both. If you specify a Direct Connect gateway, the response contains all virtual private gateways associated with the Direct Connect gateway. If you specify a virtual private gateway, the response contains all Direct Connect gateways associated with the virtual private gateway. If you specify both, the response contains the association between the Direct Connect gateway and the virtual private gateway.</p>",
+    "DescribeDirectConnectGatewayAttachments": "<p>Lists the attachments between your Direct Connect gateways and virtual interfaces. You must specify a Direct Connect gateway, a virtual interface, or both. If you specify a Direct Connect gateway, the response contains all virtual interfaces attached to the Direct Connect gateway. If you specify a virtual interface, the response contains all Direct Connect gateways attached to the virtual interface. If you specify both, the response contains the attachment between the Direct Connect gateway and the virtual interface.</p>",
+    "DescribeDirectConnectGateways": "<p>Lists all your Direct Connect gateways or only the specified Direct Connect gateway. Deleted Direct Connect gateways are not returned.</p>",
+    "DescribeHostedConnections": "<p>Lists the hosted connections that have been provisioned on the specified interconnect or link aggregation group (LAG).</p> <note> <p>Intended for use by AWS Direct Connect Partners only.</p> </note>",
+    "DescribeInterconnectLoa": "<p>Deprecated. Use <a>DescribeLoa</a> instead.</p> <p>Gets the LOA-CFA for the specified interconnect.</p> <p>The Letter of Authorization - Connecting Facility Assignment (LOA-CFA) is a document that is used when establishing your cross connect to AWS at the colocation facility. For more information, see <a href=\"https://docs.aws.amazon.com/directconnect/latest/UserGuide/Colocation.html\">Requesting Cross Connects at AWS Direct Connect Locations</a> in the <i>AWS Direct Connect User Guide</i>.</p>",
+    "DescribeInterconnects": "<p>Lists the interconnects owned by the AWS account or only the specified interconnect.</p>",
+    "DescribeLags": "<p>Describes all your link aggregation groups (LAG) or the specified LAG.</p>",
+    "DescribeLoa": "<p>Gets the LOA-CFA for a connection, interconnect, or link aggregation group (LAG).</p> <p>The Letter of Authorization - Connecting Facility Assignment (LOA-CFA) is a document that is used when establishing your cross connect to AWS at the colocation facility. For more information, see <a href=\"https://docs.aws.amazon.com/directconnect/latest/UserGuide/Colocation.html\">Requesting Cross Connects at AWS Direct Connect Locations</a> in the <i>AWS Direct Connect User Guide</i>.</p>",
+    "DescribeLocations": "<p>Lists the AWS Direct Connect locations in the current AWS Region. These are the locations that can be selected when calling <a>CreateConnection</a> or <a>CreateInterconnect</a>.</p>",
+    "DescribeTags": "<p>Describes the tags associated with the specified AWS Direct Connect resources.</p>",
+    "DescribeVirtualGateways": "<p>Lists the virtual private gateways owned by the AWS account.</p> <p>You can create one or more AWS Direct Connect private virtual interfaces linked to a virtual private gateway.</p>",
+    "DescribeVirtualInterfaces": "<p>Displays all virtual interfaces for an AWS account. Virtual interfaces deleted fewer than 15 minutes before you make the request are also returned. If you specify a connection ID, only the virtual interfaces associated with the connection are returned. If you specify a virtual interface ID, then only a single virtual interface is returned.</p> <p>A virtual interface (VLAN) transmits the traffic between the AWS Direct Connect location and the customer network.</p>",
+    "DisassociateConnectionFromLag": "<p>Disassociates a connection from a link aggregation group (LAG). The connection is interrupted and re-established as a standalone connection (the connection is not deleted; to delete the connection, use the <a>DeleteConnection</a> request). If the LAG has associated virtual interfaces or hosted connections, they remain associated with the LAG. A disassociated connection owned by an AWS Direct Connect Partner is automatically converted to an interconnect.</p> <p>If disassociating the connection would cause the LAG to fall below its setting for minimum number of operational connections, the request fails, except when it's the last member of the LAG. If all connections are disassociated, the LAG continues to exist as an empty LAG with no physical connections. </p>",
+    "ListVirtualInterfaceTestHistory": "<p>Lists the virtual interface failover test history.</p>",
+    "StartBgpFailoverTest": "<p>Starts the virtual interface failover test that verifies your configuration meets your resiliency requirements by placing the BGP peering session in the DOWN state. You can then send traffic to verify that there are no outages.</p> <p>You can run the test on public, private, transit, and hosted virtual interfaces.</p> <p>You can use <a href=\"https://docs.aws.amazon.com/directconnect/latest/APIReference/API_ListVirtualInterfaceTestHistory.html\">ListVirtualInterfaceTestHistory</a> to view the virtual interface test history.</p> <p>If you need to stop the test before the test interval completes, use <a href=\"https://docs.aws.amazon.com/directconnect/latest/APIReference/API_StopBgpFailoverTest.html\">StopBgpFailoverTest</a>.</p>",
+    "StopBgpFailoverTest": "<p>Stops the virtual interface failover test.</p>",
+    "TagResource": "<p>Adds the specified tags to the specified AWS Direct Connect resource. Each resource can have a maximum of 50 tags.</p> <p>Each tag consists of a key and an optional value. If a tag with the same key is already associated with the resource, this action updates its value.</p>",
+    "UntagResource": "<p>Removes one or more tags from the specified AWS Direct Connect resource.</p>",
+    "UpdateDirectConnectGatewayAssociation": "<p>Updates the specified attributes of the Direct Connect gateway association.</p> <p>Add or remove prefixes from the association.</p>",
+    "UpdateLag": "<p>Updates the attributes of the specified link aggregation group (LAG).</p> <p>You can update the following attributes:</p> <ul> <li> <p>The name of the LAG.</p> </li> <li> <p>The value for the minimum number of connections that must be operational for the LAG itself to be operational. </p> </li> </ul> <p>When you create a LAG, the default value for the minimum number of operational connections is zero (0). If you update this value and the number of operational connections falls below the specified value, the LAG automatically goes down to avoid over-utilization of the remaining connections. Adjust this value with care, as it could force the LAG down if it is set higher than the current number of operational connections.</p>",
+    "UpdateVirtualInterfaceAttributes": "<p>Updates the specified attributes of the specified virtual private interface.</p> <p>Setting the MTU of a virtual interface to 9001 (jumbo frames) can cause an update to the underlying physical connection if it wasn't updated to support jumbo frames. Updating the connection disrupts network connectivity for all virtual interfaces associated with the connection for up to 30 seconds. To check whether your connection supports jumbo frames, call <a>DescribeConnections</a>. To check whether your virtual q interface supports jumbo frames, call <a>DescribeVirtualInterfaces</a>.</p>"
+  },
+  "shapes": {
+    "ASN": {
+      "base": null,
+      "refs": {
+        "BGPPeer$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p>",
+        "DeleteBGPPeerRequest$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p>",
+        "NewBGPPeer$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p>",
+        "NewPrivateVirtualInterface$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "NewPrivateVirtualInterfaceAllocation$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "NewPublicVirtualInterface$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "NewPublicVirtualInterfaceAllocation$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "NewTransitVirtualInterface$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "NewTransitVirtualInterfaceAllocation$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>",
+        "VirtualInterface$asn": "<p>The autonomous system (AS) number for Border Gateway Protocol (BGP) configuration.</p> <p>The valid values are 1-2147483647.</p>"
+      }
+    },
+    "AcceptDirectConnectGatewayAssociationProposalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AcceptDirectConnectGatewayAssociationProposalResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddressFamily": {
+      "base": null,
+      "refs": {
+        "BGPPeer$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewBGPPeer$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewPrivateVirtualInterface$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewPrivateVirtualInterfaceAllocation$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewPublicVirtualInterface$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewPublicVirtualInterfaceAllocation$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewTransitVirtualInterface$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "NewTransitVirtualInterfaceAllocation$addressFamily": "<p>The address family for the BGP peer.</p>",
+        "VirtualInterface$addressFamily": "<p>The address family for the BGP peer.</p>"
+      }
+    },
+    "AllocateConnectionOnInterconnectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AllocateHostedConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AllocatePrivateVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AllocatePublicVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AllocateTransitVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AllocateTransitVirtualInterfaceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AmazonAddress": {
+      "base": null,
+      "refs": {
+        "BGPPeer$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewBGPPeer$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewPrivateVirtualInterface$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewPrivateVirtualInterfaceAllocation$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewPublicVirtualInterface$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewPublicVirtualInterfaceAllocation$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewTransitVirtualInterface$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "NewTransitVirtualInterfaceAllocation$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>",
+        "VirtualInterface$amazonAddress": "<p>The IP address assigned to the Amazon interface.</p>"
+      }
+    },
+    "AssociateConnectionWithLagRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateHostedConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociatedGateway": {
+      "base": "<p>Information about the associated gateway.</p>",
+      "refs": {
+        "DirectConnectGatewayAssociation$associatedGateway": "<p>Information about the associated gateway.</p>",
+        "DirectConnectGatewayAssociationProposal$associatedGateway": "<p>Information about the associated gateway.</p>"
+      }
+    },
+    "AssociatedGatewayId": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAssociationProposalsRequest$associatedGatewayId": "<p>The ID of the associated gateway.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$associatedGatewayId": "<p>The ID of the associated gateway.</p>"
+      }
+    },
+    "AvailablePortSpeeds": {
+      "base": null,
+      "refs": {
+        "Location$availablePortSpeeds": "<p>The available port speeds for the location.</p>"
+      }
+    },
+    "AwsDevice": {
+      "base": null,
+      "refs": {
+        "Connection$awsDevice": "<p>The Direct Connect endpoint on which the physical connection terminates.</p>",
+        "Interconnect$awsDevice": "<p>The Direct Connect endpoint on which the physical connection terminates.</p>",
+        "Lag$awsDevice": "<p>The AWS Direct Connect endpoint that hosts the LAG.</p>"
+      }
+    },
+    "AwsDeviceV2": {
+      "base": null,
+      "refs": {
+        "BGPPeer$awsDeviceV2": "<p>The Direct Connect endpoint on which the BGP peer terminates.</p>",
+        "Connection$awsDeviceV2": "<p>The Direct Connect endpoint on which the physical connection terminates.</p>",
+        "Interconnect$awsDeviceV2": "<p>The Direct Connect endpoint on which the physical connection terminates.</p>",
+        "Lag$awsDeviceV2": "<p>The AWS Direct Connect endpoint that hosts the LAG.</p>",
+        "VirtualInterface$awsDeviceV2": "<p>The Direct Connect endpoint on which the virtual interface terminates.</p>"
+      }
+    },
+    "BGPAuthKey": {
+      "base": null,
+      "refs": {
+        "BGPPeer$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewBGPPeer$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewPrivateVirtualInterface$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewPrivateVirtualInterfaceAllocation$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewPublicVirtualInterface$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewPublicVirtualInterfaceAllocation$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewTransitVirtualInterface$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "NewTransitVirtualInterfaceAllocation$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>",
+        "VirtualInterface$authKey": "<p>The authentication key for BGP configuration. This string has a minimum length of 6 characters and and a maximun lenth of 80 characters.</p>"
+      }
+    },
+    "BGPPeer": {
+      "base": "<p>Information about a BGP peer.</p>",
+      "refs": {
+        "BGPPeerList$member": null
+      }
+    },
+    "BGPPeerId": {
+      "base": null,
+      "refs": {
+        "BGPPeer$bgpPeerId": "<p>The ID of the BGP peer.</p>",
+        "BGPPeerIdList$member": null,
+        "DeleteBGPPeerRequest$bgpPeerId": "<p>The ID of the BGP peer.</p>"
+      }
+    },
+    "BGPPeerIdList": {
+      "base": null,
+      "refs": {
+        "ListVirtualInterfaceTestHistoryRequest$bgpPeers": "<p>The BGP peers that were placed in the DOWN state during the virtual interface failover test.</p>",
+        "StartBgpFailoverTestRequest$bgpPeers": "<p>The BGP peers to place in the DOWN state.</p>",
+        "VirtualInterfaceTestHistory$bgpPeers": "<p>The BGP peers that were put in the DOWN state as part of the virtual interface failover test.</p>"
+      }
+    },
+    "BGPPeerList": {
+      "base": null,
+      "refs": {
+        "VirtualInterface$bgpPeers": "<p>The BGP peers configured on this virtual interface.</p>"
+      }
+    },
+    "BGPPeerState": {
+      "base": null,
+      "refs": {
+        "BGPPeer$bgpPeerState": "<p>The state of the BGP peer. The following are the possible values:</p> <ul> <li> <p> <code>verifying</code>: The BGP peering addresses or ASN require validation before the BGP peer can be created. This state applies only to public virtual interfaces.</p> </li> <li> <p> <code>pending</code>: The BGP peer is created, and remains in this state until it is ready to be established.</p> </li> <li> <p> <code>available</code>: The BGP peer is ready to be established.</p> </li> <li> <p> <code>deleting</code>: The BGP peer is being deleted.</p> </li> <li> <p> <code>deleted</code>: The BGP peer is deleted and cannot be established.</p> </li> </ul>"
+      }
+    },
+    "BGPStatus": {
+      "base": null,
+      "refs": {
+        "BGPPeer$bgpStatus": "<p>The status of the BGP peer. The following are the possible values:</p> <ul> <li> <p> <code>up</code>: The BGP peer is established. This state does not indicate the state of the routing function. Ensure that you are receiving routes over the BGP session.</p> </li> <li> <p> <code>down</code>: The BGP peer is down.</p> </li> <li> <p> <code>unknown</code>: The BGP peer status is not available.</p> </li> </ul>"
+      }
+    },
+    "Bandwidth": {
+      "base": null,
+      "refs": {
+        "AllocateConnectionOnInterconnectRequest$bandwidth": "<p>The bandwidth of the connection. The possible values are 50Mbps, 100Mbps, 200Mbps, 300Mbps, 400Mbps, 500Mbps, 1Gbps, 2Gbps, 5Gbps, and 10Gbps. Note that only those AWS Direct Connect Partners who have met specific requirements are allowed to create a 1Gbps, 2Gbps, 5Gbps or 10Gbps hosted connection.</p>",
+        "AllocateHostedConnectionRequest$bandwidth": "<p>The bandwidth of the connection. The possible values are 50Mbps, 100Mbps, 200Mbps, 300Mbps, 400Mbps, 500Mbps, 1Gbps, 2Gbps, 5Gbps, and 10Gbps. Note that only those AWS Direct Connect Partners who have met specific requirements are allowed to create a 1Gbps, 2Gbps, 5Gbps or 10Gbps hosted connection. </p>",
+        "Connection$bandwidth": "<p>The bandwidth of the connection.</p>",
+        "CreateConnectionRequest$bandwidth": "<p>The bandwidth of the connection.</p>",
+        "CreateInterconnectRequest$bandwidth": "<p>The port bandwidth, in Gbps. The possible values are 1 and 10.</p>",
+        "CreateLagRequest$connectionsBandwidth": "<p>The bandwidth of the individual physical dedicated connections bundled by the LAG. The possible values are 1Gbps and 10Gbps. </p>",
+        "Interconnect$bandwidth": "<p>The bandwidth of the connection.</p>",
+        "Lag$connectionsBandwidth": "<p>The individual bandwidth of the physical connections bundled by the LAG. The possible values are 1Gbps and 10Gbps. </p>"
+      }
+    },
+    "BooleanFlag": {
+      "base": null,
+      "refs": {
+        "Lag$allowsHostedConnections": "<p>Indicates whether the LAG can host other connections.</p>"
+      }
+    },
+    "CIDR": {
+      "base": null,
+      "refs": {
+        "RouteFilterPrefix$cidr": "<p>The CIDR block for the advertised route. Separate multiple routes using commas. An IPv6 CIDR must use /64 or shorter.</p>"
+      }
+    },
+    "ConfirmConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmConnectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmPrivateVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmPrivateVirtualInterfaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmPublicVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmPublicVirtualInterfaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmTransitVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfirmTransitVirtualInterfaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Connection": {
+      "base": "<p>Information about an AWS Direct Connect connection.</p>",
+      "refs": {
+        "ConnectionList$member": null
+      }
+    },
+    "ConnectionId": {
+      "base": null,
+      "refs": {
+        "AllocateHostedConnectionRequest$connectionId": "<p>The ID of the interconnect or LAG.</p>",
+        "AllocatePrivateVirtualInterfaceRequest$connectionId": "<p>The ID of the connection on which the private virtual interface is provisioned.</p>",
+        "AllocatePublicVirtualInterfaceRequest$connectionId": "<p>The ID of the connection on which the public virtual interface is provisioned.</p>",
+        "AllocateTransitVirtualInterfaceRequest$connectionId": "<p>The ID of the connection on which the transit virtual interface is provisioned.</p>",
+        "AssociateConnectionWithLagRequest$connectionId": "<p>The ID of the connection.</p>",
+        "AssociateHostedConnectionRequest$connectionId": "<p>The ID of the hosted connection.</p>",
+        "AssociateHostedConnectionRequest$parentConnectionId": "<p>The ID of the interconnect or the LAG.</p>",
+        "AssociateVirtualInterfaceRequest$connectionId": "<p>The ID of the LAG or connection.</p>",
+        "ConfirmConnectionRequest$connectionId": "<p>The ID of the hosted connection.</p>",
+        "Connection$connectionId": "<p>The ID of the connection.</p>",
+        "CreateLagRequest$connectionId": "<p>The ID of an existing dedicated connection to migrate to the LAG.</p>",
+        "CreatePrivateVirtualInterfaceRequest$connectionId": "<p>The ID of the connection.</p>",
+        "CreatePublicVirtualInterfaceRequest$connectionId": "<p>The ID of the connection.</p>",
+        "CreateTransitVirtualInterfaceRequest$connectionId": "<p>The ID of the connection.</p>",
+        "DeleteConnectionRequest$connectionId": "<p>The ID of the connection.</p>",
+        "DescribeConnectionLoaRequest$connectionId": "<p>The ID of the connection.</p>",
+        "DescribeConnectionsRequest$connectionId": "<p>The ID of the connection.</p>",
+        "DescribeHostedConnectionsRequest$connectionId": "<p>The ID of the interconnect or LAG.</p>",
+        "DescribeLoaRequest$connectionId": "<p>The ID of a connection, LAG, or interconnect.</p>",
+        "DescribeVirtualInterfacesRequest$connectionId": "<p>The ID of the connection.</p>",
+        "DisassociateConnectionFromLagRequest$connectionId": "<p>The ID of the connection.</p>",
+        "VirtualInterface$connectionId": "<p>The ID of the connection.</p>"
+      }
+    },
+    "ConnectionList": {
+      "base": null,
+      "refs": {
+        "Connections$connections": "<p>The connections.</p>",
+        "Lag$connections": "<p>The connections bundled by the LAG.</p>"
+      }
+    },
+    "ConnectionName": {
+      "base": null,
+      "refs": {
+        "AllocateConnectionOnInterconnectRequest$connectionName": "<p>The name of the provisioned connection.</p>",
+        "AllocateHostedConnectionRequest$connectionName": "<p>The name of the hosted connection.</p>",
+        "Connection$connectionName": "<p>The name of the connection.</p>",
+        "CreateConnectionRequest$connectionName": "<p>The name of the connection.</p>"
+      }
+    },
+    "ConnectionState": {
+      "base": null,
+      "refs": {
+        "ConfirmConnectionResponse$connectionState": "<p>The state of the connection. The following are the possible values:</p> <ul> <li> <p> <code>ordering</code>: The initial state of a hosted connection provisioned on an interconnect. The connection stays in the ordering state until the owner of the hosted connection confirms or declines the connection order.</p> </li> <li> <p> <code>requested</code>: The initial state of a standard connection. The connection stays in the requested state until the Letter of Authorization (LOA) is sent to the customer.</p> </li> <li> <p> <code>pending</code>: The connection has been approved and is being initialized.</p> </li> <li> <p> <code>available</code>: The network link is up and the connection is ready for use.</p> </li> <li> <p> <code>down</code>: The network link is down.</p> </li> <li> <p> <code>deleting</code>: The connection is being deleted.</p> </li> <li> <p> <code>deleted</code>: The connection has been deleted.</p> </li> <li> <p> <code>rejected</code>: A hosted connection in the <code>ordering</code> state enters the <code>rejected</code> state if it is deleted by the customer.</p> </li> <li> <p> <code>unknown</code>: The state of the connection is not available.</p> </li> </ul>",
+        "Connection$connectionState": "<p>The state of the connection. The following are the possible values:</p> <ul> <li> <p> <code>ordering</code>: The initial state of a hosted connection provisioned on an interconnect. The connection stays in the ordering state until the owner of the hosted connection confirms or declines the connection order.</p> </li> <li> <p> <code>requested</code>: The initial state of a standard connection. The connection stays in the requested state until the Letter of Authorization (LOA) is sent to the customer.</p> </li> <li> <p> <code>pending</code>: The connection has been approved and is being initialized.</p> </li> <li> <p> <code>available</code>: The network link is up and the connection is ready for use.</p> </li> <li> <p> <code>down</code>: The network link is down.</p> </li> <li> <p> <code>deleting</code>: The connection is being deleted.</p> </li> <li> <p> <code>deleted</code>: The connection has been deleted.</p> </li> <li> <p> <code>rejected</code>: A hosted connection in the <code>ordering</code> state enters the <code>rejected</code> state if it is deleted by the customer.</p> </li> <li> <p> <code>unknown</code>: The state of the connection is not available.</p> </li> </ul>"
+      }
+    },
+    "Connections": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Count": {
+      "base": null,
+      "refs": {
+        "CreateLagRequest$numberOfConnections": "<p>The number of physical dedicated connections initially provisioned and bundled by the LAG.</p>",
+        "Lag$numberOfConnections": "<p>The number of physical dedicated connections bundled by the LAG, up to a maximum of 10.</p>",
+        "Lag$minimumLinks": "<p>The minimum number of physical dedicated connections that must be operational for the LAG itself to be operational.</p>",
+        "UpdateLagRequest$minimumLinks": "<p>The minimum number of physical connections that must be operational for the LAG itself to be operational.</p>"
+      }
+    },
+    "CreateBGPPeerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateBGPPeerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayAssociationProposalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayAssociationProposalResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDirectConnectGatewayResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateInterconnectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLagRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePrivateVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePublicVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTransitVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTransitVirtualInterfaceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CustomerAddress": {
+      "base": null,
+      "refs": {
+        "BGPPeer$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "DeleteBGPPeerRequest$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewBGPPeer$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewPrivateVirtualInterface$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewPrivateVirtualInterfaceAllocation$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewPublicVirtualInterface$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewPublicVirtualInterfaceAllocation$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewTransitVirtualInterface$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "NewTransitVirtualInterfaceAllocation$customerAddress": "<p>The IP address assigned to the customer interface.</p>",
+        "VirtualInterface$customerAddress": "<p>The IP address assigned to the customer interface.</p>"
+      }
+    },
+    "DeleteBGPPeerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBGPPeerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayAssociationProposalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayAssociationProposalResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDirectConnectGatewayResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInterconnectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInterconnectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLagRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVirtualInterfaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVirtualInterfaceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionLoaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionLoaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionsOnInterconnectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAssociationProposalsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAssociationProposalsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAssociationsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAttachmentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewayAttachmentsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewaysRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDirectConnectGatewaysResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeHostedConnectionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeInterconnectLoaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeInterconnectLoaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeInterconnectsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLoaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTagsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeVirtualInterfacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DirectConnectClientException": {
+      "base": "<p>One or more parameters are not valid.</p>",
+      "refs": {
+      }
+    },
+    "DirectConnectGateway": {
+      "base": "<p>Information about a Direct Connect gateway, which enables you to connect virtual interfaces and virtual private gateway or transit gateways.</p>",
+      "refs": {
+        "CreateDirectConnectGatewayResult$directConnectGateway": "<p>The Direct Connect gateway.</p>",
+        "DeleteDirectConnectGatewayResult$directConnectGateway": "<p>The Direct Connect gateway.</p>",
+        "DirectConnectGatewayList$member": null
+      }
+    },
+    "DirectConnectGatewayAssociation": {
+      "base": "<p>Information about an association between a Direct Connect gateway and a virtual private gateway or transit gateway.</p>",
+      "refs": {
+        "AcceptDirectConnectGatewayAssociationProposalResult$directConnectGatewayAssociation": null,
+        "CreateDirectConnectGatewayAssociationResult$directConnectGatewayAssociation": "<p>The association to be created.</p>",
+        "DeleteDirectConnectGatewayAssociationResult$directConnectGatewayAssociation": "<p>Information about the deleted association.</p>",
+        "DirectConnectGatewayAssociationList$member": null,
+        "UpdateDirectConnectGatewayAssociationResult$directConnectGatewayAssociation": null
+      }
+    },
+    "DirectConnectGatewayAssociationId": {
+      "base": null,
+      "refs": {
+        "DeleteDirectConnectGatewayAssociationRequest$associationId": "<p>The ID of the Direct Connect gateway association.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$associationId": "<p>The ID of the Direct Connect gateway association.</p>",
+        "DirectConnectGatewayAssociation$associationId": "<p>The ID of the Direct Connect gateway association.</p>",
+        "UpdateDirectConnectGatewayAssociationRequest$associationId": "<p>The ID of the Direct Connect gateway association.</p>"
+      }
+    },
+    "DirectConnectGatewayAssociationList": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAssociationsResult$directConnectGatewayAssociations": "<p>Information about the associations.</p>"
+      }
+    },
+    "DirectConnectGatewayAssociationProposal": {
+      "base": "<p>Information about the proposal request to attach a virtual private gateway to a Direct Connect gateway. </p>",
+      "refs": {
+        "CreateDirectConnectGatewayAssociationProposalResult$directConnectGatewayAssociationProposal": "<p>Information about the Direct Connect gateway proposal.</p>",
+        "DeleteDirectConnectGatewayAssociationProposalResult$directConnectGatewayAssociationProposal": "<p>The ID of the associated gateway.</p>",
+        "DirectConnectGatewayAssociationProposalList$member": null
+      }
+    },
+    "DirectConnectGatewayAssociationProposalId": {
+      "base": null,
+      "refs": {
+        "AcceptDirectConnectGatewayAssociationProposalRequest$proposalId": "<p>The ID of the request proposal.</p>",
+        "DeleteDirectConnectGatewayAssociationProposalRequest$proposalId": "<p>The ID of the proposal.</p>",
+        "DescribeDirectConnectGatewayAssociationProposalsRequest$proposalId": "<p>The ID of the proposal.</p>",
+        "DirectConnectGatewayAssociationProposal$proposalId": "<p>The ID of the association proposal.</p>"
+      }
+    },
+    "DirectConnectGatewayAssociationProposalList": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAssociationProposalsResult$directConnectGatewayAssociationProposals": "<p>Describes the Direct Connect gateway association proposals.</p>"
+      }
+    },
+    "DirectConnectGatewayAssociationProposalState": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAssociationProposal$proposalState": "<p>The state of the proposal. The following are possible values:</p> <ul> <li> <p> <code>accepted</code>: The proposal has been accepted. The Direct Connect gateway association is available to use in this state.</p> </li> <li> <p> <code>deleted</code>: The proposal has been deleted by the owner that made the proposal. The Direct Connect gateway association cannot be used in this state.</p> </li> <li> <p> <code>requested</code>: The proposal has been requested. The Direct Connect gateway association cannot be used in this state.</p> </li> </ul>"
+      }
+    },
+    "DirectConnectGatewayAssociationState": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAssociation$associationState": "<p>The state of the association. The following are the possible values:</p> <ul> <li> <p> <code>associating</code>: The initial state after calling <a>CreateDirectConnectGatewayAssociation</a>.</p> </li> <li> <p> <code>associated</code>: The Direct Connect gateway and virtual private gateway or transit gateway are successfully associated and ready to pass traffic.</p> </li> <li> <p> <code>disassociating</code>: The initial state after calling <a>DeleteDirectConnectGatewayAssociation</a>.</p> </li> <li> <p> <code>disassociated</code>: The virtual private gateway or transit gateway is disassociated from the Direct Connect gateway. Traffic flow between the Direct Connect gateway and virtual private gateway or transit gateway is stopped.</p> </li> </ul>"
+      }
+    },
+    "DirectConnectGatewayAttachment": {
+      "base": "<p>Information about an attachment between a Direct Connect gateway and a virtual interface.</p>",
+      "refs": {
+        "DirectConnectGatewayAttachmentList$member": null
+      }
+    },
+    "DirectConnectGatewayAttachmentList": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAttachmentsResult$directConnectGatewayAttachments": "<p>The attachments.</p>"
+      }
+    },
+    "DirectConnectGatewayAttachmentState": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAttachment$attachmentState": "<p>The state of the attachment. The following are the possible values:</p> <ul> <li> <p> <code>attaching</code>: The initial state after a virtual interface is created using the Direct Connect gateway.</p> </li> <li> <p> <code>attached</code>: The Direct Connect gateway and virtual interface are attached and ready to pass traffic.</p> </li> <li> <p> <code>detaching</code>: The initial state after calling <a>DeleteVirtualInterface</a>.</p> </li> <li> <p> <code>detached</code>: The virtual interface is detached from the Direct Connect gateway. Traffic flow between the Direct Connect gateway and virtual interface is stopped.</p> </li> </ul>"
+      }
+    },
+    "DirectConnectGatewayAttachmentType": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAttachment$attachmentType": "<p>The type of attachment.</p>"
+      }
+    },
+    "DirectConnectGatewayId": {
+      "base": null,
+      "refs": {
+        "AcceptDirectConnectGatewayAssociationProposalRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "ConfirmPrivateVirtualInterfaceRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "ConfirmTransitVirtualInterfaceRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "CreateDirectConnectGatewayAssociationProposalRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "CreateDirectConnectGatewayAssociationRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DeleteDirectConnectGatewayAssociationRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DeleteDirectConnectGatewayRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DescribeDirectConnectGatewayAssociationProposalsRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DescribeDirectConnectGatewayAttachmentsRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DescribeDirectConnectGatewaysRequest$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DirectConnectGateway$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAssociation$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAssociationProposal$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAttachment$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "NewPrivateVirtualInterface$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "NewTransitVirtualInterface$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>",
+        "VirtualInterface$directConnectGatewayId": "<p>The ID of the Direct Connect gateway.</p>"
+      }
+    },
+    "DirectConnectGatewayList": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewaysResult$directConnectGateways": "<p>The Direct Connect gateways.</p>"
+      }
+    },
+    "DirectConnectGatewayName": {
+      "base": null,
+      "refs": {
+        "CreateDirectConnectGatewayRequest$directConnectGatewayName": "<p>The name of the Direct Connect gateway.</p>",
+        "DirectConnectGateway$directConnectGatewayName": "<p>The name of the Direct Connect gateway.</p>"
+      }
+    },
+    "DirectConnectGatewayState": {
+      "base": null,
+      "refs": {
+        "DirectConnectGateway$directConnectGatewayState": "<p>The state of the Direct Connect gateway. The following are the possible values:</p> <ul> <li> <p> <code>pending</code>: The initial state after calling <a>CreateDirectConnectGateway</a>.</p> </li> <li> <p> <code>available</code>: The Direct Connect gateway is ready for use.</p> </li> <li> <p> <code>deleting</code>: The initial state after calling <a>DeleteDirectConnectGateway</a>.</p> </li> <li> <p> <code>deleted</code>: The Direct Connect gateway is deleted and cannot pass traffic.</p> </li> </ul>"
+      }
+    },
+    "DirectConnectServerException": {
+      "base": "<p>A server-side error occurred.</p>",
+      "refs": {
+      }
+    },
+    "DisassociateConnectionFromLagRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DuplicateTagKeysException": {
+      "base": "<p>A tag key was specified more than once.</p>",
+      "refs": {
+      }
+    },
+    "EndTime": {
+      "base": null,
+      "refs": {
+        "VirtualInterfaceTestHistory$endTime": "<p>The time that the virtual interface moves out of the DOWN state.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "DirectConnectClientException$message": null,
+        "DirectConnectServerException$message": null
+      }
+    },
+    "FailureTestHistoryStatus": {
+      "base": null,
+      "refs": {
+        "ListVirtualInterfaceTestHistoryRequest$status": "<p>The status of the virtual interface failover test.</p>",
+        "VirtualInterfaceTestHistory$status": "<p>The status of the virtual interface failover test.</p>"
+      }
+    },
+    "GatewayIdToAssociate": {
+      "base": null,
+      "refs": {
+        "CreateDirectConnectGatewayAssociationProposalRequest$gatewayId": "<p>The ID of the virtual private gateway or transit gateway.</p>",
+        "CreateDirectConnectGatewayAssociationRequest$gatewayId": "<p>The ID of the virtual private gateway or transit gateway.</p>"
+      }
+    },
+    "GatewayIdentifier": {
+      "base": null,
+      "refs": {
+        "AssociatedGateway$id": "<p>The ID of the associated gateway.</p>"
+      }
+    },
+    "GatewayType": {
+      "base": null,
+      "refs": {
+        "AssociatedGateway$type": "<p>The type of associated gateway.</p>"
+      }
+    },
+    "HasLogicalRedundancy": {
+      "base": null,
+      "refs": {
+        "Connection$hasLogicalRedundancy": "<p>Indicates whether the connection supports a secondary BGP peer in the same address family (IPv4/IPv6).</p>",
+        "Interconnect$hasLogicalRedundancy": "<p>Indicates whether the interconnect supports a secondary BGP in the same address family (IPv4/IPv6).</p>",
+        "Lag$hasLogicalRedundancy": "<p>Indicates whether the LAG supports a secondary BGP peer in the same address family (IPv4/IPv6).</p>"
+      }
+    },
+    "Interconnect": {
+      "base": "<p>Information about an interconnect.</p>",
+      "refs": {
+        "InterconnectList$member": null
+      }
+    },
+    "InterconnectId": {
+      "base": null,
+      "refs": {
+        "AllocateConnectionOnInterconnectRequest$interconnectId": "<p>The ID of the interconnect on which the connection will be provisioned.</p>",
+        "DeleteInterconnectRequest$interconnectId": "<p>The ID of the interconnect.</p>",
+        "DescribeConnectionsOnInterconnectRequest$interconnectId": "<p>The ID of the interconnect.</p>",
+        "DescribeInterconnectLoaRequest$interconnectId": "<p>The ID of the interconnect.</p>",
+        "DescribeInterconnectsRequest$interconnectId": "<p>The ID of the interconnect.</p>",
+        "Interconnect$interconnectId": "<p>The ID of the interconnect.</p>"
+      }
+    },
+    "InterconnectList": {
+      "base": null,
+      "refs": {
+        "Interconnects$interconnects": "<p>The interconnects.</p>"
+      }
+    },
+    "InterconnectName": {
+      "base": null,
+      "refs": {
+        "CreateInterconnectRequest$interconnectName": "<p>The name of the interconnect.</p>",
+        "Interconnect$interconnectName": "<p>The name of the interconnect.</p>"
+      }
+    },
+    "InterconnectState": {
+      "base": null,
+      "refs": {
+        "DeleteInterconnectResponse$interconnectState": "<p>The state of the interconnect. The following are the possible values:</p> <ul> <li> <p> <code>requested</code>: The initial state of an interconnect. The interconnect stays in the requested state until the Letter of Authorization (LOA) is sent to the customer.</p> </li> <li> <p> <code>pending</code>: The interconnect is approved, and is being initialized.</p> </li> <li> <p> <code>available</code>: The network link is up, and the interconnect is ready for use.</p> </li> <li> <p> <code>down</code>: The network link is down.</p> </li> <li> <p> <code>deleting</code>: The interconnect is being deleted.</p> </li> <li> <p> <code>deleted</code>: The interconnect is deleted.</p> </li> <li> <p> <code>unknown</code>: The state of the interconnect is not available.</p> </li> </ul>",
+        "Interconnect$interconnectState": "<p>The state of the interconnect. The following are the possible values:</p> <ul> <li> <p> <code>requested</code>: The initial state of an interconnect. The interconnect stays in the requested state until the Letter of Authorization (LOA) is sent to the customer.</p> </li> <li> <p> <code>pending</code>: The interconnect is approved, and is being initialized.</p> </li> <li> <p> <code>available</code>: The network link is up, and the interconnect is ready for use.</p> </li> <li> <p> <code>down</code>: The network link is down.</p> </li> <li> <p> <code>deleting</code>: The interconnect is being deleted.</p> </li> <li> <p> <code>deleted</code>: The interconnect is deleted.</p> </li> <li> <p> <code>unknown</code>: The state of the interconnect is not available.</p> </li> </ul>"
+      }
+    },
+    "Interconnects": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "JumboFrameCapable": {
+      "base": null,
+      "refs": {
+        "Connection$jumboFrameCapable": "<p>Indicates whether jumbo frames (9001 MTU) are supported.</p>",
+        "Interconnect$jumboFrameCapable": "<p>Indicates whether jumbo frames (9001 MTU) are supported.</p>",
+        "Lag$jumboFrameCapable": "<p>Indicates whether jumbo frames (9001 MTU) are supported.</p>",
+        "VirtualInterface$jumboFrameCapable": "<p>Indicates whether jumbo frames (9001 MTU) are supported.</p>"
+      }
+    },
+    "Lag": {
+      "base": "<p>Information about a link aggregation group (LAG).</p>",
+      "refs": {
+        "LagList$member": null
+      }
+    },
+    "LagId": {
+      "base": null,
+      "refs": {
+        "AssociateConnectionWithLagRequest$lagId": "<p>The ID of the LAG with which to associate the connection.</p>",
+        "Connection$lagId": "<p>The ID of the LAG.</p>",
+        "CreateConnectionRequest$lagId": "<p>The ID of the LAG.</p>",
+        "CreateInterconnectRequest$lagId": "<p>The ID of the LAG.</p>",
+        "DeleteLagRequest$lagId": "<p>The ID of the LAG.</p>",
+        "DescribeLagsRequest$lagId": "<p>The ID of the LAG.</p>",
+        "DisassociateConnectionFromLagRequest$lagId": "<p>The ID of the LAG.</p>",
+        "Interconnect$lagId": "<p>The ID of the LAG.</p>",
+        "Lag$lagId": "<p>The ID of the LAG.</p>",
+        "UpdateLagRequest$lagId": "<p>The ID of the LAG.</p>"
+      }
+    },
+    "LagList": {
+      "base": null,
+      "refs": {
+        "Lags$lags": "<p>The LAGs.</p>"
+      }
+    },
+    "LagName": {
+      "base": null,
+      "refs": {
+        "CreateLagRequest$lagName": "<p>The name of the LAG.</p>",
+        "Lag$lagName": "<p>The name of the LAG.</p>",
+        "UpdateLagRequest$lagName": "<p>The name of the LAG.</p>"
+      }
+    },
+    "LagState": {
+      "base": null,
+      "refs": {
+        "Lag$lagState": "<p>The state of the LAG. The following are the possible values:</p> <ul> <li> <p> <code>requested</code>: The initial state of a LAG. The LAG stays in the requested state until the Letter of Authorization (LOA) is available.</p> </li> <li> <p> <code>pending</code>: The LAG has been approved and is being initialized.</p> </li> <li> <p> <code>available</code>: The network link is established and the LAG is ready for use.</p> </li> <li> <p> <code>down</code>: The network link is down.</p> </li> <li> <p> <code>deleting</code>: The LAG is being deleted.</p> </li> <li> <p> <code>deleted</code>: The LAG is deleted.</p> </li> <li> <p> <code>unknown</code>: The state of the LAG is not available.</p> </li> </ul>"
+      }
+    },
+    "Lags": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVirtualInterfaceTestHistoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVirtualInterfaceTestHistoryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Loa": {
+      "base": "<p>Information about a Letter of Authorization - Connecting Facility Assignment (LOA-CFA) for a connection.</p>",
+      "refs": {
+        "DescribeConnectionLoaResponse$loa": "<p>The Letter of Authorization - Connecting Facility Assignment (LOA-CFA).</p>",
+        "DescribeInterconnectLoaResponse$loa": "<p>The Letter of Authorization - Connecting Facility Assignment (LOA-CFA).</p>"
+      }
+    },
+    "LoaContent": {
+      "base": null,
+      "refs": {
+        "Loa$loaContent": "<p>The binary contents of the LOA-CFA document.</p>"
+      }
+    },
+    "LoaContentType": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionLoaRequest$loaContentType": "<p>The standard media type for the LOA-CFA document. The only supported value is application/pdf.</p>",
+        "DescribeInterconnectLoaRequest$loaContentType": "<p>The standard media type for the LOA-CFA document. The only supported value is application/pdf.</p>",
+        "DescribeLoaRequest$loaContentType": "<p>The standard media type for the LOA-CFA document. The only supported value is application/pdf.</p>",
+        "Loa$loaContentType": "<p>The standard media type for the LOA-CFA document. The only supported value is application/pdf.</p>"
+      }
+    },
+    "LoaIssueTime": {
+      "base": null,
+      "refs": {
+        "Connection$loaIssueTime": "<p>The time of the most recent call to <a>DescribeLoa</a> for this connection.</p>",
+        "Interconnect$loaIssueTime": "<p>The time of the most recent call to <a>DescribeLoa</a> for this connection.</p>"
+      }
+    },
+    "Location": {
+      "base": "<p>Information about an AWS Direct Connect location.</p>",
+      "refs": {
+        "LocationList$member": null
+      }
+    },
+    "LocationCode": {
+      "base": null,
+      "refs": {
+        "Connection$location": "<p>The location of the connection.</p>",
+        "CreateConnectionRequest$location": "<p>The location of the connection.</p>",
+        "CreateInterconnectRequest$location": "<p>The location of the interconnect.</p>",
+        "CreateLagRequest$location": "<p>The location for the LAG.</p>",
+        "Interconnect$location": "<p>The location of the connection.</p>",
+        "Lag$location": "<p>The location of the LAG.</p>",
+        "Location$locationCode": "<p>The code for the location.</p>",
+        "VirtualInterface$location": "<p>The location of the connection.</p>"
+      }
+    },
+    "LocationList": {
+      "base": null,
+      "refs": {
+        "Locations$locations": "<p>The locations.</p>"
+      }
+    },
+    "LocationName": {
+      "base": null,
+      "refs": {
+        "Location$locationName": "<p>The name of the location. This includes the name of the colocation partner and the physical site of the building.</p>"
+      }
+    },
+    "Locations": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LongAsn": {
+      "base": null,
+      "refs": {
+        "CreateDirectConnectGatewayRequest$amazonSideAsn": "<p>The autonomous system number (ASN) for Border Gateway Protocol (BGP) to be configured on the Amazon side of the connection. The ASN must be in the private range of 64,512 to 65,534 or 4,200,000,000 to 4,294,967,294. The default is 64512.</p>",
+        "DirectConnectGateway$amazonSideAsn": "<p>The autonomous system number (ASN) for the Amazon side of the connection.</p>",
+        "VirtualInterface$amazonSideAsn": "<p>The autonomous system number (ASN) for the Amazon side of the connection.</p>"
+      }
+    },
+    "MTU": {
+      "base": null,
+      "refs": {
+        "NewPrivateVirtualInterface$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500.</p>",
+        "NewPrivateVirtualInterfaceAllocation$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500.</p>",
+        "NewTransitVirtualInterface$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500.</p>",
+        "NewTransitVirtualInterfaceAllocation$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500. </p>",
+        "UpdateVirtualInterfaceAttributesRequest$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500.</p>",
+        "VirtualInterface$mtu": "<p>The maximum transmission unit (MTU), in bytes. The supported values are 1500 and 9001. The default value is 1500.</p>"
+      }
+    },
+    "MaxResultSetSize": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAssociationProposalsRequest$maxResults": "<p>The maximum number of results to return with a single call. To retrieve the remaining results, make another call with the returned <code>nextToken</code> value.</p> <p>If <code>MaxResults</code> is given a value larger than 100, only 100 results are returned.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$maxResults": "<p>The maximum number of results to return with a single call. To retrieve the remaining results, make another call with the returned <code>nextToken</code> value.</p> <p>If <code>MaxResults</code> is given a value larger than 100, only 100 results are returned.</p>",
+        "DescribeDirectConnectGatewayAttachmentsRequest$maxResults": "<p>The maximum number of results to return with a single call. To retrieve the remaining results, make another call with the returned <code>nextToken</code> value.</p> <p>If <code>MaxResults</code> is given a value larger than 100, only 100 results are returned.</p>",
+        "DescribeDirectConnectGatewaysRequest$maxResults": "<p>The maximum number of results to return with a single call. To retrieve the remaining results, make another call with the returned <code>nextToken</code> value.</p> <p>If <code>MaxResults</code> is given a value larger than 100, only 100 results are returned.</p>",
+        "ListVirtualInterfaceTestHistoryRequest$maxResults": "<p>The maximum number of results to return with a single call. To retrieve the remaining results, make another call with the returned <code>nextToken</code> value.</p> <p>If <code>MaxResults</code> is given a value larger than 100, only 100 results are returned.</p>"
+      }
+    },
+    "NewBGPPeer": {
+      "base": "<p>Information about a new BGP peer.</p>",
+      "refs": {
+        "CreateBGPPeerRequest$newBGPPeer": "<p>Information about the BGP peer.</p>"
+      }
+    },
+    "NewPrivateVirtualInterface": {
+      "base": "<p>Information about a private virtual interface.</p>",
+      "refs": {
+        "CreatePrivateVirtualInterfaceRequest$newPrivateVirtualInterface": "<p>Information about the private virtual interface.</p>"
+      }
+    },
+    "NewPrivateVirtualInterfaceAllocation": {
+      "base": "<p>Information about a private virtual interface to be provisioned on a connection.</p>",
+      "refs": {
+        "AllocatePrivateVirtualInterfaceRequest$newPrivateVirtualInterfaceAllocation": "<p>Information about the private virtual interface.</p>"
+      }
+    },
+    "NewPublicVirtualInterface": {
+      "base": "<p>Information about a public virtual interface.</p>",
+      "refs": {
+        "CreatePublicVirtualInterfaceRequest$newPublicVirtualInterface": "<p>Information about the public virtual interface.</p>"
+      }
+    },
+    "NewPublicVirtualInterfaceAllocation": {
+      "base": "<p>Information about a public virtual interface to be provisioned on a connection.</p>",
+      "refs": {
+        "AllocatePublicVirtualInterfaceRequest$newPublicVirtualInterfaceAllocation": "<p>Information about the public virtual interface.</p>"
+      }
+    },
+    "NewTransitVirtualInterface": {
+      "base": "<p>Information about a transit virtual interface.</p>",
+      "refs": {
+        "CreateTransitVirtualInterfaceRequest$newTransitVirtualInterface": "<p>Information about the transit virtual interface.</p>"
+      }
+    },
+    "NewTransitVirtualInterfaceAllocation": {
+      "base": "<p>Information about a transit virtual interface to be provisioned on a connection.</p>",
+      "refs": {
+        "AllocateTransitVirtualInterfaceRequest$newTransitVirtualInterfaceAllocation": "<p>Information about the transit virtual interface.</p>"
+      }
+    },
+    "OwnerAccount": {
+      "base": null,
+      "refs": {
+        "AcceptDirectConnectGatewayAssociationProposalRequest$associatedGatewayOwnerAccount": "<p>The ID of the AWS account that owns the virtual private gateway or transit gateway.</p>",
+        "AllocateConnectionOnInterconnectRequest$ownerAccount": "<p>The ID of the AWS account of the customer for whom the connection will be provisioned.</p>",
+        "AllocateHostedConnectionRequest$ownerAccount": "<p>The ID of the AWS account ID of the customer for the connection.</p>",
+        "AllocatePrivateVirtualInterfaceRequest$ownerAccount": "<p>The ID of the AWS account that owns the virtual private interface.</p>",
+        "AllocatePublicVirtualInterfaceRequest$ownerAccount": "<p>The ID of the AWS account that owns the public virtual interface.</p>",
+        "AllocateTransitVirtualInterfaceRequest$ownerAccount": "<p>The ID of the AWS account that owns the transit virtual interface.</p>",
+        "AssociatedGateway$ownerAccount": "<p>The ID of the AWS account that owns the associated virtual private gateway or transit gateway.</p>",
+        "Connection$ownerAccount": "<p>The ID of the AWS account that owns the connection.</p>",
+        "CreateDirectConnectGatewayAssociationProposalRequest$directConnectGatewayOwnerAccount": "<p>The ID of the AWS account that owns the Direct Connect gateway.</p>",
+        "DirectConnectGateway$ownerAccount": "<p>The ID of the AWS account that owns the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAssociation$directConnectGatewayOwnerAccount": "<p>The ID of the AWS account that owns the associated gateway.</p>",
+        "DirectConnectGatewayAssociation$virtualGatewayOwnerAccount": "<p>The ID of the AWS account that owns the virtual private gateway.</p>",
+        "DirectConnectGatewayAssociationProposal$directConnectGatewayOwnerAccount": "<p>The ID of the AWS account that owns the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAttachment$virtualInterfaceOwnerAccount": "<p>The ID of the AWS account that owns the virtual interface.</p>",
+        "Lag$ownerAccount": "<p>The ID of the AWS account that owns the LAG.</p>",
+        "VirtualInterface$ownerAccount": "<p>The ID of the AWS account that owns the virtual interface.</p>",
+        "VirtualInterfaceTestHistory$ownerAccount": "<p>The owner ID of the tested virtual interface.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "DescribeDirectConnectGatewayAssociationProposalsRequest$nextToken": "<p>The token for the next page of results.</p>",
+        "DescribeDirectConnectGatewayAssociationProposalsResult$nextToken": "<p>The token to use to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$nextToken": "<p>The token provided in the previous call to retrieve the next page.</p>",
+        "DescribeDirectConnectGatewayAssociationsResult$nextToken": "<p>The token to retrieve the next page.</p>",
+        "DescribeDirectConnectGatewayAttachmentsRequest$nextToken": "<p>The token provided in the previous call to retrieve the next page.</p>",
+        "DescribeDirectConnectGatewayAttachmentsResult$nextToken": "<p>The token to retrieve the next page.</p>",
+        "DescribeDirectConnectGatewaysRequest$nextToken": "<p>The token provided in the previous call to retrieve the next page.</p>",
+        "DescribeDirectConnectGatewaysResult$nextToken": "<p>The token to retrieve the next page.</p>",
+        "ListVirtualInterfaceTestHistoryRequest$nextToken": "<p>The token for the next page of results.</p>",
+        "ListVirtualInterfaceTestHistoryResponse$nextToken": "<p>The token to use to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>"
+      }
+    },
+    "PartnerName": {
+      "base": null,
+      "refs": {
+        "Connection$partnerName": "<p>The name of the AWS Direct Connect service provider associated with the connection.</p>"
+      }
+    },
+    "PortSpeed": {
+      "base": null,
+      "refs": {
+        "AvailablePortSpeeds$member": null
+      }
+    },
+    "ProviderList": {
+      "base": null,
+      "refs": {
+        "Location$availableProviders": "<p>The name of the service provider for the location.</p>"
+      }
+    },
+    "ProviderName": {
+      "base": null,
+      "refs": {
+        "Connection$providerName": "<p>The name of the service provider associated with the connection.</p>",
+        "CreateConnectionRequest$providerName": "<p>The name of the service provider associated with the requested connection.</p>",
+        "CreateInterconnectRequest$providerName": "<p>The name of the service provider associated with the interconnect.</p>",
+        "CreateLagRequest$providerName": "<p>The name of the service provider associated with the LAG.</p>",
+        "DescribeConnectionLoaRequest$providerName": "<p>The name of the APN partner or service provider who establishes connectivity on your behalf. If you specify this parameter, the LOA-CFA lists the provider name alongside your company name as the requester of the cross connect.</p>",
+        "DescribeInterconnectLoaRequest$providerName": "<p>The name of the service provider who establishes connectivity on your behalf. If you supply this parameter, the LOA-CFA lists the provider name alongside your company name as the requester of the cross connect.</p>",
+        "DescribeLoaRequest$providerName": "<p>The name of the service provider who establishes connectivity on your behalf. If you specify this parameter, the LOA-CFA lists the provider name alongside your company name as the requester of the cross connect.</p>",
+        "Interconnect$providerName": "<p>The name of the service provider associated with the interconnect.</p>",
+        "Lag$providerName": "<p>The name of the service provider associated with the LAG.</p>",
+        "ProviderList$member": null
+      }
+    },
+    "Region": {
+      "base": null,
+      "refs": {
+        "AssociatedGateway$region": "<p>The Region where the associated gateway is located.</p>",
+        "Connection$region": "<p>The AWS Region where the connection is located.</p>",
+        "Interconnect$region": "<p>The AWS Region where the connection is located.</p>",
+        "Lag$region": "<p>The AWS Region where the connection is located.</p>",
+        "Location$region": "<p>The AWS Region for the location.</p>",
+        "VirtualInterface$region": "<p>The AWS Region where the virtual interface is located.</p>"
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "ResourceArnList$member": null,
+        "ResourceTag$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>"
+      }
+    },
+    "ResourceArnList": {
+      "base": null,
+      "refs": {
+        "DescribeTagsRequest$resourceArns": "<p>The Amazon Resource Names (ARNs) of the resources.</p>"
+      }
+    },
+    "ResourceTag": {
+      "base": "<p>Information about a tag associated with an AWS Direct Connect resource.</p>",
+      "refs": {
+        "ResourceTagList$member": null
+      }
+    },
+    "ResourceTagList": {
+      "base": null,
+      "refs": {
+        "DescribeTagsResponse$resourceTags": "<p>Information about the tags.</p>"
+      }
+    },
+    "RouteFilterPrefix": {
+      "base": "<p>Information about a route filter prefix that a customer can advertise through Border Gateway Protocol (BGP) over a public virtual interface.</p>",
+      "refs": {
+        "RouteFilterPrefixList$member": null
+      }
+    },
+    "RouteFilterPrefixList": {
+      "base": null,
+      "refs": {
+        "AcceptDirectConnectGatewayAssociationProposalRequest$overrideAllowedPrefixesToDirectConnectGateway": "<p>Overrides the Amazon VPC prefixes advertised to the Direct Connect gateway.</p> <p>For information about how to set the prefixes, see <a href=\"https://docs.aws.amazon.com/directconnect/latest/UserGuide/multi-account-associate-vgw.html#allowed-prefixes\">Allowed Prefixes</a> in the <i>AWS Direct Connect User Guide</i>.</p>",
+        "CreateDirectConnectGatewayAssociationProposalRequest$addAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to advertise to the Direct Connect gateway.</p>",
+        "CreateDirectConnectGatewayAssociationProposalRequest$removeAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to no longer advertise to the Direct Connect gateway.</p>",
+        "CreateDirectConnectGatewayAssociationRequest$addAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to advertise to the Direct Connect gateway</p> <p>This parameter is required when you create an association to a transit gateway.</p> <p>For information about how to set the prefixes, see <a href=\"https://docs.aws.amazon.com/directconnect/latest/UserGuide/multi-account-associate-vgw.html#allowed-prefixes\">Allowed Prefixes</a> in the <i>AWS Direct Connect User Guide</i>.</p>",
+        "DirectConnectGatewayAssociation$allowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to advertise to the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAssociationProposal$existingAllowedPrefixesToDirectConnectGateway": "<p>The existing Amazon VPC prefixes advertised to the Direct Connect gateway.</p>",
+        "DirectConnectGatewayAssociationProposal$requestedAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to advertise to the Direct Connect gateway.</p>",
+        "NewPublicVirtualInterface$routeFilterPrefixes": "<p>The routes to be advertised to the AWS network in this Region. Applies to public virtual interfaces.</p>",
+        "NewPublicVirtualInterfaceAllocation$routeFilterPrefixes": "<p>The routes to be advertised to the AWS network in this Region. Applies to public virtual interfaces.</p>",
+        "UpdateDirectConnectGatewayAssociationRequest$addAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to advertise to the Direct Connect gateway.</p>",
+        "UpdateDirectConnectGatewayAssociationRequest$removeAllowedPrefixesToDirectConnectGateway": "<p>The Amazon VPC prefixes to no longer advertise to the Direct Connect gateway.</p>",
+        "VirtualInterface$routeFilterPrefixes": "<p>The routes to be advertised to the AWS network in this Region. Applies to public virtual interfaces.</p>"
+      }
+    },
+    "RouterConfig": {
+      "base": null,
+      "refs": {
+        "VirtualInterface$customerRouterConfig": "<p>The customer router configuration.</p>"
+      }
+    },
+    "StartBgpFailoverTestRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartBgpFailoverTestResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartTime": {
+      "base": null,
+      "refs": {
+        "VirtualInterfaceTestHistory$startTime": "<p>The time that the virtual interface moves to the DOWN state.</p>"
+      }
+    },
+    "StateChangeError": {
+      "base": null,
+      "refs": {
+        "DirectConnectGateway$stateChangeError": "<p>The error message if the state of an object failed to advance.</p>",
+        "DirectConnectGatewayAssociation$stateChangeError": "<p>The error message if the state of an object failed to advance.</p>",
+        "DirectConnectGatewayAttachment$stateChangeError": "<p>The error message if the state of an object failed to advance.</p>"
+      }
+    },
+    "StopBgpFailoverTestRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopBgpFailoverTestResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Tag": {
+      "base": "<p>Information about a tag.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>The key.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The tag keys of the tags to remove.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "AllocateHostedConnectionRequest$tags": "<p>The tags associated with the connection.</p>",
+        "Connection$tags": "<p>The tags associated with the connection.</p>",
+        "CreateConnectionRequest$tags": "<p>The tags to associate with the lag.</p>",
+        "CreateInterconnectRequest$tags": "<p>The tags to associate with the interconnect.</p>",
+        "CreateLagRequest$tags": "<p>The tags to associate with the LAG.</p>",
+        "CreateLagRequest$childConnectionTags": "<p>The tags to associate with the automtically created LAGs.</p>",
+        "Interconnect$tags": "<p>The tags associated with the interconnect.</p>",
+        "Lag$tags": "<p>The tags associated with the LAG.</p>",
+        "NewPrivateVirtualInterface$tags": "<p>The tags associated with the private virtual interface.</p>",
+        "NewPrivateVirtualInterfaceAllocation$tags": "<p>The tags associated with the private virtual interface.</p>",
+        "NewPublicVirtualInterface$tags": "<p>The tags associated with the public virtual interface.</p>",
+        "NewPublicVirtualInterfaceAllocation$tags": "<p>The tags associated with the public virtual interface.</p>",
+        "NewTransitVirtualInterface$tags": "<p>The tags associated with the transitive virtual interface.</p>",
+        "NewTransitVirtualInterfaceAllocation$tags": "<p>The tags associated with the transitive virtual interface.</p>",
+        "ResourceTag$tags": "<p>The tags.</p>",
+        "TagResourceRequest$tags": "<p>The tags to add.</p>",
+        "VirtualInterface$tags": "<p>The tags associated with the virtual interface.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>The value.</p>"
+      }
+    },
+    "TestDuration": {
+      "base": null,
+      "refs": {
+        "StartBgpFailoverTestRequest$testDurationInMinutes": "<p>The time in minutes that the virtual interface failover test will last.</p> <p>Maximum value: 180 minutes (3 hours).</p> <p>Default: 180 minutes (3 hours).</p>",
+        "VirtualInterfaceTestHistory$testDurationInMinutes": "<p>The time that the virtual interface failover test ran in minutes.</p>"
+      }
+    },
+    "TestId": {
+      "base": null,
+      "refs": {
+        "ListVirtualInterfaceTestHistoryRequest$testId": "<p>The ID of the virtual interface failover test.</p>",
+        "VirtualInterfaceTestHistory$testId": "<p>The ID of the virtual interface failover test.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>You have reached the limit on the number of tags that can be assigned.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDirectConnectGatewayAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDirectConnectGatewayAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateLagRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVirtualInterfaceAttributesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VLAN": {
+      "base": null,
+      "refs": {
+        "AllocateConnectionOnInterconnectRequest$vlan": "<p>The dedicated VLAN provisioned to the connection.</p>",
+        "AllocateHostedConnectionRequest$vlan": "<p>The dedicated VLAN provisioned to the hosted connection.</p>",
+        "Connection$vlan": "<p>The ID of the VLAN.</p>",
+        "NewPrivateVirtualInterface$vlan": "<p>The ID of the VLAN.</p>",
+        "NewPrivateVirtualInterfaceAllocation$vlan": "<p>The ID of the VLAN.</p>",
+        "NewPublicVirtualInterface$vlan": "<p>The ID of the VLAN.</p>",
+        "NewPublicVirtualInterfaceAllocation$vlan": "<p>The ID of the VLAN.</p>",
+        "NewTransitVirtualInterface$vlan": "<p>The ID of the VLAN.</p>",
+        "NewTransitVirtualInterfaceAllocation$vlan": "<p>The ID of the VLAN.</p>",
+        "VirtualInterface$vlan": "<p>The ID of the VLAN.</p>"
+      }
+    },
+    "VirtualGateway": {
+      "base": "<p>Information about a virtual private gateway for a private virtual interface.</p>",
+      "refs": {
+        "VirtualGatewayList$member": null
+      }
+    },
+    "VirtualGatewayId": {
+      "base": null,
+      "refs": {
+        "ConfirmPrivateVirtualInterfaceRequest$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "CreateDirectConnectGatewayAssociationRequest$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "DeleteDirectConnectGatewayAssociationRequest$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "DescribeDirectConnectGatewayAssociationsRequest$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "DirectConnectGatewayAssociation$virtualGatewayId": "<p>The ID of the virtual private gateway. Applies only to private virtual interfaces.</p>",
+        "NewPrivateVirtualInterface$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "VirtualGateway$virtualGatewayId": "<p>The ID of the virtual private gateway.</p>",
+        "VirtualInterface$virtualGatewayId": "<p>The ID of the virtual private gateway. Applies only to private virtual interfaces.</p>"
+      }
+    },
+    "VirtualGatewayList": {
+      "base": null,
+      "refs": {
+        "VirtualGateways$virtualGateways": "<p>The virtual private gateways.</p>"
+      }
+    },
+    "VirtualGatewayRegion": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAssociation$virtualGatewayRegion": "<p>The AWS Region where the virtual private gateway is located.</p>"
+      }
+    },
+    "VirtualGatewayState": {
+      "base": null,
+      "refs": {
+        "VirtualGateway$virtualGatewayState": "<p>The state of the virtual private gateway. The following are the possible values:</p> <ul> <li> <p> <code>pending</code>: Initial state after creating the virtual private gateway.</p> </li> <li> <p> <code>available</code>: Ready for use by a private virtual interface.</p> </li> <li> <p> <code>deleting</code>: Initial state after deleting the virtual private gateway.</p> </li> <li> <p> <code>deleted</code>: The virtual private gateway is deleted. The private virtual interface is unable to send traffic over this gateway.</p> </li> </ul>"
+      }
+    },
+    "VirtualGateways": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VirtualInterface": {
+      "base": "<p>Information about a virtual interface.</p>",
+      "refs": {
+        "AllocateTransitVirtualInterfaceResult$virtualInterface": null,
+        "CreateBGPPeerResponse$virtualInterface": "<p>The virtual interface.</p>",
+        "CreateTransitVirtualInterfaceResult$virtualInterface": null,
+        "DeleteBGPPeerResponse$virtualInterface": "<p>The virtual interface.</p>",
+        "VirtualInterfaceList$member": null
+      }
+    },
+    "VirtualInterfaceId": {
+      "base": null,
+      "refs": {
+        "AssociateVirtualInterfaceRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "ConfirmPrivateVirtualInterfaceRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "ConfirmPublicVirtualInterfaceRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "ConfirmTransitVirtualInterfaceRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "CreateBGPPeerRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "DeleteBGPPeerRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "DeleteVirtualInterfaceRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "DescribeDirectConnectGatewayAttachmentsRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "DescribeVirtualInterfacesRequest$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "DirectConnectGatewayAttachment$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "ListVirtualInterfaceTestHistoryRequest$virtualInterfaceId": "<p>The ID of the virtual interface that was tested.</p>",
+        "StartBgpFailoverTestRequest$virtualInterfaceId": "<p>The ID of the virtual interface you want to test.</p>",
+        "StopBgpFailoverTestRequest$virtualInterfaceId": "<p>The ID of the virtual interface you no longer want to test.</p>",
+        "UpdateVirtualInterfaceAttributesRequest$virtualInterfaceId": "<p>The ID of the virtual private interface.</p>",
+        "VirtualInterface$virtualInterfaceId": "<p>The ID of the virtual interface.</p>",
+        "VirtualInterfaceTestHistory$virtualInterfaceId": "<p>The ID of the tested virtual interface.</p>"
+      }
+    },
+    "VirtualInterfaceList": {
+      "base": null,
+      "refs": {
+        "VirtualInterfaces$virtualInterfaces": "<p>The virtual interfaces</p>"
+      }
+    },
+    "VirtualInterfaceName": {
+      "base": null,
+      "refs": {
+        "NewPrivateVirtualInterface$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "NewPrivateVirtualInterfaceAllocation$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "NewPublicVirtualInterface$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "NewPublicVirtualInterfaceAllocation$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "NewTransitVirtualInterface$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "NewTransitVirtualInterfaceAllocation$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>",
+        "VirtualInterface$virtualInterfaceName": "<p>The name of the virtual interface assigned by the customer network. The name has a maximum of 100 characters. The following are valid characters: a-z, 0-9 and a hyphen (-).</p>"
+      }
+    },
+    "VirtualInterfaceRegion": {
+      "base": null,
+      "refs": {
+        "DirectConnectGatewayAttachment$virtualInterfaceRegion": "<p>The AWS Region where the virtual interface is located.</p>"
+      }
+    },
+    "VirtualInterfaceState": {
+      "base": null,
+      "refs": {
+        "ConfirmPrivateVirtualInterfaceResponse$virtualInterfaceState": "<p>The state of the virtual interface. The following are the possible values:</p> <ul> <li> <p> <code>confirming</code>: The creation of the virtual interface is pending confirmation from the virtual interface owner. If the owner of the virtual interface is different from the owner of the connection on which it is provisioned, then the virtual interface will remain in this state until it is confirmed by the virtual interface owner.</p> </li> <li> <p> <code>verifying</code>: This state only applies to public virtual interfaces. Each public virtual interface needs validation before the virtual interface can be created.</p> </li> <li> <p> <code>pending</code>: A virtual interface is in this state from the time that it is created until the virtual interface is ready to forward traffic.</p> </li> <li> <p> <code>available</code>: A virtual interface that is able to forward traffic.</p> </li> <li> <p> <code>down</code>: A virtual interface that is BGP down.</p> </li> <li> <p> <code>deleting</code>: A virtual interface is in this state immediately after calling <a>DeleteVirtualInterface</a> until it can no longer forward traffic.</p> </li> <li> <p> <code>deleted</code>: A virtual interface that cannot forward traffic.</p> </li> <li> <p> <code>rejected</code>: The virtual interface owner has declined creation of the virtual interface. If a virtual interface in the <code>Confirming</code> state is deleted by the virtual interface owner, the virtual interface enters the <code>Rejected</code> state.</p> </li> <li> <p> <code>unknown</code>: The state of the virtual interface is not available.</p> </li> </ul>",
+        "ConfirmPublicVirtualInterfaceResponse$virtualInterfaceState": "<p>The state of the virtual interface. The following are the possible values:</p> <ul> <li> <p> <code>confirming</code>: The creation of the virtual interface is pending confirmation from the virtual interface owner. If the owner of the virtual interface is different from the owner of the connection on which it is provisioned, then the virtual interface will remain in this state until it is confirmed by the virtual interface owner.</p> </li> <li> <p> <code>verifying</code>: This state only applies to public virtual interfaces. Each public virtual interface needs validation before the virtual interface can be created.</p> </li> <li> <p> <code>pending</code>: A virtual interface is in this state from the time that it is created until the virtual interface is ready to forward traffic.</p> </li> <li> <p> <code>available</code>: A virtual interface that is able to forward traffic.</p> </li> <li> <p> <code>down</code>: A virtual interface that is BGP down.</p> </li> <li> <p> <code>deleting</code>: A virtual interface is in this state immediately after calling <a>DeleteVirtualInterface</a> until it can no longer forward traffic.</p> </li> <li> <p> <code>deleted</code>: A virtual interface that cannot forward traffic.</p> </li> <li> <p> <code>rejected</code>: The virtual interface owner has declined creation of the virtual interface. If a virtual interface in the <code>Confirming</code> state is deleted by the virtual interface owner, the virtual interface enters the <code>Rejected</code> state.</p> </li> <li> <p> <code>unknown</code>: The state of the virtual interface is not available.</p> </li> </ul>",
+        "ConfirmTransitVirtualInterfaceResponse$virtualInterfaceState": "<p>The state of the virtual interface. The following are the possible values:</p> <ul> <li> <p> <code>confirming</code>: The creation of the virtual interface is pending confirmation from the virtual interface owner. If the owner of the virtual interface is different from the owner of the connection on which it is provisioned, then the virtual interface will remain in this state until it is confirmed by the virtual interface owner.</p> </li> <li> <p> <code>verifying</code>: This state only applies to public virtual interfaces. Each public virtual interface needs validation before the virtual interface can be created.</p> </li> <li> <p> <code>pending</code>: A virtual interface is in this state from the time that it is created until the virtual interface is ready to forward traffic.</p> </li> <li> <p> <code>available</code>: A virtual interface that is able to forward traffic.</p> </li> <li> <p> <code>down</code>: A virtual interface that is BGP down.</p> </li> <li> <p> <code>deleting</code>: A virtual interface is in this state immediately after calling <a>DeleteVirtualInterface</a> until it can no longer forward traffic.</p> </li> <li> <p> <code>deleted</code>: A virtual interface that cannot forward traffic.</p> </li> <li> <p> <code>rejected</code>: The virtual interface owner has declined creation of the virtual interface. If a virtual interface in the <code>Confirming</code> state is deleted by the virtual interface owner, the virtual interface enters the <code>Rejected</code> state.</p> </li> <li> <p> <code>unknown</code>: The state of the virtual interface is not available.</p> </li> </ul>",
+        "DeleteVirtualInterfaceResponse$virtualInterfaceState": "<p>The state of the virtual interface. The following are the possible values:</p> <ul> <li> <p> <code>confirming</code>: The creation of the virtual interface is pending confirmation from the virtual interface owner. If the owner of the virtual interface is different from the owner of the connection on which it is provisioned, then the virtual interface will remain in this state until it is confirmed by the virtual interface owner.</p> </li> <li> <p> <code>verifying</code>: This state only applies to public virtual interfaces. Each public virtual interface needs validation before the virtual interface can be created.</p> </li> <li> <p> <code>pending</code>: A virtual interface is in this state from the time that it is created until the virtual interface is ready to forward traffic.</p> </li> <li> <p> <code>available</code>: A virtual interface that is able to forward traffic.</p> </li> <li> <p> <code>down</code>: A virtual interface that is BGP down.</p> </li> <li> <p> <code>deleting</code>: A virtual interface is in this state immediately after calling <a>DeleteVirtualInterface</a> until it can no longer forward traffic.</p> </li> <li> <p> <code>deleted</code>: A virtual interface that cannot forward traffic.</p> </li> <li> <p> <code>rejected</code>: The virtual interface owner has declined creation of the virtual interface. If a virtual interface in the <code>Confirming</code> state is deleted by the virtual interface owner, the virtual interface enters the <code>Rejected</code> state.</p> </li> <li> <p> <code>unknown</code>: The state of the virtual interface is not available.</p> </li> </ul>",
+        "VirtualInterface$virtualInterfaceState": "<p>The state of the virtual interface. The following are the possible values:</p> <ul> <li> <p> <code>confirming</code>: The creation of the virtual interface is pending confirmation from the virtual interface owner. If the owner of the virtual interface is different from the owner of the connection on which it is provisioned, then the virtual interface will remain in this state until it is confirmed by the virtual interface owner.</p> </li> <li> <p> <code>verifying</code>: This state only applies to public virtual interfaces. Each public virtual interface needs validation before the virtual interface can be created.</p> </li> <li> <p> <code>pending</code>: A virtual interface is in this state from the time that it is created until the virtual interface is ready to forward traffic.</p> </li> <li> <p> <code>available</code>: A virtual interface that is able to forward traffic.</p> </li> <li> <p> <code>down</code>: A virtual interface that is BGP down.</p> </li> <li> <p> <code>deleting</code>: A virtual interface is in this state immediately after calling <a>DeleteVirtualInterface</a> until it can no longer forward traffic.</p> </li> <li> <p> <code>deleted</code>: A virtual interface that cannot forward traffic.</p> </li> <li> <p> <code>rejected</code>: The virtual interface owner has declined creation of the virtual interface. If a virtual interface in the <code>Confirming</code> state is deleted by the virtual interface owner, the virtual interface enters the <code>Rejected</code> state.</p> </li> <li> <p> <code>unknown</code>: The state of the virtual interface is not available.</p> </li> </ul>"
+      }
+    },
+    "VirtualInterfaceTestHistory": {
+      "base": "<p>Information about the virtual interface failover test.</p>",
+      "refs": {
+        "StartBgpFailoverTestResponse$virtualInterfaceTest": "<p>Information about the virtual interface failover test.</p>",
+        "StopBgpFailoverTestResponse$virtualInterfaceTest": "<p>Information about the virtual interface failover test.</p>",
+        "VirtualInterfaceTestHistoryList$member": null
+      }
+    },
+    "VirtualInterfaceTestHistoryList": {
+      "base": null,
+      "refs": {
+        "ListVirtualInterfaceTestHistoryResponse$virtualInterfaceTestHistory": "<p>The ID of the tested virtual interface.</p>"
+      }
+    },
+    "VirtualInterfaceType": {
+      "base": null,
+      "refs": {
+        "VirtualInterface$virtualInterfaceType": "<p>The type of virtual interface. The possible values are <code>private</code> and <code>public</code>.</p>"
+      }
+    },
+    "VirtualInterfaces": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    env:
+      GOPATH: ${{ github.workspace }}
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
+    strategy:
+      matrix:
+        go-version: [1.8.x, 1.9.x, 1.10.x, 1.11.x, 1.12.x, 1.13.x, 1.14.x, 1.15.x, 1.16.x]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        path: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
+    - name: Checkout dependencies
+      run: go get golang.org/x/xerrors
+    - name: Test
+      run: go test -v -race ./...
+    - name: Format
+      if: matrix.go-version == '1.16.x'
+      run: diff -u <(echo -n) <(gofmt -d .)

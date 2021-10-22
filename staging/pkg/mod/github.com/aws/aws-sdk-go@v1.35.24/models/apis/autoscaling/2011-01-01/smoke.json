@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeScalingProcessTypes",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "CreateLaunchConfiguration",
+            "input": {
+                "LaunchConfigurationName": "hello, world",
+                "ImageId": "ami-12345678",
+                "InstanceType": "m1.small"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

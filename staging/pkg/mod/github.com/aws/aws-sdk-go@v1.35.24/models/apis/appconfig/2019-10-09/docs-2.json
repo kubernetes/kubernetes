@@ -1,0 +1,778 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS AppConfig</fullname> <p>Use AWS AppConfig, a capability of AWS Systems Manager, to create, manage, and quickly deploy application configurations. AppConfig supports controlled deployments to applications of any size and includes built-in validation checks and monitoring. You can use AppConfig with applications hosted on Amazon EC2 instances, AWS Lambda, containers, mobile applications, or IoT devices.</p> <p>To prevent errors when deploying application configurations, especially for production systems where a simple typo could cause an unexpected outage, AppConfig includes validators. A validator provides a syntactic or semantic check to ensure that the configuration you want to deploy works as intended. To validate your application configuration data, you provide a schema or a Lambda function that runs against the configuration. The configuration deployment or update can only proceed when the configuration data is valid.</p> <p>During a configuration deployment, AppConfig monitors the application to ensure that the deployment is successful. If the system encounters an error, AppConfig rolls back the change to minimize impact for your application users. You can configure a deployment strategy for each application or environment that includes deployment criteria, including velocity, bake time, and alarms to monitor. Similar to error monitoring, if a deployment triggers an alarm, AppConfig automatically rolls back to the previous version. </p> <p>AppConfig supports multiple use cases. Here are some examples.</p> <ul> <li> <p> <b>Application tuning</b>: Use AppConfig to carefully introduce changes to your application that can only be tested with production traffic.</p> </li> <li> <p> <b>Feature toggle</b>: Use AppConfig to turn on new features that require a timely deployment, such as a product launch or announcement. </p> </li> <li> <p> <b>Allow list</b>: Use AppConfig to allow premium subscribers to access paid content. </p> </li> <li> <p> <b>Operational issues</b>: Use AppConfig to reduce stress on your application when a dependency or other external factor impacts the system.</p> </li> </ul> <p>This reference is intended to be used with the <a href=\"http://docs.aws.amazon.com/systems-manager/latest/userguide/appconfig.html\">AWS AppConfig User Guide</a>.</p>",
+  "operations": {
+    "CreateApplication": "<p>An application in AppConfig is a logical unit of code that provides capabilities for your customers. For example, an application can be a microservice that runs on Amazon EC2 instances, a mobile application installed by your users, a serverless application using Amazon API Gateway and AWS Lambda, or any system you run on behalf of others.</p>",
+    "CreateConfigurationProfile": "<p>Information that enables AppConfig to access the configuration source. Valid configuration sources include Systems Manager (SSM) documents, SSM Parameter Store parameters, and Amazon S3 objects. A configuration profile includes the following information.</p> <ul> <li> <p>The Uri location of the configuration data.</p> </li> <li> <p>The AWS Identity and Access Management (IAM) role that provides access to the configuration data.</p> </li> <li> <p>A validator for the configuration data. Available validators include either a JSON Schema or an AWS Lambda function.</p> </li> </ul> <p>For more information, see <a href=\"http://docs.aws.amazon.com/systems-manager/latest/userguide/appconfig-creating-configuration-and-profile.html\">Create a Configuration and a Configuration Profile</a> in the <i>AWS AppConfig User Guide</i>.</p>",
+    "CreateDeploymentStrategy": "<p>A deployment strategy defines important criteria for rolling out your configuration to the designated targets. A deployment strategy includes: the overall duration required, a percentage of targets to receive the deployment during each interval, an algorithm that defines how percentage grows, and bake time.</p>",
+    "CreateEnvironment": "<p>For each application, you define one or more environments. An environment is a logical deployment group of AppConfig targets, such as applications in a <code>Beta</code> or <code>Production</code> environment. You can also define environments for application subcomponents such as the <code>Web</code>, <code>Mobile</code> and <code>Back-end</code> components for your application. You can configure Amazon CloudWatch alarms for each environment. The system monitors alarms during a configuration deployment. If an alarm is triggered, the system rolls back the configuration.</p>",
+    "CreateHostedConfigurationVersion": "<p>Create a new configuration in the AppConfig configuration store.</p>",
+    "DeleteApplication": "<p>Delete an application. Deleting an application does not delete a configuration from a host.</p>",
+    "DeleteConfigurationProfile": "<p>Delete a configuration profile. Deleting a configuration profile does not delete a configuration from a host.</p>",
+    "DeleteDeploymentStrategy": "<p>Delete a deployment strategy. Deleting a deployment strategy does not delete a configuration from a host.</p>",
+    "DeleteEnvironment": "<p>Delete an environment. Deleting an environment does not delete a configuration from a host.</p>",
+    "DeleteHostedConfigurationVersion": "<p>Delete a version of a configuration from the AppConfig configuration store.</p>",
+    "GetApplication": "<p>Retrieve information about an application.</p>",
+    "GetConfiguration": "<p>Receive information about a configuration.</p> <important> <p>AWS AppConfig uses the value of the <code>ClientConfigurationVersion</code> parameter to identify the configuration version on your clients. If you don’t send <code>ClientConfigurationVersion</code> with each call to <code>GetConfiguration</code>, your clients receive the current configuration. You are charged each time your clients receive a configuration.</p> <p>To avoid excess charges, we recommend that you include the <code>ClientConfigurationVersion</code> value with every call to <code>GetConfiguration</code>. This value must be saved on your client. Subsequent calls to <code>GetConfiguration</code> must pass this value by using the <code>ClientConfigurationVersion</code> parameter. </p> </important>",
+    "GetConfigurationProfile": "<p>Retrieve information about a configuration profile.</p>",
+    "GetDeployment": "<p>Retrieve information about a configuration deployment.</p>",
+    "GetDeploymentStrategy": "<p>Retrieve information about a deployment strategy. A deployment strategy defines important criteria for rolling out your configuration to the designated targets. A deployment strategy includes: the overall duration required, a percentage of targets to receive the deployment during each interval, an algorithm that defines how percentage grows, and bake time.</p>",
+    "GetEnvironment": "<p>Retrieve information about an environment. An environment is a logical deployment group of AppConfig applications, such as applications in a <code>Production</code> environment or in an <code>EU_Region</code> environment. Each configuration deployment targets an environment. You can enable one or more Amazon CloudWatch alarms for an environment. If an alarm is triggered during a deployment, AppConfig roles back the configuration.</p>",
+    "GetHostedConfigurationVersion": "<p>Get information about a specific configuration version.</p>",
+    "ListApplications": "<p>List all applications in your AWS account.</p>",
+    "ListConfigurationProfiles": "<p>Lists the configuration profiles for an application.</p>",
+    "ListDeploymentStrategies": "<p>List deployment strategies.</p>",
+    "ListDeployments": "<p>Lists the deployments for an environment.</p>",
+    "ListEnvironments": "<p>List the environments for an application.</p>",
+    "ListHostedConfigurationVersions": "<p>View a list of configurations stored in the AppConfig configuration store by version.</p>",
+    "ListTagsForResource": "<p>Retrieves the list of key-value tags assigned to the resource.</p>",
+    "StartDeployment": "<p>Starts a deployment.</p>",
+    "StopDeployment": "<p>Stops a deployment. This API action works only on deployments that have a status of <code>DEPLOYING</code>. This action moves the deployment to a status of <code>ROLLED_BACK</code>.</p>",
+    "TagResource": "<p>Metadata to assign to an AppConfig resource. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define. You can specify a maximum of 50 tags for a resource.</p>",
+    "UntagResource": "<p>Deletes a tag key and value from an AppConfig resource.</p>",
+    "UpdateApplication": "<p>Updates an application.</p>",
+    "UpdateConfigurationProfile": "<p>Updates a configuration profile.</p>",
+    "UpdateDeploymentStrategy": "<p>Updates a deployment strategy.</p>",
+    "UpdateEnvironment": "<p>Updates an environment.</p>",
+    "ValidateConfiguration": "<p>Uses the validators in a configuration profile to validate a configuration.</p>"
+  },
+  "shapes": {
+    "Application": {
+      "base": null,
+      "refs": {
+        "ApplicationList$member": null
+      }
+    },
+    "ApplicationList": {
+      "base": null,
+      "refs": {
+        "Applications$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "Applications": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceArn": "<p>The resource ARN.</p>",
+        "Monitor$AlarmArn": "<p>ARN of the Amazon CloudWatch alarm.</p>",
+        "TagResourceRequest$ResourceArn": "<p>The ARN of the resource for which to retrieve tags.</p>",
+        "UntagResourceRequest$ResourceArn": "<p>The ARN of the resource for which to remove tags.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>The input fails to satisfy the constraints specified by an AWS service.</p>",
+      "refs": {
+      }
+    },
+    "Blob": {
+      "base": null,
+      "refs": {
+        "Configuration$Content": "<p>The content of the configuration or the configuration data.</p>",
+        "CreateHostedConfigurationVersionRequest$Content": "<p>The content of the configuration or the configuration data.</p>",
+        "HostedConfigurationVersion$Content": "<p>The content of the configuration or the configuration data.</p>"
+      }
+    },
+    "BytesMeasure": {
+      "base": null,
+      "refs": {
+        "PayloadTooLargeException$Measure": null
+      }
+    },
+    "Configuration": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfigurationProfile": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConfigurationProfileSummary": {
+      "base": "<p>A summary of a configuration profile.</p>",
+      "refs": {
+        "ConfigurationProfileSummaryList$member": null
+      }
+    },
+    "ConfigurationProfileSummaryList": {
+      "base": null,
+      "refs": {
+        "ConfigurationProfiles$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "ConfigurationProfiles": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConflictException": {
+      "base": "<p>The request could not be processed because of conflict in the current state of the resource.</p>",
+      "refs": {
+      }
+    },
+    "CreateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateConfigurationProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDeploymentStrategyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateHostedConfigurationVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteConfigurationProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDeploymentStrategyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteHostedConfigurationVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Deployment": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeploymentEvent": {
+      "base": "<p>An object that describes a deployment event.</p>",
+      "refs": {
+        "DeploymentEvents$member": null
+      }
+    },
+    "DeploymentEventType": {
+      "base": null,
+      "refs": {
+        "DeploymentEvent$EventType": "<p>The type of deployment event. Deployment event types include the start, stop, or completion of a deployment; a percentage update; the start or stop of a bake period; the start or completion of a rollback.</p>"
+      }
+    },
+    "DeploymentEvents": {
+      "base": null,
+      "refs": {
+        "Deployment$EventLog": "<p>A list containing all events related to a deployment. The most recent events are displayed first.</p>"
+      }
+    },
+    "DeploymentList": {
+      "base": null,
+      "refs": {
+        "Deployments$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "DeploymentState": {
+      "base": null,
+      "refs": {
+        "Deployment$State": "<p>The state of the deployment.</p>",
+        "DeploymentSummary$State": "<p>The state of the deployment.</p>"
+      }
+    },
+    "DeploymentStrategies": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeploymentStrategy": {
+      "base": null,
+      "refs": {
+        "DeploymentStrategyList$member": null
+      }
+    },
+    "DeploymentStrategyId": {
+      "base": null,
+      "refs": {
+        "DeleteDeploymentStrategyRequest$DeploymentStrategyId": "<p>The ID of the deployment strategy you want to delete.</p>",
+        "GetDeploymentStrategyRequest$DeploymentStrategyId": "<p>The ID of the deployment strategy to get.</p>",
+        "StartDeploymentRequest$DeploymentStrategyId": "<p>The deployment strategy ID.</p>",
+        "UpdateDeploymentStrategyRequest$DeploymentStrategyId": "<p>The deployment strategy ID.</p>"
+      }
+    },
+    "DeploymentStrategyList": {
+      "base": null,
+      "refs": {
+        "DeploymentStrategies$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "DeploymentSummary": {
+      "base": "<p>Information about the deployment.</p>",
+      "refs": {
+        "DeploymentList$member": null
+      }
+    },
+    "Deployments": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "Application$Description": "<p>The description of the application.</p>",
+        "ConfigurationProfile$Description": "<p>The configuration profile description.</p>",
+        "CreateApplicationRequest$Description": "<p>A description of the application.</p>",
+        "CreateConfigurationProfileRequest$Description": "<p>A description of the configuration profile.</p>",
+        "CreateDeploymentStrategyRequest$Description": "<p>A description of the deployment strategy.</p>",
+        "CreateEnvironmentRequest$Description": "<p>A description of the environment.</p>",
+        "CreateHostedConfigurationVersionRequest$Description": "<p>A description of the configuration.</p>",
+        "Deployment$Description": "<p>The description of the deployment.</p>",
+        "DeploymentEvent$Description": "<p>A description of the deployment event. Descriptions include, but are not limited to, the user account or the CloudWatch alarm ARN that initiated a rollback, the percentage of hosts that received the deployment, or in the case of an internal error, a recommendation to attempt a new deployment.</p>",
+        "DeploymentStrategy$Description": "<p>The description of the deployment strategy.</p>",
+        "Environment$Description": "<p>The description of the environment.</p>",
+        "HostedConfigurationVersion$Description": "<p>A description of the configuration.</p>",
+        "HostedConfigurationVersionSummary$Description": "<p>A description of the configuration.</p>",
+        "StartDeploymentRequest$Description": "<p>A description of the deployment.</p>",
+        "UpdateApplicationRequest$Description": "<p>A description of the application.</p>",
+        "UpdateConfigurationProfileRequest$Description": "<p>A description of the configuration profile.</p>",
+        "UpdateDeploymentStrategyRequest$Description": "<p>A description of the deployment strategy.</p>",
+        "UpdateEnvironmentRequest$Description": "<p>A description of the environment.</p>"
+      }
+    },
+    "Environment": {
+      "base": null,
+      "refs": {
+        "EnvironmentList$member": null
+      }
+    },
+    "EnvironmentList": {
+      "base": null,
+      "refs": {
+        "Environments$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "EnvironmentState": {
+      "base": null,
+      "refs": {
+        "Environment$State": "<p>The state of the environment. An environment can be in one of the following states: <code>READY_FOR_DEPLOYMENT</code>, <code>DEPLOYING</code>, <code>ROLLING_BACK</code>, or <code>ROLLED_BACK</code> </p>"
+      }
+    },
+    "Environments": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Float": {
+      "base": null,
+      "refs": {
+        "PayloadTooLargeException$Limit": null,
+        "PayloadTooLargeException$Size": null
+      }
+    },
+    "GetApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetConfigurationProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDeploymentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDeploymentStrategyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetHostedConfigurationVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GrowthFactor": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentStrategyRequest$GrowthFactor": "<p>The percentage of targets to receive a deployed configuration during each interval.</p>",
+        "UpdateDeploymentStrategyRequest$GrowthFactor": "<p>The percentage of targets to receive a deployed configuration during each interval.</p>"
+      }
+    },
+    "GrowthType": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentStrategyRequest$GrowthType": "<p>The algorithm used to define how percentage grows over time. AWS AppConfig supports the following growth types:</p> <p> <b>Linear</b>: For this type, AppConfig processes the deployment by dividing the total number of targets by the value specified for <code>Step percentage</code>. For example, a linear deployment that uses a <code>Step percentage</code> of 10 deploys the configuration to 10 percent of the hosts. After those deployments are complete, the system deploys the configuration to the next 10 percent. This continues until 100% of the targets have successfully received the configuration.</p> <p> <b>Exponential</b>: For this type, AppConfig processes the deployment exponentially using the following formula: <code>G*(2^N)</code>. In this formula, <code>G</code> is the growth factor specified by the user and <code>N</code> is the number of steps until the configuration is deployed to all targets. For example, if you specify a growth factor of 2, then the system rolls out the configuration as follows:</p> <p> <code>2*(2^0)</code> </p> <p> <code>2*(2^1)</code> </p> <p> <code>2*(2^2)</code> </p> <p>Expressed numerically, the deployment rolls out as follows: 2% of the targets, 4% of the targets, 8% of the targets, and continues until the configuration has been deployed to all targets.</p>",
+        "Deployment$GrowthType": "<p>The algorithm used to define how percentage grew over time.</p>",
+        "DeploymentStrategy$GrowthType": "<p>The algorithm used to define how percentage grew over time.</p>",
+        "DeploymentSummary$GrowthType": "<p>The algorithm used to define how percentage grows over time.</p>",
+        "UpdateDeploymentStrategyRequest$GrowthType": "<p>The algorithm used to define how percentage grows over time. AWS AppConfig supports the following growth types:</p> <p> <b>Linear</b>: For this type, AppConfig processes the deployment by increments of the growth factor evenly distributed over the deployment time. For example, a linear deployment that uses a growth factor of 20 initially makes the configuration available to 20 percent of the targets. After 1/5th of the deployment time has passed, the system updates the percentage to 40 percent. This continues until 100% of the targets are set to receive the deployed configuration.</p> <p> <b>Exponential</b>: For this type, AppConfig processes the deployment exponentially using the following formula: <code>G*(2^N)</code>. In this formula, <code>G</code> is the growth factor specified by the user and <code>N</code> is the number of steps until the configuration is deployed to all targets. For example, if you specify a growth factor of 2, then the system rolls out the configuration as follows:</p> <p> <code>2*(2^0)</code> </p> <p> <code>2*(2^1)</code> </p> <p> <code>2*(2^2)</code> </p> <p>Expressed numerically, the deployment rolls out as follows: 2% of the targets, 4% of the targets, 8% of the targets, and continues until the configuration has been deployed to all targets.</p>"
+      }
+    },
+    "HostedConfigurationVersion": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HostedConfigurationVersionSummary": {
+      "base": "<p>Information about the configuration.</p>",
+      "refs": {
+        "HostedConfigurationVersionSummaryList$member": null
+      }
+    },
+    "HostedConfigurationVersionSummaryList": {
+      "base": null,
+      "refs": {
+        "HostedConfigurationVersions$Items": "<p>The elements from this collection.</p>"
+      }
+    },
+    "HostedConfigurationVersions": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "Application$Id": "<p>The application ID.</p>",
+        "ConfigurationProfile$ApplicationId": "<p>The application ID.</p>",
+        "ConfigurationProfile$Id": "<p>The configuration profile ID.</p>",
+        "ConfigurationProfileSummary$ApplicationId": "<p>The application ID.</p>",
+        "ConfigurationProfileSummary$Id": "<p>The ID of the configuration profile.</p>",
+        "CreateConfigurationProfileRequest$ApplicationId": "<p>The application ID.</p>",
+        "CreateEnvironmentRequest$ApplicationId": "<p>The application ID.</p>",
+        "CreateHostedConfigurationVersionRequest$ApplicationId": "<p>The application ID.</p>",
+        "CreateHostedConfigurationVersionRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "DeleteApplicationRequest$ApplicationId": "<p>The ID of the application to delete.</p>",
+        "DeleteConfigurationProfileRequest$ApplicationId": "<p>The application ID that includes the configuration profile you want to delete.</p>",
+        "DeleteConfigurationProfileRequest$ConfigurationProfileId": "<p>The ID of the configuration profile you want to delete.</p>",
+        "DeleteEnvironmentRequest$ApplicationId": "<p>The application ID that includes the environment you want to delete.</p>",
+        "DeleteEnvironmentRequest$EnvironmentId": "<p>The ID of the environment you want to delete.</p>",
+        "DeleteHostedConfigurationVersionRequest$ApplicationId": "<p>The application ID.</p>",
+        "DeleteHostedConfigurationVersionRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "Deployment$ApplicationId": "<p>The ID of the application that was deployed.</p>",
+        "Deployment$EnvironmentId": "<p>The ID of the environment that was deployed.</p>",
+        "Deployment$DeploymentStrategyId": "<p>The ID of the deployment strategy that was deployed.</p>",
+        "Deployment$ConfigurationProfileId": "<p>The ID of the configuration profile that was deployed.</p>",
+        "DeploymentStrategy$Id": "<p>The deployment strategy ID.</p>",
+        "Environment$ApplicationId": "<p>The application ID.</p>",
+        "Environment$Id": "<p>The environment ID.</p>",
+        "GetApplicationRequest$ApplicationId": "<p>The ID of the application you want to get.</p>",
+        "GetConfigurationProfileRequest$ApplicationId": "<p>The ID of the application that includes the configuration profile you want to get.</p>",
+        "GetConfigurationProfileRequest$ConfigurationProfileId": "<p>The ID of the configuration profile you want to get.</p>",
+        "GetDeploymentRequest$ApplicationId": "<p>The ID of the application that includes the deployment you want to get. </p>",
+        "GetDeploymentRequest$EnvironmentId": "<p>The ID of the environment that includes the deployment you want to get. </p>",
+        "GetEnvironmentRequest$ApplicationId": "<p>The ID of the application that includes the environment you want to get.</p>",
+        "GetEnvironmentRequest$EnvironmentId": "<p>The ID of the environment you wnat to get.</p>",
+        "GetHostedConfigurationVersionRequest$ApplicationId": "<p>The application ID.</p>",
+        "GetHostedConfigurationVersionRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "HostedConfigurationVersion$ApplicationId": "<p>The application ID.</p>",
+        "HostedConfigurationVersion$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "HostedConfigurationVersionSummary$ApplicationId": "<p>The application ID.</p>",
+        "HostedConfigurationVersionSummary$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "ListConfigurationProfilesRequest$ApplicationId": "<p>The application ID.</p>",
+        "ListDeploymentsRequest$ApplicationId": "<p>The application ID.</p>",
+        "ListDeploymentsRequest$EnvironmentId": "<p>The environment ID.</p>",
+        "ListEnvironmentsRequest$ApplicationId": "<p>The application ID.</p>",
+        "ListHostedConfigurationVersionsRequest$ApplicationId": "<p>The application ID.</p>",
+        "ListHostedConfigurationVersionsRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "StartDeploymentRequest$ApplicationId": "<p>The application ID.</p>",
+        "StartDeploymentRequest$EnvironmentId": "<p>The environment ID.</p>",
+        "StartDeploymentRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>",
+        "StopDeploymentRequest$ApplicationId": "<p>The application ID.</p>",
+        "StopDeploymentRequest$EnvironmentId": "<p>The environment ID.</p>",
+        "UpdateApplicationRequest$ApplicationId": "<p>The application ID.</p>",
+        "UpdateConfigurationProfileRequest$ApplicationId": "<p>The application ID.</p>",
+        "UpdateConfigurationProfileRequest$ConfigurationProfileId": "<p>The ID of the configuration profile.</p>",
+        "UpdateEnvironmentRequest$ApplicationId": "<p>The application ID.</p>",
+        "UpdateEnvironmentRequest$EnvironmentId": "<p>The environment ID.</p>",
+        "ValidateConfigurationRequest$ApplicationId": "<p>The application ID.</p>",
+        "ValidateConfigurationRequest$ConfigurationProfileId": "<p>The configuration profile ID.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "CreateHostedConfigurationVersionRequest$LatestVersionNumber": "<p>An optional locking token used to prevent race conditions from overwriting configuration updates when creating a new version. To ensure your data is not overwritten when creating multiple hosted configuration versions in rapid succession, specify the version of the latest hosted configuration version.</p>",
+        "DeleteHostedConfigurationVersionRequest$VersionNumber": "<p>The versions number to delete.</p>",
+        "Deployment$DeploymentNumber": "<p>The sequence number of the deployment.</p>",
+        "DeploymentSummary$DeploymentNumber": "<p>The sequence number of the deployment.</p>",
+        "GetDeploymentRequest$DeploymentNumber": "<p>The sequence number of the deployment.</p>",
+        "GetHostedConfigurationVersionRequest$VersionNumber": "<p>The version.</p>",
+        "HostedConfigurationVersion$VersionNumber": "<p>The configuration version.</p>",
+        "HostedConfigurationVersionSummary$VersionNumber": "<p>The configuration version.</p>",
+        "StopDeploymentRequest$DeploymentNumber": "<p>The sequence number of the deployment.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>There was an internal failure in the AppConfig service.</p>",
+      "refs": {
+      }
+    },
+    "Iso8601DateTime": {
+      "base": null,
+      "refs": {
+        "Deployment$StartedAt": "<p>The time the deployment started.</p>",
+        "Deployment$CompletedAt": "<p>The time the deployment completed. </p>",
+        "DeploymentEvent$OccurredAt": "<p>The date and time the event occurred.</p>",
+        "DeploymentSummary$StartedAt": "<p>Time the deployment started.</p>",
+        "DeploymentSummary$CompletedAt": "<p>Time the deployment completed.</p>"
+      }
+    },
+    "ListApplicationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListConfigurationProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDeploymentStrategiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDeploymentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEnvironmentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHostedConfigurationVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListApplicationsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListConfigurationProfilesRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListDeploymentStrategiesRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListDeploymentsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListEnvironmentsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListHostedConfigurationVersionsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>"
+      }
+    },
+    "MinutesBetween0And24Hours": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentStrategyRequest$DeploymentDurationInMinutes": "<p>Total amount of time for a deployment to last.</p>",
+        "CreateDeploymentStrategyRequest$FinalBakeTimeInMinutes": "<p>The amount of time AppConfig monitors for alarms before considering the deployment to be complete and no longer eligible for automatic roll back.</p>",
+        "Deployment$DeploymentDurationInMinutes": "<p>Total amount of time the deployment lasted.</p>",
+        "Deployment$FinalBakeTimeInMinutes": "<p>The amount of time AppConfig monitored for alarms before considering the deployment to be complete and no longer eligible for automatic roll back.</p>",
+        "DeploymentStrategy$DeploymentDurationInMinutes": "<p>Total amount of time the deployment lasted.</p>",
+        "DeploymentStrategy$FinalBakeTimeInMinutes": "<p>The amount of time AppConfig monitored for alarms before considering the deployment to be complete and no longer eligible for automatic roll back.</p>",
+        "DeploymentSummary$DeploymentDurationInMinutes": "<p>Total amount of time the deployment lasted.</p>",
+        "DeploymentSummary$FinalBakeTimeInMinutes": "<p>The amount of time AppConfig monitors for alarms before considering the deployment to be complete and no longer eligible for automatic roll back.</p>",
+        "UpdateDeploymentStrategyRequest$DeploymentDurationInMinutes": "<p>Total amount of time for a deployment to last.</p>",
+        "UpdateDeploymentStrategyRequest$FinalBakeTimeInMinutes": "<p>The amount of time AppConfig monitors for alarms before considering the deployment to be complete and no longer eligible for automatic roll back.</p>"
+      }
+    },
+    "Monitor": {
+      "base": "<p>Amazon CloudWatch alarms to monitor during the deployment process.</p>",
+      "refs": {
+        "MonitorList$member": null
+      }
+    },
+    "MonitorList": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentRequest$Monitors": "<p>Amazon CloudWatch alarms to monitor during the deployment process.</p>",
+        "Environment$Monitors": "<p>Amazon CloudWatch alarms monitored during the deployment.</p>",
+        "UpdateEnvironmentRequest$Monitors": "<p>Amazon CloudWatch alarms to monitor during the deployment process.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "Application$Name": "<p>The application name.</p>",
+        "ConfigurationProfile$Name": "<p>The name of the configuration profile.</p>",
+        "ConfigurationProfileSummary$Name": "<p>The name of the configuration profile.</p>",
+        "CreateApplicationRequest$Name": "<p>A name for the application.</p>",
+        "CreateConfigurationProfileRequest$Name": "<p>A name for the configuration profile.</p>",
+        "CreateDeploymentStrategyRequest$Name": "<p>A name for the deployment strategy.</p>",
+        "CreateEnvironmentRequest$Name": "<p>A name for the environment.</p>",
+        "Deployment$ConfigurationName": "<p>The name of the configuration.</p>",
+        "DeploymentStrategy$Name": "<p>The name of the deployment strategy.</p>",
+        "DeploymentSummary$ConfigurationName": "<p>The name of the configuration.</p>",
+        "Environment$Name": "<p>The name of the environment.</p>",
+        "UpdateApplicationRequest$Name": "<p>The name of the application.</p>",
+        "UpdateConfigurationProfileRequest$Name": "<p>The name of the configuration profile.</p>",
+        "UpdateEnvironmentRequest$Name": "<p>The name of the environment.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "Applications$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "ConfigurationProfiles$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "DeploymentStrategies$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "Deployments$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "Environments$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "HostedConfigurationVersions$NextToken": "<p>The token for the next set of items to return. Use this token to get the next set of results.</p>",
+        "ListApplicationsRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results.</p>",
+        "ListConfigurationProfilesRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results.</p>",
+        "ListDeploymentStrategiesRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results.</p>",
+        "ListDeploymentsRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results.</p>",
+        "ListEnvironmentsRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results.</p>",
+        "ListHostedConfigurationVersionsRequest$NextToken": "<p>A token to start the list. Use this token to get the next set of results. </p>"
+      }
+    },
+    "PayloadTooLargeException": {
+      "base": "<p>The configuration size is too large.</p>",
+      "refs": {
+      }
+    },
+    "Percentage": {
+      "base": null,
+      "refs": {
+        "Deployment$GrowthFactor": "<p>The percentage of targets to receive a deployed configuration during each interval.</p>",
+        "Deployment$PercentageComplete": "<p>The percentage of targets for which the deployment is available.</p>",
+        "DeploymentStrategy$GrowthFactor": "<p>The percentage of targets that received a deployed configuration during each interval.</p>",
+        "DeploymentSummary$GrowthFactor": "<p>The percentage of targets to receive a deployed configuration during each interval.</p>",
+        "DeploymentSummary$PercentageComplete": "<p>The percentage of targets for which the deployment is available.</p>"
+      }
+    },
+    "ReplicateTo": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentStrategyRequest$ReplicateTo": "<p>Save the deployment strategy to a Systems Manager (SSM) document.</p>",
+        "DeploymentStrategy$ReplicateTo": "<p>Save the deployment strategy to a Systems Manager (SSM) document.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The requested resource could not be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceTags": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "ConfigurationProfile$RetrievalRoleArn": "<p>The ARN of an IAM role with permission to access the configuration at the specified LocationUri.</p>",
+        "CreateConfigurationProfileRequest$RetrievalRoleArn": "<p>The ARN of an IAM role with permission to access the configuration at the specified LocationUri.</p>",
+        "Monitor$AlarmRoleArn": "<p>ARN of an IAM role for AppConfig to monitor <code>AlarmArn</code>.</p>",
+        "UpdateConfigurationProfileRequest$RetrievalRoleArn": "<p>The ARN of an IAM role with permission to access the configuration at the specified LocationUri.</p>"
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>The number of hosted configuration versions exceeds the limit for the AppConfig configuration store. Delete one or more versions and try again.</p>",
+      "refs": {
+      }
+    },
+    "StartDeploymentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopDeploymentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "BadRequestException$Message": null,
+        "Configuration$ContentType": "<p>A standard MIME type describing the format of the configuration content. For more information, see <a href=\"http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17\">Content-Type</a>.</p>",
+        "ConflictException$Message": null,
+        "InternalServerException$Message": null,
+        "PayloadTooLargeException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ResourceNotFoundException$ResourceName": null,
+        "ServiceQuotaExceededException$Message": null
+      }
+    },
+    "StringWithLengthBetween0And32768": {
+      "base": null,
+      "refs": {
+        "Validator$Content": "<p>Either the JSON Schema content or the Amazon Resource Name (ARN) of an AWS Lambda function.</p>"
+      }
+    },
+    "StringWithLengthBetween1And255": {
+      "base": null,
+      "refs": {
+        "CreateHostedConfigurationVersionRequest$ContentType": "<p>A standard MIME type describing the format of the configuration content. For more information, see <a href=\"https://docs.aws.amazon.com/https:/www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17\">Content-Type</a>.</p>",
+        "HostedConfigurationVersion$ContentType": "<p>A standard MIME type describing the format of the configuration content. For more information, see <a href=\"https://docs.aws.amazon.com/https:/www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17\">Content-Type</a>.</p>",
+        "HostedConfigurationVersionSummary$ContentType": "<p>A standard MIME type describing the format of the configuration content. For more information, see <a href=\"https://docs.aws.amazon.com/https:/www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17\">Content-Type</a>.</p>"
+      }
+    },
+    "StringWithLengthBetween1And64": {
+      "base": null,
+      "refs": {
+        "GetConfigurationRequest$Application": "<p>The application to get. Specify either the application name or the application ID.</p>",
+        "GetConfigurationRequest$Environment": "<p>The environment to get. Specify either the environment name or the environment ID.</p>",
+        "GetConfigurationRequest$Configuration": "<p>The configuration to get. Specify either the configuration name or the configuration ID.</p>",
+        "GetConfigurationRequest$ClientId": "<p>A unique ID to identify the client for the configuration. This ID enables AppConfig to deploy the configuration in intervals, as defined in the deployment strategy.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tag keys to delete.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateApplicationRequest$Tags": "<p>Metadata to assign to the application. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "CreateConfigurationProfileRequest$Tags": "<p>Metadata to assign to the configuration profile. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "CreateDeploymentStrategyRequest$Tags": "<p>Metadata to assign to the deployment strategy. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "CreateEnvironmentRequest$Tags": "<p>Metadata to assign to the environment. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "ResourceTags$Tags": "<p>Metadata to assign to AppConfig resources. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "StartDeploymentRequest$Tags": "<p>Metadata to assign to the deployment. Tags help organize and categorize your AppConfig resources. Each tag consists of a key and an optional value, both of which you define.</p>",
+        "TagResourceRequest$Tags": "<p>The key-value string map. The valid character set is [a-zA-Z+-=._:/]. The tag key can be up to 128 characters and must not start with <code>aws:</code>. The tag value can be up to 256 characters.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "TriggeredBy": {
+      "base": null,
+      "refs": {
+        "DeploymentEvent$TriggeredBy": "<p>The entity that triggered the deployment event. Events can be triggered by a user, AWS AppConfig, an Amazon CloudWatch alarm, or an internal error.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateConfigurationProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeploymentStrategyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Uri": {
+      "base": null,
+      "refs": {
+        "ConfigurationProfile$LocationUri": "<p>The URI location of the configuration.</p>",
+        "ConfigurationProfileSummary$LocationUri": "<p>The URI location of the configuration.</p>",
+        "CreateConfigurationProfileRequest$LocationUri": "<p>A URI to locate the configuration. You can specify a Systems Manager (SSM) document, an SSM Parameter Store parameter, or an Amazon S3 object. For an SSM document, specify either the document name in the format <code>ssm-document://&lt;Document_name&gt;</code> or the Amazon Resource Name (ARN). For a parameter, specify either the parameter name in the format <code>ssm-parameter://&lt;Parameter_name&gt;</code> or the ARN. For an Amazon S3 object, specify the URI in the following format: <code>s3://&lt;bucket&gt;/&lt;objectKey&gt; </code>. Here is an example: s3://my-bucket/my-app/us-east-1/my-config.json</p>",
+        "Deployment$ConfigurationLocationUri": "<p>Information about the source location of the configuration.</p>"
+      }
+    },
+    "ValidateConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Validator": {
+      "base": "<p>A validator provides a syntactic or semantic check to ensure the configuration you want to deploy functions as intended. To validate your application configuration data, you provide a schema or a Lambda function that runs against the configuration. The configuration deployment or update can only proceed when the configuration data is valid.</p>",
+      "refs": {
+        "ValidatorList$member": null
+      }
+    },
+    "ValidatorList": {
+      "base": null,
+      "refs": {
+        "ConfigurationProfile$Validators": "<p>A list of methods for validating the configuration.</p>",
+        "CreateConfigurationProfileRequest$Validators": "<p>A list of methods for validating the configuration.</p>",
+        "UpdateConfigurationProfileRequest$Validators": "<p>A list of methods for validating the configuration.</p>"
+      }
+    },
+    "ValidatorType": {
+      "base": null,
+      "refs": {
+        "Validator$Type": "<p>AppConfig supports validators of type <code>JSON_SCHEMA</code> and <code>LAMBDA</code> </p>",
+        "ValidatorTypeList$member": null
+      }
+    },
+    "ValidatorTypeList": {
+      "base": null,
+      "refs": {
+        "ConfigurationProfileSummary$ValidatorTypes": "<p>The types of validators in the configuration profile.</p>"
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "Configuration$ConfigurationVersion": "<p>The configuration version.</p>",
+        "Deployment$ConfigurationVersion": "<p>The configuration version that was deployed.</p>",
+        "DeploymentSummary$ConfigurationVersion": "<p>The version of the configuration.</p>",
+        "GetConfigurationRequest$ClientConfigurationVersion": "<p>The configuration version returned in the most recent <code>GetConfiguration</code> response.</p> <important> <p>AWS AppConfig uses the value of the <code>ClientConfigurationVersion</code> parameter to identify the configuration version on your clients. If you don’t send <code>ClientConfigurationVersion</code> with each call to <code>GetConfiguration</code>, your clients receive the current configuration. You are charged each time your clients receive a configuration.</p> <p>To avoid excess charges, we recommend that you include the <code>ClientConfigurationVersion</code> value with every call to <code>GetConfiguration</code>. This value must be saved on your client. Subsequent calls to <code>GetConfiguration</code> must pass this value by using the <code>ClientConfigurationVersion</code> parameter. </p> </important> <p>For more information about working with configurations, see <a href=\"https://docs.aws.amazon.com/systems-manager/latest/userguide/appconfig-retrieving-the-configuration.html\">Retrieving the Configuration</a> in the <i>AWS AppConfig User Guide</i>.</p>",
+        "StartDeploymentRequest$ConfigurationVersion": "<p>The configuration version to deploy.</p>",
+        "ValidateConfigurationRequest$ConfigurationVersion": "<p>The version of the configuration to validate.</p>"
+      }
+    }
+  }
+}

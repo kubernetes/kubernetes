@@ -1,0 +1,17 @@
+{
+  "include": [
+    "../../services/authorization/mgmt/2015-07-01/authorization",
+    "../../services/compute/mgmt/2017-03-30/compute",
+    "../../services/dns/mgmt/2016-04-01/dns",
+    "../../services/keyvault/2016-10-01/keyvault",
+    "../../services/keyvault/mgmt/2016-10-01/keyvault",
+    "../../services/network/mgmt/2017-10-01/network",
+    "../../services/resources/mgmt/2016-09-01/links",
+    "../../services/resources/mgmt/2016-09-01/locks",
+    "../../services/resources/mgmt/2016-12-01/policy",
+    "../../services/resources/mgmt/2018-02-01/resources",
+    "../../services/resources/mgmt/2016-06-01/subscriptions",
+    "../../services/storage/mgmt/2016-01-01/storage",
+    "../../services/web/mgmt/2016-09-01/web"
+  ]
+}

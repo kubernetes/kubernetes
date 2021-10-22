@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/documentation/sdkautomation/SwaggerToSdkConfigSchema.json",
+  "generateOptions": {
+    "generateScript": {
+      "path": "go run ./tools/generator/main.go",
+      "stderr": {
+        "showInComment": "^\\[AUTOREST\\]",
+        "scriptError": "^\\[ERROR\\]",
+        "scriptWarning": "^\\[WARNING\\]"
+      }
+    }
+  },
+  "advancedOptions": {
+    "cloneDir": "src/github.com/Azure/azure-sdk-for-go",
+    "breakingChangeTracking": true
+  },
+  "initOptions": {
+    "initScript": {
+      "path": "sh ./initScript.sh",
+      "stderr": {
+        "scriptWarning": false
+      }
+    }
+  },
+  "packageOptions": {
+    "breakingChangeLabel": "CI-BreakingChange-Go"
+  }
+}

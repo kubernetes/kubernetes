@@ -1,0 +1,69 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:Dl9rdBA5kJ4Zg/qjpt+smAvpuhw3YO+3hG6KhikR2MU=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-44storagesharesuitetestcreatesharedeleteshare?restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:26 GMT
+      Etag:
+      - '"0x8D6E3BD33653982"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - af9af868-d01a-00de-57a6-15eceb000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:5EhhQCpd9O5YkfiV6dh9JpHKqX5Z3429DWlv/i2CO1g=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-44storagesharesuitetestcreatesharedeleteshare?restype=share
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:26 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - af9af86a-d01a-00de-58a6-15eceb000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

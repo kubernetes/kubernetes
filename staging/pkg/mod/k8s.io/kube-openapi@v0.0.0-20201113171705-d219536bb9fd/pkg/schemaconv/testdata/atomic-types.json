@@ -1,0 +1,30 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Atomic Types",
+    "version": "v1.0.0"
+  },
+  "paths": {
+  },
+  "definitions": {
+    "io.k8s.testcase.AtomicMapField": {
+      "description": "",
+      "properties": {
+        "atomicField": {
+          "description": "",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-kubernetes-map-type": "atomic"
+        }
+      }
+    },
+    "io.k8s.testcase.DeclaredAtomicMap": {
+      "description": "",
+      "properties": {
+      },
+      "x-kubernetes-map-type": "atomic"
+    }
+  }
+}

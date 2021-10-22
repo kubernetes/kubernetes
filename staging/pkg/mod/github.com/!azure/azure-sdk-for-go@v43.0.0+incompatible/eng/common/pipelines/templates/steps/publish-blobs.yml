@@ -1,0 +1,23 @@
+parameters:
+  FolderForUpload: ''
+  BlobSASKey: ''
+  TargetLanguage: ''
+  BlobName: ''
+  ScriptPath: ''
+
+steps:
+- pwsh: |
+    Invoke-WebRequest -MaximumRetryCount 10 -Uri "https://aka.ms/downloadazcopy-v10-windows" `
+    -OutFile "azcopy.zip" | Wait-Process; Expand-Archive -Path "azcopy.zip" -DestinationPath "$(Build.BinariesDirectory)/azcopy/"
+  workingDirectory: $(Build.BinariesDirectory)
+  displayName: Download and Extract azcopy Zip
+
+- task: Powershell@2
+  inputs:
+    targetType: 'filePath'
+    filePath: ${{ parameters.ScriptPath }}
+    arguments: -AzCopy $(Resolve-Path "$(Build.BinariesDirectory)/azcopy/azcopy_windows_amd64_*/azcopy.exe")[0] -DocLocation "${{ parameters.FolderForUpload }}" -SASKey "${{ parameters.BlobSASKey }}" -Language "${{ parameters.TargetLanguage }}" -BlobName "${{ parameters.BlobName }}"
+    pwsh: true
+    workingDirectory: $(Pipeline.Workspace)
+  displayName: Copy Docs to Blob
+  continueOnError: false

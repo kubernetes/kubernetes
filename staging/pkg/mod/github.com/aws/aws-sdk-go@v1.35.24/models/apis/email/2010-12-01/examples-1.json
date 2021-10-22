@@ -1,0 +1,1021 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CloneReceiptRuleSet": [
+      {
+        "input": {
+          "OriginalRuleSetName": "RuleSetToClone",
+          "RuleSetName": "RuleSetToCreate"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a receipt rule set by cloning an existing one:",
+        "id": "clonereceiptruleset-1469055039770",
+        "title": "CloneReceiptRuleSet"
+      }
+    ],
+    "CreateReceiptFilter": [
+      {
+        "input": {
+          "Filter": {
+            "IpFilter": {
+              "Cidr": "1.2.3.4/24",
+              "Policy": "Allow"
+            },
+            "Name": "MyFilter"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a new IP address filter:",
+        "id": "createreceiptfilter-1469122681253",
+        "title": "CreateReceiptFilter"
+      }
+    ],
+    "CreateReceiptRule": [
+      {
+        "input": {
+          "After": "",
+          "Rule": {
+            "Actions": [
+              {
+                "S3Action": {
+                  "BucketName": "MyBucket",
+                  "ObjectKeyPrefix": "email"
+                }
+              }
+            ],
+            "Enabled": true,
+            "Name": "MyRule",
+            "ScanEnabled": true,
+            "TlsPolicy": "Optional"
+          },
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a new receipt rule:",
+        "id": "createreceiptrule-1469122946515",
+        "title": "CreateReceiptRule"
+      }
+    ],
+    "CreateReceiptRuleSet": [
+      {
+        "input": {
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates an empty receipt rule set:",
+        "id": "createreceiptruleset-1469058761646",
+        "title": "CreateReceiptRuleSet"
+      }
+    ],
+    "DeleteIdentity": [
+      {
+        "input": {
+          "Identity": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes an identity from the list of identities that have been submitted for verification with Amazon SES:",
+        "id": "deleteidentity-1469047858906",
+        "title": "DeleteIdentity"
+      }
+    ],
+    "DeleteIdentityPolicy": [
+      {
+        "input": {
+          "Identity": "user@example.com",
+          "PolicyName": "MyPolicy"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes a sending authorization policy for an identity:",
+        "id": "deleteidentitypolicy-1469055282499",
+        "title": "DeleteIdentityPolicy"
+      }
+    ],
+    "DeleteReceiptFilter": [
+      {
+        "input": {
+          "FilterName": "MyFilter"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes an IP address filter:",
+        "id": "deletereceiptfilter-1469055456835",
+        "title": "DeleteReceiptFilter"
+      }
+    ],
+    "DeleteReceiptRule": [
+      {
+        "input": {
+          "RuleName": "MyRule",
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes a receipt rule:",
+        "id": "deletereceiptrule-1469055563599",
+        "title": "DeleteReceiptRule"
+      }
+    ],
+    "DeleteReceiptRuleSet": [
+      {
+        "input": {
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes a receipt rule set:",
+        "id": "deletereceiptruleset-1469055713690",
+        "title": "DeleteReceiptRuleSet"
+      }
+    ],
+    "DeleteVerifiedEmailAddress": [
+      {
+        "input": {
+          "EmailAddress": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes an email address from the list of identities that have been submitted for verification with Amazon SES:",
+        "id": "deleteverifiedemailaddress-1469051086444",
+        "title": "DeleteVerifiedEmailAddress"
+      }
+    ],
+    "DescribeActiveReceiptRuleSet": [
+      {
+        "input": {
+        },
+        "output": {
+          "Metadata": {
+            "CreatedTimestamp": "2016-07-15T16:25:59.607Z",
+            "Name": "default-rule-set"
+          },
+          "Rules": [
+            {
+              "Actions": [
+                {
+                  "S3Action": {
+                    "BucketName": "MyBucket",
+                    "ObjectKeyPrefix": "email"
+                  }
+                }
+              ],
+              "Enabled": true,
+              "Name": "MyRule",
+              "ScanEnabled": true,
+              "TlsPolicy": "Optional"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the metadata and receipt rules for the receipt rule set that is currently active:",
+        "id": "describeactivereceiptruleset-1469121611502",
+        "title": "DescribeActiveReceiptRuleSet"
+      }
+    ],
+    "DescribeReceiptRule": [
+      {
+        "input": {
+          "RuleName": "MyRule",
+          "RuleSetName": "MyRuleSet"
+        },
+        "output": {
+          "Rule": {
+            "Actions": [
+              {
+                "S3Action": {
+                  "BucketName": "MyBucket",
+                  "ObjectKeyPrefix": "email"
+                }
+              }
+            ],
+            "Enabled": true,
+            "Name": "MyRule",
+            "ScanEnabled": true,
+            "TlsPolicy": "Optional"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the details of a receipt rule:",
+        "id": "describereceiptrule-1469055813118",
+        "title": "DescribeReceiptRule"
+      }
+    ],
+    "DescribeReceiptRuleSet": [
+      {
+        "input": {
+          "RuleSetName": "MyRuleSet"
+        },
+        "output": {
+          "Metadata": {
+            "CreatedTimestamp": "2016-07-15T16:25:59.607Z",
+            "Name": "MyRuleSet"
+          },
+          "Rules": [
+            {
+              "Actions": [
+                {
+                  "S3Action": {
+                    "BucketName": "MyBucket",
+                    "ObjectKeyPrefix": "email"
+                  }
+                }
+              ],
+              "Enabled": true,
+              "Name": "MyRule",
+              "ScanEnabled": true,
+              "TlsPolicy": "Optional"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the metadata and receipt rules of a receipt rule set:",
+        "id": "describereceiptruleset-1469121240385",
+        "title": "DescribeReceiptRuleSet"
+      }
+    ],
+    "GetAccountSendingEnabled": [
+      {
+        "output": {
+          "Enabled": true
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns if sending status for an account is enabled. (true / false):",
+        "id": "getaccountsendingenabled-1469047741333",
+        "title": "GetAccountSendingEnabled"
+      }
+    ],
+    "GetIdentityDkimAttributes": [
+      {
+        "input": {
+          "Identities": [
+            "example.com",
+            "user@example.com"
+          ]
+        },
+        "output": {
+          "DkimAttributes": {
+            "example.com": {
+              "DkimEnabled": true,
+              "DkimTokens": [
+                "EXAMPLEjcs5xoyqytjsotsijas7236gr",
+                "EXAMPLEjr76cvoc6mysspnioorxsn6ep",
+                "EXAMPLEkbmkqkhlm2lyz77ppkulerm4k"
+              ],
+              "DkimVerificationStatus": "Success"
+            },
+            "user@example.com": {
+              "DkimEnabled": false,
+              "DkimVerificationStatus": "NotStarted"
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example retrieves the Amazon SES Easy DKIM attributes for a list of identities:",
+        "id": "getidentitydkimattributes-1469050695628",
+        "title": "GetIdentityDkimAttributes"
+      }
+    ],
+    "GetIdentityMailFromDomainAttributes": [
+      {
+        "input": {
+          "Identities": [
+            "example.com"
+          ]
+        },
+        "output": {
+          "MailFromDomainAttributes": {
+            "example.com": {
+              "BehaviorOnMXFailure": "UseDefaultValue",
+              "MailFromDomain": "bounces.example.com",
+              "MailFromDomainStatus": "Success"
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the custom MAIL FROM attributes for an identity:",
+        "id": "getidentitymailfromdomainattributes-1469123114860",
+        "title": "GetIdentityMailFromDomainAttributes"
+      }
+    ],
+    "GetIdentityNotificationAttributes": [
+      {
+        "input": {
+          "Identities": [
+            "example.com"
+          ]
+        },
+        "output": {
+          "NotificationAttributes": {
+            "example.com": {
+              "BounceTopic": "arn:aws:sns:us-east-1:EXAMPLE65304:ExampleTopic",
+              "ComplaintTopic": "arn:aws:sns:us-east-1:EXAMPLE65304:ExampleTopic",
+              "DeliveryTopic": "arn:aws:sns:us-east-1:EXAMPLE65304:ExampleTopic",
+              "ForwardingEnabled": true,
+              "HeadersInBounceNotificationsEnabled": false,
+              "HeadersInComplaintNotificationsEnabled": false,
+              "HeadersInDeliveryNotificationsEnabled": false
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the notification attributes for an identity:",
+        "id": "getidentitynotificationattributes-1469123466947",
+        "title": "GetIdentityNotificationAttributes"
+      }
+    ],
+    "GetIdentityPolicies": [
+      {
+        "input": {
+          "Identity": "example.com",
+          "PolicyNames": [
+            "MyPolicy"
+          ]
+        },
+        "output": {
+          "Policies": {
+            "MyPolicy": "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Sid\":\"stmt1469123904194\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::123456789012:root\"},\"Action\":[\"ses:SendEmail\",\"ses:SendRawEmail\"],\"Resource\":\"arn:aws:ses:us-east-1:EXAMPLE65304:identity/example.com\"}]}"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a sending authorization policy for an identity:",
+        "id": "getidentitypolicies-1469123949351",
+        "title": "GetIdentityPolicies"
+      }
+    ],
+    "GetIdentityVerificationAttributes": [
+      {
+        "input": {
+          "Identities": [
+            "example.com"
+          ]
+        },
+        "output": {
+          "VerificationAttributes": {
+            "example.com": {
+              "VerificationStatus": "Success",
+              "VerificationToken": "EXAMPLE3VYb9EDI2nTOQRi/Tf6MI/6bD6THIGiP1MVY="
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the verification status and the verification token for a domain identity:",
+        "id": "getidentityverificationattributes-1469124205897",
+        "title": "GetIdentityVerificationAttributes"
+      }
+    ],
+    "GetSendQuota": [
+      {
+        "output": {
+          "Max24HourSend": 200,
+          "MaxSendRate": 1,
+          "SentLast24Hours": 1
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the Amazon SES sending limits for an AWS account:",
+        "id": "getsendquota-1469047324508",
+        "title": "GetSendQuota"
+      }
+    ],
+    "GetSendStatistics": [
+      {
+        "output": {
+          "SendDataPoints": [
+            {
+              "Bounces": 0,
+              "Complaints": 0,
+              "DeliveryAttempts": 5,
+              "Rejects": 0,
+              "Timestamp": "2016-07-13T22:43:00Z"
+            },
+            {
+              "Bounces": 0,
+              "Complaints": 0,
+              "DeliveryAttempts": 3,
+              "Rejects": 0,
+              "Timestamp": "2016-07-13T23:13:00Z"
+            },
+            {
+              "Bounces": 0,
+              "Complaints": 0,
+              "DeliveryAttempts": 1,
+              "Rejects": 0,
+              "Timestamp": "2016-07-13T21:13:00Z"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns Amazon SES sending statistics:",
+        "id": "getsendstatistics-1469047741329",
+        "title": "GetSendStatistics"
+      }
+    ],
+    "ListIdentities": [
+      {
+        "input": {
+          "IdentityType": "EmailAddress",
+          "MaxItems": 123,
+          "NextToken": ""
+        },
+        "output": {
+          "Identities": [
+            "user@example.com"
+          ],
+          "NextToken": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists the email address identities that have been submitted for verification with Amazon SES:",
+        "id": "listidentities-1469048638493",
+        "title": "ListIdentities"
+      }
+    ],
+    "ListIdentityPolicies": [
+      {
+        "input": {
+          "Identity": "example.com"
+        },
+        "output": {
+          "PolicyNames": [
+            "MyPolicy"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of sending authorization policies that are attached to an identity:",
+        "id": "listidentitypolicies-1469124417674",
+        "title": "ListIdentityPolicies"
+      }
+    ],
+    "ListReceiptFilters": [
+      {
+        "output": {
+          "Filters": [
+            {
+              "IpFilter": {
+                "Cidr": "1.2.3.4/24",
+                "Policy": "Block"
+              },
+              "Name": "MyFilter"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists the IP address filters that are associated with an AWS account:",
+        "id": "listreceiptfilters-1469120786789",
+        "title": "ListReceiptFilters"
+      }
+    ],
+    "ListReceiptRuleSets": [
+      {
+        "input": {
+          "NextToken": ""
+        },
+        "output": {
+          "NextToken": "",
+          "RuleSets": [
+            {
+              "CreatedTimestamp": "2016-07-15T16:25:59.607Z",
+              "Name": "MyRuleSet"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists the receipt rule sets that exist under an AWS account:",
+        "id": "listreceiptrulesets-1469121037235",
+        "title": "ListReceiptRuleSets"
+      }
+    ],
+    "ListVerifiedEmailAddresses": [
+      {
+        "output": {
+          "VerifiedEmailAddresses": [
+            "user1@example.com",
+            "user2@example.com"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists all email addresses that have been submitted for verification with Amazon SES:",
+        "id": "listverifiedemailaddresses-1469051402570",
+        "title": "ListVerifiedEmailAddresses"
+      }
+    ],
+    "PutIdentityPolicy": [
+      {
+        "input": {
+          "Identity": "example.com",
+          "Policy": "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Sid\":\"stmt1469123904194\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::123456789012:root\"},\"Action\":[\"ses:SendEmail\",\"ses:SendRawEmail\"],\"Resource\":\"arn:aws:ses:us-east-1:EXAMPLE65304:identity/example.com\"}]}",
+          "PolicyName": "MyPolicy"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example adds a sending authorization policy to an identity:",
+        "id": "putidentitypolicy-1469124560016",
+        "title": "PutIdentityPolicy"
+      }
+    ],
+    "ReorderReceiptRuleSet": [
+      {
+        "input": {
+          "RuleNames": [
+            "MyRule",
+            "MyOtherRule"
+          ],
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example reorders the receipt rules within a receipt rule set:",
+        "id": "reorderreceiptruleset-1469058156806",
+        "title": "ReorderReceiptRuleSet"
+      }
+    ],
+    "SendEmail": [
+      {
+        "input": {
+          "Destination": {
+            "BccAddresses": [
+
+            ],
+            "CcAddresses": [
+              "recipient3@example.com"
+            ],
+            "ToAddresses": [
+              "recipient1@example.com",
+              "recipient2@example.com"
+            ]
+          },
+          "Message": {
+            "Body": {
+              "Html": {
+                "Charset": "UTF-8",
+                "Data": "This message body contains HTML formatting. It can, for example, contain links like this one: <a class=\"ulink\" href=\"http://docs.aws.amazon.com/ses/latest/DeveloperGuide\" target=\"_blank\">Amazon SES Developer Guide</a>."
+              },
+              "Text": {
+                "Charset": "UTF-8",
+                "Data": "This is the message body in text format."
+              }
+            },
+            "Subject": {
+              "Charset": "UTF-8",
+              "Data": "Test email"
+            }
+          },
+          "ReplyToAddresses": [
+
+          ],
+          "ReturnPath": "",
+          "ReturnPathArn": "",
+          "Source": "sender@example.com",
+          "SourceArn": ""
+        },
+        "output": {
+          "MessageId": "EXAMPLE78603177f-7a5433e7-8edb-42ae-af10-f0181f34d6ee-000000"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sends a formatted email:",
+        "id": "sendemail-1469049656296",
+        "title": "SendEmail"
+      }
+    ],
+    "SendRawEmail": [
+      {
+        "input": {
+          "Destinations": [
+
+          ],
+          "FromArn": "",
+          "RawMessage": {
+            "Data": "From: sender@example.com\\nTo: recipient@example.com\\nSubject: Test email (contains an attachment)\\nMIME-Version: 1.0\\nContent-type: Multipart/Mixed; boundary=\"NextPart\"\\n\\n--NextPart\\nContent-Type: text/plain\\n\\nThis is the message body.\\n\\n--NextPart\\nContent-Type: text/plain;\\nContent-Disposition: attachment; filename=\"attachment.txt\"\\n\\nThis is the text in the attachment.\\n\\n--NextPart--"
+          },
+          "ReturnPathArn": "",
+          "Source": "",
+          "SourceArn": ""
+        },
+        "output": {
+          "MessageId": "EXAMPLEf3f73d99b-c63fb06f-d263-41f8-a0fb-d0dc67d56c07-000000"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sends an email with an attachment:",
+        "id": "sendrawemail-1469118548649",
+        "title": "SendRawEmail"
+      }
+    ],
+    "SetActiveReceiptRuleSet": [
+      {
+        "input": {
+          "RuleSetName": "RuleSetToActivate"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sets the active receipt rule set:",
+        "id": "setactivereceiptruleset-1469058391329",
+        "title": "SetActiveReceiptRuleSet"
+      }
+    ],
+    "SetIdentityDkimEnabled": [
+      {
+        "input": {
+          "DkimEnabled": true,
+          "Identity": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures Amazon SES to Easy DKIM-sign the email sent from an identity:",
+        "id": "setidentitydkimenabled-1469057485202",
+        "title": "SetIdentityDkimEnabled"
+      }
+    ],
+    "SetIdentityFeedbackForwardingEnabled": [
+      {
+        "input": {
+          "ForwardingEnabled": true,
+          "Identity": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures Amazon SES to forward an identity's bounces and complaints via email:",
+        "id": "setidentityfeedbackforwardingenabled-1469056811329",
+        "title": "SetIdentityFeedbackForwardingEnabled"
+      }
+    ],
+    "SetIdentityHeadersInNotificationsEnabled": [
+      {
+        "input": {
+          "Enabled": true,
+          "Identity": "user@example.com",
+          "NotificationType": "Bounce"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures Amazon SES to include the original email headers in the Amazon SNS bounce notifications for an identity:",
+        "id": "setidentityheadersinnotificationsenabled-1469057295001",
+        "title": "SetIdentityHeadersInNotificationsEnabled"
+      }
+    ],
+    "SetIdentityMailFromDomain": [
+      {
+        "input": {
+          "BehaviorOnMXFailure": "UseDefaultValue",
+          "Identity": "user@example.com",
+          "MailFromDomain": "bounces.example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures Amazon SES to use a custom MAIL FROM domain for an identity:",
+        "id": "setidentitymailfromdomain-1469057693908",
+        "title": "SetIdentityMailFromDomain"
+      }
+    ],
+    "SetIdentityNotificationTopic": [
+      {
+        "input": {
+          "Identity": "user@example.com",
+          "NotificationType": "Bounce",
+          "SnsTopic": "arn:aws:sns:us-west-2:111122223333:MyTopic"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sets the Amazon SNS topic to which Amazon SES will publish bounce, complaint, and/or delivery notifications for emails sent with the specified identity as the Source:",
+        "id": "setidentitynotificationtopic-1469057854966",
+        "title": "SetIdentityNotificationTopic"
+      }
+    ],
+    "SetReceiptRulePosition": [
+      {
+        "input": {
+          "After": "PutRuleAfterThisRule",
+          "RuleName": "RuleToReposition",
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sets the position of a receipt rule in a receipt rule set:",
+        "id": "setreceiptruleposition-1469058530550",
+        "title": "SetReceiptRulePosition"
+      }
+    ],
+    "UpdateAccountSendingEnabled": [
+      {
+        "input": {
+          "Enabled": true
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example updated the sending status for this account.",
+        "id": "updateaccountsendingenabled-1469047741333",
+        "title": "UpdateAccountSendingEnabled"
+      }
+    ],
+    "UpdateConfigurationSetReputationMetricsEnabled": [
+      {
+        "input": {
+          "ConfigurationSetName": "foo",
+          "Enabled": true
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Set the reputationMetricsEnabled flag for a specific configuration set.",
+        "id": "updateconfigurationsetreputationmetricsenabled-2362747741333",
+        "title": "UpdateConfigurationSetReputationMetricsEnabled"
+      }
+    ],
+    "UpdateConfigurationSetSendingEnabled": [
+      {
+        "input": {
+          "ConfigurationSetName": "foo",
+          "Enabled": true
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Set the sending enabled flag for a specific configuration set.",
+        "id": "updateconfigurationsetsendingenabled-2362747741333",
+        "title": "UpdateConfigurationSetReputationMetricsEnabled"
+      }
+    ],
+    "UpdateReceiptRule": [
+      {
+        "input": {
+          "Rule": {
+            "Actions": [
+              {
+                "S3Action": {
+                  "BucketName": "MyBucket",
+                  "ObjectKeyPrefix": "email"
+                }
+              }
+            ],
+            "Enabled": true,
+            "Name": "MyRule",
+            "ScanEnabled": true,
+            "TlsPolicy": "Optional"
+          },
+          "RuleSetName": "MyRuleSet"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example updates a receipt rule to use an Amazon S3 action:",
+        "id": "updatereceiptrule-1469051756940",
+        "title": "UpdateReceiptRule"
+      }
+    ],
+    "VerifyDomainDkim": [
+      {
+        "input": {
+          "Domain": "example.com"
+        },
+        "output": {
+          "DkimTokens": [
+            "EXAMPLEq76owjnks3lnluwg65scbemvw",
+            "EXAMPLEi3dnsj67hstzaj673klariwx2",
+            "EXAMPLEwfbtcukvimehexktmdtaz6naj"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example generates DKIM tokens for a domain that has been verified with Amazon SES:",
+        "id": "verifydomaindkim-1469049503083",
+        "title": "VerifyDomainDkim"
+      }
+    ],
+    "VerifyDomainIdentity": [
+      {
+        "input": {
+          "Domain": "example.com"
+        },
+        "output": {
+          "VerificationToken": "eoEmxw+YaYhb3h3iVJHuXMJXqeu1q1/wwmvjuEXAMPLE"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example starts the domain verification process with Amazon SES:",
+        "id": "verifydomainidentity-1469049165936",
+        "title": "VerifyDomainIdentity"
+      }
+    ],
+    "VerifyEmailAddress": [
+      {
+        "input": {
+          "EmailAddress": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example starts the email address verification process with Amazon SES:",
+        "id": "verifyemailaddress-1469048849187",
+        "title": "VerifyEmailAddress"
+      }
+    ],
+    "VerifyEmailIdentity": [
+      {
+        "input": {
+          "EmailAddress": "user@example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example starts the email address verification process with Amazon SES:",
+        "id": "verifyemailidentity-1469049068623",
+        "title": "VerifyEmailIdentity"
+      }
+    ]
+  }
+}

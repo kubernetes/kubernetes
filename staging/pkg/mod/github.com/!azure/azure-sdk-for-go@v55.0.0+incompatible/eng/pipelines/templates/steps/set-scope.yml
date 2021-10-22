@@ -1,0 +1,14 @@
+parameters:
+  ServiceDirectory: ''
+  GoWorkspace: ''
+
+steps:
+  # any further jobs should be run with a workingDirectory property set to the GO_WORKSPACE_PATH now!
+  - pwsh: |
+      $serviceDir = "${{parameters.ServiceDirectory}}"
+      $scope = (./eng/scripts/scoped_discover.ps1 -serviceDir "$serviceDir")
+
+      Write-Host $scope
+      Write-Host "##vso[task.setvariable variable=SCOPE]$scope"
+    displayName: 'Set Target Scope'
+    workingDirectory: "${{ parameters.GoWorkspace }}"

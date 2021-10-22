@@ -1,0 +1,12 @@
+#data
+<table><math><select><mi><select></table>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math select>
+|         <math mi>
+|           <select>
+|     <table>

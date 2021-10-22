@@ -1,0 +1,71 @@
+parameters:
+  - name: SubscriptionConfiguration
+    type: string
+    default: $(sub-config-azure-cloud-test-resources)
+  - name: SubscriptionConfigurations
+    type: object
+    default: null
+
+steps:
+  - ${{ if parameters.SubscriptionConfiguration }}:
+    - pwsh: |
+        $config = @'
+          ${{ parameters.SubscriptionConfiguration }}
+        '@ | ConvertFrom-Json -AsHashtable
+
+        foreach($pair in $config.GetEnumerator()) {
+          if ($pair.Value -is [Hashtable]) {
+            foreach($nestedPair in $pair.Value.GetEnumerator()) {
+              # Mark values as secret so we don't print json blobs containing secrets in the logs.
+              # Prepend underscore to the variable name, so we can still access the variable names via environment
+              # variables if they get set subsequently.
+              Write-Host "##vso[task.setvariable variable=_$($nestedPair.Name);issecret=true;]$($nestedPair.Value)"
+            }
+          } else {
+            Write-Host "##vso[task.setvariable variable=_$($pair.Name);issecret=true;]$($pair.Value)"
+          }
+        }
+
+        Write-Host ($config | ConvertTo-Json)
+        $serialized = $config | ConvertTo-Json -Compress
+        Write-Host "##vso[task.setvariable variable=SubscriptionConfiguration;]$serialized"
+      displayName: Initialize SubscriptionConfiguration variable
+
+  - ${{ if parameters.SubscriptionConfigurations }}:
+    - pwsh: |
+        Write-Host "##vso[task.setvariable variable=SubscriptionConfiguration;]{}"
+      displayName: Initialize SubscriptionConfiguration variable for merging
+      condition: eq(variables['SubscriptionConfiguration'], '')
+
+    - ${{ each config in parameters.SubscriptionConfigurations }}:
+      - pwsh: |
+          $config = @'
+            $(SubscriptionConfiguration)
+          '@ | ConvertFrom-Json -AsHashtable
+          $addToConfig = @'
+            ${{ config }}
+          '@ | ConvertFrom-Json -AsHashtable
+
+          foreach ($pair in $addToConfig.GetEnumerator()) {
+            if ($pair.Value -is [Hashtable]) {
+              if (!$config.ContainsKey($pair.Name)) {
+                $config[$pair.Name] = @{}
+              }
+              foreach($nestedPair in $pair.Value.GetEnumerator()) {
+                # Mark values as secret so we don't print json blobs containing secrets in the logs.
+                # Prepend underscore to the variable name, so we can still access the variable names via environment
+                # variables if they get set subsequently.
+                Write-Host "##vso[task.setvariable variable=_$($nestedPair.Name);issecret=true;]$($nestedPair.Value)"
+                $config[$pair.Name][$nestedPair.Name] = $nestedPair.Value
+              }
+            } else {
+              Write-Host "##vso[task.setvariable variable=_$($pair.Name);issecret=true;]$($pair.Value)"
+              $config[$pair.Name] = $pair.Value
+            }
+          }
+
+          $serialized = $config | ConvertTo-Json -Compress
+          Write-Host ($config | ConvertTo-Json)
+          Write-Host "##vso[task.setvariable variable=SubscriptionConfiguration;]$serialized"
+
+        displayName: Merge Test Resource Configurations

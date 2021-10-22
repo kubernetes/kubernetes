@@ -1,0 +1,819 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://healthcare.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Cloud Healthcare",
+  "description": "Manage, store, and access healthcare data in Google Cloud Platform.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/healthcare",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "healthcare:v1alpha",
+  "kind": "discovery#restDescription",
+  "name": "healthcare",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "projects": {
+      "resources": {
+        "locations": {
+          "methods": {
+            "get": {
+              "description": "Gets information about a location.",
+              "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}",
+              "httpMethod": "GET",
+              "id": "healthcare.projects.locations.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Resource name for the location.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/locations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha/{+name}",
+              "response": {
+                "$ref": "Location"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "Lists information about the supported locations for this service.",
+              "flatPath": "v1alpha/projects/{projectsId}/locations",
+              "httpMethod": "GET",
+              "id": "healthcare.projects.locations.list",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "The standard list filter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The resource that owns the locations collection, if applicable.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "The standard list page size.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "The standard list page token.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha/{+name}/locations",
+              "response": {
+                "$ref": "ListLocationsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          },
+          "resources": {
+            "datasets": {
+              "methods": {
+                "getIamPolicy": {
+                  "description": "Gets the access control policy for a resource.\nReturns an empty policy if the resource exists and does not have a policy\nset.",
+                  "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}:getIamPolicy",
+                  "httpMethod": "GET",
+                  "id": "healthcare.projects.locations.datasets.getIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha/{+resource}:getIamPolicy",
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "setIamPolicy": {
+                  "description": "Sets the access control policy on the specified resource. Replaces any\nexisting policy.",
+                  "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}:setIamPolicy",
+                  "httpMethod": "POST",
+                  "id": "healthcare.projects.locations.datasets.setIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha/{+resource}:setIamPolicy",
+                  "request": {
+                    "$ref": "SetIamPolicyRequest"
+                  },
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "testIamPermissions": {
+                  "description": "Returns permissions that a caller has on the specified resource.\nIf the resource does not exist, this will return an empty set of\npermissions, not a NOT_FOUND error.\n\nNote: This operation is designed to be used for building permission-aware\nUIs and command-line tools, not for authorization checking. This operation\nmay \"fail open\" without warning.",
+                  "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}:testIamPermissions",
+                  "httpMethod": "POST",
+                  "id": "healthcare.projects.locations.datasets.testIamPermissions",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha/{+resource}:testIamPermissions",
+                  "request": {
+                    "$ref": "TestIamPermissionsRequest"
+                  },
+                  "response": {
+                    "$ref": "TestIamPermissionsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              },
+              "resources": {
+                "dicomStores": {
+                  "methods": {
+                    "getIamPolicy": {
+                      "description": "Gets the access control policy for a resource.\nReturns an empty policy if the resource exists and does not have a policy\nset.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/dicomStores/{dicomStoresId}:getIamPolicy",
+                      "httpMethod": "GET",
+                      "id": "healthcare.projects.locations.datasets.dicomStores.getIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/dicomStores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:getIamPolicy",
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "setIamPolicy": {
+                      "description": "Sets the access control policy on the specified resource. Replaces any\nexisting policy.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/dicomStores/{dicomStoresId}:setIamPolicy",
+                      "httpMethod": "POST",
+                      "id": "healthcare.projects.locations.datasets.dicomStores.setIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/dicomStores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:setIamPolicy",
+                      "request": {
+                        "$ref": "SetIamPolicyRequest"
+                      },
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "testIamPermissions": {
+                      "description": "Returns permissions that a caller has on the specified resource.\nIf the resource does not exist, this will return an empty set of\npermissions, not a NOT_FOUND error.\n\nNote: This operation is designed to be used for building permission-aware\nUIs and command-line tools, not for authorization checking. This operation\nmay \"fail open\" without warning.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/dicomStores/{dicomStoresId}:testIamPermissions",
+                      "httpMethod": "POST",
+                      "id": "healthcare.projects.locations.datasets.dicomStores.testIamPermissions",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/dicomStores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:testIamPermissions",
+                      "request": {
+                        "$ref": "TestIamPermissionsRequest"
+                      },
+                      "response": {
+                        "$ref": "TestIamPermissionsResponse"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                },
+                "hl7V2Stores": {
+                  "methods": {
+                    "getIamPolicy": {
+                      "description": "Gets the access control policy for a resource.\nReturns an empty policy if the resource exists and does not have a policy\nset.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/hl7V2Stores/{hl7V2StoresId}:getIamPolicy",
+                      "httpMethod": "GET",
+                      "id": "healthcare.projects.locations.datasets.hl7V2Stores.getIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/hl7V2Stores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:getIamPolicy",
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "setIamPolicy": {
+                      "description": "Sets the access control policy on the specified resource. Replaces any\nexisting policy.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/hl7V2Stores/{hl7V2StoresId}:setIamPolicy",
+                      "httpMethod": "POST",
+                      "id": "healthcare.projects.locations.datasets.hl7V2Stores.setIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/hl7V2Stores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:setIamPolicy",
+                      "request": {
+                        "$ref": "SetIamPolicyRequest"
+                      },
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "testIamPermissions": {
+                      "description": "Returns permissions that a caller has on the specified resource.\nIf the resource does not exist, this will return an empty set of\npermissions, not a NOT_FOUND error.\n\nNote: This operation is designed to be used for building permission-aware\nUIs and command-line tools, not for authorization checking. This operation\nmay \"fail open\" without warning.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/hl7V2Stores/{hl7V2StoresId}:testIamPermissions",
+                      "httpMethod": "POST",
+                      "id": "healthcare.projects.locations.datasets.hl7V2Stores.testIamPermissions",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/hl7V2Stores/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+resource}:testIamPermissions",
+                      "request": {
+                        "$ref": "TestIamPermissionsRequest"
+                      },
+                      "response": {
+                        "$ref": "TestIamPermissionsResponse"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                },
+                "operations": {
+                  "methods": {
+                    "get": {
+                      "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/operations/{operationsId}",
+                      "httpMethod": "GET",
+                      "id": "healthcare.projects.locations.datasets.operations.get",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "name": {
+                          "description": "The name of the operation resource.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+/operations/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+name}",
+                      "response": {
+                        "$ref": "Operation"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "list": {
+                      "description": "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n\nNOTE: the `name` binding allows API services to override the binding\nto use different resource name schemes, such as `users/*/operations`. To\noverride the binding, API services can add a binding such as\n`\"/v1/{name=users/*}/operations\"` to their service configuration.\nFor backwards compatibility, the default name includes the operations\ncollection id, however overriding users must ensure the name binding\nis the parent resource, without the operations collection id.",
+                      "flatPath": "v1alpha/projects/{projectsId}/locations/{locationsId}/datasets/{datasetsId}/operations",
+                      "httpMethod": "GET",
+                      "id": "healthcare.projects.locations.datasets.operations.list",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "filter": {
+                          "description": "The standard list filter.",
+                          "location": "query",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name of the operation's parent resource.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/datasets/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        },
+                        "pageSize": {
+                          "description": "The standard list page size.",
+                          "format": "int32",
+                          "location": "query",
+                          "type": "integer"
+                        },
+                        "pageToken": {
+                          "description": "The standard list page token.",
+                          "location": "query",
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha/{+name}/operations",
+                      "response": {
+                        "$ref": "ListOperationsResponse"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20190417",
+  "rootUrl": "https://healthcare.googleapis.com/",
+  "schemas": {
+    "AuditConfig": {
+      "description": "Specifies the audit configuration for a service.\nThe configuration determines which permission types are logged, and what\nidentities, if any, are exempted from logging.\nAn AuditConfig must have one or more AuditLogConfigs.\n\nIf there are AuditConfigs for both `allServices` and a specific service,\nthe union of the two AuditConfigs is used for that service: the log_types\nspecified in each AuditConfig are enabled, and the exempted_members in each\nAuditLogConfig are exempted.\n\nExample Policy with multiple AuditConfigs:\n\n    {\n      \"audit_configs\": [\n        {\n          \"service\": \"allServices\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n              \"exempted_members\": [\n                \"user:foo@gmail.com\"\n              ]\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n            },\n            {\n              \"log_type\": \"ADMIN_READ\",\n            }\n          ]\n        },\n        {\n          \"service\": \"fooservice.googleapis.com\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n              \"exempted_members\": [\n                \"user:bar@gmail.com\"\n              ]\n            }\n          ]\n        }\n      ]\n    }\n\nFor fooservice, this policy enables DATA_READ, DATA_WRITE and ADMIN_READ\nlogging. It also exempts foo@gmail.com from DATA_READ logging, and\nbar@gmail.com from DATA_WRITE logging.",
+      "id": "AuditConfig",
+      "properties": {
+        "auditLogConfigs": {
+          "description": "The configuration for logging of each type of permission.",
+          "items": {
+            "$ref": "AuditLogConfig"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "Specifies a service that will be enabled for audit logging.\nFor example, `storage.googleapis.com`, `cloudsql.googleapis.com`.\n`allServices` is a special value that covers all services.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditLogConfig": {
+      "description": "Provides the configuration for logging a type of permissions.\nExample:\n\n    {\n      \"audit_log_configs\": [\n        {\n          \"log_type\": \"DATA_READ\",\n          \"exempted_members\": [\n            \"user:foo@gmail.com\"\n          ]\n        },\n        {\n          \"log_type\": \"DATA_WRITE\",\n        }\n      ]\n    }\n\nThis enables 'DATA_READ' and 'DATA_WRITE' logging, while exempting\nfoo@gmail.com from DATA_READ logging.",
+      "id": "AuditLogConfig",
+      "properties": {
+        "exemptedMembers": {
+          "description": "Specifies the identities that do not cause logging for this type of\npermission.\nFollows the same format of Binding.members.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logType": {
+          "description": "The log type that this config enables.",
+          "enum": [
+            "LOG_TYPE_UNSPECIFIED",
+            "ADMIN_READ",
+            "DATA_WRITE",
+            "DATA_READ"
+          ],
+          "enumDescriptions": [
+            "Default case. Should never be this.",
+            "Admin reads. Example: CloudIAM getIamPolicy",
+            "Data writes. Example: CloudSQL Users create",
+            "Data reads. Example: CloudSQL Users list"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "description": "Associates `members` with a `role`.",
+      "id": "Binding",
+      "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "The condition that is associated with this binding.\nNOTE: An unsatisfied condition will not allow user access via current\nbinding. Different bindings, including their conditions, are examined\nindependently."
+        },
+        "members": {
+          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@gmail.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n\n* `domain:{domain}`: The G Suite domain (primary) that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "role": {
+          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents an expression text. Example:\n\n    title: \"User account presence\"\n    description: \"Determines whether the request has a user account\"\n    expression: \"size(request.user) \u003e 0\"",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "An optional description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in\nCommon Expression Language syntax.\n\nThe application context of the containing message determines which\nwell-known feature set of CEL is supported.",
+          "type": "string"
+        },
+        "location": {
+          "description": "An optional string indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "An optional title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListLocationsResponse": {
+      "description": "The response message for Locations.ListLocations.",
+      "id": "ListLocationsResponse",
+      "properties": {
+        "locations": {
+          "description": "A list of locations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Location"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListOperationsResponse": {
+      "description": "The response message for Operations.ListOperations.",
+      "id": "ListOperationsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        },
+        "operations": {
+          "description": "A list of operations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Operation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Location": {
+      "description": "A resource that represents Google Cloud Platform location.",
+      "id": "Location",
+      "properties": {
+        "displayName": {
+          "description": "The friendly name for this location, typically a nearby city name.\nFor example, \"Tokyo\".",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Cross-service attributes for the location. For example\n\n    {\"cloud.googleapis.com/region\": \"us-east1\"}",
+          "type": "object"
+        },
+        "locationId": {
+          "description": "The canonical id for this location. For example: `\"us-east1\"`.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata. For example the available capacity at the given\nlocation.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Resource name for the location, which may vary between implementations.\nFor example: `\"projects/example-project/locations/us-east1\"`",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call.",
+      "id": "Operation",
+      "properties": {
+        "done": {
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable.",
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should have the format of `operations/some/unique/name`.",
+          "type": "string"
+        },
+        "response": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The normal response of the operation in case of success.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Policy": {
+      "description": "Defines an Identity and Access Management (IAM) policy. It is used to\nspecify access control policies for Cloud Platform resources.\n\n\nA `Policy` consists of a list of `bindings`. A `binding` binds a list of\n`members` to a `role`, where the members can be user accounts, Google groups,\nGoogle domains, and service accounts. A `role` is a named list of permissions\ndefined by IAM.\n\n**JSON Example**\n\n    {\n      \"bindings\": [\n        {\n          \"role\": \"roles/owner\",\n          \"members\": [\n            \"user:mike@example.com\",\n            \"group:admins@example.com\",\n            \"domain:google.com\",\n            \"serviceAccount:my-other-app@appspot.gserviceaccount.com\"\n          ]\n        },\n        {\n          \"role\": \"roles/viewer\",\n          \"members\": [\"user:sean@example.com\"]\n        }\n      ]\n    }\n\n**YAML Example**\n\n    bindings:\n    - members:\n      - user:mike@example.com\n      - group:admins@example.com\n      - domain:google.com\n      - serviceAccount:my-other-app@appspot.gserviceaccount.com\n      role: roles/owner\n    - members:\n      - user:sean@example.com\n      role: roles/viewer\n\n\nFor a description of IAM and its features, see the\n[IAM developer's guide](https://cloud.google.com/iam/docs).",
+      "id": "Policy",
+      "properties": {
+        "auditConfigs": {
+          "description": "Specifies cloud audit logging configuration for this policy.",
+          "items": {
+            "$ref": "AuditConfig"
+          },
+          "type": "array"
+        },
+        "bindings": {
+          "description": "Associates a list of `members` to a `role`.\n`bindings` with no members will result in an error.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy.\n\nIf no `etag` is provided in the call to `setIamPolicy`, then the existing\npolicy is overwritten blindly.",
+          "format": "byte",
+          "type": "string"
+        },
+        "version": {
+          "description": "Deprecated.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "SetIamPolicyRequest": {
+      "description": "Request message for `SetIamPolicy` method.",
+      "id": "SetIamPolicyRequest",
+      "properties": {
+        "policy": {
+          "$ref": "Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Cloud Platform services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "description": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:\npaths: \"bindings, etag\"\nThis field is only used by Cloud IAM.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). The error model is designed to be:\n\n- Simple to use and understand for most users\n- Flexible enough to meet unexpected needs\n\n# Overview\n\nThe `Status` message contains three pieces of data: error code, error\nmessage, and error details. The error code should be an enum value of\ngoogle.rpc.Code, but it may accept additional error codes if needed.  The\nerror message should be a developer-facing English message that helps\ndevelopers *understand* and *resolve* the error. If a localized user-facing\nerror message is needed, put the localized message in the error details or\nlocalize it in the client. The optional error details may contain arbitrary\ninformation about the error. There is a predefined set of error detail types\nin the package `google.rpc` that can be used for common error conditions.\n\n# Language mapping\n\nThe `Status` message is the logical representation of the error model, but it\nis not necessarily the actual wire format. When the `Status` message is\nexposed in different client libraries and different wire protocols, it can be\nmapped differently. For example, it will likely be mapped to some exceptions\nin Java, but more likely mapped to some error codes in C.\n\n# Other uses\n\nThe error model and the `Status` message can be used in a variety of\nenvironments, either with or without APIs, to provide a\nconsistent developer experience across different environments.\n\nExample uses of this error model include:\n\n- Partial errors. If a service needs to return partial errors to the client,\n    it may embed the `Status` in the normal response to indicate the partial\n    errors.\n\n- Workflow errors. A typical workflow has multiple steps. Each step may\n    have a `Status` message for error reporting.\n\n- Batch operations. If a client uses batch request and batch response, the\n    `Status` message should be used directly inside batch response, one for\n    each error sub-response.\n\n- Asynchronous operations. If an API call embeds asynchronous operation\n    results in its response, the status of those operations should be\n    represented directly using the `Status` message.\n\n- Logging. If some API errors are stored in logs, the message `Status` could\n    be used directly after any stripping needed for security/privacy reasons.",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use.",
+          "items": {
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\ngoogle.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsRequest": {
+      "description": "Request message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsRequest",
+      "properties": {
+        "permissions": {
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsResponse": {
+      "description": "Response message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsResponse",
+      "properties": {
+        "permissions": {
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Healthcare API",
+  "version": "v1alpha",
+  "version_module": true
+}

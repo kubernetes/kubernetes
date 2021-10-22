@@ -1,0 +1,30 @@
+version: '2'
+
+env:
+  GOFLAGS: -mod=vendor
+
+tasks:
+  default:
+    deps: [test]
+
+  lint:
+    desc: Checks code style
+    cmds:
+      - gofmt -d -s *.go
+      - go vet ./...
+    silent: true
+
+  lint-fix:
+    desc: Fixes code style
+    cmds:
+      - gofmt -w -s *.go
+
+  test:
+    desc: Runs go tests
+    cmds:
+      - go test -race  ./...
+
+  test-coverage:
+    desc: Runs go tests and calucates test coverage
+    cmds:
+      - go test -race -coverprofile=c.out ./...

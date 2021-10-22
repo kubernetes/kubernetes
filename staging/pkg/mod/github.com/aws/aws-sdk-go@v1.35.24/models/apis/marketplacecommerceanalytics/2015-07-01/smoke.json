@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "defaultRegion": "us-east-1",
+    "testCases": [
+        {
+            "operationName": "GenerateDataSet",
+            "input": {
+                "dataSetType": "fake-type",
+                "dataSetPublicationDate": 0,
+                "roleNameArn": "fake-arn",
+                "destinationS3BucketName": "fake-bucket",
+                "snsTopicArn": "fake-arn"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

@@ -1,0 +1,14 @@
+{
+  "pagination": {
+    "ListDatabases": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListTables": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

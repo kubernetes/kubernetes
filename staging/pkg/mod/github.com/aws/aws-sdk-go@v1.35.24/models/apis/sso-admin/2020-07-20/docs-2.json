@@ -1,0 +1,778 @@
+{
+  "version": "2.0",
+  "service": null,
+  "operations": {
+    "AttachManagedPolicyToPermissionSet": "<p>Attaches an IAM managed policy ARN to a permission set.</p> <note> <p>If the permission set is already referenced by one or more account assignments, you will need to call <code> <a>ProvisionPermissionSet</a> </code> after this action to apply the corresponding IAM policy updates to all assigned accounts.</p> </note>",
+    "CreateAccountAssignment": "<p>Assigns access to a principal for a specified AWS account using a specified permission set.</p> <note> <p>The term <i>principal</i> here refers to a user or group that is defined in AWS SSO.</p> </note> <note> <p>As part of a successful <code>CreateAccountAssignment</code> call, the specified permission set will automatically be provisioned to the account in the form of an IAM policy attached to the SSO-created IAM role. If the permission set is subsequently updated, the corresponding IAM policies attached to roles in your accounts will not be updated automatically. In this case, you will need to call <code> <a>ProvisionPermissionSet</a> </code> to make these updates.</p> </note>",
+    "CreatePermissionSet": "<p>Creates a permission set within a specified SSO instance.</p> <note> <p>To grant users and groups access to AWS account resources, use <code> <a>CreateAccountAssignment</a> </code>.</p> </note>",
+    "DeleteAccountAssignment": "<p>Deletes a principal's access from a specified AWS account using a specified permission set.</p>",
+    "DeleteInlinePolicyFromPermissionSet": "<p>Deletes the inline policy from a specified permission set.</p>",
+    "DeletePermissionSet": "<p>Deletes the specified permission set.</p>",
+    "DescribeAccountAssignmentCreationStatus": "<p>Describes the status of the assignment creation request.</p>",
+    "DescribeAccountAssignmentDeletionStatus": "<p>Describes the status of the assignment deletion request.</p>",
+    "DescribePermissionSet": "<p>Gets the details of the permission set.</p>",
+    "DescribePermissionSetProvisioningStatus": "<p>Describes the status for the given permission set provisioning request.</p>",
+    "DetachManagedPolicyFromPermissionSet": "<p>Detaches the attached IAM managed policy ARN from the specified permission set.</p>",
+    "GetInlinePolicyForPermissionSet": "<p>Obtains the inline policy assigned to the permission set.</p>",
+    "ListAccountAssignmentCreationStatus": "<p>Lists the status of the AWS account assignment creation requests for a specified SSO instance.</p>",
+    "ListAccountAssignmentDeletionStatus": "<p>Lists the status of the AWS account assignment deletion requests for a specified SSO instance.</p>",
+    "ListAccountAssignments": "<p>Lists the assignee of the specified AWS account with the specified permission set.</p>",
+    "ListAccountsForProvisionedPermissionSet": "<p>Lists all the AWS accounts where the specified permission set is provisioned.</p>",
+    "ListInstances": "<p>Lists the SSO instances that the caller has access to.</p>",
+    "ListManagedPoliciesInPermissionSet": "<p>Lists the IAM managed policy that is attached to a specified permission set.</p>",
+    "ListPermissionSetProvisioningStatus": "<p>Lists the status of the permission set provisioning requests for a specified SSO instance.</p>",
+    "ListPermissionSets": "<p>Lists the <a>PermissionSet</a>s in an SSO instance.</p>",
+    "ListPermissionSetsProvisionedToAccount": "<p>Lists all the permission sets that are provisioned to a specified AWS account.</p>",
+    "ListTagsForResource": "<p>Lists the tags that are attached to a specified resource.</p>",
+    "ProvisionPermissionSet": "<p>The process by which a specified permission set is provisioned to the specified target.</p>",
+    "PutInlinePolicyToPermissionSet": "<p>Attaches an IAM inline policy to a permission set.</p> <note> <p>If the permission set is already referenced by one or more account assignments, you will need to call <code> <a>ProvisionPermissionSet</a> </code> after this action to apply the corresponding IAM policy updates to all assigned accounts.</p> </note>",
+    "TagResource": "<p>Associates a set of tags with a specified resource.</p>",
+    "UntagResource": "<p>Disassociates a set of tags from a specified resource.</p>",
+    "UpdatePermissionSet": "<p>Updates an existing permission set.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AccessDeniedExceptionMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null
+      }
+    },
+    "AccountAssignment": {
+      "base": "<p>The assignment that indicates a principal's limited access to a specified AWS account with a specified permission set.</p> <note> <p>The term <i>principal</i> here refers to a user or group that is defined in AWS SSO.</p> </note>",
+      "refs": {
+        "AccountAssignmentList$member": null
+      }
+    },
+    "AccountAssignmentList": {
+      "base": null,
+      "refs": {
+        "ListAccountAssignmentsResponse$AccountAssignments": "<p>The list of assignments that match the input AWS account and permission set.</p>"
+      }
+    },
+    "AccountAssignmentOperationStatus": {
+      "base": "<p>The status of the creation or deletion operation of an assignment that a principal needs to access an account.</p>",
+      "refs": {
+        "CreateAccountAssignmentResponse$AccountAssignmentCreationStatus": "<p>The status object for the account assignment creation operation.</p>",
+        "DeleteAccountAssignmentResponse$AccountAssignmentDeletionStatus": "<p>The status object for the account assignment deletion operation.</p>",
+        "DescribeAccountAssignmentCreationStatusResponse$AccountAssignmentCreationStatus": "<p>The status object for the account assignment creation operation.</p>",
+        "DescribeAccountAssignmentDeletionStatusResponse$AccountAssignmentDeletionStatus": "<p>The status object for the account assignment deletion operation.</p>"
+      }
+    },
+    "AccountAssignmentOperationStatusList": {
+      "base": null,
+      "refs": {
+        "ListAccountAssignmentCreationStatusResponse$AccountAssignmentsCreationStatus": "<p>The status object for the account assignment creation operation.</p>",
+        "ListAccountAssignmentDeletionStatusResponse$AccountAssignmentsDeletionStatus": "<p>The status object for the account assignment deletion operation.</p>"
+      }
+    },
+    "AccountAssignmentOperationStatusMetadata": {
+      "base": "<p>Provides information about the <a>AccountAssignment</a> creation request.</p>",
+      "refs": {
+        "AccountAssignmentOperationStatusList$member": null
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "AccountAssignment$AccountId": "<p>The identifier of the AWS account.</p>",
+        "AccountList$member": null,
+        "ListPermissionSetsProvisionedToAccountRequest$AccountId": "<p>The identifier of the AWS account from which to list the assignments.</p>",
+        "PermissionSetProvisioningStatus$AccountId": "<p>The identifier of the AWS account from which to list the assignments.</p>"
+      }
+    },
+    "AccountList": {
+      "base": null,
+      "refs": {
+        "ListAccountsForProvisionedPermissionSetResponse$AccountIds": "<p>The list of AWS <code>AccountIds</code>.</p>"
+      }
+    },
+    "AttachManagedPolicyToPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AttachManagedPolicyToPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AttachedManagedPolicy": {
+      "base": "<p>A structure that stores the details of the IAM managed policy.</p>",
+      "refs": {
+        "AttachedManagedPolicyList$member": null
+      }
+    },
+    "AttachedManagedPolicyList": {
+      "base": null,
+      "refs": {
+        "ListManagedPoliciesInPermissionSetResponse$AttachedManagedPolicies": "<p>The array of the <a>AttachedManagedPolicy</a> data type object.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>Occurs when a conflict with a previous successful write is detected. This generally occurs when the previous write did not have time to propagate to the host serving the current request. A retry (with appropriate backoff logic) is the recommended response to this exception.</p>",
+      "refs": {
+      }
+    },
+    "ConflictExceptionMessage": {
+      "base": null,
+      "refs": {
+        "ConflictException$Message": null
+      }
+    },
+    "CreateAccountAssignmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAccountAssignmentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$CreatedDate": "<p>The date that the permission set was created.</p>",
+        "AccountAssignmentOperationStatusMetadata$CreatedDate": "<p>The date that the permission set was created.</p>",
+        "PermissionSet$CreatedDate": "<p>The date that the permission set was created.</p>",
+        "PermissionSetProvisioningStatus$CreatedDate": "<p>The date that the permission set was created.</p>",
+        "PermissionSetProvisioningStatusMetadata$CreatedDate": "<p>The date that the permission set was created.</p>"
+      }
+    },
+    "DeleteAccountAssignmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAccountAssignmentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInlinePolicyFromPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInlinePolicyFromPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountAssignmentCreationStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountAssignmentCreationStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountAssignmentDeletionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountAssignmentDeletionStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePermissionSetProvisioningStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePermissionSetProvisioningStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetachManagedPolicyFromPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetachManagedPolicyFromPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Duration": {
+      "base": null,
+      "refs": {
+        "CreatePermissionSetRequest$SessionDuration": "<p>The length of time that the application user sessions are valid in the ISO-8601 standard.</p>",
+        "PermissionSet$SessionDuration": "<p>The length of time that the application user sessions are valid for in the ISO-8601 standard.</p>",
+        "UpdatePermissionSetRequest$SessionDuration": "<p>The length of time that the application user sessions are valid for in the ISO-8601 standard.</p>"
+      }
+    },
+    "GeneralArn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceArn": "<p>The ARN of the resource with the tags to be listed.</p>",
+        "TagResourceRequest$ResourceArn": "<p>The ARN of the resource with the tags to be listed.</p>",
+        "UntagResourceRequest$ResourceArn": "<p>The ARN of the resource with the tags to be listed.</p>"
+      }
+    },
+    "GetInlinePolicyForPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetInlinePolicyForPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "InstanceMetadata$IdentityStoreId": "<p>The identifier of the identity store that is connected to the SSO instance.</p>"
+      }
+    },
+    "InstanceArn": {
+      "base": null,
+      "refs": {
+        "AttachManagedPolicyToPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "CreateAccountAssignmentRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "CreatePermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DeleteAccountAssignmentRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DeleteInlinePolicyFromPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DeletePermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DescribeAccountAssignmentCreationStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DescribeAccountAssignmentDeletionStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DescribePermissionSetProvisioningStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DescribePermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DetachManagedPolicyFromPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "GetInlinePolicyForPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "InstanceMetadata$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListAccountAssignmentCreationStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListAccountAssignmentDeletionStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListAccountAssignmentsRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListAccountsForProvisionedPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListManagedPoliciesInPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListPermissionSetProvisioningStatusRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListPermissionSetsProvisionedToAccountRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListPermissionSetsRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ListTagsForResourceRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ProvisionPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "PutInlinePolicyToPermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "TagResourceRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "UntagResourceRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "UpdatePermissionSetRequest$InstanceArn": "<p>The ARN of the SSO instance under which the operation will be executed. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>"
+      }
+    },
+    "InstanceList": {
+      "base": null,
+      "refs": {
+        "ListInstancesResponse$Instances": "<p>Lists the SSO instances that the caller has access to.</p>"
+      }
+    },
+    "InstanceMetadata": {
+      "base": "<p>Provides information about the SSO instance.</p>",
+      "refs": {
+        "InstanceList$member": null
+      }
+    },
+    "InternalFailureMessage": {
+      "base": null,
+      "refs": {
+        "InternalServerException$Message": null
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>The request processing has failed because of an unknown error, exception, or failure with an internal server.</p>",
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentCreationStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentCreationStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentDeletionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentDeletionStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountAssignmentsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountsForProvisionedPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccountsForProvisionedPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInstancesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInstancesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListManagedPoliciesInPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListManagedPoliciesInPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetProvisioningStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetProvisioningStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetsProvisionedToAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetsProvisionedToAccountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionSetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ManagedPolicyArn": {
+      "base": null,
+      "refs": {
+        "AttachManagedPolicyToPermissionSetRequest$ManagedPolicyArn": "<p>The IAM managed policy ARN to be attached to a permission set.</p>",
+        "AttachedManagedPolicy$Arn": "<p>The ARN of the IAM managed policy. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "DetachManagedPolicyFromPermissionSetRequest$ManagedPolicyArn": "<p>The IAM managed policy ARN to be attached to a permission set.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAccountAssignmentCreationStatusRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>",
+        "ListAccountAssignmentDeletionStatusRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>",
+        "ListAccountAssignmentsRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>",
+        "ListAccountsForProvisionedPermissionSetRequest$MaxResults": "<p>The maximum number of results to display for the <a>PermissionSet</a>.</p>",
+        "ListInstancesRequest$MaxResults": "<p>The maximum number of results to display for the instance.</p>",
+        "ListManagedPoliciesInPermissionSetRequest$MaxResults": "<p>The maximum number of results to display for the <a>PermissionSet</a>.</p>",
+        "ListPermissionSetProvisioningStatusRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>",
+        "ListPermissionSetsProvisionedToAccountRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>",
+        "ListPermissionSetsRequest$MaxResults": "<p>The maximum number of results to display for the assignment.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "AttachedManagedPolicy$Name": "<p>The name of the IAM managed policy.</p>"
+      }
+    },
+    "OperationStatusFilter": {
+      "base": "<p>Filters he operation status list based on the passed attribute value.</p>",
+      "refs": {
+        "ListAccountAssignmentCreationStatusRequest$Filter": "<p>Filters results based on the passed attribute value.</p>",
+        "ListAccountAssignmentDeletionStatusRequest$Filter": "<p>Filters results based on the passed attribute value.</p>",
+        "ListPermissionSetProvisioningStatusRequest$Filter": "<p>Filters results based on the passed attribute value.</p>"
+      }
+    },
+    "PermissionSet": {
+      "base": "<p>An entity that contains IAM policies.</p>",
+      "refs": {
+        "CreatePermissionSetResponse$PermissionSet": "<p>Defines the level of access on an AWS account.</p>",
+        "DescribePermissionSetResponse$PermissionSet": "<p>Describes the level of access on an AWS account.</p>"
+      }
+    },
+    "PermissionSetArn": {
+      "base": null,
+      "refs": {
+        "AccountAssignment$PermissionSetArn": "<p>The ARN of the permission set. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "AccountAssignmentOperationStatus$PermissionSetArn": "<p>The ARN of the permission set. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "AttachManagedPolicyToPermissionSetRequest$PermissionSetArn": "<p>The ARN of the <a>PermissionSet</a> that the managed policy should be attached to.</p>",
+        "CreateAccountAssignmentRequest$PermissionSetArn": "<p>The ARN of the permission set that the admin wants to grant the principal access to.</p>",
+        "DeleteAccountAssignmentRequest$PermissionSetArn": "<p>The ARN of the permission set that will be used to remove access.</p>",
+        "DeleteInlinePolicyFromPermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set that will be used to remove access.</p>",
+        "DeletePermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set that should be deleted.</p>",
+        "DescribePermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set.</p>",
+        "DetachManagedPolicyFromPermissionSetRequest$PermissionSetArn": "<p>The ARN of the <a>PermissionSet</a> from which the policy should be detached.</p>",
+        "GetInlinePolicyForPermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set.</p>",
+        "ListAccountAssignmentsRequest$PermissionSetArn": "<p>The ARN of the permission set from which to list assignments.</p>",
+        "ListAccountsForProvisionedPermissionSetRequest$PermissionSetArn": "<p>The ARN of the <a>PermissionSet</a> from which the associated AWS accounts will be listed.</p>",
+        "ListManagedPoliciesInPermissionSetRequest$PermissionSetArn": "<p>The ARN of the <a>PermissionSet</a> whose managed policies will be listed.</p>",
+        "PermissionSet$PermissionSetArn": "<p>The ARN of the permission set. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "PermissionSetList$member": null,
+        "PermissionSetProvisioningStatus$PermissionSetArn": "<p>The ARN of the permission set that is being provisioned. For more information about ARNs, see <a href=\"/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "ProvisionPermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set.</p>",
+        "PutInlinePolicyToPermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set.</p>",
+        "UpdatePermissionSetRequest$PermissionSetArn": "<p>The ARN of the permission set.</p>"
+      }
+    },
+    "PermissionSetDescription": {
+      "base": null,
+      "refs": {
+        "CreatePermissionSetRequest$Description": "<p>The description of the <a>PermissionSet</a>.</p>",
+        "PermissionSet$Description": "<p>The description of the <a>PermissionSet</a>.</p>",
+        "UpdatePermissionSetRequest$Description": "<p>The description of the <a>PermissionSet</a>.</p>"
+      }
+    },
+    "PermissionSetList": {
+      "base": null,
+      "refs": {
+        "ListPermissionSetsProvisionedToAccountResponse$PermissionSets": "<p>Defines the level of access that an AWS account has.</p>",
+        "ListPermissionSetsResponse$PermissionSets": "<p>Defines the level of access on an AWS account.</p>"
+      }
+    },
+    "PermissionSetName": {
+      "base": null,
+      "refs": {
+        "CreatePermissionSetRequest$Name": "<p>The name of the <a>PermissionSet</a>.</p>",
+        "PermissionSet$Name": "<p>The name of the permission set.</p>"
+      }
+    },
+    "PermissionSetPolicyDocument": {
+      "base": null,
+      "refs": {
+        "GetInlinePolicyForPermissionSetResponse$InlinePolicy": "<p>The IAM inline policy that is attached to the permission set.</p>",
+        "PutInlinePolicyToPermissionSetRequest$InlinePolicy": "<p>The IAM inline policy to attach to a <a>PermissionSet</a>.</p>"
+      }
+    },
+    "PermissionSetProvisioningStatus": {
+      "base": "<p>A structure that is used to provide the status of the provisioning operation for a specified permission set.</p>",
+      "refs": {
+        "DescribePermissionSetProvisioningStatusResponse$PermissionSetProvisioningStatus": "<p>The status object for the permission set provisioning operation.</p>",
+        "ProvisionPermissionSetResponse$PermissionSetProvisioningStatus": "<p>The status object for the permission set provisioning operation.</p>"
+      }
+    },
+    "PermissionSetProvisioningStatusList": {
+      "base": null,
+      "refs": {
+        "ListPermissionSetProvisioningStatusResponse$PermissionSetsProvisioningStatus": "<p>The status object for the permission set provisioning operation.</p>"
+      }
+    },
+    "PermissionSetProvisioningStatusMetadata": {
+      "base": "<p>Provides information about the permission set provisioning status.</p>",
+      "refs": {
+        "PermissionSetProvisioningStatusList$member": null
+      }
+    },
+    "PrincipalId": {
+      "base": null,
+      "refs": {
+        "AccountAssignment$PrincipalId": "<p>An identifier for an object in AWS SSO, such as a user or group. PrincipalIds are GUIDs (For example, f81d4fae-7dec-11d0-a765-00a0c91e6bf6). For more information about PrincipalIds in AWS SSO, see the <a href=\"/singlesignon/latest/IdentityStoreAPIReference/welcome.html\">AWS SSO Identity Store API Reference</a>.</p>",
+        "AccountAssignmentOperationStatus$PrincipalId": "<p>An identifier for an object in AWS SSO, such as a user or group. PrincipalIds are GUIDs (For example, f81d4fae-7dec-11d0-a765-00a0c91e6bf6). For more information about PrincipalIds in AWS SSO, see the <a href=\"/singlesignon/latest/IdentityStoreAPIReference/welcome.html\">AWS SSO Identity Store API Reference</a>.</p>",
+        "CreateAccountAssignmentRequest$PrincipalId": "<p>An identifier for an object in AWS SSO, such as a user or group. PrincipalIds are GUIDs (For example, f81d4fae-7dec-11d0-a765-00a0c91e6bf6). For more information about PrincipalIds in AWS SSO, see the <a href=\"/singlesignon/latest/IdentityStoreAPIReference/welcome.html\">AWS SSO Identity Store API Reference</a>.</p>",
+        "DeleteAccountAssignmentRequest$PrincipalId": "<p>An identifier for an object in AWS SSO, such as a user or group. PrincipalIds are GUIDs (For example, f81d4fae-7dec-11d0-a765-00a0c91e6bf6). For more information about PrincipalIds in AWS SSO, see the <a href=\"/singlesignon/latest/IdentityStoreAPIReference/welcome.html\">AWS SSO Identity Store API Reference</a>.</p>"
+      }
+    },
+    "PrincipalType": {
+      "base": null,
+      "refs": {
+        "AccountAssignment$PrincipalType": "<p>The entity type for which the assignment will be created.</p>",
+        "AccountAssignmentOperationStatus$PrincipalType": "<p>The entity type for which the assignment will be created.</p>",
+        "CreateAccountAssignmentRequest$PrincipalType": "<p>The entity type for which the assignment will be created.</p>",
+        "DeleteAccountAssignmentRequest$PrincipalType": "<p>The entity type for which the assignment will be deleted.</p>"
+      }
+    },
+    "ProvisionPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ProvisionPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ProvisionTargetType": {
+      "base": null,
+      "refs": {
+        "ProvisionPermissionSetRequest$TargetType": "<p>The entity type for which the assignment will be created.</p>"
+      }
+    },
+    "ProvisioningStatus": {
+      "base": null,
+      "refs": {
+        "ListAccountsForProvisionedPermissionSetRequest$ProvisioningStatus": "<p>The permission set provisioning status for an AWS account.</p>",
+        "ListPermissionSetsProvisionedToAccountRequest$ProvisioningStatus": "<p>The status object for the permission set provisioning operation.</p>"
+      }
+    },
+    "PutInlinePolicyToPermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutInlinePolicyToPermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Reason": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$FailureReason": "<p>The message that contains an error or exception in case of an operation failure.</p>",
+        "PermissionSetProvisioningStatus$FailureReason": "<p>The message that contains an error or exception in case of an operation failure.</p>"
+      }
+    },
+    "RelayState": {
+      "base": null,
+      "refs": {
+        "CreatePermissionSetRequest$RelayState": "<p>Used to redirect users within the application during the federation authentication process.</p>",
+        "PermissionSet$RelayState": "<p>Used to redirect users within the application during the federation authentication process.</p>",
+        "UpdatePermissionSetRequest$RelayState": "<p>Used to redirect users within the application during the federation authentication process.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Indicates that a requested resource is not found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundMessage": {
+      "base": null,
+      "refs": {
+        "ResourceNotFoundException$Message": null
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>Indicates that the principal has crossed the permitted number of resources that can be created.</p>",
+      "refs": {
+      }
+    },
+    "ServiceQuotaExceededMessage": {
+      "base": null,
+      "refs": {
+        "ServiceQuotaExceededException$Message": null
+      }
+    },
+    "StatusValues": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$Status": "<p>The status of the permission set provisioning process.</p>",
+        "AccountAssignmentOperationStatusMetadata$Status": "<p>The status of the permission set provisioning process.</p>",
+        "OperationStatusFilter$Status": "<p>Filters the list operations result based on the status attribute.</p>",
+        "PermissionSetProvisioningStatus$Status": "<p>The status of the permission set provisioning process.</p>",
+        "PermissionSetProvisioningStatusMetadata$Status": "<p>The status of the permission set provisioning process.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A set of key-value pairs that are used to manage the resource. Tags can only be applied to permission sets and cannot be applied to corresponding roles that AWS SSO creates in AWS accounts.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key for the tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The keys of tags that are attached to the resource.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreatePermissionSetRequest$Tags": "<p>The tags to attach to the new <a>PermissionSet</a>.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>A set of key-value pairs that are used to manage the resource.</p>",
+        "TagResourceRequest$Tags": "<p>A set of key-value pairs that are used to manage the resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "TargetId": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$TargetId": "<p>TargetID is an AWS account identifier, typically a 10-12 digit string (For example, 123456789012).</p>",
+        "CreateAccountAssignmentRequest$TargetId": "<p>TargetID is an AWS account identifier, typically a 10-12 digit string (For example, 123456789012).</p>",
+        "DeleteAccountAssignmentRequest$TargetId": "<p>TargetID is an AWS account identifier, typically a 10-12 digit string (For example, 123456789012).</p>",
+        "ListAccountAssignmentsRequest$AccountId": "<p>The identifier of the AWS account from which to list the assignments.</p>",
+        "ProvisionPermissionSetRequest$TargetId": "<p>TargetID is an AWS account identifier, typically a 10-12 digit string (For example, 123456789012).</p>"
+      }
+    },
+    "TargetType": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$TargetType": "<p>The entity type for which the assignment will be created.</p>",
+        "CreateAccountAssignmentRequest$TargetType": "<p>The entity type for which the assignment will be created.</p>",
+        "DeleteAccountAssignmentRequest$TargetType": "<p>The entity type for which the assignment will be deleted.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Indicates that the principal has crossed the throttling limits of the API operations.</p>",
+      "refs": {
+      }
+    },
+    "ThrottlingExceptionMessage": {
+      "base": null,
+      "refs": {
+        "ThrottlingException$Message": null
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "ListAccountAssignmentCreationStatusRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountAssignmentCreationStatusResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountAssignmentDeletionStatusRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountAssignmentDeletionStatusResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountAssignmentsRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountAssignmentsResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountsForProvisionedPermissionSetRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListAccountsForProvisionedPermissionSetResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListInstancesRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListInstancesResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListManagedPoliciesInPermissionSetRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListManagedPoliciesInPermissionSetResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetProvisioningStatusRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetProvisioningStatusResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetsProvisionedToAccountRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetsProvisionedToAccountResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetsRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListPermissionSetsResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListTagsForResourceRequest$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>",
+        "ListTagsForResourceResponse$NextToken": "<p>The pagination token for the list API. Initially the value is null. Use the output of previous API calls to make subsequent calls.</p>"
+      }
+    },
+    "UUId": {
+      "base": null,
+      "refs": {
+        "AccountAssignmentOperationStatus$RequestId": "<p>The identifier for tracking the request operation that is generated by the universally unique identifier (UUID) workflow.</p>",
+        "AccountAssignmentOperationStatusMetadata$RequestId": "<p>The identifier for tracking the request operation that is generated by the universally unique identifier (UUID) workflow.</p>",
+        "DescribeAccountAssignmentCreationStatusRequest$AccountAssignmentCreationRequestId": "<p>The identifier that is used to track the request operation progress.</p>",
+        "DescribeAccountAssignmentDeletionStatusRequest$AccountAssignmentDeletionRequestId": "<p>The identifier that is used to track the request operation progress.</p>",
+        "DescribePermissionSetProvisioningStatusRequest$ProvisionPermissionSetRequestId": "<p>The identifier that is provided by the <a>ProvisionPermissionSet</a> call to retrieve the current status of the provisioning workflow.</p>",
+        "PermissionSetProvisioningStatus$RequestId": "<p>The identifier for tracking the request operation that is generated by the universally unique identifier (UUID) workflow.</p>",
+        "PermissionSetProvisioningStatusMetadata$RequestId": "<p>The identifier for tracking the request operation that is generated by the universally unique identifier (UUID) workflow.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePermissionSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePermissionSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The request failed because it contains a syntax error.</p>",
+      "refs": {
+      }
+    },
+    "ValidationExceptionMessage": {
+      "base": null,
+      "refs": {
+        "ValidationException$Message": null
+      }
+    }
+  }
+}

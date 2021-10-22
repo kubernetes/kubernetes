@@ -1,0 +1,517 @@
+{
+  "version": "2.0",
+  "service": "<p>This AWS CodeStar Notifications API Reference provides descriptions and usage examples of the operations and data types for the AWS CodeStar Notifications API. You can use the AWS CodeStar Notifications API to work with the following objects:</p> <p>Notification rules, by calling the following: </p> <ul> <li> <p> <a>CreateNotificationRule</a>, which creates a notification rule for a resource in your account. </p> </li> <li> <p> <a>DeleteNotificationRule</a>, which deletes a notification rule. </p> </li> <li> <p> <a>DescribeNotificationRule</a>, which provides information about a notification rule. </p> </li> <li> <p> <a>ListNotificationRules</a>, which lists the notification rules associated with your account. </p> </li> <li> <p> <a>UpdateNotificationRule</a>, which changes the name, events, or targets associated with a notification rule. </p> </li> <li> <p> <a>Subscribe</a>, which subscribes a target to a notification rule. </p> </li> <li> <p> <a>Unsubscribe</a>, which removes a target from a notification rule. </p> </li> </ul> <p>Targets, by calling the following: </p> <ul> <li> <p> <a>DeleteTarget</a>, which removes a notification rule target (SNS topic) from a notification rule. </p> </li> <li> <p> <a>ListTargets</a>, which lists the targets associated with a notification rule. </p> </li> </ul> <p>Events, by calling the following: </p> <ul> <li> <p> <a>ListEventTypes</a>, which lists the event types you can include in a notification rule. </p> </li> </ul> <p>Tags, by calling the following: </p> <ul> <li> <p> <a>ListTagsForResource</a>, which lists the tags already associated with a notification rule in your account. </p> </li> <li> <p> <a>TagResource</a>, which associates a tag you provide with a notification rule in your account. </p> </li> <li> <p> <a>UntagResource</a>, which removes a tag from a notification rule in your account. </p> </li> </ul> <p> For information about how to use AWS CodeStar Notifications, see link in the CodeStarNotifications User Guide. </p>",
+  "operations": {
+    "CreateNotificationRule": "<p>Creates a notification rule for a resource. The rule specifies the events you want notifications about and the targets (such as SNS topics) where you want to receive them.</p>",
+    "DeleteNotificationRule": "<p>Deletes a notification rule for a resource.</p>",
+    "DeleteTarget": "<p>Deletes a specified target for notifications.</p>",
+    "DescribeNotificationRule": "<p>Returns information about a specified notification rule.</p>",
+    "ListEventTypes": "<p>Returns information about the event types available for configuring notifications.</p>",
+    "ListNotificationRules": "<p>Returns a list of the notification rules for an AWS account.</p>",
+    "ListTagsForResource": "<p>Returns a list of the tags associated with a notification rule.</p>",
+    "ListTargets": "<p>Returns a list of the notification rule targets for an AWS account.</p>",
+    "Subscribe": "<p>Creates an association between a notification rule and an SNS topic so that the associated target can receive notifications when the events described in the rule are triggered.</p>",
+    "TagResource": "<p>Associates a set of provided tags with a notification rule.</p>",
+    "Unsubscribe": "<p>Removes an association between a notification rule and an Amazon SNS topic so that subscribers to that topic stop receiving notifications when the events described in the rule are triggered.</p>",
+    "UntagResource": "<p>Removes the association between one or more provided tags and a notification rule.</p>",
+    "UpdateNotificationRule": "<p>Updates a notification rule for a resource. You can change the events that trigger the notification rule, the status of the rule, and the targets that receive the notifications.</p> <note> <p>To add or remove tags for a notification rule, you must use <a>TagResource</a> and <a>UntagResource</a>.</p> </note>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>AWS CodeStar Notifications can't create the notification rule because you do not have sufficient permissions.</p>",
+      "refs": {
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$ClientRequestToken": "<p>A unique, client-generated idempotency token that, when provided in a request, ensures the request cannot be repeated with a changed parameter. If a request with the same parameters is received and a token is included, the request returns information about the initial request that used that token.</p> <note> <p>The AWS SDKs prepopulate client request tokens. If you are using an AWS SDK, an idempotency token is created for you.</p> </note>",
+        "SubscribeRequest$ClientRequestToken": "<p>An enumeration token that, when provided in a request, returns the next batch of the results.</p>"
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p>AWS CodeStar Notifications can't complete the request because the resource is being modified by another process. Wait a few minutes and try again.</p>",
+      "refs": {
+      }
+    },
+    "ConfigurationException": {
+      "base": "<p>Some or all of the configuration is incomplete, missing, or not valid.</p>",
+      "refs": {
+      }
+    },
+    "CreateNotificationRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNotificationRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatedTimestamp": {
+      "base": null,
+      "refs": {
+        "DescribeNotificationRuleResult$CreatedTimestamp": "<p>The date and time the notification rule was created, in timestamp format.</p>"
+      }
+    },
+    "DeleteNotificationRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNotificationRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTargetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTargetResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeNotificationRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeNotificationRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetailType": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$DetailType": "<p>The level of detail to include in the notifications for this resource. BASIC will include only the contents of the event as it would appear in AWS CloudWatch. FULL will include any supplemental information provided by AWS CodeStar Notifications and/or the service for the resource for which the notification is created.</p>",
+        "DescribeNotificationRuleResult$DetailType": "<p>The level of detail included in the notifications for this resource. BASIC will include only the contents of the event as it would appear in AWS CloudWatch. FULL will include any supplemental information provided by AWS CodeStar Notifications and/or the service for the resource for which the notification is created.</p>",
+        "UpdateNotificationRuleRequest$DetailType": "<p>The level of detail to include in the notifications for this resource. BASIC will include only the contents of the event as it would appear in AWS CloudWatch. FULL will include any supplemental information provided by AWS CodeStar Notifications and/or the service for the resource for which the notification is created.</p>"
+      }
+    },
+    "EventTypeBatch": {
+      "base": null,
+      "refs": {
+        "DescribeNotificationRuleResult$EventTypes": "<p>A list of the event types associated with the notification rule.</p>",
+        "ListEventTypesResult$EventTypes": "<p>Information about each event, including service name, resource type, event ID, and event name.</p>"
+      }
+    },
+    "EventTypeId": {
+      "base": null,
+      "refs": {
+        "EventTypeIds$member": null,
+        "EventTypeSummary$EventTypeId": "<p>The system-generated ID of the event.</p>"
+      }
+    },
+    "EventTypeIds": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$EventTypeIds": "<p>A list of event types associated with this notification rule. For a list of allowed events, see <a>EventTypeSummary</a>.</p>",
+        "UpdateNotificationRuleRequest$EventTypeIds": "<p>A list of event types associated with this notification rule.</p>"
+      }
+    },
+    "EventTypeName": {
+      "base": null,
+      "refs": {
+        "EventTypeSummary$EventTypeName": "<p>The name of the event.</p>"
+      }
+    },
+    "EventTypeSummary": {
+      "base": "<p>Returns information about an event that has triggered a notification rule.</p>",
+      "refs": {
+        "EventTypeBatch$member": null
+      }
+    },
+    "ForceUnsubscribeAll": {
+      "base": null,
+      "refs": {
+        "DeleteTargetRequest$ForceUnsubscribeAll": "<p>A Boolean value that can be used to delete all associations with this SNS topic. The default value is FALSE. If set to TRUE, all associations between that target and every notification rule in your AWS account are deleted.</p>"
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The value for the enumeration token used in the request to return the next batch of the results is not valid. </p>",
+      "refs": {
+      }
+    },
+    "LastModifiedTimestamp": {
+      "base": null,
+      "refs": {
+        "DescribeNotificationRuleResult$LastModifiedTimestamp": "<p>The date and time the notification rule was most recently updated, in timestamp format.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>One of the AWS CodeStar Notifications limits has been exceeded. Limits apply to accounts, notification rules, notifications, resources, and targets. For more information, see Limits.</p>",
+      "refs": {
+      }
+    },
+    "ListEventTypesFilter": {
+      "base": "<p>Information about a filter to apply to the list of returned event types. You can filter by resource type or service name.</p>",
+      "refs": {
+        "ListEventTypesFilters$member": null
+      }
+    },
+    "ListEventTypesFilterName": {
+      "base": null,
+      "refs": {
+        "ListEventTypesFilter$Name": "<p>The system-generated name of the filter type you want to filter by.</p>"
+      }
+    },
+    "ListEventTypesFilterValue": {
+      "base": null,
+      "refs": {
+        "ListEventTypesFilter$Value": "<p>The name of the resource type (for example, pipeline) or service name (for example, CodePipeline) that you want to filter by.</p>"
+      }
+    },
+    "ListEventTypesFilters": {
+      "base": null,
+      "refs": {
+        "ListEventTypesRequest$Filters": "<p>The filters to use to return information by service or resource type.</p>"
+      }
+    },
+    "ListEventTypesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEventTypesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNotificationRulesFilter": {
+      "base": "<p>Information about a filter to apply to the list of returned notification rules. You can filter by event type, owner, resource, or target.</p>",
+      "refs": {
+        "ListNotificationRulesFilters$member": null
+      }
+    },
+    "ListNotificationRulesFilterName": {
+      "base": null,
+      "refs": {
+        "ListNotificationRulesFilter$Name": "<p>The name of the attribute you want to use to filter the returned notification rules.</p>"
+      }
+    },
+    "ListNotificationRulesFilterValue": {
+      "base": null,
+      "refs": {
+        "ListNotificationRulesFilter$Value": "<p>The value of the attribute you want to use to filter the returned notification rules. For example, if you specify filtering by <i>RESOURCE</i> in Name, you might specify the ARN of a pipeline in AWS CodePipeline for the value.</p>"
+      }
+    },
+    "ListNotificationRulesFilters": {
+      "base": null,
+      "refs": {
+        "ListNotificationRulesRequest$Filters": "<p>The filters to use to return information by service or resource type. For valid values, see <a>ListNotificationRulesFilter</a>.</p> <note> <p>A filter with the same name can appear more than once when used with OR statements. Filters with different names should be applied with AND statements.</p> </note>"
+      }
+    },
+    "ListNotificationRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNotificationRulesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTargetsFilter": {
+      "base": "<p>Information about a filter to apply to the list of returned targets. You can filter by target type, address, or status. For example, to filter results to notification rules that have active Amazon SNS topics as targets, you could specify a ListTargetsFilter Name as TargetType and a Value of SNS, and a Name of TARGET_STATUS and a Value of ACTIVE.</p>",
+      "refs": {
+        "ListTargetsFilters$member": null
+      }
+    },
+    "ListTargetsFilterName": {
+      "base": null,
+      "refs": {
+        "ListTargetsFilter$Name": "<p>The name of the attribute you want to use to filter the returned targets.</p>"
+      }
+    },
+    "ListTargetsFilterValue": {
+      "base": null,
+      "refs": {
+        "ListTargetsFilter$Value": "<p>The value of the attribute you want to use to filter the returned targets. For example, if you specify <i>SNS</i> for the Target type, you could specify an Amazon Resource Name (ARN) for a topic as the value.</p>"
+      }
+    },
+    "ListTargetsFilters": {
+      "base": null,
+      "refs": {
+        "ListTargetsRequest$Filters": "<p>The filters to use to return information by service or resource type. Valid filters include target type, target address, and target status.</p> <note> <p>A filter with the same name can appear more than once when used with OR statements. Filters with different names should be applied with AND statements.</p> </note>"
+      }
+    },
+    "ListTargetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTargetsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListEventTypesRequest$MaxResults": "<p>A non-negative integer used to limit the number of returned results. The default number is 50. The maximum number of results that can be returned is 100.</p>",
+        "ListNotificationRulesRequest$MaxResults": "<p>A non-negative integer used to limit the number of returned results. The maximum number of results that can be returned is 100.</p>",
+        "ListTargetsRequest$MaxResults": "<p>A non-negative integer used to limit the number of returned results. The maximum number of results that can be returned is 100.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "ConcurrentModificationException$Message": null,
+        "ConfigurationException$Message": null,
+        "InvalidNextTokenException$Message": null,
+        "LimitExceededException$Message": null,
+        "ResourceAlreadyExistsException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListEventTypesRequest$NextToken": "<p>An enumeration token that, when provided in a request, returns the next batch of the results.</p>",
+        "ListEventTypesResult$NextToken": "<p>An enumeration token that can be used in a request to return the next batch of the results.</p>",
+        "ListNotificationRulesRequest$NextToken": "<p>An enumeration token that, when provided in a request, returns the next batch of the results.</p>",
+        "ListNotificationRulesResult$NextToken": "<p>An enumeration token that can be used in a request to return the next batch of the results.</p>",
+        "ListTargetsRequest$NextToken": "<p>An enumeration token that, when provided in a request, returns the next batch of the results.</p>",
+        "ListTargetsResult$NextToken": "<p>An enumeration token that can be used in a request to return the next batch of results.</p>"
+      }
+    },
+    "NotificationRuleArn": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleResult$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>",
+        "DeleteNotificationRuleRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule you want to delete.</p>",
+        "DeleteNotificationRuleResult$Arn": "<p>The Amazon Resource Name (ARN) of the deleted notification rule.</p>",
+        "DescribeNotificationRuleRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>",
+        "DescribeNotificationRuleResult$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>",
+        "ListTagsForResourceRequest$Arn": "<p>The Amazon Resource Name (ARN) for the notification rule.</p>",
+        "NotificationRuleSummary$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>",
+        "SubscribeRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule for which you want to create the association.</p>",
+        "SubscribeResult$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule for which you have created assocations.</p>",
+        "TagResourceRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule to tag.</p>",
+        "UnsubscribeRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>",
+        "UnsubscribeResult$Arn": "<p>The Amazon Resource Name (ARN) of the the notification rule from which you have removed a subscription.</p>",
+        "UntagResourceRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule from which to remove the tags.</p>",
+        "UpdateNotificationRuleRequest$Arn": "<p>The Amazon Resource Name (ARN) of the notification rule.</p>"
+      }
+    },
+    "NotificationRuleBatch": {
+      "base": null,
+      "refs": {
+        "ListNotificationRulesResult$NotificationRules": "<p>The list of notification rules for the AWS account, by Amazon Resource Name (ARN) and ID. </p>"
+      }
+    },
+    "NotificationRuleCreatedBy": {
+      "base": null,
+      "refs": {
+        "DescribeNotificationRuleResult$CreatedBy": "<p>The name or email alias of the person who created the notification rule.</p>"
+      }
+    },
+    "NotificationRuleId": {
+      "base": null,
+      "refs": {
+        "NotificationRuleSummary$Id": "<p>The unique ID of the notification rule.</p>"
+      }
+    },
+    "NotificationRuleName": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$Name": "<p>The name for the notification rule. Notifictaion rule names must be unique in your AWS account.</p>",
+        "DescribeNotificationRuleResult$Name": "<p>The name of the notification rule.</p>",
+        "UpdateNotificationRuleRequest$Name": "<p>The name of the notification rule.</p>"
+      }
+    },
+    "NotificationRuleResource": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$Resource": "<p>The Amazon Resource Name (ARN) of the resource to associate with the notification rule. Supported resources include pipelines in AWS CodePipeline, repositories in AWS CodeCommit, and build projects in AWS CodeBuild.</p>",
+        "DescribeNotificationRuleResult$Resource": "<p>The Amazon Resource Name (ARN) of the resource associated with the notification rule.</p>"
+      }
+    },
+    "NotificationRuleStatus": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$Status": "<p>The status of the notification rule. The default value is ENABLED. If the status is set to DISABLED, notifications aren't sent for the notification rule.</p>",
+        "DescribeNotificationRuleResult$Status": "<p>The status of the notification rule. Valid statuses are on (sending notifications) or off (not sending notifications).</p>",
+        "UpdateNotificationRuleRequest$Status": "<p>The status of the notification rule. Valid statuses include enabled (sending notifications) or disabled (not sending notifications).</p>"
+      }
+    },
+    "NotificationRuleSummary": {
+      "base": "<p>Information about a specified notification rule.</p>",
+      "refs": {
+        "NotificationRuleBatch$member": null
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>A resource with the same name or ID already exists. Notification rule names must be unique in your AWS account.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>AWS CodeStar Notifications can't find a resource that matches the provided ARN. </p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "EventTypeSummary$ResourceType": "<p>The resource type of the event.</p>"
+      }
+    },
+    "ServiceName": {
+      "base": null,
+      "refs": {
+        "EventTypeSummary$ServiceName": "<p>The name of the service for which the event applies.</p>"
+      }
+    },
+    "SubscribeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubscribeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeys$member": null,
+        "Tags$key": null
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The key names of the tags to remove.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tags$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$Tags": "<p>A list of tags to apply to this notification rule. Key names cannot start with \"aws\". </p>",
+        "DescribeNotificationRuleResult$Tags": "<p>The tags associated with the notification rule.</p>",
+        "ListTagsForResourceResult$Tags": "<p>The tags associated with the notification rule.</p>",
+        "TagResourceRequest$Tags": "<p>The list of tags to associate with the resource. Tag key names cannot start with \"aws\".</p>",
+        "TagResourceResult$Tags": "<p>The list of tags associated with the resource.</p>"
+      }
+    },
+    "Target": {
+      "base": "<p>Information about the SNS topics associated with a notification rule.</p>",
+      "refs": {
+        "SubscribeRequest$Target": null,
+        "Targets$member": null
+      }
+    },
+    "TargetAddress": {
+      "base": null,
+      "refs": {
+        "DeleteTargetRequest$TargetAddress": "<p>The Amazon Resource Name (ARN) of the SNS topic to delete.</p>",
+        "Target$TargetAddress": "<p>The Amazon Resource Name (ARN) of the SNS topic.</p>",
+        "TargetSummary$TargetAddress": "<p>The Amazon Resource Name (ARN) of the SNS topic.</p>",
+        "UnsubscribeRequest$TargetAddress": "<p>The ARN of the SNS topic to unsubscribe from the notification rule.</p>"
+      }
+    },
+    "TargetStatus": {
+      "base": null,
+      "refs": {
+        "TargetSummary$TargetStatus": "<p>The status of the target.</p>"
+      }
+    },
+    "TargetSummary": {
+      "base": "<p>Information about the targets specified for a notification rule.</p>",
+      "refs": {
+        "TargetsBatch$member": null
+      }
+    },
+    "TargetType": {
+      "base": null,
+      "refs": {
+        "Target$TargetType": "<p>The target type. Can be an Amazon SNS topic.</p>",
+        "TargetSummary$TargetType": "<p>The type of the target (for example, SNS).</p>"
+      }
+    },
+    "Targets": {
+      "base": null,
+      "refs": {
+        "CreateNotificationRuleRequest$Targets": "<p>A list of Amazon Resource Names (ARNs) of SNS topics to associate with the notification rule.</p>",
+        "UpdateNotificationRuleRequest$Targets": "<p>The address and type of the targets to receive notifications from this notification rule.</p>"
+      }
+    },
+    "TargetsBatch": {
+      "base": null,
+      "refs": {
+        "DescribeNotificationRuleResult$Targets": "<p>A list of the SNS topics associated with the notification rule.</p>",
+        "ListTargetsResult$Targets": "<p>The list of notification rule targets. </p>"
+      }
+    },
+    "UnsubscribeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnsubscribeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNotificationRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNotificationRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>One or more parameter values are not valid.</p>",
+      "refs": {
+      }
+    }
+  }
+}

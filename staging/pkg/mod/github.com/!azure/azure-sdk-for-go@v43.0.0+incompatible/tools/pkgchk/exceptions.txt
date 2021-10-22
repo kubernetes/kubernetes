@@ -1,0 +1,4 @@
+bad directory structure '/datalake/analytics/mgmt/2016-11-01/account'
+bad directory structure '/datalake/store/mgmt/2016-11-01/account'
+bad directory structure '/preview/datalake/analytics/mgmt/2015-10-01-preview/account'
+bad directory structure '/preview/datalake/store/mgmt/2015-10-01-preview/account'

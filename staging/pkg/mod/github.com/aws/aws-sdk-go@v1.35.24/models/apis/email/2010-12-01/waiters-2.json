@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "waiters": {
+    "IdentityExists": {
+      "delay": 3,
+      "operation": "GetIdentityVerificationAttributes",
+      "maxAttempts": 20,
+      "acceptors": [
+        {
+          "expected": "Success",
+          "matcher": "pathAll",
+          "state": "success",
+          "argument": "VerificationAttributes.*.VerificationStatus"
+        }
+      ]
+    }
+  }
+}

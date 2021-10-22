@@ -1,0 +1,60 @@
+# Expects azuresdk-github-pat is set to the PAT for azure-sdk
+# Expects the buildtools to be cloned
+
+parameters:
+  BaseBranchName: $(Build.SourceBranch)
+  PRBranchName: not-specified
+  PROwner: azure-sdk
+  CommitMsg: not-specified
+  RepoOwner: Azure
+  RepoName: not-specified
+  PushArgs:
+  WorkingDirectory: $(System.DefaultWorkingDirectory)
+  PRTitle: not-specified
+
+steps:
+
+- pwsh: |
+    echo "git add ."
+    git add .
+
+    echo "git diff --name-status --cached --exit-code"
+    git diff --name-status --cached --exit-code
+
+    if ($LastExitCode -ne 0) {
+      echo "##vso[task.setvariable variable=HasChanges]$true"
+      echo "Changes detected so setting HasChanges=true"
+    }
+    else {
+      echo "##vso[task.setvariable variable=HasChanges]$false"
+      echo "No changes so skipping code push"
+    }
+
+  displayName: Check for changes
+  workingDirectory: ${{ parameters.WorkingDirectory }}
+  ignoreLASTEXITCODE: true
+
+- pwsh: |
+    eng/common/scripts/git-branch-push.ps1 `
+      -PRBranchName "${{ parameters.PRBranchName }}" `
+      -CommitMsg "${{ parameters.CommitMsg }}" `
+      -GitUrl "https://$(azuresdk-github-pat)@github.com/${{ parameters.PROwner }}/${{ parameters.RepoName }}.git" `
+      -PushArgs "${{ parameters.PushArgs }}"
+
+  displayName: Push changes
+  workingDirectory: ${{ parameters.WorkingDirectory }}
+  condition: and(succeeded(), eq(variables['HasChanges'], 'true'))
+
+- pwsh: |
+    eng/common/scripts/Submit-PullRequest.ps1 `
+      -RepoOwner "${{ parameters.RepoOwner }}" `
+      -RepoName "${{ parameters.RepoName }}" `
+      -BaseBranch "${{ parameters.BaseBranchName }}" `
+      -PROwner "${{ parameters.PROwner }}" `
+      -PRBranch "${{ parameters.PRBranchName }}" `
+      -AuthToken "$(azuresdk-github-pat)" `
+      -PRTitle "${{ parameters.PRTitle }}"
+
+  displayName: Create pull request
+  workingDirectory: ${{ parameters.WorkingDirectory }}
+  condition: and(succeeded(), eq(variables['HasChanges'], 'true'))

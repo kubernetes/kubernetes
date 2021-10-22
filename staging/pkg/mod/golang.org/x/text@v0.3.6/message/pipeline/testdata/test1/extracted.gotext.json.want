@@ -1,0 +1,188 @@
+{
+    "language": "en-US",
+    "messages": [
+        {
+            "id": "Hello world!",
+            "key": "Hello world!\n",
+            "message": "Hello world!",
+            "translation": "",
+            "position": "testdata/test1/test1.go:19:10"
+        },
+        {
+            "id": "Hello {City}!",
+            "key": "Hello %s!\n",
+            "message": "Hello {City}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "City",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "city"
+                }
+            ],
+            "position": "testdata/test1/test1.go:24:10"
+        },
+        {
+            "id": "{Person} is visiting {Place}!",
+            "key": "%s is visiting %s!\n",
+            "message": "{Person} is visiting {Place}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Person",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "person",
+                    "comment": "The person of matter."
+                },
+                {
+                    "id": "Place",
+                    "string": "%[2]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 2,
+                    "expr": "place",
+                    "comment": "Place the person is visiting."
+                }
+            ],
+            "position": "testdata/test1/test1.go:30:10"
+        },
+        {
+            "id": "{Person} is visiting {Place}!",
+            "key": "%[1]s is visiting %[3]s!\n",
+            "message": "{Person} is visiting {Place}!",
+            "translation": "",
+            "comment": "Field names are placeholders.",
+            "placeholders": [
+                {
+                    "id": "Person",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "pp.Person"
+                },
+                {
+                    "id": "Place",
+                    "string": "%[3]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 3,
+                    "expr": "pp.Place",
+                    "comment": "Place the person is visiting."
+                },
+                {
+                    "id": "Extra",
+                    "string": "%[2]v",
+                    "type": "int",
+                    "underlyingType": "int",
+                    "argNum": 2,
+                    "expr": "pp.extra"
+                }
+            ],
+            "position": "testdata/test1/test1.go:44:10"
+        },
+        {
+            "id": "{2} files remaining!",
+            "key": "%d files remaining!",
+            "message": "{2} files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "2",
+                    "string": "%[1]d",
+                    "type": "int",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "2"
+                }
+            ],
+            "position": "testdata/test1/test1.go:51:10"
+        },
+        {
+            "id": "{N} more files remaining!",
+            "key": "%d more files remaining!",
+            "message": "{N} more files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "N",
+                    "string": "%[1]d",
+                    "type": "int",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "n"
+                }
+            ],
+            "position": "testdata/test1/test1.go:56:10"
+        },
+        {
+            "id": "Use the following code for your discount: {ReferralCode}",
+            "key": "Use the following code for your discount: %d\n",
+            "message": "Use the following code for your discount: {ReferralCode}",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "ReferralCode",
+                    "string": "%[1]d",
+                    "type": "testdata/test1.referralCode",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "c"
+                }
+            ],
+            "position": "testdata/test1/test1.go:64:10"
+        },
+        {
+            "id": [
+                "msgOutOfOrder",
+                "{Device} is out of order!"
+            ],
+            "key": "%s is out of order!",
+            "message": "{Device} is out of order!",
+            "translation": "",
+            "comment": "This comment wins.\n",
+            "placeholders": [
+                {
+                    "id": "Device",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "device"
+                }
+            ],
+            "position": "testdata/test1/test1.go:70:10"
+        },
+        {
+            "id": "{Miles} miles traveled ({Miles_1})",
+            "key": "%.2[1]f miles traveled (%[1]f)",
+            "message": "{Miles} miles traveled ({Miles_1})",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Miles",
+                    "string": "%.2[1]f",
+                    "type": "float64",
+                    "underlyingType": "float64",
+                    "argNum": 1,
+                    "expr": "miles"
+                },
+                {
+                    "id": "Miles_1",
+                    "string": "%[1]f",
+                    "type": "float64",
+                    "underlyingType": "float64",
+                    "argNum": 1,
+                    "expr": "miles"
+                }
+            ],
+            "position": "testdata/test1/test1.go:74:10"
+        }
+    ]
+}

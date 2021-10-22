@@ -1,0 +1,14 @@
+{
+	"foo": {
+	},
+	"bar": {
+		"aws_access_key_id": "valid",
+		"aws_secret_access_key": "valid",
+		"aws_session_token": "valid"
+	},
+	"baz": {
+		"aws_access_key_id": "valid",
+		"aws_secret_access_key": "valid",
+		"aws_session_token": "valid"
+	}
+}

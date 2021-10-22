@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+set -x
+
+source `dirname $0`/stackenv
+
+timeout="60m"
+failed=
+
+# Run the acceptance tests.
+# Check the error code after each suite, but do not exit early if a suite failed.
+
+ACCEPTANCE_TESTS=(
+acceptance/openstack/blockstorage/extensions
+
+# snapshots_test.go:16: Unable to create a blockstorage client: CinderEndpoint is required
+# acceptance/openstack/blockstorage/noauth
+
+# snapshots_test.go:21: Unable to retrieve snapshots: Resource not found
+# acceptance/openstack/blockstorage/v1
+
+acceptance/openstack/blockstorage/v2
+acceptance/openstack/blockstorage/v3
+
+# No suitable endpoint could be found in the service catalog.
+# acceptance/openstack/clustering/v1
+
+acceptance/openstack/compute/v2
+
+# No suitable endpoint could be found in the service catalog.
+# acceptance/openstack/containerinfra/v1
+
+acceptance/openstack/container/v1
+
+# Unable to create a DB client: No suitable endpoint could be found in the service catalog.
+# acceptance/openstack/db/v1
+
+acceptance/openstack/dns/v2
+acceptance/openstack/identity/v2
+acceptance/openstack/identity/v3
+acceptance/openstack/imageservice/v2
+acceptance/openstack/keymanager/v1
+acceptance/openstack/loadbalancer/v2
+
+# No suitable endpoint could be found in the service catalog.
+# acceptance/openstack/messaging/v2
+
+acceptance/openstack/networking/v2
+acceptance/openstack/networking/v2/extensions
+acceptance/openstack/networking/v2/extensions/dns
+
+# Resource not found
+# acceptance/openstack/networking/v2/extensions/fwaas
+
+acceptance/openstack/networking/v2/extensions/layer3
+
+# Unable to create: Resource not found
+# acceptance/openstack/networking/v2/extensions/lbaas
+
+# Resource not found
+# acceptance/openstack/networking/v2/extensions/lbaas_v2
+
+acceptance/openstack/networking/v2/extensions/mtu
+acceptance/openstack/networking/v2/extensions/networkipavailabilities
+acceptance/openstack/networking/v2/extensions/portsbinding
+acceptance/openstack/networking/v2/extensions/qos/ruletypes
+acceptance/openstack/networking/v2/extensions/rbacpolicies
+acceptance/openstack/networking/v2/extensions/subnetpools
+acceptance/openstack/networking/v2/extensions/trunks
+
+# Unable to create: Resource not found
+# acceptance/openstack/networking/v2/extensions/vpnaas
+
+acceptance/openstack/objectstorage/v1
+acceptance/openstack/orchestration/v1
+acceptance/openstack/sharedfilesystems/v2
+
+# No suitable endpoint could be found in the service catalog
+# acceptance/openstack/workflow/v2
+)
+
+for acceptance_test in ${ACCEPTANCE_TESTS[@]}; do
+  go test -v -timeout $timeout -tags "fixtures acceptance" ./${acceptance_test}
+  if [[ $? != 0 ]]; then
+    failed=1
+  fi
+done
+
+# If any of the test suites failed, exit 1
+if [[ -n $failed ]]; then
+  exit 1
+fi
+
+exit 0

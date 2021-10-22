@@ -1,0 +1,108 @@
+[default]
+s3 =
+  unsupported_key=123
+  other_unsupported=abc
+
+region = default_region
+
+[profile alt_profile_name]
+region = alt_profile_name_region
+
+[short_profile_name_first]
+region = short_profile_name_first_short
+
+[profile short_profile_name_first]
+region = short_profile_name_first_alt
+
+[partial_creds]
+aws_access_key_id = partial_creds_akid
+
+[complete_creds]
+aws_access_key_id = complete_creds_akid
+aws_secret_access_key = complete_creds_secret
+
+[complete_creds_with_token]
+aws_access_key_id = complete_creds_with_token_akid
+aws_secret_access_key = complete_creds_with_token_secret
+aws_session_token = complete_creds_with_token_token
+
+[full_profile]
+aws_access_key_id = full_profile_akid
+aws_secret_access_key = full_profile_secret
+region = full_profile_region
+
+[config_file_load_order]
+region = shared_config_region
+aws_access_key_id = shared_config_akid
+aws_secret_access_key = shared_config_secret
+
+[partial_assume_role]
+role_arn = partial_assume_role_role_arn
+
+[assume_role]
+role_arn = assume_role_role_arn
+source_profile = complete_creds
+
+[assume_role_w_mfa]
+role_arn = assume_role_role_arn
+source_profile = complete_creds
+mfa_serial = 0123456789
+
+[assume_role_invalid_source_profile]
+role_arn = assume_role_invalid_source_profile_role_arn
+source_profile = profile_not_exists
+
+[assume_role_w_creds]
+role_arn = assume_role_w_creds_role_arn
+source_profile = assume_role_w_creds
+external_id = 1234
+role_session_name = assume_role_w_creds_session_name
+aws_access_key_id = assume_role_w_creds_akid
+aws_secret_access_key = assume_role_w_creds_secret
+
+[assume_role_w_creds_w_duration]
+role_arn = assume_role_w_creds_role_arn
+source_profile = assume_role_w_creds_w_duration
+duration_seconds = 1800
+external_id = 1234
+role_session_name = assume_role_w_creds_session_name
+aws_access_key_id = assume_role_w_creds_akid
+aws_secret_access_key = assume_role_w_creds_secret
+
+[assume_role_w_creds_w_invalid_duration]
+role_arn = assume_role_w_creds_role_arn
+source_profile = assume_role_w_creds_w_invalid_duration
+duration_seconds = 600
+external_id = 1234
+role_session_name = assume_role_w_creds_session_name
+aws_access_key_id = assume_role_w_creds_akid
+aws_secret_access_key = assume_role_w_creds_secret
+
+[assume_role_wo_creds]
+role_arn = assume_role_wo_creds_role_arn
+source_profile = assume_role_wo_creds
+
+[assume_role_with_credential_source]
+role_arn = assume_role_with_credential_source_role_arn
+credential_source = Ec2InstanceMetadata
+
+[multiple_assume_role]
+role_arn = multiple_assume_role_role_arn
+source_profile = assume_role
+
+[multiple_assume_role_with_credential_source]
+role_arn = multiple_assume_role_with_credential_source_role_arn
+source_profile = assume_role_with_credential_source
+
+[multiple_assume_role_with_credential_source2]
+role_arn = multiple_assume_role_with_credential_source2_role_arn
+source_profile = multiple_assume_role_with_credential_source
+
+[with_sts_regional]
+sts_regional_endpoints = regional
+
+[with_s3_us_east_1_regional]
+s3_us_east_1_regional_endpoint = regional
+
+[valid_arn_region]
+s3_use_arn_region=true

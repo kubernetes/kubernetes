@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeWorkspaces",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeWorkspaces",
+            "input": {
+                "DirectoryId": "fake-id"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

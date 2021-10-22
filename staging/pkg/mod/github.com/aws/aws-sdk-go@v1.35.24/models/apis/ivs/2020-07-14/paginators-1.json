@@ -1,0 +1,33 @@
+{
+  "pagination": {
+    "ListChannels": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "channels"
+    },
+    "ListPlaybackKeyPairs": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "keyPairs"
+    },
+    "ListStreamKeys": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "streamKeys"
+    },
+    "ListStreams": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "streams"
+    },
+    "ListTagsForResource": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

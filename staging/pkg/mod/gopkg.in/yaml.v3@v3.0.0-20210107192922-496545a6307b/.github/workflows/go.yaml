@@ -1,0 +1,61 @@
+---
+name: Go
+on: [push, pull_request]
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go:
+        - "1.5"
+        - "1.6"
+        - "1.7"
+        - "1.8"
+        - "1.9"
+        - "1.10"
+        - "1.11"
+        - "1.12"
+        - "1.13"
+        - "1.14"
+        - "1.15"
+        - "1.16.0-beta1"
+        - "tip"
+    env:
+      GOPATH: ${{ github.workspace }}/go
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+      with:
+        path: ${{ github.workspace }}/go/src/gopkg.in/yaml.v3
+    - name: Set up Go ${{ matrix.go }}
+      if: matrix.go != 'tip'
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+        stable: false
+    - name: Set up Go ${{ matrix.go }}
+      if: matrix.go == 'tip'
+      run: |
+        export GOROOT_BOOTSTRAP=`go env GOROOT`
+        export GOROOT=$HOME/gotip
+        mkdir $HOME/gotip
+        cd $HOME/gotip
+
+        curl -s 'https://go.googlesource.com/go/+/refs/heads/master?format=JSON' | awk '/"commit"/{print substr($2,2,40);exit}' >HEAD
+        awk '{printf("gotip-%s",substr($0,0,7))}' <HEAD >VERSION
+
+        curl -s -o go.tar.gz https://go.googlesource.com/go/+archive/`cat HEAD`.tar.gz
+        tar xfz go.tar.gz
+
+        cd src
+        bash make.bash
+
+        echo "GOROOT=$GOROOT" >> $GITHUB_ENV
+        echo "$GOROOT/bin" >> $GITHUB_PATH
+    - run: go version
+    - run: go get -t ./...
+      working-directory: ${{ github.workspace }}/go/src/gopkg.in/yaml.v3
+    - run: go test .
+      working-directory: ${{ github.workspace }}/go/src/gopkg.in/yaml.v3

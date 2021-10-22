@@ -1,0 +1,1873 @@
+{
+  "version": "2.0",
+  "service": "<p>Welcome to the AWS IoT SiteWise API Reference. AWS IoT SiteWise is an AWS service that connects <a href=\"https://en.wikipedia.org/wiki/Internet_of_things#Industrial_applications\">Industrial Internet of Things (IIoT)</a> devices to the power of the AWS Cloud. For more information, see the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/\">AWS IoT SiteWise User Guide</a>. For information about AWS IoT SiteWise quotas, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+  "operations": {
+    "AssociateAssets": "<p>Associates a child asset with the given parent asset through a hierarchy defined in the parent asset's model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/add-associated-assets.html\">Associating assets</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "BatchAssociateProjectAssets": "<p>Associates a group (batch) of assets with an AWS IoT SiteWise Monitor project.</p>",
+    "BatchDisassociateProjectAssets": "<p>Disassociates a group (batch) of assets from an AWS IoT SiteWise Monitor project.</p>",
+    "BatchPutAssetPropertyValue": "<p>Sends a list of asset property values to AWS IoT SiteWise. Each value is a timestamp-quality-value (TQV) data point. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/ingest-api.html\">Ingesting data using the API</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>To identify an asset property, you must specify one of the following:</p> <ul> <li> <p>The <code>assetId</code> and <code>propertyId</code> of an asset property.</p> </li> <li> <p>A <code>propertyAlias</code>, which is a data stream alias (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). To define an asset property's alias, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p> </li> </ul> <important> <p>With respect to Unix epoch time, AWS IoT SiteWise accepts only TQVs that have a timestamp of no more than 15 minutes in the past and no more than 5 minutes in the future. AWS IoT SiteWise rejects timestamps outside of the inclusive range of [-15, +5] minutes and returns a <code>TimestampOutOfRangeException</code> error.</p> <p>For each asset property, AWS IoT SiteWise overwrites TQVs with duplicate timestamps unless the newer TQV has a different quality. For example, if you store a TQV <code>{T1, GOOD, V1}</code>, then storing <code>{T1, GOOD, V2}</code> replaces the existing TQV.</p> </important> <p>AWS IoT SiteWise authorizes access to each <code>BatchPutAssetPropertyValue</code> entry individually. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/security_iam_service-with-iam.html#security_iam_service-with-iam-id-based-policies-batchputassetpropertyvalue-action\">BatchPutAssetPropertyValue authorization</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "CreateAccessPolicy": "<p>Creates an access policy that grants the specified identity (AWS SSO user, AWS SSO group, or IAM user) access to the specified AWS IoT SiteWise Monitor portal or project resource.</p>",
+    "CreateAsset": "<p>Creates an asset from an existing asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/create-assets.html\">Creating assets</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "CreateAssetModel": "<p>Creates an asset model from specified property and hierarchy definitions. You create assets from asset models. With asset models, you can easily create assets of the same type that have standardized definitions. Each asset created from a model inherits the asset model's property and hierarchy definitions. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/define-models.html\">Defining asset models</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "CreateDashboard": "<p>Creates a dashboard in an AWS IoT SiteWise Monitor project.</p>",
+    "CreateGateway": "<p>Creates a gateway, which is a virtual or edge device that delivers industrial data streams from local servers to AWS IoT SiteWise. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/gateway-connector.html\">Ingesting data using a gateway</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "CreatePortal": "<p>Creates a portal, which can contain projects and dashboards. AWS IoT SiteWise Monitor uses AWS SSO or IAM to authenticate portal users and manage user permissions.</p> <note> <p>Before you can sign in to a new portal, you must add at least one identity to that portal. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/administer-portals.html#portal-change-admins\">Adding or removing portal administrators</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> </note>",
+    "CreateProject": "<p>Creates a project in the specified portal.</p>",
+    "DeleteAccessPolicy": "<p>Deletes an access policy that grants the specified identity access to the specified AWS IoT SiteWise Monitor resource. You can use this operation to revoke access to an AWS IoT SiteWise Monitor resource.</p>",
+    "DeleteAsset": "<p>Deletes an asset. This action can't be undone. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/delete-assets-and-models.html\">Deleting assets and models</a> in the <i>AWS IoT SiteWise User Guide</i>. </p> <note> <p>You can't delete an asset that's associated to another asset. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DisassociateAssets.html\">DisassociateAssets</a>.</p> </note>",
+    "DeleteAssetModel": "<p>Deletes an asset model. This action can't be undone. You must delete all assets created from an asset model before you can delete the model. Also, you can't delete an asset model if a parent asset model exists that contains a property formula expression that depends on the asset model that you want to delete. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/delete-assets-and-models.html\">Deleting assets and models</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "DeleteDashboard": "<p>Deletes a dashboard from AWS IoT SiteWise Monitor.</p>",
+    "DeleteGateway": "<p>Deletes a gateway from AWS IoT SiteWise. When you delete a gateway, some of the gateway's files remain in your gateway's file system.</p>",
+    "DeletePortal": "<p>Deletes a portal from AWS IoT SiteWise Monitor.</p>",
+    "DeleteProject": "<p>Deletes a project from AWS IoT SiteWise Monitor.</p>",
+    "DescribeAccessPolicy": "<p>Describes an access policy, which specifies an identity's access to an AWS IoT SiteWise Monitor portal or project.</p>",
+    "DescribeAsset": "<p>Retrieves information about an asset.</p>",
+    "DescribeAssetModel": "<p>Retrieves information about an asset model.</p>",
+    "DescribeAssetProperty": "<p>Retrieves information about an asset property.</p> <note> <p>When you call this operation for an attribute property, this response includes the default attribute value that you define in the asset model. If you update the default value in the model, this operation's response includes the new default value.</p> </note> <p>This operation doesn't return the value of the asset property. To get the value of an asset property, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_GetAssetPropertyValue.html\">GetAssetPropertyValue</a>.</p>",
+    "DescribeDashboard": "<p>Retrieves information about a dashboard.</p>",
+    "DescribeGateway": "<p>Retrieves information about a gateway.</p>",
+    "DescribeGatewayCapabilityConfiguration": "<p>Retrieves information about a gateway capability configuration. Each gateway capability defines data sources for a gateway. A capability configuration can contain multiple data source configurations. If you define OPC-UA sources for a gateway in the AWS IoT SiteWise console, all of your OPC-UA sources are stored in one capability configuration. To list all capability configurations for a gateway, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeGateway.html\">DescribeGateway</a>.</p>",
+    "DescribeLoggingOptions": "<p>Retrieves the current AWS IoT SiteWise logging options.</p>",
+    "DescribePortal": "<p>Retrieves information about a portal.</p>",
+    "DescribeProject": "<p>Retrieves information about a project.</p>",
+    "DisassociateAssets": "<p>Disassociates a child asset from the given parent asset through a hierarchy defined in the parent asset's model.</p>",
+    "GetAssetPropertyAggregates": "<p>Gets aggregated values for an asset property. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/query-industrial-data.html#aggregates\">Querying aggregates</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>To identify an asset property, you must specify one of the following:</p> <ul> <li> <p>The <code>assetId</code> and <code>propertyId</code> of an asset property.</p> </li> <li> <p>A <code>propertyAlias</code>, which is a data stream alias (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). To define an asset property's alias, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p> </li> </ul>",
+    "GetAssetPropertyValue": "<p>Gets an asset property's current value. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/query-industrial-data.html#current-values\">Querying current values</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>To identify an asset property, you must specify one of the following:</p> <ul> <li> <p>The <code>assetId</code> and <code>propertyId</code> of an asset property.</p> </li> <li> <p>A <code>propertyAlias</code>, which is a data stream alias (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). To define an asset property's alias, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p> </li> </ul>",
+    "GetAssetPropertyValueHistory": "<p>Gets the history of an asset property's values. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/query-industrial-data.html#historical-values\">Querying historical values</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>To identify an asset property, you must specify one of the following:</p> <ul> <li> <p>The <code>assetId</code> and <code>propertyId</code> of an asset property.</p> </li> <li> <p>A <code>propertyAlias</code>, which is a data stream alias (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). To define an asset property's alias, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p> </li> </ul>",
+    "ListAccessPolicies": "<p>Retrieves a paginated list of access policies for an identity (an AWS SSO user, an AWS SSO group, or an IAM user) or an AWS IoT SiteWise Monitor resource (a portal or project).</p>",
+    "ListAssetModels": "<p>Retrieves a paginated list of summaries of all asset models.</p>",
+    "ListAssets": "<p>Retrieves a paginated list of asset summaries.</p> <p>You can use this operation to do the following:</p> <ul> <li> <p>List assets based on a specific asset model.</p> </li> <li> <p>List top-level assets.</p> </li> </ul> <p>You can't use this operation to list all assets. To retrieve summaries for all of your assets, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_ListAssetModels.html\">ListAssetModels</a> to get all of your asset model IDs. Then, use ListAssets to get all assets for each asset model.</p>",
+    "ListAssociatedAssets": "<p>Retrieves a paginated list of associated assets.</p> <p>You can use this operation to do the following:</p> <ul> <li> <p>List child assets associated to a parent asset by a hierarchy that you specify.</p> </li> <li> <p>List an asset's parent asset.</p> </li> </ul>",
+    "ListDashboards": "<p>Retrieves a paginated list of dashboards for an AWS IoT SiteWise Monitor project.</p>",
+    "ListGateways": "<p>Retrieves a paginated list of gateways.</p>",
+    "ListPortals": "<p>Retrieves a paginated list of AWS IoT SiteWise Monitor portals.</p>",
+    "ListProjectAssets": "<p>Retrieves a paginated list of assets associated with an AWS IoT SiteWise Monitor project.</p>",
+    "ListProjects": "<p>Retrieves a paginated list of projects for an AWS IoT SiteWise Monitor portal.</p>",
+    "ListTagsForResource": "<p>Retrieves the list of tags for an AWS IoT SiteWise resource.</p>",
+    "PutLoggingOptions": "<p>Sets logging options for AWS IoT SiteWise.</p>",
+    "TagResource": "<p>Adds tags to an AWS IoT SiteWise resource. If a tag already exists for the resource, this operation updates the tag's value.</p>",
+    "UntagResource": "<p>Removes a tag from an AWS IoT SiteWise resource.</p>",
+    "UpdateAccessPolicy": "<p>Updates an existing access policy that specifies an identity's access to an AWS IoT SiteWise Monitor portal or project resource.</p>",
+    "UpdateAsset": "<p>Updates an asset's name. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/update-assets-and-models.html\">Updating assets and models</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+    "UpdateAssetModel": "<p>Updates an asset model and all of the assets that were created from the model. Each asset created from the model inherits the updated asset model's property and hierarchy definitions. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/update-assets-and-models.html\">Updating assets and models</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <important> <p>This operation overwrites the existing model with the provided model. To avoid deleting your asset model's properties or hierarchies, you must include their IDs and definitions in the updated asset model payload. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeAssetModel.html\">DescribeAssetModel</a>.</p> <p>If you remove a property from an asset model, AWS IoT SiteWise deletes all previous data for that property. If you remove a hierarchy definition from an asset model, AWS IoT SiteWise disassociates every asset associated with that hierarchy. You can't change the type or data type of an existing property.</p> </important>",
+    "UpdateAssetProperty": "<p>Updates an asset property's alias and notification state.</p> <important> <p>This operation overwrites the property's existing alias and notification state. To keep your existing property's alias or notification state, you must include the existing values in the UpdateAssetProperty request. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeAssetProperty.html\">DescribeAssetProperty</a>.</p> </important>",
+    "UpdateDashboard": "<p>Updates an AWS IoT SiteWise Monitor dashboard.</p>",
+    "UpdateGateway": "<p>Updates a gateway's name.</p>",
+    "UpdateGatewayCapabilityConfiguration": "<p>Updates a gateway capability configuration or defines a new capability configuration. Each gateway capability defines data sources for a gateway. A capability configuration can contain multiple data source configurations. If you define OPC-UA sources for a gateway in the AWS IoT SiteWise console, all of your OPC-UA sources are stored in one capability configuration. To list all capability configurations for a gateway, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeGateway.html\">DescribeGateway</a>.</p>",
+    "UpdatePortal": "<p>Updates an AWS IoT SiteWise Monitor portal.</p>",
+    "UpdateProject": "<p>Updates an AWS IoT SiteWise Monitor project.</p>"
+  },
+  "shapes": {
+    "ARN": {
+      "base": null,
+      "refs": {
+        "AssetModelSummary$arn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset model, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset-model/${AssetModelId}</code> </p>",
+        "AssetSummary$arn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset/${AssetId}</code> </p>",
+        "AssociatedAssetsSummary$arn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset/${AssetId}</code> </p>",
+        "CreateAccessPolicyResponse$accessPolicyArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the access policy, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:access-policy/${AccessPolicyId}</code> </p>",
+        "CreateAssetModelResponse$assetModelArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset model, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset-model/${AssetModelId}</code> </p>",
+        "CreateAssetResponse$assetArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset/${AssetId}</code> </p>",
+        "CreateDashboardResponse$dashboardArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the dashboard, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:dashboard/${DashboardId}</code> </p>",
+        "CreateGatewayResponse$gatewayArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the gateway, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:gateway/${GatewayId}</code> </p>",
+        "CreatePortalRequest$roleArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of a service role that allows the portal's users to access your AWS IoT SiteWise resources on your behalf. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/monitor-service-role.html\">Using service roles for AWS IoT SiteWise Monitor</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreatePortalResponse$portalArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the portal, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:portal/${PortalId}</code> </p>",
+        "CreateProjectResponse$projectArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the project, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:project/${ProjectId}</code> </p>",
+        "DescribeAccessPolicyResponse$accessPolicyArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the access policy, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:access-policy/${AccessPolicyId}</code> </p>",
+        "DescribeAssetModelResponse$assetModelArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset model, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset-model/${AssetModelId}</code> </p>",
+        "DescribeAssetResponse$assetArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the asset, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:asset/${AssetId}</code> </p>",
+        "DescribeDashboardResponse$dashboardArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the dashboard, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:dashboard/${DashboardId}</code> </p>",
+        "DescribeGatewayResponse$gatewayArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the gateway, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:gateway/${GatewayId}</code> </p>",
+        "DescribePortalResponse$portalArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the portal, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:portal/${PortalId}</code> </p>",
+        "DescribePortalResponse$roleArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the service role that allows the portal's users to access your AWS IoT SiteWise resources on your behalf. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/monitor-service-role.html\">Using service roles for AWS IoT SiteWise Monitor</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "DescribeProjectResponse$projectArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the project, which has the following format.</p> <p> <code>arn:${Partition}:iotsitewise:${Region}:${Account}:project/${ProjectId}</code> </p>",
+        "Greengrass$groupArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the Greengrass group. For more information about how to find a group's ARN, see <a href=\"https://docs.aws.amazon.com/greengrass/latest/apireference/listgroups-get.html\">ListGroups</a> and <a href=\"https://docs.aws.amazon.com/greengrass/latest/apireference/getgroup-get.html\">GetGroup</a> in the <i>AWS IoT Greengrass API Reference</i>.</p>",
+        "IAMUserIdentity$arn": "<p>The ARN of the IAM user. IAM users must have the <code>iotsitewise:CreatePresignedPortalUrl</code> permission to sign in to the portal. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html\">IAM ARNs</a> in the <i>IAM User Guide</i>.</p> <note> <p>If you delete the IAM user, access policies that contain this identity include an empty <code>arn</code>. You can delete the access policy for the IAM user that no longer exists.</p> </note>",
+        "ListAccessPoliciesRequest$iamArn": "<p>The ARN of the IAM user. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html\">IAM ARNs</a> in the <i>IAM User Guide</i>. This parameter is required if you specify <code>IAM</code> for <code>identityType</code>.</p>",
+        "PortalSummary$roleArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the service role that allows the portal's users to access your AWS IoT SiteWise resources on your behalf. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/monitor-service-role.html\">Using service roles for AWS IoT SiteWise Monitor</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "UpdatePortalRequest$roleArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of a service role that allows the portal's users to access your AWS IoT SiteWise resources on your behalf. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/monitor-service-role.html\">Using service roles for AWS IoT SiteWise Monitor</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AccessPolicySummaries": {
+      "base": null,
+      "refs": {
+        "ListAccessPoliciesResponse$accessPolicySummaries": "<p>A list that summarizes each access policy.</p>"
+      }
+    },
+    "AccessPolicySummary": {
+      "base": "<p>Contains an access policy that defines an identity's access to an AWS IoT SiteWise Monitor resource.</p>",
+      "refs": {
+        "AccessPolicySummaries$member": null
+      }
+    },
+    "AggregateType": {
+      "base": null,
+      "refs": {
+        "AggregateTypes$member": null
+      }
+    },
+    "AggregateTypes": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$aggregateTypes": "<p>The data aggregating function.</p>"
+      }
+    },
+    "AggregatedDoubleValue": {
+      "base": null,
+      "refs": {
+        "Aggregates$average": "<p>The average (mean) value of the time series over a time interval window.</p>",
+        "Aggregates$count": "<p>The count of data points in the time series over a time interval window.</p>",
+        "Aggregates$maximum": "<p>The maximum value of the time series over a time interval window.</p>",
+        "Aggregates$minimum": "<p>The minimum value of the time series over a time interval window.</p>",
+        "Aggregates$sum": "<p>The sum of the time series over a time interval window.</p>",
+        "Aggregates$standardDeviation": "<p>The standard deviation of the time series over a time interval window.</p>"
+      }
+    },
+    "AggregatedValue": {
+      "base": "<p>Contains aggregated asset property values (for example, average, minimum, and maximum).</p>",
+      "refs": {
+        "AggregatedValues$member": null
+      }
+    },
+    "AggregatedValues": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesResponse$aggregatedValues": "<p>The requested aggregated values.</p>"
+      }
+    },
+    "Aggregates": {
+      "base": "<p>Contains the (pre-calculated) aggregate values for an asset property.</p>",
+      "refs": {
+        "AggregatedValue$value": "<p>The value of the aggregates.</p>"
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$resourceArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the resource.</p>",
+        "TagResourceRequest$resourceArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the resource to tag.</p>",
+        "TooManyTagsException$resourceName": "<p>The name of the resource with too many tags.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">ARN</a> of the resource to untag.</p>"
+      }
+    },
+    "AssetErrorCode": {
+      "base": null,
+      "refs": {
+        "AssetErrorDetails$code": "<p>The error code.</p>"
+      }
+    },
+    "AssetErrorDetails": {
+      "base": "<p>Contains error details for the requested associate project asset action.</p>",
+      "refs": {
+        "BatchAssociateProjectAssetsErrors$member": null,
+        "BatchDisassociateProjectAssetsErrors$member": null
+      }
+    },
+    "AssetErrorMessage": {
+      "base": null,
+      "refs": {
+        "AssetErrorDetails$message": "<p>The error message.</p>"
+      }
+    },
+    "AssetHierarchies": {
+      "base": null,
+      "refs": {
+        "AssetSummary$hierarchies": "<p>A list of asset hierarchies that each contain a <code>hierarchyId</code>. A hierarchy specifies allowed parent/child asset relationships.</p>",
+        "AssociatedAssetsSummary$hierarchies": "<p>A list of asset hierarchies that each contain a <code>hierarchyId</code>. A hierarchy specifies allowed parent/child asset relationships.</p>",
+        "DescribeAssetResponse$assetHierarchies": "<p>A list of asset hierarchies that each contain a <code>hierarchyId</code>. A hierarchy specifies allowed parent/child asset relationships.</p>"
+      }
+    },
+    "AssetHierarchy": {
+      "base": "<p>Describes an asset hierarchy that contains a hierarchy's name and ID.</p>",
+      "refs": {
+        "AssetHierarchies$member": null
+      }
+    },
+    "AssetIDs": {
+      "base": null,
+      "refs": {
+        "ListProjectAssetsResponse$assetIds": "<p>A list that contains the IDs of each asset associated with the project.</p>"
+      }
+    },
+    "AssetModelHierarchies": {
+      "base": null,
+      "refs": {
+        "DescribeAssetModelResponse$assetModelHierarchies": "<p>A list of asset model hierarchies that each contain a <code>childAssetModelId</code> and a <code>hierarchyId</code> (named <code>id</code>). A hierarchy specifies allowed parent/child asset relationships for an asset model.</p>",
+        "UpdateAssetModelRequest$assetModelHierarchies": "<p>The updated hierarchy definitions of the asset model. Each hierarchy specifies an asset model whose assets can be children of any other assets created from this asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>You can specify up to 10 hierarchies per asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AssetModelHierarchy": {
+      "base": "<p>Describes an asset hierarchy that contains a hierarchy's name, ID, and child asset model ID that specifies the type of asset that can be in this hierarchy.</p>",
+      "refs": {
+        "AssetModelHierarchies$member": null
+      }
+    },
+    "AssetModelHierarchyDefinition": {
+      "base": "<p>Contains an asset model hierarchy used in asset model creation. An asset model hierarchy determines the kind (or type) of asset that can belong to a hierarchy.</p>",
+      "refs": {
+        "AssetModelHierarchyDefinitions$member": null
+      }
+    },
+    "AssetModelHierarchyDefinitions": {
+      "base": null,
+      "refs": {
+        "CreateAssetModelRequest$assetModelHierarchies": "<p>The hierarchy definitions of the asset model. Each hierarchy specifies an asset model whose assets can be children of any other assets created from this asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>You can specify up to 10 hierarchies per asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AssetModelProperties": {
+      "base": null,
+      "refs": {
+        "DescribeAssetModelResponse$assetModelProperties": "<p>The list of asset properties for the asset model.</p>",
+        "UpdateAssetModelRequest$assetModelProperties": "<p>The updated property definitions of the asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html\">Asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>You can specify up to 200 properties per asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AssetModelProperty": {
+      "base": "<p>Contains information about an asset model property.</p>",
+      "refs": {
+        "AssetModelProperties$member": null
+      }
+    },
+    "AssetModelPropertyDefinition": {
+      "base": "<p>Contains an asset model property definition. This property definition is applied to all assets created from the asset model.</p>",
+      "refs": {
+        "AssetModelPropertyDefinitions$member": null
+      }
+    },
+    "AssetModelPropertyDefinitions": {
+      "base": null,
+      "refs": {
+        "CreateAssetModelRequest$assetModelProperties": "<p>The property definitions of the asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html\">Asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>You can specify up to 200 properties per asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AssetModelState": {
+      "base": null,
+      "refs": {
+        "AssetModelStatus$state": "<p>The current state of the asset model.</p>"
+      }
+    },
+    "AssetModelStatus": {
+      "base": "<p>Contains current status information for an asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-and-model-states.html\">Asset and model states</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "AssetModelSummary$status": "<p>The current status of the asset model.</p>",
+        "CreateAssetModelResponse$assetModelStatus": "<p>The status of the asset model, which contains a state (<code>CREATING</code> after successfully calling this operation) and any error message.</p>",
+        "DeleteAssetModelResponse$assetModelStatus": "<p>The status of the asset model, which contains a state (<code>DELETING</code> after successfully calling this operation) and any error message.</p>",
+        "DescribeAssetModelResponse$assetModelStatus": "<p>The current status of the asset model, which contains a state and any error message.</p>",
+        "UpdateAssetModelResponse$assetModelStatus": "<p>The status of the asset model, which contains a state (<code>UPDATING</code> after successfully calling this operation) and any error message.</p>"
+      }
+    },
+    "AssetModelSummaries": {
+      "base": null,
+      "refs": {
+        "ListAssetModelsResponse$assetModelSummaries": "<p>A list that summarizes each asset model.</p>"
+      }
+    },
+    "AssetModelSummary": {
+      "base": "<p>Contains a summary of an asset model.</p>",
+      "refs": {
+        "AssetModelSummaries$member": null
+      }
+    },
+    "AssetProperties": {
+      "base": null,
+      "refs": {
+        "DescribeAssetResponse$assetProperties": "<p>The list of asset properties for the asset.</p>"
+      }
+    },
+    "AssetProperty": {
+      "base": "<p>Contains asset property information.</p>",
+      "refs": {
+        "AssetProperties$member": null
+      }
+    },
+    "AssetPropertyAlias": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$propertyAlias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "GetAssetPropertyValueHistoryRequest$propertyAlias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "GetAssetPropertyValueRequest$propertyAlias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "PutAssetPropertyValueEntry$propertyAlias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "AssetPropertyValue": {
+      "base": "<p>Contains asset property value information.</p>",
+      "refs": {
+        "AssetPropertyValueHistory$member": null,
+        "AssetPropertyValues$member": null,
+        "GetAssetPropertyValueResponse$propertyValue": "<p>The current asset property value.</p>"
+      }
+    },
+    "AssetPropertyValueHistory": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyValueHistoryResponse$assetPropertyValueHistory": "<p>The asset property's value history.</p>"
+      }
+    },
+    "AssetPropertyValues": {
+      "base": null,
+      "refs": {
+        "PutAssetPropertyValueEntry$propertyValues": "<p>The list of property values to upload. You can specify up to 10 <code>propertyValues</code> array elements. </p>"
+      }
+    },
+    "AssetState": {
+      "base": null,
+      "refs": {
+        "AssetStatus$state": "<p>The current status of the asset.</p>"
+      }
+    },
+    "AssetStatus": {
+      "base": "<p>Contains information about the current status of an asset. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-and-model-states.html\">Asset and model states</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "AssetSummary$status": "<p>The current status of the asset.</p>",
+        "AssociatedAssetsSummary$status": "<p>The current status of the asset.</p>",
+        "CreateAssetResponse$assetStatus": "<p>The status of the asset, which contains a state (<code>CREATING</code> after successfully calling this operation) and any error message.</p>",
+        "DeleteAssetResponse$assetStatus": "<p>The status of the asset, which contains a state (<code>DELETING</code> after successfully calling this operation) and any error message.</p>",
+        "DescribeAssetResponse$assetStatus": "<p>The current status of the asset, which contains a state and any error message.</p>",
+        "UpdateAssetResponse$assetStatus": "<p>The status of the asset, which contains a state (<code>UPDATING</code> after successfully calling this operation) and any error message.</p>"
+      }
+    },
+    "AssetSummaries": {
+      "base": null,
+      "refs": {
+        "ListAssetsResponse$assetSummaries": "<p>A list that summarizes each asset.</p>"
+      }
+    },
+    "AssetSummary": {
+      "base": "<p>Contains a summary of an asset.</p>",
+      "refs": {
+        "AssetSummaries$member": null
+      }
+    },
+    "AssociateAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociatedAssetsSummaries": {
+      "base": null,
+      "refs": {
+        "ListAssociatedAssetsResponse$assetSummaries": "<p>A list that summarizes the associated assets.</p>"
+      }
+    },
+    "AssociatedAssetsSummary": {
+      "base": "<p>Contains a summary of an associated asset.</p>",
+      "refs": {
+        "AssociatedAssetsSummaries$member": null
+      }
+    },
+    "Attribute": {
+      "base": "<p>Contains an asset attribute property. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html#attributes\">Attributes</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "PropertyType$attribute": "<p>Specifies an asset attribute property. An attribute generally contains static information, such as the serial number of an <a href=\"https://en.wikipedia.org/wiki/Internet_of_things#Industrial_applications\">IIoT</a> wind turbine.</p>"
+      }
+    },
+    "AuthMode": {
+      "base": null,
+      "refs": {
+        "CreatePortalRequest$portalAuthMode": "<p>The service to use to authenticate users to the portal. Choose from the following options:</p> <ul> <li> <p> <code>SSO</code> – The portal uses AWS Single Sign-On to authenticate users and manage user permissions. Before you can create a portal that uses AWS SSO, you must enable AWS SSO. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/monitor-get-started.html#mon-gs-sso\">Enabling AWS SSO</a> in the <i>AWS IoT SiteWise User Guide</i>. This option is only available in AWS Regions other than the China Regions.</p> </li> <li> <p> <code>IAM</code> – The portal uses AWS Identity and Access Management (IAM) to authenticate users and manage user permissions. IAM users must have the <code>iotsitewise:CreatePresignedPortalUrl</code> permission to sign in to the portal. This option is only available in the China Regions.</p> </li> </ul> <p>You can't change this value after you create a portal.</p> <p>Default: <code>SSO</code> </p>",
+        "DescribePortalResponse$portalAuthMode": "<p>The service to use to authenticate users to the portal.</p>"
+      }
+    },
+    "BatchAssociateProjectAssetsErrors": {
+      "base": null,
+      "refs": {
+        "BatchAssociateProjectAssetsResponse$errors": "<p>A list of associated error information, if any.</p>"
+      }
+    },
+    "BatchAssociateProjectAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchAssociateProjectAssetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDisassociateProjectAssetsErrors": {
+      "base": null,
+      "refs": {
+        "BatchDisassociateProjectAssetsResponse$errors": "<p>A list of associated error information, if any.</p>"
+      }
+    },
+    "BatchDisassociateProjectAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDisassociateProjectAssetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPutAssetPropertyError": {
+      "base": "<p>Contains error information from updating a batch of asset property values.</p>",
+      "refs": {
+        "BatchPutAssetPropertyErrors$member": null
+      }
+    },
+    "BatchPutAssetPropertyErrorEntries": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyValueResponse$errorEntries": "<p>A list of the errors (if any) associated with the batch put request. Each error entry contains the <code>entryId</code> of the entry that failed.</p>"
+      }
+    },
+    "BatchPutAssetPropertyErrorEntry": {
+      "base": "<p>Contains error information for asset property value entries that are associated with the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_BatchPutAssetPropertyValue.html\">BatchPutAssetPropertyValue</a> API.</p>",
+      "refs": {
+        "BatchPutAssetPropertyErrorEntries$member": null
+      }
+    },
+    "BatchPutAssetPropertyErrors": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyErrorEntry$errors": "<p>The list of update property value errors.</p>"
+      }
+    },
+    "BatchPutAssetPropertyValueErrorCode": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyError$errorCode": "<p>The error code.</p>"
+      }
+    },
+    "BatchPutAssetPropertyValueRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPutAssetPropertyValueResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CapabilityConfiguration": {
+      "base": null,
+      "refs": {
+        "DescribeGatewayCapabilityConfigurationResponse$capabilityConfiguration": "<p>The JSON document that defines the gateway capability's configuration. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/configure-sources.html#configure-source-cli\">Configuring data sources (CLI)</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "UpdateGatewayCapabilityConfigurationRequest$capabilityConfiguration": "<p>The JSON document that defines the configuration for the gateway capability. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/configure-sources.html#configure-source-cli\">Configuring data sources (CLI)</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "CapabilityNamespace": {
+      "base": null,
+      "refs": {
+        "DescribeGatewayCapabilityConfigurationRequest$capabilityNamespace": "<p>The namespace of the capability configuration. For example, if you configure OPC-UA sources from the AWS IoT SiteWise console, your OPC-UA capability configuration has the namespace <code>iotsitewise:opcuacollector:version</code>, where <code>version</code> is a number such as <code>1</code>.</p>",
+        "DescribeGatewayCapabilityConfigurationResponse$capabilityNamespace": "<p>The namespace of the gateway capability.</p>",
+        "GatewayCapabilitySummary$capabilityNamespace": "<p>The namespace of the capability configuration. For example, if you configure OPC-UA sources from the AWS IoT SiteWise console, your OPC-UA capability configuration has the namespace <code>iotsitewise:opcuacollector:version</code>, where <code>version</code> is a number such as <code>1</code>.</p>",
+        "UpdateGatewayCapabilityConfigurationRequest$capabilityNamespace": "<p>The namespace of the gateway capability configuration to be updated. For example, if you configure OPC-UA sources from the AWS IoT SiteWise console, your OPC-UA capability configuration has the namespace <code>iotsitewise:opcuacollector:version</code>, where <code>version</code> is a number such as <code>1</code>.</p>",
+        "UpdateGatewayCapabilityConfigurationResponse$capabilityNamespace": "<p>The namespace of the gateway capability.</p>"
+      }
+    },
+    "CapabilitySyncStatus": {
+      "base": null,
+      "refs": {
+        "DescribeGatewayCapabilityConfigurationResponse$capabilitySyncStatus": "<p>The synchronization status of the capability configuration. The sync status can be one of the following:</p> <ul> <li> <p> <code>IN_SYNC</code> – The gateway is running the capability configuration.</p> </li> <li> <p> <code>OUT_OF_SYNC</code> – The gateway hasn't received the capability configuration.</p> </li> <li> <p> <code>SYNC_FAILED</code> – The gateway rejected the capability configuration.</p> </li> </ul>",
+        "GatewayCapabilitySummary$capabilitySyncStatus": "<p>The synchronization status of the capability configuration. The sync status can be one of the following:</p> <ul> <li> <p> <code>IN_SYNC</code> – The gateway is running the capability configuration.</p> </li> <li> <p> <code>OUT_OF_SYNC</code> – The gateway hasn't received the capability configuration.</p> </li> <li> <p> <code>SYNC_FAILED</code> – The gateway rejected the capability configuration.</p> </li> </ul>",
+        "UpdateGatewayCapabilityConfigurationResponse$capabilitySyncStatus": "<p>The synchronization status of the capability configuration. The sync status can be one of the following:</p> <ul> <li> <p> <code>IN_SYNC</code> – The gateway is running the capability configuration.</p> </li> <li> <p> <code>OUT_OF_SYNC</code> – The gateway hasn't received the capability configuration.</p> </li> <li> <p> <code>SYNC_FAILED</code> – The gateway rejected the capability configuration.</p> </li> </ul> <p>After you update a capability configuration, its sync status is <code>OUT_OF_SYNC</code> until the gateway receives and applies or rejects the updated configuration.</p>"
+      }
+    },
+    "ClientToken": {
+      "base": null,
+      "refs": {
+        "AssociateAssetsRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "BatchAssociateProjectAssetsRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "BatchDisassociateProjectAssetsRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreateAccessPolicyRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreateAssetModelRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreateAssetRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreateDashboardRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreatePortalRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "CreateProjectRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeleteAccessPolicyRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeleteAssetModelRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeleteAssetRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeleteDashboardRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeletePortalRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DeleteProjectRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "DisassociateAssetsRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateAccessPolicyRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateAssetModelRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateAssetPropertyRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateAssetRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateDashboardRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdatePortalRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>",
+        "UpdateProjectRequest$clientToken": "<p>A unique case-sensitive identifier that you can provide to ensure the idempotency of the request. Don't reuse this client token if a new idempotent request is required.</p>"
+      }
+    },
+    "ConflictingOperationException": {
+      "base": "<p>Your request has conflicting operations. This can occur if you're trying to perform more than one operation on the same resource at the same time.</p>",
+      "refs": {
+      }
+    },
+    "CreateAccessPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAccessPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssetModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssetModelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDashboardRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDashboardResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePortalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePortalResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DashboardDefinition": {
+      "base": null,
+      "refs": {
+        "CreateDashboardRequest$dashboardDefinition": "<p>The dashboard definition specified in a JSON literal. For detailed information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/create-dashboards-using-aws-cli.html\">Creating dashboards (CLI)</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "DescribeDashboardResponse$dashboardDefinition": "<p>The dashboard's definition JSON literal. For detailed information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/create-dashboards-using-aws-cli.html\">Creating dashboards (CLI)</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "UpdateDashboardRequest$dashboardDefinition": "<p>The new dashboard definition, as specified in a JSON literal. For detailed information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/create-dashboards-using-aws-cli.html\">Creating dashboards (CLI)</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "DashboardSummaries": {
+      "base": null,
+      "refs": {
+        "ListDashboardsResponse$dashboardSummaries": "<p>A list that summarizes each dashboard in the project.</p>"
+      }
+    },
+    "DashboardSummary": {
+      "base": "<p>Contains a dashboard summary.</p>",
+      "refs": {
+        "DashboardSummaries$member": null
+      }
+    },
+    "DefaultValue": {
+      "base": null,
+      "refs": {
+        "Attribute$defaultValue": "<p>The default value of the asset model property attribute. All assets that you create from the asset model contain this attribute value. You can update an attribute's value after you create an asset. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/update-attribute-values.html\">Updating attribute values</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "DeleteAccessPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAccessPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAssetModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAssetModelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAssetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAssetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDashboardRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDashboardResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePortalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePortalResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccessPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccessPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetModelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetPropertyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetPropertyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDashboardRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDashboardResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGatewayCapabilityConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGatewayCapabilityConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLoggingOptionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLoggingOptionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePortalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePortalResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "AssetModelSummary$description": "<p>The asset model description.</p>",
+        "CreateAssetModelRequest$assetModelDescription": "<p>A description for the asset model.</p>",
+        "CreateDashboardRequest$dashboardDescription": "<p>A description for the dashboard.</p>",
+        "CreatePortalRequest$portalDescription": "<p>A description for the portal.</p>",
+        "CreateProjectRequest$projectDescription": "<p>A description for the project.</p>",
+        "DashboardSummary$description": "<p>The dashboard's description.</p>",
+        "DescribeAssetModelResponse$assetModelDescription": "<p>The asset model's description.</p>",
+        "DescribeDashboardResponse$dashboardDescription": "<p>The dashboard's description.</p>",
+        "DescribePortalResponse$portalDescription": "<p>The portal's description.</p>",
+        "DescribeProjectResponse$projectDescription": "<p>The project's description.</p>",
+        "PortalSummary$description": "<p>The portal's description.</p>",
+        "ProjectSummary$description": "<p>The project's description.</p>",
+        "UpdateAssetModelRequest$assetModelDescription": "<p>A description for the asset model.</p>",
+        "UpdateDashboardRequest$dashboardDescription": "<p>A new description for the dashboard.</p>",
+        "UpdatePortalRequest$portalDescription": "<p>A new description for the portal.</p>",
+        "UpdateProjectRequest$projectDescription": "<p>A new description for the project.</p>"
+      }
+    },
+    "DisassociateAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Email": {
+      "base": null,
+      "refs": {
+        "CreatePortalRequest$portalContactEmail": "<p>The AWS administrator's contact email address.</p>",
+        "DescribePortalResponse$portalContactEmail": "<p>The AWS administrator's contact email address.</p>",
+        "UpdatePortalRequest$portalContactEmail": "<p>The AWS administrator's contact email address.</p>"
+      }
+    },
+    "EntryId": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyErrorEntry$entryId": "<p>The ID of the failed entry.</p>",
+        "PutAssetPropertyValueEntry$entryId": "<p>The user specified ID for the entry. You can use this ID to identify which entries failed.</p>"
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "ErrorDetails$code": "<p>The error code.</p>"
+      }
+    },
+    "ErrorDetails": {
+      "base": "<p>Contains the details of an AWS IoT SiteWise error.</p>",
+      "refs": {
+        "AssetModelStatus$error": "<p>Contains associated error information, if any.</p>",
+        "AssetStatus$error": "<p>Contains associated error information, if any.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyError$errorMessage": "<p>The associated error message.</p>",
+        "ConflictingOperationException$message": null,
+        "ErrorDetails$message": "<p>The error message.</p>",
+        "InternalFailureException$message": null,
+        "InvalidRequestException$message": null,
+        "LimitExceededException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ServiceUnavailableException$message": null,
+        "ThrottlingException$message": null
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "TooManyTagsException$message": null
+      }
+    },
+    "Expression": {
+      "base": null,
+      "refs": {
+        "Metric$expression": "<p>The mathematical expression that defines the metric aggregation function. You can specify up to 10 variables per expression. You can specify up to 10 functions per expression. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "Transform$expression": "<p>The mathematical expression that defines the transformation function. You can specify up to 10 variables per expression. You can specify up to 10 functions per expression. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "ExpressionVariable": {
+      "base": "<p>Contains expression variable information.</p>",
+      "refs": {
+        "ExpressionVariables$member": null
+      }
+    },
+    "ExpressionVariables": {
+      "base": null,
+      "refs": {
+        "Metric$variables": "<p>The list of variables used in the expression.</p>",
+        "Transform$variables": "<p>The list of variables used in the expression.</p>"
+      }
+    },
+    "GatewayCapabilitySummaries": {
+      "base": null,
+      "refs": {
+        "DescribeGatewayResponse$gatewayCapabilitySummaries": "<p>A list of gateway capability summaries that each contain a namespace and status. Each gateway capability defines data sources for the gateway. To retrieve a capability configuration's definition, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeGatewayCapabilityConfiguration.html\">DescribeGatewayCapabilityConfiguration</a>.</p>",
+        "GatewaySummary$gatewayCapabilitySummaries": "<p>A list of gateway capability summaries that each contain a namespace and status. Each gateway capability defines data sources for the gateway. To retrieve a capability configuration's definition, use <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeGatewayCapabilityConfiguration.html\">DescribeGatewayCapabilityConfiguration</a>.</p>"
+      }
+    },
+    "GatewayCapabilitySummary": {
+      "base": "<p>Contains a summary of a gateway capability configuration.</p>",
+      "refs": {
+        "GatewayCapabilitySummaries$member": null
+      }
+    },
+    "GatewayPlatform": {
+      "base": "<p>Contains a gateway's platform information.</p>",
+      "refs": {
+        "CreateGatewayRequest$gatewayPlatform": "<p>The gateway's platform. You can only specify one platform in a gateway.</p>",
+        "DescribeGatewayResponse$gatewayPlatform": "<p>The gateway's platform.</p>"
+      }
+    },
+    "GatewaySummaries": {
+      "base": null,
+      "refs": {
+        "ListGatewaysResponse$gatewaySummaries": "<p>A list that summarizes each gateway.</p>"
+      }
+    },
+    "GatewaySummary": {
+      "base": "<p>Contains a summary of a gateway.</p>",
+      "refs": {
+        "GatewaySummaries$member": null
+      }
+    },
+    "GetAssetPropertyAggregatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssetPropertyAggregatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssetPropertyValueHistoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssetPropertyValueHistoryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssetPropertyValueRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssetPropertyValueResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Greengrass": {
+      "base": "<p>Contains details for a gateway that runs on AWS IoT Greengrass. To create a gateway that runs on AWS IoT Greengrass, you must add the IoT SiteWise connector to a Greengrass group and deploy it. Your Greengrass group must also have permissions to upload data to AWS IoT SiteWise. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/gateway-connector.html\">Ingesting data using a gateway</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "GatewayPlatform$greengrass": "<p>A gateway that runs on AWS IoT Greengrass.</p>"
+      }
+    },
+    "GroupIdentity": {
+      "base": "<p>Contains information for a group identity in an access policy.</p>",
+      "refs": {
+        "Identity$group": "<p>An AWS SSO group identity.</p>"
+      }
+    },
+    "IAMUserIdentity": {
+      "base": "<p>Contains information about an AWS Identity and Access Management (IAM) user.</p>",
+      "refs": {
+        "Identity$iamUser": "<p>An IAM user identity.</p>"
+      }
+    },
+    "ID": {
+      "base": null,
+      "refs": {
+        "AccessPolicySummary$id": "<p>The ID of the access policy.</p>",
+        "AssetErrorDetails$assetId": "<p>The ID of the asset.</p>",
+        "AssetHierarchy$id": "<p>The ID of the hierarchy. This ID is a <code>hierarchyId</code>.</p>",
+        "AssetIDs$member": null,
+        "AssetModelHierarchy$id": "<p>The ID of the asset model hierarchy. This ID is a <code>hierarchyId</code>.</p>",
+        "AssetModelHierarchy$childAssetModelId": "<p>The ID of the asset model. All assets in this hierarchy must be instances of the <code>childAssetModelId</code> asset model.</p>",
+        "AssetModelHierarchyDefinition$childAssetModelId": "<p>The ID of an asset model for this hierarchy.</p>",
+        "AssetModelProperty$id": "<p>The ID of the asset model property.</p>",
+        "AssetModelSummary$id": "<p>The ID of the asset model (used with AWS IoT SiteWise APIs).</p>",
+        "AssetProperty$id": "<p>The ID of the asset property.</p>",
+        "AssetSummary$id": "<p>The ID of the asset.</p>",
+        "AssetSummary$assetModelId": "<p>The ID of the asset model used to create this asset.</p>",
+        "AssociateAssetsRequest$assetId": "<p>The ID of the parent asset.</p>",
+        "AssociateAssetsRequest$hierarchyId": "<p>The ID of a hierarchy in the parent asset's model. Hierarchies allow different groupings of assets to be formed that all come from the same asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "AssociateAssetsRequest$childAssetId": "<p>The ID of the child asset to be associated.</p>",
+        "AssociatedAssetsSummary$id": "<p>The ID of the asset.</p>",
+        "AssociatedAssetsSummary$assetModelId": "<p>The ID of the asset model used to create the asset.</p>",
+        "BatchAssociateProjectAssetsRequest$projectId": "<p>The ID of the project to which to associate the assets.</p>",
+        "BatchDisassociateProjectAssetsRequest$projectId": "<p>The ID of the project from which to disassociate the assets.</p>",
+        "CreateAccessPolicyResponse$accessPolicyId": "<p>The ID of the access policy.</p>",
+        "CreateAssetModelResponse$assetModelId": "<p>The ID of the asset model. You can use this ID when you call other AWS IoT SiteWise APIs.</p>",
+        "CreateAssetRequest$assetModelId": "<p>The ID of the asset model from which to create the asset.</p>",
+        "CreateAssetResponse$assetId": "<p>The ID of the asset. This ID uniquely identifies the asset within AWS IoT SiteWise and can be used with other AWS IoT SiteWise APIs.</p>",
+        "CreateDashboardRequest$projectId": "<p>The ID of the project in which to create the dashboard.</p>",
+        "CreateDashboardResponse$dashboardId": "<p>The ID of the dashboard.</p>",
+        "CreateGatewayResponse$gatewayId": "<p>The ID of the gateway device. You can use this ID when you call other AWS IoT SiteWise APIs.</p>",
+        "CreatePortalResponse$portalId": "<p>The ID of the created portal.</p>",
+        "CreateProjectRequest$portalId": "<p>The ID of the portal in which to create the project.</p>",
+        "CreateProjectResponse$projectId": "<p>The ID of the project.</p>",
+        "DashboardSummary$id": "<p>The ID of the dashboard.</p>",
+        "DeleteAccessPolicyRequest$accessPolicyId": "<p>The ID of the access policy to be deleted.</p>",
+        "DeleteAssetModelRequest$assetModelId": "<p>The ID of the asset model to delete.</p>",
+        "DeleteAssetRequest$assetId": "<p>The ID of the asset to delete.</p>",
+        "DeleteDashboardRequest$dashboardId": "<p>The ID of the dashboard to delete.</p>",
+        "DeleteGatewayRequest$gatewayId": "<p>The ID of the gateway to delete.</p>",
+        "DeletePortalRequest$portalId": "<p>The ID of the portal to delete.</p>",
+        "DeleteProjectRequest$projectId": "<p>The ID of the project.</p>",
+        "DescribeAccessPolicyRequest$accessPolicyId": "<p>The ID of the access policy.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyId": "<p>The ID of the access policy.</p>",
+        "DescribeAssetModelRequest$assetModelId": "<p>The ID of the asset model.</p>",
+        "DescribeAssetModelResponse$assetModelId": "<p>The ID of the asset model.</p>",
+        "DescribeAssetPropertyRequest$assetId": "<p>The ID of the asset.</p>",
+        "DescribeAssetPropertyRequest$propertyId": "<p>The ID of the asset property.</p>",
+        "DescribeAssetPropertyResponse$assetId": "<p>The ID of the asset.</p>",
+        "DescribeAssetPropertyResponse$assetModelId": "<p>The ID of the asset model.</p>",
+        "DescribeAssetRequest$assetId": "<p>The ID of the asset.</p>",
+        "DescribeAssetResponse$assetId": "<p>The ID of the asset.</p>",
+        "DescribeAssetResponse$assetModelId": "<p>The ID of the asset model that was used to create the asset.</p>",
+        "DescribeDashboardRequest$dashboardId": "<p>The ID of the dashboard.</p>",
+        "DescribeDashboardResponse$dashboardId": "<p>The ID of the dashboard.</p>",
+        "DescribeDashboardResponse$projectId": "<p>The ID of the project that the dashboard is in.</p>",
+        "DescribeGatewayCapabilityConfigurationRequest$gatewayId": "<p>The ID of the gateway that defines the capability configuration.</p>",
+        "DescribeGatewayCapabilityConfigurationResponse$gatewayId": "<p>The ID of the gateway that defines the capability configuration.</p>",
+        "DescribeGatewayRequest$gatewayId": "<p>The ID of the gateway device.</p>",
+        "DescribeGatewayResponse$gatewayId": "<p>The ID of the gateway device.</p>",
+        "DescribePortalRequest$portalId": "<p>The ID of the portal.</p>",
+        "DescribePortalResponse$portalId": "<p>The ID of the portal.</p>",
+        "DescribeProjectRequest$projectId": "<p>The ID of the project.</p>",
+        "DescribeProjectResponse$projectId": "<p>The ID of the project.</p>",
+        "DescribeProjectResponse$portalId": "<p>The ID of the portal that the project is in.</p>",
+        "DisassociateAssetsRequest$assetId": "<p>The ID of the parent asset from which to disassociate the child asset.</p>",
+        "DisassociateAssetsRequest$hierarchyId": "<p>The ID of a hierarchy in the parent asset's model. Hierarchies allow different groupings of assets to be formed that all come from the same asset model. You can use the hierarchy ID to identify the correct asset to disassociate. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "DisassociateAssetsRequest$childAssetId": "<p>The ID of the child asset to disassociate.</p>",
+        "GatewaySummary$gatewayId": "<p>The ID of the gateway device.</p>",
+        "GetAssetPropertyAggregatesRequest$assetId": "<p>The ID of the asset.</p>",
+        "GetAssetPropertyAggregatesRequest$propertyId": "<p>The ID of the asset property.</p>",
+        "GetAssetPropertyValueHistoryRequest$assetId": "<p>The ID of the asset.</p>",
+        "GetAssetPropertyValueHistoryRequest$propertyId": "<p>The ID of the asset property.</p>",
+        "GetAssetPropertyValueRequest$assetId": "<p>The ID of the asset.</p>",
+        "GetAssetPropertyValueRequest$propertyId": "<p>The ID of the asset property.</p>",
+        "IDs$member": null,
+        "Image$id": "<p>The ID of an existing image. Specify this parameter to keep an existing image.</p>",
+        "ImageLocation$id": "<p>The ID of the image.</p>",
+        "ListAccessPoliciesRequest$resourceId": "<p>The ID of the resource. This parameter is required if you specify <code>resourceType</code>.</p>",
+        "ListAssetsRequest$assetModelId": "<p>The ID of the asset model by which to filter the list of assets. This parameter is required if you choose <code>ALL</code> for <code>filter</code>.</p>",
+        "ListAssociatedAssetsRequest$assetId": "<p>The ID of the asset to query.</p>",
+        "ListAssociatedAssetsRequest$hierarchyId": "<p>The ID of the hierarchy by which child assets are associated to the asset. To find a hierarchy ID, use the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeAsset.html\">DescribeAsset</a> or <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_DescribeAssetModel.html\">DescribeAssetModel</a> operations. This parameter is required if you choose <code>CHILD</code> for <code>traversalDirection</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "ListDashboardsRequest$projectId": "<p>The ID of the project.</p>",
+        "ListProjectAssetsRequest$projectId": "<p>The ID of the project.</p>",
+        "ListProjectsRequest$portalId": "<p>The ID of the portal.</p>",
+        "PortalResource$id": "<p>The ID of the portal.</p>",
+        "PortalSummary$id": "<p>The ID of the portal.</p>",
+        "ProjectResource$id": "<p>The ID of the project.</p>",
+        "ProjectSummary$id": "<p>The ID of the project.</p>",
+        "Property$id": "<p>The ID of the asset property.</p>",
+        "PutAssetPropertyValueEntry$assetId": "<p>The ID of the asset to update.</p>",
+        "PutAssetPropertyValueEntry$propertyId": "<p>The ID of the asset property for this entry.</p>",
+        "UpdateAccessPolicyRequest$accessPolicyId": "<p>The ID of the access policy.</p>",
+        "UpdateAssetModelRequest$assetModelId": "<p>The ID of the asset model to update.</p>",
+        "UpdateAssetPropertyRequest$assetId": "<p>The ID of the asset to be updated.</p>",
+        "UpdateAssetPropertyRequest$propertyId": "<p>The ID of the asset property to be updated.</p>",
+        "UpdateAssetRequest$assetId": "<p>The ID of the asset to update.</p>",
+        "UpdateDashboardRequest$dashboardId": "<p>The ID of the dashboard to update.</p>",
+        "UpdateGatewayCapabilityConfigurationRequest$gatewayId": "<p>The ID of the gateway to be updated.</p>",
+        "UpdateGatewayRequest$gatewayId": "<p>The ID of the gateway to update.</p>",
+        "UpdatePortalRequest$portalId": "<p>The ID of the portal to update.</p>",
+        "UpdateProjectRequest$projectId": "<p>The ID of the project to update.</p>"
+      }
+    },
+    "IDs": {
+      "base": null,
+      "refs": {
+        "BatchAssociateProjectAssetsRequest$assetIds": "<p>The IDs of the assets to be associated to the project.</p>",
+        "BatchDisassociateProjectAssetsRequest$assetIds": "<p>The IDs of the assets to be disassociated from the project.</p>"
+      }
+    },
+    "Identity": {
+      "base": "<p>Contains an identity that can access an AWS IoT SiteWise Monitor resource.</p> <note> <p>Currently, you can't use AWS APIs to retrieve AWS SSO identity IDs. You can find the AWS SSO identity IDs in the URL of user and group pages in the <a href=\"https://console.aws.amazon.com/singlesignon\">AWS SSO console</a>.</p> </note>",
+      "refs": {
+        "AccessPolicySummary$identity": "<p>The identity (an AWS SSO user, an AWS SSO group, or an IAM user).</p>",
+        "CreateAccessPolicyRequest$accessPolicyIdentity": "<p>The identity for this access policy. Choose an AWS SSO user, an AWS SSO group, or an IAM user.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyIdentity": "<p>The identity (AWS SSO user, AWS SSO group, or IAM user) to which this access policy applies.</p>",
+        "UpdateAccessPolicyRequest$accessPolicyIdentity": "<p>The identity for this access policy. Choose an AWS SSO user, an AWS SSO group, or an IAM user.</p>"
+      }
+    },
+    "IdentityId": {
+      "base": null,
+      "refs": {
+        "GroupIdentity$id": "<p>The AWS SSO ID of the group.</p>",
+        "ListAccessPoliciesRequest$identityId": "<p>The ID of the identity. This parameter is required if you specify <code>USER</code> or <code>GROUP</code> for <code>identityType</code>.</p>",
+        "UserIdentity$id": "<p>The AWS SSO ID of the user.</p>"
+      }
+    },
+    "IdentityType": {
+      "base": null,
+      "refs": {
+        "ListAccessPoliciesRequest$identityType": "<p>The type of identity (AWS SSO user, AWS SSO group, or IAM user). This parameter is required if you specify <code>identityId</code>.</p>"
+      }
+    },
+    "Image": {
+      "base": "<p>Contains an image that is one of the following:</p> <ul> <li> <p>An image file. Choose this option to upload a new image.</p> </li> <li> <p>The ID of an existing image. Choose this option to keep an existing image.</p> </li> </ul>",
+      "refs": {
+        "UpdatePortalRequest$portalLogoImage": null
+      }
+    },
+    "ImageFile": {
+      "base": "<p>Contains an image file.</p>",
+      "refs": {
+        "CreatePortalRequest$portalLogoImageFile": "<p>A logo image to display in the portal. Upload a square, high-resolution image. The image is displayed on a dark background.</p>",
+        "Image$file": null
+      }
+    },
+    "ImageFileData": {
+      "base": null,
+      "refs": {
+        "ImageFile$data": "<p>The image file contents, represented as a base64-encoded string. The file size must be less than 1 MB.</p>"
+      }
+    },
+    "ImageFileType": {
+      "base": null,
+      "refs": {
+        "ImageFile$type": "<p>The file type of the image.</p>"
+      }
+    },
+    "ImageLocation": {
+      "base": "<p>Contains an image that is uploaded to AWS IoT SiteWise and available at a URL.</p>",
+      "refs": {
+        "DescribePortalResponse$portalLogoImageLocation": "<p>The portal's logo image, which is available at a URL.</p>"
+      }
+    },
+    "InternalFailureException": {
+      "base": "<p>AWS IoT SiteWise can't process your request right now. Try again later.</p>",
+      "refs": {
+      }
+    },
+    "Interval": {
+      "base": null,
+      "refs": {
+        "TumblingWindow$interval": "<p>The time interval for the tumbling window. Note that <code>w</code> represents weeks, <code>d</code> represents days, <code>h</code> represents hours, and <code>m</code> represents minutes. AWS IoT SiteWise computes the <code>1w</code> interval the end of Sunday at midnight each week (UTC), the <code>1d</code> interval at the end of each day at midnight (UTC), the <code>1h</code> interval at the end of each hour, and so on. </p> <p>When AWS IoT SiteWise aggregates data points for metric computations, the start of each interval is exclusive and the end of each interval is inclusive. AWS IoT SiteWise places the computed data point at the end of the interval.</p>"
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request isn't valid. This can occur if your request contains malformed JSON or unsupported characters. Check your request and try again.</p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>You've reached the limit for a resource. For example, this can occur if you're trying to associate more than the allowed number of child assets or attempting to create more than the allowed number of properties for an asset model.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+      }
+    },
+    "ListAccessPoliciesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccessPoliciesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssetModelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssetModelsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssetsFilter": {
+      "base": null,
+      "refs": {
+        "ListAssetsRequest$filter": "<p>The filter for the requested list of assets. Choose one of the following options:</p> <ul> <li> <p> <code>ALL</code> – The list includes all assets for a given asset model ID. The <code>assetModelId</code> parameter is required if you filter by <code>ALL</code>.</p> </li> <li> <p> <code>TOP_LEVEL</code> – The list includes only top-level assets in the asset hierarchy tree.</p> </li> </ul> <p>Default: <code>ALL</code> </p>"
+      }
+    },
+    "ListAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssociatedAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssociatedAssetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDashboardsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDashboardsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGatewaysRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGatewaysResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPortalsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPortalsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectAssetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LoggingLevel": {
+      "base": null,
+      "refs": {
+        "LoggingOptions$level": "<p>The AWS IoT SiteWise logging verbosity level.</p>"
+      }
+    },
+    "LoggingOptions": {
+      "base": "<p>Contains logging options.</p>",
+      "refs": {
+        "DescribeLoggingOptionsResponse$loggingOptions": "<p>The current logging options.</p>",
+        "PutLoggingOptionsRequest$loggingOptions": "<p>The logging options to set.</p>"
+      }
+    },
+    "Macro": {
+      "base": null,
+      "refs": {
+        "VariableValue$propertyId": "<p>The ID of the property to use as the variable. You can use the property <code>name</code> if it's from the same asset model.</p>",
+        "VariableValue$hierarchyId": "<p>The ID of the hierarchy to query for the property ID. You can use the hierarchy's name instead of the hierarchy's ID.</p> <p>You use a hierarchy ID instead of a model ID because you can have several hierarchies using the same model and therefore the same <code>propertyId</code>. For example, you might have separately grouped assets that come from the same asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-hierarchies.html\">Asset hierarchies</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 100</p>",
+        "GetAssetPropertyValueHistoryRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 100</p>",
+        "ListAccessPoliciesRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListAssetModelsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListAssetsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListAssociatedAssetsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListDashboardsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListGatewaysRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListPortalsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListProjectAssetsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>",
+        "ListProjectsRequest$maxResults": "<p>The maximum number of results to be returned per paginated request.</p> <p>Default: 50</p>"
+      }
+    },
+    "Measurement": {
+      "base": "<p>Contains an asset measurement property. This structure is empty. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html#measurements\">Measurements</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "PropertyType$measurement": "<p>Specifies an asset measurement property. A measurement represents a device's raw sensor data stream, such as timestamped temperature values or timestamped power values.</p>"
+      }
+    },
+    "Metric": {
+      "base": "<p>Contains an asset metric property. With metrics, you can calculate aggregate functions, such as an average, maximum, or minimum, as specified through an expression. A metric maps several values to a single value (such as a sum).</p> <p>The maximum number of dependent/cascading variables used in any one metric calculation is 10. Therefore, a <i>root</i> metric can have up to 10 cascading metrics in its computational dependency tree. Additionally, a metric can only have a data type of <code>DOUBLE</code> and consume properties with data types of <code>INTEGER</code> or <code>DOUBLE</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html#metrics\">Metrics</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "PropertyType$metric": "<p>Specifies an asset metric property. A metric contains a mathematical expression that uses aggregate functions to process all input data points over a time interval and output a single data point, such as to calculate the average hourly temperature.</p>"
+      }
+    },
+    "MetricWindow": {
+      "base": "<p>Contains a time interval window used for data aggregate computations (for example, average, sum, count, and so on).</p>",
+      "refs": {
+        "Metric$window": "<p>The window (time interval) over which AWS IoT SiteWise computes the metric's aggregation expression. AWS IoT SiteWise computes one data point per <code>window</code>.</p>"
+      }
+    },
+    "MonitorErrorCode": {
+      "base": null,
+      "refs": {
+        "MonitorErrorDetails$code": "<p>The error code.</p>"
+      }
+    },
+    "MonitorErrorDetails": {
+      "base": "<p>Contains AWS IoT SiteWise Monitor error details.</p>",
+      "refs": {
+        "PortalStatus$error": "<p>Contains associated error information, if any.</p>"
+      }
+    },
+    "MonitorErrorMessage": {
+      "base": null,
+      "refs": {
+        "MonitorErrorDetails$message": "<p>The error message.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "AssetHierarchy$name": "<p>The hierarchy name provided in the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_CreateAssetModel.html\">CreateAssetModel</a> or <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetModel.html\">UpdateAssetModel</a> API operation.</p>",
+        "AssetModelHierarchy$name": "<p>The name of the asset model hierarchy that you specify by using the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_CreateAssetModel.html\">CreateAssetModel</a> or <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetModel.html\">UpdateAssetModel</a> API operation.</p>",
+        "AssetModelHierarchyDefinition$name": "<p>The name of the asset model hierarchy definition (as specified in the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_CreateAssetModel.html\">CreateAssetModel</a> or <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetModel.html\">UpdateAssetModel</a> API operation).</p>",
+        "AssetModelProperty$name": "<p>The name of the asset model property.</p>",
+        "AssetModelPropertyDefinition$name": "<p>The name of the property definition.</p>",
+        "AssetModelSummary$name": "<p>The name of the asset model.</p>",
+        "AssetProperty$name": "<p>The name of the property.</p>",
+        "AssetSummary$name": "<p>The name of the asset.</p>",
+        "AssociatedAssetsSummary$name": "<p>The name of the asset.</p>",
+        "CreateAssetModelRequest$assetModelName": "<p>A unique, friendly name for the asset model.</p>",
+        "CreateAssetRequest$assetName": "<p>A unique, friendly name for the asset.</p>",
+        "CreateDashboardRequest$dashboardName": "<p>A friendly name for the dashboard.</p>",
+        "CreateGatewayRequest$gatewayName": "<p>A unique, friendly name for the gateway.</p>",
+        "CreatePortalRequest$portalName": "<p>A friendly name for the portal.</p>",
+        "CreateProjectRequest$projectName": "<p>A friendly name for the project.</p>",
+        "DashboardSummary$name": "<p>The name of the dashboard</p>",
+        "DescribeAssetModelResponse$assetModelName": "<p>The name of the asset model.</p>",
+        "DescribeAssetPropertyResponse$assetName": "<p>The name of the asset.</p>",
+        "DescribeAssetResponse$assetName": "<p>The name of the asset.</p>",
+        "DescribeDashboardResponse$dashboardName": "<p>The name of the dashboard.</p>",
+        "DescribeGatewayResponse$gatewayName": "<p>The name of the gateway.</p>",
+        "DescribePortalResponse$portalName": "<p>The name of the portal.</p>",
+        "DescribeProjectResponse$projectName": "<p>The name of the project.</p>",
+        "GatewaySummary$gatewayName": "<p>The name of the asset.</p>",
+        "PortalSummary$name": "<p>The name of the portal.</p>",
+        "ProjectSummary$name": "<p>The name of the project.</p>",
+        "Property$name": "<p>The name of the property.</p>",
+        "UpdateAssetModelRequest$assetModelName": "<p>A unique, friendly name for the asset model.</p>",
+        "UpdateAssetRequest$assetName": "<p>A unique, friendly name for the asset.</p>",
+        "UpdateDashboardRequest$dashboardName": "<p>A new friendly name for the dashboard.</p>",
+        "UpdateGatewayRequest$gatewayName": "<p>A unique, friendly name for the gateway.</p>",
+        "UpdatePortalRequest$portalName": "<p>A new friendly name for the portal.</p>",
+        "UpdateProjectRequest$projectName": "<p>A new friendly name for the project.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "GetAssetPropertyAggregatesResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "GetAssetPropertyValueHistoryRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "GetAssetPropertyValueHistoryResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListAccessPoliciesRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListAccessPoliciesResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListAssetModelsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListAssetModelsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListAssetsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListAssetsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListAssociatedAssetsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListAssociatedAssetsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListDashboardsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListDashboardsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListGatewaysRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListGatewaysResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListPortalsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListPortalsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListProjectAssetsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListProjectAssetsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>",
+        "ListProjectsRequest$nextToken": "<p>The token to be used for the next set of paginated results.</p>",
+        "ListProjectsResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>"
+      }
+    },
+    "OffsetInNanos": {
+      "base": null,
+      "refs": {
+        "TimeInNanos$offsetInNanos": "<p>The nanosecond offset from <code>timeInSeconds</code>.</p>"
+      }
+    },
+    "Permission": {
+      "base": null,
+      "refs": {
+        "AccessPolicySummary$permission": "<p>The permissions for the access policy. Note that a project <code>ADMINISTRATOR</code> is also known as a project owner.</p>",
+        "CreateAccessPolicyRequest$accessPolicyPermission": "<p>The permission level for this access policy. Note that a project <code>ADMINISTRATOR</code> is also known as a project owner.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyPermission": "<p>The access policy permission. Note that a project <code>ADMINISTRATOR</code> is also known as a project owner.</p>",
+        "UpdateAccessPolicyRequest$accessPolicyPermission": "<p>The permission level for this access policy. Note that a project <code>ADMINISTRATOR</code> is also known as a project owner.</p>"
+      }
+    },
+    "PortalClientId": {
+      "base": null,
+      "refs": {
+        "DescribePortalResponse$portalClientId": "<p>The AWS SSO application generated client ID (used with AWS SSO APIs). AWS IoT SiteWise includes <code>portalClientId</code> for only portals that use AWS SSO to authenticate users.</p>"
+      }
+    },
+    "PortalResource": {
+      "base": "<p>Identifies an AWS IoT SiteWise Monitor portal.</p>",
+      "refs": {
+        "Resource$portal": "<p>A portal resource.</p>"
+      }
+    },
+    "PortalState": {
+      "base": null,
+      "refs": {
+        "PortalStatus$state": "<p>The current state of the portal.</p>"
+      }
+    },
+    "PortalStatus": {
+      "base": "<p>Contains information about the current status of a portal.</p>",
+      "refs": {
+        "CreatePortalResponse$portalStatus": "<p>The status of the portal, which contains a state (<code>CREATING</code> after successfully calling this operation) and any error message.</p>",
+        "DeletePortalResponse$portalStatus": "<p>The status of the portal, which contains a state (<code>DELETING</code> after successfully calling this operation) and any error message.</p>",
+        "DescribePortalResponse$portalStatus": "<p>The current status of the portal, which contains a state and any error message.</p>",
+        "PortalSummary$status": null,
+        "UpdatePortalResponse$portalStatus": "<p>The status of the portal, which contains a state (<code>UPDATING</code> after successfully calling this operation) and any error message.</p>"
+      }
+    },
+    "PortalSummaries": {
+      "base": null,
+      "refs": {
+        "ListPortalsResponse$portalSummaries": "<p>A list that summarizes each portal.</p>"
+      }
+    },
+    "PortalSummary": {
+      "base": "<p>Contains a portal summary.</p>",
+      "refs": {
+        "PortalSummaries$member": null
+      }
+    },
+    "ProjectResource": {
+      "base": "<p>Identifies a specific AWS IoT SiteWise Monitor project.</p>",
+      "refs": {
+        "Resource$project": "<p>A project resource.</p>"
+      }
+    },
+    "ProjectSummaries": {
+      "base": null,
+      "refs": {
+        "ListProjectsResponse$projectSummaries": "<p>A list that summarizes each project in the portal.</p>"
+      }
+    },
+    "ProjectSummary": {
+      "base": "<p>Contains project summary information.</p>",
+      "refs": {
+        "ProjectSummaries$member": null
+      }
+    },
+    "Property": {
+      "base": "<p>Contains asset property information.</p>",
+      "refs": {
+        "DescribeAssetPropertyResponse$assetProperty": "<p>The asset property's definition, alias, and notification state.</p>"
+      }
+    },
+    "PropertyAlias": {
+      "base": null,
+      "refs": {
+        "AssetProperty$alias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "Property$alias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "UpdateAssetPropertyRequest$propertyAlias": "<p>The property alias that identifies the property, such as an OPC-UA server data stream path (for example, <code>/company/windfarm/3/turbine/7/temperature</code>). For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/connect-data-streams.html\">Mapping industrial data streams to asset properties</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>If you omit this parameter, the alias is removed from the property.</p>"
+      }
+    },
+    "PropertyDataType": {
+      "base": null,
+      "refs": {
+        "AssetModelProperty$dataType": "<p>The data type of the asset model property.</p>",
+        "AssetModelPropertyDefinition$dataType": "<p>The data type of the property definition.</p>",
+        "AssetProperty$dataType": "<p>The data type of the asset property.</p>",
+        "Property$dataType": "<p>The property data type.</p>"
+      }
+    },
+    "PropertyNotification": {
+      "base": "<p>Contains asset property value notification information. When the notification state is enabled, AWS IoT SiteWise publishes property value updates to a unique MQTT topic. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/interact-with-other-services.html\">Interacting with other services</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "AssetProperty$notification": "<p>The asset property's notification topic and state. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p>",
+        "Property$notification": "<p>The asset property's notification topic and state. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_UpdateAssetProperty.html\">UpdateAssetProperty</a>.</p>"
+      }
+    },
+    "PropertyNotificationState": {
+      "base": null,
+      "refs": {
+        "PropertyNotification$state": "<p>The current notification state.</p>",
+        "UpdateAssetPropertyRequest$propertyNotificationState": "<p>The MQTT notification state (enabled or disabled) for this asset property. When the notification state is enabled, AWS IoT SiteWise publishes property value updates to a unique MQTT topic. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/interact-with-other-services.html\">Interacting with other services</a> in the <i>AWS IoT SiteWise User Guide</i>.</p> <p>If you omit this parameter, the notification state is set to <code>DISABLED</code>.</p>"
+      }
+    },
+    "PropertyNotificationTopic": {
+      "base": null,
+      "refs": {
+        "PropertyNotification$topic": "<p>The MQTT topic to which AWS IoT SiteWise publishes property value update notifications.</p>"
+      }
+    },
+    "PropertyType": {
+      "base": "<p>Contains a property type, which can be one of <code>attribute</code>, <code>measurement</code>, <code>metric</code>, or <code>transform</code>.</p>",
+      "refs": {
+        "AssetModelProperty$type": "<p>The property type (see <code>PropertyType</code>).</p>",
+        "AssetModelPropertyDefinition$type": "<p>The property definition type (see <code>PropertyType</code>). You can only specify one type in a property definition.</p>",
+        "Property$type": "<p>The property type (see <code>PropertyType</code>). A property contains one type.</p>"
+      }
+    },
+    "PropertyUnit": {
+      "base": null,
+      "refs": {
+        "AssetModelProperty$unit": "<p>The unit of the asset model property, such as <code>Newtons</code> or <code>RPM</code>.</p>",
+        "AssetModelPropertyDefinition$unit": "<p>The unit of the property definition, such as <code>Newtons</code> or <code>RPM</code>.</p>",
+        "AssetProperty$unit": "<p>The unit (such as <code>Newtons</code> or <code>RPM</code>) of the asset property.</p>",
+        "Property$unit": "<p>The unit (such as <code>Newtons</code> or <code>RPM</code>) of the asset property.</p>"
+      }
+    },
+    "PropertyValueBooleanValue": {
+      "base": null,
+      "refs": {
+        "Variant$booleanValue": "<p>Asset property data of type Boolean (true or false).</p>"
+      }
+    },
+    "PropertyValueDoubleValue": {
+      "base": null,
+      "refs": {
+        "Variant$doubleValue": "<p>Asset property data of type double (floating point number).</p>"
+      }
+    },
+    "PropertyValueIntegerValue": {
+      "base": null,
+      "refs": {
+        "Variant$integerValue": "<p>Asset property data of type integer (whole number).</p>"
+      }
+    },
+    "PropertyValueStringValue": {
+      "base": null,
+      "refs": {
+        "Variant$stringValue": "<p>Asset property data of type string (sequence of characters).</p>"
+      }
+    },
+    "PutAssetPropertyValueEntries": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyValueRequest$entries": "<p>The list of asset property value entries for the batch put request. You can specify up to 10 entries per request.</p>"
+      }
+    },
+    "PutAssetPropertyValueEntry": {
+      "base": "<p>Contains a list of value updates for an asset property in the list of asset entries consumed by the <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/APIReference/API_BatchPutAssetPropertyValue.html\">BatchPutAssetPropertyValue</a> API operation.</p>",
+      "refs": {
+        "PutAssetPropertyValueEntries$member": null
+      }
+    },
+    "PutLoggingOptionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLoggingOptionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Qualities": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$qualities": "<p>The quality by which to filter asset data.</p>",
+        "GetAssetPropertyValueHistoryRequest$qualities": "<p>The quality by which to filter asset data.</p>"
+      }
+    },
+    "Quality": {
+      "base": null,
+      "refs": {
+        "AggregatedValue$quality": "<p>The quality of the aggregated data.</p>",
+        "AssetPropertyValue$quality": "<p>The quality of the asset property value.</p>",
+        "Qualities$member": null
+      }
+    },
+    "Resolution": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$resolution": "<p>The time interval over which to aggregate data.</p>"
+      }
+    },
+    "Resource": {
+      "base": "<p>Contains an AWS IoT SiteWise Monitor resource ID for a portal or project.</p>",
+      "refs": {
+        "AccessPolicySummary$resource": "<p>The AWS IoT SiteWise Monitor resource (a portal or project).</p>",
+        "CreateAccessPolicyRequest$accessPolicyResource": "<p>The AWS IoT SiteWise Monitor resource for this access policy. Choose either a portal or a project.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyResource": "<p>The AWS IoT SiteWise Monitor resource (portal or project) to which this access policy provides access.</p>",
+        "UpdateAccessPolicyRequest$accessPolicyResource": "<p>The AWS IoT SiteWise Monitor resource for this access policy. Choose either a portal or a project.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "ConflictingOperationException$resourceArn": "<p>The ARN of the resource that conflicts with this operation.</p>",
+        "ResourceAlreadyExistsException$resourceArn": "<p>The ARN of the resource that already exists.</p>"
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "ConflictingOperationException$resourceId": "<p>The ID of the resource that conflicts with this operation.</p>",
+        "ResourceAlreadyExistsException$resourceId": "<p>The ID of the resource that already exists.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The requested resource can't be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "ListAccessPoliciesRequest$resourceType": "<p>The type of resource (portal or project). This parameter is required if you specify <code>resourceId</code>.</p>"
+      }
+    },
+    "SSOApplicationId": {
+      "base": null,
+      "refs": {
+        "CreatePortalResponse$ssoApplicationId": "<p>The associated AWS SSO application ID, if the portal uses AWS SSO.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The requested service is unavailable.</p>",
+      "refs": {
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>A list of keys for tags to remove from the resource.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateAccessPolicyRequest$tags": "<p>A list of key-value pairs that contain metadata for the access policy. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreateAssetModelRequest$tags": "<p>A list of key-value pairs that contain metadata for the asset model. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreateAssetRequest$tags": "<p>A list of key-value pairs that contain metadata for the asset. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreateDashboardRequest$tags": "<p>A list of key-value pairs that contain metadata for the dashboard. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreateGatewayRequest$tags": "<p>A list of key-value pairs that contain metadata for the gateway. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreatePortalRequest$tags": "<p>A list of key-value pairs that contain metadata for the portal. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "CreateProjectRequest$tags": "<p>A list of key-value pairs that contain metadata for the project. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "ListTagsForResourceResponse$tags": "<p>The list of key-value pairs that contain metadata for the resource. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+        "TagResourceRequest$tags": "<p>A list of key-value pairs that contain metadata for the resource. For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/tag-resources.html\">Tagging your AWS IoT SiteWise resources</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Your request exceeded a rate limit. For example, you might have exceeded the number of AWS IoT SiteWise assets that can be created per second, the allowed number of messages per second, and so on.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/quotas.html\">Quotas</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+      }
+    },
+    "TimeInNanos": {
+      "base": "<p>Contains a timestamp with optional nanosecond granularity.</p>",
+      "refs": {
+        "AssetPropertyValue$timestamp": "<p>The timestamp of the asset property value.</p>",
+        "Timestamps$member": null
+      }
+    },
+    "TimeInSeconds": {
+      "base": null,
+      "refs": {
+        "TimeInNanos$timeInSeconds": "<p>The timestamp date, in seconds, in the Unix epoch format. Fractional nanosecond data is provided by <code>offsetInNanos</code>.</p>"
+      }
+    },
+    "TimeOrdering": {
+      "base": null,
+      "refs": {
+        "GetAssetPropertyAggregatesRequest$timeOrdering": "<p>The chronological sorting order of the requested information.</p> <p>Default: <code>ASCENDING</code> </p>",
+        "GetAssetPropertyValueHistoryRequest$timeOrdering": "<p>The chronological sorting order of the requested information.</p> <p>Default: <code>ASCENDING</code> </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "AccessPolicySummary$creationDate": "<p>The date the access policy was created, in Unix epoch time.</p>",
+        "AccessPolicySummary$lastUpdateDate": "<p>The date the access policy was last updated, in Unix epoch time.</p>",
+        "AggregatedValue$timestamp": "<p>The date the aggregating computations occurred, in Unix epoch time.</p>",
+        "AssetModelSummary$creationDate": "<p>The date the asset model was created, in Unix epoch time.</p>",
+        "AssetModelSummary$lastUpdateDate": "<p>The date the asset model was last updated, in Unix epoch time.</p>",
+        "AssetSummary$creationDate": "<p>The date the asset was created, in Unix epoch time.</p>",
+        "AssetSummary$lastUpdateDate": "<p>The date the asset was last updated, in Unix epoch time.</p>",
+        "AssociatedAssetsSummary$creationDate": "<p>The date the asset was created, in Unix epoch time.</p>",
+        "AssociatedAssetsSummary$lastUpdateDate": "<p>The date the asset was last updated, in Unix epoch time.</p>",
+        "DashboardSummary$creationDate": "<p>The date the dashboard was created, in Unix epoch time.</p>",
+        "DashboardSummary$lastUpdateDate": "<p>The date the dashboard was last updated, in Unix epoch time.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyCreationDate": "<p>The date the access policy was created, in Unix epoch time.</p>",
+        "DescribeAccessPolicyResponse$accessPolicyLastUpdateDate": "<p>The date the access policy was last updated, in Unix epoch time.</p>",
+        "DescribeAssetModelResponse$assetModelCreationDate": "<p>The date the asset model was created, in Unix epoch time.</p>",
+        "DescribeAssetModelResponse$assetModelLastUpdateDate": "<p>The date the asset model was last updated, in Unix epoch time.</p>",
+        "DescribeAssetResponse$assetCreationDate": "<p>The date the asset was created, in Unix epoch time.</p>",
+        "DescribeAssetResponse$assetLastUpdateDate": "<p>The date the asset was last updated, in Unix epoch time.</p>",
+        "DescribeDashboardResponse$dashboardCreationDate": "<p>The date the dashboard was created, in Unix epoch time.</p>",
+        "DescribeDashboardResponse$dashboardLastUpdateDate": "<p>The date the dashboard was last updated, in Unix epoch time.</p>",
+        "DescribeGatewayResponse$creationDate": "<p>The date the gateway was created, in Unix epoch time.</p>",
+        "DescribeGatewayResponse$lastUpdateDate": "<p>The date the gateway was last updated, in Unix epoch time.</p>",
+        "DescribePortalResponse$portalCreationDate": "<p>The date the portal was created, in Unix epoch time.</p>",
+        "DescribePortalResponse$portalLastUpdateDate": "<p>The date the portal was last updated, in Unix epoch time.</p>",
+        "DescribeProjectResponse$projectCreationDate": "<p>The date the project was created, in Unix epoch time.</p>",
+        "DescribeProjectResponse$projectLastUpdateDate": "<p>The date the project was last updated, in Unix epoch time.</p>",
+        "GatewaySummary$creationDate": "<p>The date the gateway was created, in Unix epoch time.</p>",
+        "GatewaySummary$lastUpdateDate": "<p>The date the gateway was last updated, in Unix epoch time.</p>",
+        "GetAssetPropertyAggregatesRequest$startDate": "<p>The exclusive start of the range from which to query historical data, expressed in seconds in Unix epoch time.</p>",
+        "GetAssetPropertyAggregatesRequest$endDate": "<p>The inclusive end of the range from which to query historical data, expressed in seconds in Unix epoch time.</p>",
+        "GetAssetPropertyValueHistoryRequest$startDate": "<p>The exclusive start of the range from which to query historical data, expressed in seconds in Unix epoch time.</p>",
+        "GetAssetPropertyValueHistoryRequest$endDate": "<p>The inclusive end of the range from which to query historical data, expressed in seconds in Unix epoch time.</p>",
+        "PortalSummary$creationDate": "<p>The date the portal was created, in Unix epoch time.</p>",
+        "PortalSummary$lastUpdateDate": "<p>The date the portal was last updated, in Unix epoch time.</p>",
+        "ProjectSummary$creationDate": "<p>The date the project was created, in Unix epoch time.</p>",
+        "ProjectSummary$lastUpdateDate": "<p>The date the project was last updated, in Unix epoch time.</p>"
+      }
+    },
+    "Timestamps": {
+      "base": null,
+      "refs": {
+        "BatchPutAssetPropertyError$timestamps": "<p>A list of timestamps for each error, if any.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>You've reached the limit for the number of tags allowed for a resource. For more information, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html#tag-conventions\">Tag naming limits and requirements</a> in the <i>AWS General Reference</i>.</p>",
+      "refs": {
+      }
+    },
+    "Transform": {
+      "base": "<p>Contains an asset transform property. A transform is a one-to-one mapping of a property's data points from one form to another. For example, you can use a transform to convert a Celsius data stream to Fahrenheit by applying the transformation expression to each data point of the Celsius stream. A transform can only have a data type of <code>DOUBLE</code> and consume properties with data types of <code>INTEGER</code> or <code>DOUBLE</code>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-sitewise/latest/userguide/asset-properties.html#transforms\">Transforms</a> in the <i>AWS IoT SiteWise User Guide</i>.</p>",
+      "refs": {
+        "PropertyType$transform": "<p>Specifies an asset transform property. A transform contains a mathematical expression that maps a property's data points from one form to another, such as a unit conversion from Celsius to Fahrenheit.</p>"
+      }
+    },
+    "TraversalDirection": {
+      "base": null,
+      "refs": {
+        "ListAssociatedAssetsRequest$traversalDirection": "<p>The direction to list associated assets. Choose one of the following options:</p> <ul> <li> <p> <code>CHILD</code> – The list includes all child assets associated to the asset. The <code>hierarchyId</code> parameter is required if you choose <code>CHILD</code>.</p> </li> <li> <p> <code>PARENT</code> – The list includes the asset's parent asset.</p> </li> </ul> <p>Default: <code>CHILD</code> </p>"
+      }
+    },
+    "TumblingWindow": {
+      "base": "<p>Contains a tumbling window, which is a repeating fixed-sized, non-overlapping, and contiguous time interval. This window is used in metric and aggregation computations.</p>",
+      "refs": {
+        "MetricWindow$tumbling": "<p>The tumbling time interval window.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAccessPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAccessPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssetModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssetModelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssetPropertyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDashboardRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDashboardResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGatewayCapabilityConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGatewayCapabilityConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePortalRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePortalResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Url": {
+      "base": null,
+      "refs": {
+        "CreatePortalResponse$portalStartUrl": "<p>The URL for the AWS IoT SiteWise Monitor portal. You can use this URL to access portals that use AWS SSO for authentication. For portals that use IAM for authentication, you must use the <a href=\"https://docs.aws.amazon.com/AWS IoT SiteWise API ReferenceAPI_CreatePresignedPortalUrl.html\">CreatePresignedPortalUrl</a> operation to create a URL that you can use to access the portal.</p>",
+        "DescribePortalResponse$portalStartUrl": "<p>The URL for the AWS IoT SiteWise Monitor portal. You can use this URL to access portals that use AWS SSO for authentication. For portals that use IAM for authentication, you must use the <a href=\"https://docs.aws.amazon.com/AWS IoT SiteWise API ReferenceAPI_CreatePresignedPortalUrl.html\">CreatePresignedPortalUrl</a> operation to create a URL that you can use to access the portal.</p>",
+        "ImageLocation$url": "<p>The URL where the image is available. The URL is valid for 15 minutes so that you can view and download the image</p>",
+        "PortalSummary$startUrl": "<p>The URL for the AWS IoT SiteWise Monitor portal. You can use this URL to access portals that use AWS SSO for authentication. For portals that use IAM for authentication, you must use the <a href=\"https://docs.aws.amazon.com/AWS IoT SiteWise API ReferenceAPI_CreatePresignedPortalUrl.html\">CreatePresignedPortalUrl</a> operation to create a URL that you can use to access the portal.</p>"
+      }
+    },
+    "UserIdentity": {
+      "base": "<p>Contains information for a user identity in an access policy.</p>",
+      "refs": {
+        "Identity$user": "<p>An AWS SSO user identity.</p>"
+      }
+    },
+    "VariableName": {
+      "base": null,
+      "refs": {
+        "ExpressionVariable$name": "<p>The friendly name of the variable to be used in the expression.</p>"
+      }
+    },
+    "VariableValue": {
+      "base": "<p>Identifies a property value used in an expression.</p>",
+      "refs": {
+        "ExpressionVariable$value": "<p>The variable that identifies an asset property from which to use values.</p>"
+      }
+    },
+    "Variant": {
+      "base": "<p>Contains an asset property value (of a single type only).</p>",
+      "refs": {
+        "AssetPropertyValue$value": "<p>The value of the asset property (see <code>Variant</code>).</p>"
+      }
+    }
+  }
+}

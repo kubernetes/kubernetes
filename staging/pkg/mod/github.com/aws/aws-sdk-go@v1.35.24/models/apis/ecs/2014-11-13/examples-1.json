@@ -1,0 +1,1137 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CreateCluster": [
+      {
+        "input": {
+          "clusterName": "my_cluster"
+        },
+        "output": {
+          "cluster": {
+            "activeServicesCount": 0,
+            "clusterArn": "arn:aws:ecs:us-east-1:012345678910:cluster/my_cluster",
+            "clusterName": "my_cluster",
+            "pendingTasksCount": 0,
+            "registeredContainerInstancesCount": 0,
+            "runningTasksCount": 0,
+            "status": "ACTIVE"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates a cluster in your default region.",
+        "id": "to-create-a-new-cluster-1472514079365",
+        "title": "To create a new cluster"
+      }
+    ],
+    "CreateService": [
+      {
+        "input": {
+          "desiredCount": 10,
+          "serviceName": "ecs-simple-service",
+          "taskDefinition": "hello_world"
+        },
+        "output": {
+          "service": {
+            "clusterArn": "arn:aws:ecs:us-east-1:012345678910:cluster/default",
+            "createdAt": "2016-08-29T16:13:47.298Z",
+            "deploymentConfiguration": {
+              "maximumPercent": 200,
+              "minimumHealthyPercent": 100
+            },
+            "deployments": [
+              {
+                "createdAt": "2016-08-29T16:13:47.298Z",
+                "desiredCount": 10,
+                "id": "ecs-svc/9223370564342348388",
+                "pendingCount": 0,
+                "runningCount": 0,
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/hello_world:6",
+                "updatedAt": "2016-08-29T16:13:47.298Z"
+              },
+              {
+                "createdAt": "2016-08-29T15:52:44.481Z",
+                "desiredCount": 0,
+                "id": "ecs-svc/9223370564343611322",
+                "pendingCount": 0,
+                "runningCount": 0,
+                "status": "ACTIVE",
+                "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/hello_world:6",
+                "updatedAt": "2016-08-29T16:11:38.941Z"
+              }
+            ],
+            "desiredCount": 10,
+            "events": [
+
+            ],
+            "loadBalancers": [
+
+            ],
+            "pendingCount": 0,
+            "runningCount": 0,
+            "serviceArn": "arn:aws:ecs:us-east-1:012345678910:service/ecs-simple-service",
+            "serviceName": "ecs-simple-service",
+            "status": "ACTIVE",
+            "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/hello_world:6"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates a service in your default region called ``ecs-simple-service``. The service uses the ``hello_world`` task definition and it maintains 10 copies of that task.",
+        "id": "to-create-a-new-service-1472512584282",
+        "title": "To create a new service"
+      },
+      {
+        "input": {
+          "desiredCount": 10,
+          "loadBalancers": [
+            {
+              "containerName": "simple-app",
+              "containerPort": 80,
+              "loadBalancerName": "EC2Contai-EcsElast-15DCDAURT3ZO2"
+            }
+          ],
+          "role": "ecsServiceRole",
+          "serviceName": "ecs-simple-service-elb",
+          "taskDefinition": "console-sample-app-static"
+        },
+        "output": {
+          "service": {
+            "clusterArn": "arn:aws:ecs:us-east-1:012345678910:cluster/default",
+            "createdAt": "2016-08-29T16:02:54.884Z",
+            "deploymentConfiguration": {
+              "maximumPercent": 200,
+              "minimumHealthyPercent": 100
+            },
+            "deployments": [
+              {
+                "createdAt": "2016-08-29T16:02:54.884Z",
+                "desiredCount": 10,
+                "id": "ecs-svc/9223370564343000923",
+                "pendingCount": 0,
+                "runningCount": 0,
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/console-sample-app-static:6",
+                "updatedAt": "2016-08-29T16:02:54.884Z"
+              }
+            ],
+            "desiredCount": 10,
+            "events": [
+
+            ],
+            "loadBalancers": [
+              {
+                "containerName": "simple-app",
+                "containerPort": 80,
+                "loadBalancerName": "EC2Contai-EcsElast-15DCDAURT3ZO2"
+              }
+            ],
+            "pendingCount": 0,
+            "roleArn": "arn:aws:iam::012345678910:role/ecsServiceRole",
+            "runningCount": 0,
+            "serviceArn": "arn:aws:ecs:us-east-1:012345678910:service/ecs-simple-service-elb",
+            "serviceName": "ecs-simple-service-elb",
+            "status": "ACTIVE",
+            "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/console-sample-app-static:6"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates a service in your default region called ``ecs-simple-service-elb``. The service uses the ``ecs-demo`` task definition and it maintains 10 copies of that task. You must reference an existing load balancer in the same region by its name.",
+        "id": "to-create-a-new-service-behind-a-load-balancer-1472512484823",
+        "title": "To create a new service behind a load balancer"
+      }
+    ],
+    "DeleteAccountSetting": [
+      {
+        "input": {
+          "name": "serviceLongArnFormat"
+        },
+        "output": {
+          "setting": {
+            "name": "serviceLongArnFormat",
+            "value": "enabled",
+            "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes the account setting for your user for the specified resource type.",
+        "id": "to-delete-the-account-setting-for-your-user-account-1549524548115",
+        "title": "To delete your account setting"
+      },
+      {
+        "input": {
+          "name": "containerInstanceLongArnFormat",
+          "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+        },
+        "output": {
+          "setting": {
+            "name": "containerInstanceLongArnFormat",
+            "value": "enabled",
+            "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes the account setting for a specific IAM user or IAM role for the specified resource type. Only the root user can view or modify the account settings for another user.",
+        "id": "to-delete-the-account-setting-for-a-specific-iam-user-or-iam-role-1549524612917",
+        "title": "To delete the account settings for a specific IAM user or IAM role"
+      }
+    ],
+    "DeleteCluster": [
+      {
+        "input": {
+          "cluster": "my_cluster"
+        },
+        "output": {
+          "cluster": {
+            "activeServicesCount": 0,
+            "clusterArn": "arn:aws:ecs:us-east-1:012345678910:cluster/my_cluster",
+            "clusterName": "my_cluster",
+            "pendingTasksCount": 0,
+            "registeredContainerInstancesCount": 0,
+            "runningTasksCount": 0,
+            "status": "INACTIVE"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes an empty cluster in your default region.",
+        "id": "to-delete-an-empty-cluster-1472512705352",
+        "title": "To delete an empty cluster"
+      }
+    ],
+    "DeleteService": [
+      {
+        "input": {
+          "service": "my-http-service"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes the my-http-service service. The service must have a desired count and running count of 0 before you can delete it.",
+        "id": "e8183e38-f86e-4390-b811-f74f30a6007d",
+        "title": "To delete a service"
+      }
+    ],
+    "DeregisterContainerInstance": [
+      {
+        "input": {
+          "cluster": "default",
+          "containerInstance": "container_instance_UUID",
+          "force": true
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deregisters a container instance from the specified cluster in your default region. If there are still tasks running on the container instance, you must either stop those tasks before deregistering, or use the force option.",
+        "id": "bf624927-cf64-4f4b-8b7e-c024a4e682f6",
+        "title": "To deregister a container instance from a cluster"
+      }
+    ],
+    "DescribeClusters": [
+      {
+        "input": {
+          "clusters": [
+            "default"
+          ]
+        },
+        "output": {
+          "clusters": [
+            {
+              "clusterArn": "arn:aws:ecs:us-east-1:aws_account_id:cluster/default",
+              "clusterName": "default",
+              "status": "ACTIVE"
+            }
+          ],
+          "failures": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example provides a description of the specified cluster in your default region.",
+        "id": "ba88d100-9672-4231-80da-a4bd210bf728",
+        "title": "To describe a cluster"
+      }
+    ],
+    "DescribeContainerInstances": [
+      {
+        "input": {
+          "cluster": "default",
+          "containerInstances": [
+            "f2756532-8f13-4d53-87c9-aed50dc94cd7"
+          ]
+        },
+        "output": {
+          "containerInstances": [
+            {
+              "agentConnected": true,
+              "containerInstanceArn": "arn:aws:ecs:us-east-1:012345678910:container-instance/f2756532-8f13-4d53-87c9-aed50dc94cd7",
+              "ec2InstanceId": "i-807f3249",
+              "pendingTasksCount": 0,
+              "registeredResources": [
+                {
+                  "name": "CPU",
+                  "type": "INTEGER",
+                  "doubleValue": 0.0,
+                  "integerValue": 2048,
+                  "longValue": 0
+                },
+                {
+                  "name": "MEMORY",
+                  "type": "INTEGER",
+                  "doubleValue": 0.0,
+                  "integerValue": 3768,
+                  "longValue": 0
+                },
+                {
+                  "name": "PORTS",
+                  "type": "STRINGSET",
+                  "doubleValue": 0.0,
+                  "integerValue": 0,
+                  "longValue": 0,
+                  "stringSetValue": [
+                    "2376",
+                    "22",
+                    "51678",
+                    "2375"
+                  ]
+                }
+              ],
+              "remainingResources": [
+                {
+                  "name": "CPU",
+                  "type": "INTEGER",
+                  "doubleValue": 0.0,
+                  "integerValue": 1948,
+                  "longValue": 0
+                },
+                {
+                  "name": "MEMORY",
+                  "type": "INTEGER",
+                  "doubleValue": 0.0,
+                  "integerValue": 3668,
+                  "longValue": 0
+                },
+                {
+                  "name": "PORTS",
+                  "type": "STRINGSET",
+                  "doubleValue": 0.0,
+                  "integerValue": 0,
+                  "longValue": 0,
+                  "stringSetValue": [
+                    "2376",
+                    "22",
+                    "80",
+                    "51678",
+                    "2375"
+                  ]
+                }
+              ],
+              "runningTasksCount": 1,
+              "status": "ACTIVE"
+            }
+          ],
+          "failures": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example provides a description of the specified container instance in your default region, using the container instance UUID as an identifier.",
+        "id": "c8f439de-eb27-4269-8ca7-2c0a7ba75ab0",
+        "title": "To describe container instance"
+      }
+    ],
+    "DescribeServices": [
+      {
+        "input": {
+          "services": [
+            "ecs-simple-service"
+          ]
+        },
+        "output": {
+          "failures": [
+
+          ],
+          "services": [
+            {
+              "clusterArn": "arn:aws:ecs:us-east-1:012345678910:cluster/default",
+              "createdAt": "2016-08-29T16:25:52.130Z",
+              "deploymentConfiguration": {
+                "maximumPercent": 200,
+                "minimumHealthyPercent": 100
+              },
+              "deployments": [
+                {
+                  "createdAt": "2016-08-29T16:25:52.130Z",
+                  "desiredCount": 1,
+                  "id": "ecs-svc/9223370564341623665",
+                  "pendingCount": 0,
+                  "runningCount": 0,
+                  "status": "PRIMARY",
+                  "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/hello_world:6",
+                  "updatedAt": "2016-08-29T16:25:52.130Z"
+                }
+              ],
+              "desiredCount": 1,
+              "events": [
+                {
+                  "createdAt": "2016-08-29T16:25:58.520Z",
+                  "id": "38c285e5-d335-4b68-8b15-e46dedc8e88d",
+                  "message": "(service ecs-simple-service) was unable to place a task because no container instance met all of its requirements. The closest matching (container-instance 3f4de1c5-ffdd-4954-af7e-75b4be0c8841) is already using a port required by your task. For more information, see the Troubleshooting section of the Amazon ECS Developer Guide."
+                }
+              ],
+              "loadBalancers": [
+
+              ],
+              "pendingCount": 0,
+              "runningCount": 0,
+              "serviceArn": "arn:aws:ecs:us-east-1:012345678910:service/ecs-simple-service",
+              "serviceName": "ecs-simple-service",
+              "status": "ACTIVE",
+              "taskDefinition": "arn:aws:ecs:us-east-1:012345678910:task-definition/hello_world:6"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+            "services[0].events[0].message": "In this example, there is a service event that shows unavailable cluster resources."
+          }
+        },
+        "description": "This example provides descriptive information about the service named ``ecs-simple-service``.",
+        "id": "to-describe-a-service-1472513256350",
+        "title": "To describe a service"
+      }
+    ],
+    "DescribeTaskDefinition": [
+      {
+        "input": {
+          "taskDefinition": "hello_world:8"
+        },
+        "output": {
+          "taskDefinition": {
+            "containerDefinitions": [
+              {
+                "name": "wordpress",
+                "cpu": 10,
+                "environment": [
+
+                ],
+                "essential": true,
+                "image": "wordpress",
+                "links": [
+                  "mysql"
+                ],
+                "memory": 500,
+                "mountPoints": [
+
+                ],
+                "portMappings": [
+                  {
+                    "containerPort": 80,
+                    "hostPort": 80
+                  }
+                ],
+                "volumesFrom": [
+
+                ]
+              },
+              {
+                "name": "mysql",
+                "cpu": 10,
+                "environment": [
+                  {
+                    "name": "MYSQL_ROOT_PASSWORD",
+                    "value": "password"
+                  }
+                ],
+                "essential": true,
+                "image": "mysql",
+                "memory": 500,
+                "mountPoints": [
+
+                ],
+                "portMappings": [
+
+                ],
+                "volumesFrom": [
+
+                ]
+              }
+            ],
+            "family": "hello_world",
+            "revision": 8,
+            "taskDefinitionArn": "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/hello_world:8",
+            "volumes": [
+
+            ]
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example provides a description of the specified task definition.",
+        "id": "4c21eeb1-f1da-4a08-8c44-297fc8d0ea88",
+        "title": "To describe a task definition"
+      }
+    ],
+    "DescribeTasks": [
+      {
+        "input": {
+          "tasks": [
+            "c5cba4eb-5dad-405e-96db-71ef8eefe6a8"
+          ]
+        },
+        "output": {
+          "failures": [
+
+          ],
+          "tasks": [
+            {
+              "clusterArn": "arn:aws:ecs:<region>:<aws_account_id>:cluster/default",
+              "containerInstanceArn": "arn:aws:ecs:<region>:<aws_account_id>:container-instance/18f9eda5-27d7-4c19-b133-45adc516e8fb",
+              "containers": [
+                {
+                  "name": "ecs-demo",
+                  "containerArn": "arn:aws:ecs:<region>:<aws_account_id>:container/7c01765b-c588-45b3-8290-4ba38bd6c5a6",
+                  "lastStatus": "RUNNING",
+                  "networkBindings": [
+                    {
+                      "bindIP": "0.0.0.0",
+                      "containerPort": 80,
+                      "hostPort": 80
+                    }
+                  ],
+                  "taskArn": "arn:aws:ecs:<region>:<aws_account_id>:task/c5cba4eb-5dad-405e-96db-71ef8eefe6a8"
+                }
+              ],
+              "desiredStatus": "RUNNING",
+              "lastStatus": "RUNNING",
+              "overrides": {
+                "containerOverrides": [
+                  {
+                    "name": "ecs-demo"
+                  }
+                ]
+              },
+              "startedBy": "ecs-svc/9223370608528463088",
+              "taskArn": "arn:aws:ecs:<region>:<aws_account_id>:task/c5cba4eb-5dad-405e-96db-71ef8eefe6a8",
+              "taskDefinitionArn": "arn:aws:ecs:<region>:<aws_account_id>:task-definition/amazon-ecs-sample:1"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example provides a description of the specified task, using the task UUID as an identifier.",
+        "id": "a90b0cde-f965-4946-b55e-cfd8cc54e827",
+        "title": "To describe a task"
+      }
+    ],
+    "ListAccountSettings": [
+      {
+        "input": {
+          "effectiveSettings": true
+        },
+        "output": {
+          "settings": [
+            {
+              "name": "containerInstanceLongArnFormat",
+              "value": "disabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            },
+            {
+              "name": "serviceLongArnFormat",
+              "value": "enabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            },
+            {
+              "name": "taskLongArnFormat",
+              "value": "disabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example displays the effective account settings for your account.",
+        "id": "to-view-your-account-settings-1549524118170",
+        "title": "To view your effective account settings"
+      },
+      {
+        "input": {
+          "effectiveSettings": true,
+          "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+        },
+        "output": {
+          "settings": [
+            {
+              "name": "containerInstanceLongArnFormat",
+              "value": "disabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            },
+            {
+              "name": "serviceLongArnFormat",
+              "value": "enabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            },
+            {
+              "name": "taskLongArnFormat",
+              "value": "disabled",
+              "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example displays the effective account settings for the specified user or role.",
+        "id": "to-view-the-account-settings-for-a-specific-iam-user-or-iam-role-1549524237932",
+        "title": "To view the effective account settings for a specific IAM user or IAM role"
+      }
+    ],
+    "ListClusters": [
+      {
+        "input": {
+        },
+        "output": {
+          "clusterArns": [
+            "arn:aws:ecs:us-east-1:<aws_account_id>:cluster/test",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:cluster/default"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of your available clusters in your default region.",
+        "id": "e337d059-134f-4125-ba8e-4f499139facf",
+        "title": "To list your available clusters"
+      }
+    ],
+    "ListContainerInstances": [
+      {
+        "input": {
+          "cluster": "default"
+        },
+        "output": {
+          "containerInstanceArns": [
+            "arn:aws:ecs:us-east-1:<aws_account_id>:container-instance/f6bbb147-5370-4ace-8c73-c7181ded911f",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:container-instance/ffe3d344-77e2-476c-a4d0-bf560ad50acb"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of your available container instances in the specified cluster in your default region.",
+        "id": "62a82a94-713c-4e18-8420-1d2b2ba9d484",
+        "title": "To list your available container instances in a cluster"
+      }
+    ],
+    "ListServices": [
+      {
+        "input": {
+        },
+        "output": {
+          "serviceArns": [
+            "arn:aws:ecs:us-east-1:012345678910:service/my-http-service"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the services running in the default cluster for an account.",
+        "id": "1d9a8037-4e0e-4234-a528-609656809a3a",
+        "title": "To list the services in a cluster"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "resourceArn": "arn:aws:ecs:region:aws_account_id:cluster/dev"
+        },
+        "output": {
+          "tags": [
+            {
+              "key": "team",
+              "value": "dev"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the tags for the 'dev' cluster.",
+        "id": "to-list-the-tags-for-a-cluster-1540582700259",
+        "title": "To list the tags for a cluster."
+      }
+    ],
+    "ListTaskDefinitionFamilies": [
+      {
+        "input": {
+        },
+        "output": {
+          "families": [
+            "node-js-app",
+            "web-timer",
+            "hpcc",
+            "hpcc-c4-8xlarge"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of your registered task definition families.",
+        "id": "b5c89769-1d94-4ca2-a79e-8069103c7f75",
+        "title": "To list your registered task definition families"
+      },
+      {
+        "input": {
+          "familyPrefix": "hpcc"
+        },
+        "output": {
+          "families": [
+            "hpcc",
+            "hpcc-c4-8xlarge"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the task definition revisions that start with \"hpcc\".",
+        "id": "8a4cf9a6-42c1-4fe3-852d-99ac8968e11b",
+        "title": "To filter your registered task definition families"
+      }
+    ],
+    "ListTaskDefinitions": [
+      {
+        "input": {
+        },
+        "output": {
+          "taskDefinitionArns": [
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/sleep300:2",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/sleep360:1",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:3",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:4",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:5",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:6"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of your registered task definitions.",
+        "id": "b381ebaf-7eba-4d60-b99b-7f6ae49d3d60",
+        "title": "To list your registered task definitions"
+      },
+      {
+        "input": {
+          "familyPrefix": "wordpress"
+        },
+        "output": {
+          "taskDefinitionArns": [
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:3",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:4",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:5",
+            "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/wordpress:6"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the task definition revisions of a specified family.",
+        "id": "734e7afd-753a-4bc2-85d0-badddce10910",
+        "title": "To list the registered task definitions in a family"
+      }
+    ],
+    "ListTasks": [
+      {
+        "input": {
+          "cluster": "default"
+        },
+        "output": {
+          "taskArns": [
+            "arn:aws:ecs:us-east-1:012345678910:task/0cc43cdb-3bee-4407-9c26-c0e6ea5bee84",
+            "arn:aws:ecs:us-east-1:012345678910:task/6b809ef6-c67e-4467-921f-ee261c15a0a1"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of the tasks in a cluster.",
+        "id": "9a6ec707-1a77-45d0-b2eb-516b5dd9e924",
+        "title": "To list the tasks in a cluster"
+      },
+      {
+        "input": {
+          "cluster": "default",
+          "containerInstance": "f6bbb147-5370-4ace-8c73-c7181ded911f"
+        },
+        "output": {
+          "taskArns": [
+            "arn:aws:ecs:us-east-1:012345678910:task/0cc43cdb-3bee-4407-9c26-c0e6ea5bee84"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the tasks of a specified container instance. Specifying a ``containerInstance`` value limits  the  results  to  tasks  that belong to that container instance.",
+        "id": "024bf3b7-9cbb-44e3-848f-9d074e1fecce",
+        "title": "To list the tasks on a particular container instance"
+      }
+    ],
+    "PutAccountSetting": [
+      {
+        "input": {
+          "name": "serviceLongArnFormat",
+          "value": "enabled"
+        },
+        "output": {
+          "setting": {
+            "name": "serviceLongArnFormat",
+            "value": "enabled",
+            "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example modifies your account settings to opt in to the new ARN and resource ID format for Amazon ECS services. If you’re using this command as the root user, then changes apply to the entire AWS account, unless an IAM user or role explicitly overrides these settings for themselves.",
+        "id": "to-modify-the-account-settings-for-your-iam-user-account-1549523130939",
+        "title": "To modify your account settings"
+      },
+      {
+        "input": {
+          "name": "containerInstanceLongArnFormat",
+          "value": "enabled",
+          "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+        },
+        "output": {
+          "setting": {
+            "name": "containerInstanceLongArnFormat",
+            "value": "enabled",
+            "principalArn": "arn:aws:iam::<aws_account_id>:user/principalName"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example modifies the account setting for a specific IAM user or IAM role to opt in to the new ARN and resource ID format for Amazon ECS container instances. If you’re using this command as the root user, then changes apply to the entire AWS account, unless an IAM user or role explicitly overrides these settings for themselves.",
+        "id": "to-modify-the-account-settings-for-a-specific-iam-user-or-iam-role-1549523518390",
+        "title": "To modify the account settings for a specific IAM user or IAM role"
+      }
+    ],
+    "PutAccountSettingDefault": [
+      {
+        "input": {
+          "name": "serviceLongArnFormat",
+          "value": "enabled"
+        },
+        "output": {
+          "setting": {
+            "name": "serviceLongArnFormat",
+            "value": "enabled",
+            "principalArn": "arn:aws:iam::<aws_account_id>:root"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example modifies the default account setting for the specified resource for all IAM users or roles on an account. These changes apply to the entire AWS account, unless an IAM user or role explicitly overrides these settings for themselves.",
+        "id": "to-modify-the-default-account-settings-for-all-iam-users-or-roles-on-your-account-1549523794603",
+        "title": "To modify the default account settings for all IAM users or roles on an account"
+      }
+    ],
+    "RegisterTaskDefinition": [
+      {
+        "input": {
+          "containerDefinitions": [
+            {
+              "name": "sleep",
+              "command": [
+                "sleep",
+                "360"
+              ],
+              "cpu": 10,
+              "essential": true,
+              "image": "busybox",
+              "memory": 10
+            }
+          ],
+          "family": "sleep360",
+          "taskRoleArn": "",
+          "volumes": [
+
+          ]
+        },
+        "output": {
+          "taskDefinition": {
+            "containerDefinitions": [
+              {
+                "name": "sleep",
+                "command": [
+                  "sleep",
+                  "360"
+                ],
+                "cpu": 10,
+                "environment": [
+
+                ],
+                "essential": true,
+                "image": "busybox",
+                "memory": 10,
+                "mountPoints": [
+
+                ],
+                "portMappings": [
+
+                ],
+                "volumesFrom": [
+
+                ]
+              }
+            ],
+            "family": "sleep360",
+            "revision": 1,
+            "taskDefinitionArn": "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/sleep360:19",
+            "volumes": [
+
+            ]
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example registers a task definition to the specified family.",
+        "id": "to-register-a-task-definition-1470764550877",
+        "title": "To register a task definition"
+      }
+    ],
+    "RunTask": [
+      {
+        "input": {
+          "cluster": "default",
+          "taskDefinition": "sleep360:1"
+        },
+        "output": {
+          "tasks": [
+            {
+              "containerInstanceArn": "arn:aws:ecs:us-east-1:<aws_account_id>:container-instance/ffe3d344-77e2-476c-a4d0-bf560ad50acb",
+              "containers": [
+                {
+                  "name": "sleep",
+                  "containerArn": "arn:aws:ecs:us-east-1:<aws_account_id>:container/58591c8e-be29-4ddf-95aa-ee459d4c59fd",
+                  "lastStatus": "PENDING",
+                  "taskArn": "arn:aws:ecs:us-east-1:<aws_account_id>:task/a9f21ea7-c9f5-44b1-b8e6-b31f50ed33c0"
+                }
+              ],
+              "desiredStatus": "RUNNING",
+              "lastStatus": "PENDING",
+              "overrides": {
+                "containerOverrides": [
+                  {
+                    "name": "sleep"
+                  }
+                ]
+              },
+              "taskArn": "arn:aws:ecs:us-east-1:<aws_account_id>:task/a9f21ea7-c9f5-44b1-b8e6-b31f50ed33c0",
+              "taskDefinitionArn": "arn:aws:ecs:us-east-1:<aws_account_id>:task-definition/sleep360:1"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example runs the specified task definition on your default cluster.",
+        "id": "6f238c83-a133-42cd-ab3d-abeca0560445",
+        "title": "To run a task on your default cluster"
+      }
+    ],
+    "TagResource": [
+      {
+        "input": {
+          "resourceArn": "arn:aws:ecs:region:aws_account_id:cluster/dev",
+          "tags": [
+            {
+              "key": "team",
+              "value": "dev"
+            }
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example tags the 'dev' cluster with key 'team' and value 'dev'.",
+        "id": "to-tag-a-cluster-1540581863751",
+        "title": "To tag a cluster."
+      }
+    ],
+    "UntagResource": [
+      {
+        "input": {
+          "resourceArn": "arn:aws:ecs:region:aws_account_id:cluster/dev",
+          "tagKeys": [
+            "team"
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes the 'team' tag from the 'dev' cluster.",
+        "id": "to-untag-a-cluster-1540582546056",
+        "title": "To untag a cluster."
+      }
+    ],
+    "UpdateService": [
+      {
+        "input": {
+          "service": "my-http-service",
+          "taskDefinition": "amazon-ecs-sample"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example updates the my-http-service service to use the amazon-ecs-sample task definition.",
+        "id": "cc9e8900-0cc2-44d2-8491-64d1d3d37887",
+        "title": "To change the task definition used in a service"
+      },
+      {
+        "input": {
+          "desiredCount": 10,
+          "service": "my-http-service"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example updates the desired count of the my-http-service service to 10.",
+        "id": "9581d6c5-02e3-4140-8cc1-5a4301586633",
+        "title": "To change the number of tasks in a service"
+      }
+    ]
+  }
+}

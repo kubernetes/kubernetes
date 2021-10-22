@@ -1,0 +1,82 @@
+{
+  "pagination": {
+    "DescribeCachediSCSIVolumes": {
+      "result_key": "CachediSCSIVolumes"
+    },
+    "DescribeStorediSCSIVolumes": {
+      "result_key": "StorediSCSIVolumes"
+    },
+    "DescribeTapeArchives": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "TapeArchives"
+    },
+    "DescribeTapeRecoveryPoints": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "TapeRecoveryPointInfos"
+    },
+    "DescribeTapes": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "Tapes"
+    },
+    "DescribeVTLDevices": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "VTLDevices"
+    },
+    "ListFileShares": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "non_aggregate_keys": [
+        "Marker"
+      ],
+      "output_token": "NextMarker",
+      "result_key": "FileShareInfoList"
+    },
+    "ListGateways": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "Gateways"
+    },
+    "ListLocalDisks": {
+      "result_key": "Disks"
+    },
+    "ListTagsForResource": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "non_aggregate_keys": [
+        "ResourceARN"
+      ],
+      "output_token": "Marker",
+      "result_key": "Tags"
+    },
+    "ListTapePools": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "PoolInfos"
+    },
+    "ListTapes": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "TapeInfos"
+    },
+    "ListVolumeRecoveryPoints": {
+      "result_key": "VolumeRecoveryPointInfos"
+    },
+    "ListVolumes": {
+      "input_token": "Marker",
+      "limit_key": "Limit",
+      "output_token": "Marker",
+      "result_key": "VolumeInfos"
+    }
+  }
+}

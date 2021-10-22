@@ -1,0 +1,230 @@
+{
+  "version": "2.0",
+  "service": "<p> </p>",
+  "operations": {
+    "CancelQuery": "<p> Cancels a query that has been issued. Cancellation is guaranteed only if the query has not completed execution before the cancellation request was issued. Because cancellation is an idempotent operation, subsequent cancellation requests will return a <code>CancellationMessage</code>, indicating that the query has already been canceled. </p>",
+    "DescribeEndpoints": "<p>DescribeEndpoints returns a list of available endpoints to make Timestream API calls against. This API is available through both Write and Query.</p> <p>Because Timestream’s SDKs are designed to transparently work with the service’s architecture, including the management and mapping of the service endpoints, <i>it is not recommended that you use this API unless</i>:</p> <ul> <li> <p>Your application uses a programming language that does not yet have SDK support</p> </li> <li> <p>You require better control over the client-side implementation</p> </li> </ul> <p>For detailed information on how to use DescribeEndpoints, see <a href=\"https://docs.aws.amazon.com/timestream/latest/developerguide/Using-API.endpoint-discovery.html\">The Endpoint Discovery Pattern and REST APIs</a>.</p>",
+    "Query": "<p> Query is a synchronous operation that enables you to execute a query. Query will timeout after 60 seconds. You must update the default timeout in the SDK to support a timeout of 60 seconds. The result set will be truncated to 1MB. Service quotas apply. For more information, see Quotas in the Timestream Developer Guide. </p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p> You are not authorized to perform this action. </p>",
+      "refs": {
+      }
+    },
+    "CancelQueryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelQueryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "QueryRequest$ClientToken": "<p> Unique, case-sensitive string of up to 64 ASCII characters that you specify when you make a Query request. Providing a <code>ClientToken</code> makes the call to <code>Query</code> idempotent, meaning that multiple identical calls have the same effect as one single call. </p> <p>Your query request will fail in the following cases:</p> <ul> <li> <p> If you submit a request with the same client token outside the 5-minute idepotency window. </p> </li> <li> <p> If you submit a request with the same client token but a change in other parameters within the 5-minute idempotency window. </p> </li> </ul> <p> After 4 hours, any request with the same client token is treated as a new request. </p>"
+      }
+    },
+    "ColumnInfo": {
+      "base": "<p> Contains the meta data for query results such as the column names, data types, and other attributes. </p>",
+      "refs": {
+        "ColumnInfoList$member": null,
+        "Type$ArrayColumnInfo": "<p>Indicates if the column is an array.</p>",
+        "Type$TimeSeriesMeasureValueColumnInfo": "<p>Indicates if the column is a timeseries data type.</p>"
+      }
+    },
+    "ColumnInfoList": {
+      "base": null,
+      "refs": {
+        "QueryResponse$ColumnInfo": "<p> The column data types of the returned result set. </p>",
+        "Type$RowColumnInfo": "<p>Indicates if the column is a row.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p> Unable to poll results for a cancelled query. </p>",
+      "refs": {
+      }
+    },
+    "Datum": {
+      "base": "<p> Datum represents a single data point in a query result. </p>",
+      "refs": {
+        "DatumList$member": null,
+        "TimeSeriesDataPoint$Value": "<p>The measure value for the data point.</p>"
+      }
+    },
+    "DatumList": {
+      "base": null,
+      "refs": {
+        "Datum$ArrayValue": "<p> Indicates if the data point is an array. </p>",
+        "Row$Data": "<p>List of data points in a single row of the result set.</p>"
+      }
+    },
+    "DescribeEndpointsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEndpointsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Endpoint": {
+      "base": "<p>Represents an available endpoint against which to make API calls agaisnt, as well as the TTL for that endpoint.</p>",
+      "refs": {
+        "Endpoints$member": null
+      }
+    },
+    "Endpoints": {
+      "base": null,
+      "refs": {
+        "DescribeEndpointsResponse$Endpoints": "<p>An <code>Endpoints</code> object is returned when a <code>DescribeEndpoints</code> request is made.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "ConflictException$Message": null,
+        "InternalServerException$Message": null,
+        "InvalidEndpointException$Message": null,
+        "QueryExecutionException$Message": null,
+        "ThrottlingException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "InternalServerException": {
+      "base": "<p> Timestream was unable to fully process this request because of an internal server error. </p>",
+      "refs": {
+      }
+    },
+    "InvalidEndpointException": {
+      "base": "<p>The requested endpoint was invalid.</p>",
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "Endpoint$CachePeriodInMinutes": "<p>The TTL for the endpoint, in minutes.</p>"
+      }
+    },
+    "MaxQueryResults": {
+      "base": null,
+      "refs": {
+        "QueryRequest$MaxRows": "<p> The total number of rows to return in the output. If the total number of rows available is more than the value specified, a NextToken is provided in the command's output. To resume pagination, provide the NextToken value in the starting-token argument of a subsequent command. </p>"
+      }
+    },
+    "NullableBoolean": {
+      "base": null,
+      "refs": {
+        "Datum$NullValue": "<p> Indicates if the data point is null. </p>"
+      }
+    },
+    "QueryExecutionException": {
+      "base": "<p> Timestream was unable to run the query successfully. </p>",
+      "refs": {
+      }
+    },
+    "QueryId": {
+      "base": null,
+      "refs": {
+        "CancelQueryRequest$QueryId": "<p> The id of the query that needs to be cancelled. <code>QueryID</code> is returned as part of QueryResult. </p>",
+        "QueryResponse$QueryId": "<p> A unique ID for the given query. </p>"
+      }
+    },
+    "QueryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QueryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QueryString": {
+      "base": null,
+      "refs": {
+        "QueryRequest$QueryString": "<p> The query to be executed by Timestream. </p>"
+      }
+    },
+    "Row": {
+      "base": "<p>Represents a single row in the query results.</p>",
+      "refs": {
+        "Datum$RowValue": "<p> Indicates if the data point is a row. </p>",
+        "RowList$member": null
+      }
+    },
+    "RowList": {
+      "base": null,
+      "refs": {
+        "QueryResponse$Rows": "<p> The result set rows returned by the query. </p>"
+      }
+    },
+    "ScalarType": {
+      "base": null,
+      "refs": {
+        "Type$ScalarType": "<p>Indicates if the column is of type string, integer, boolean, double, timestamp, date, time. </p>"
+      }
+    },
+    "ScalarValue": {
+      "base": null,
+      "refs": {
+        "Datum$ScalarValue": "<p> Indicates if the data point is a scalar value such as integer, string, double, or boolean. </p>"
+      }
+    },
+    "ServiceErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "CancelQueryResponse$CancellationMessage": "<p> A <code>CancellationMessage</code> is returned when a <code>CancelQuery</code> request for the query specified by <code>QueryId</code> has already been issued. </p>",
+        "ColumnInfo$Name": "<p> The name of the result set column. The name of the result set is available for columns of all data types except for arrays. </p>",
+        "Endpoint$Address": "<p>An endpoint address.</p>",
+        "QueryRequest$NextToken": "<p> A pagination token passed to get a set of results. </p>",
+        "QueryResponse$NextToken": "<p> A pagination token that can be used again on a <code>Query</code> call to get the next set of results. </p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request was denied due to request throttling.</p>",
+      "refs": {
+      }
+    },
+    "TimeSeriesDataPoint": {
+      "base": "<p>The timeseries datatype represents the values of a measure over time. A time series is an array of rows of timestamps and measure values, with rows sorted in ascending order of time. A TimeSeriesDataPoint is a single data point in the timeseries. It represents a tuple of (time, measure value) in a timeseries. </p>",
+      "refs": {
+        "TimeSeriesDataPointList$member": null
+      }
+    },
+    "TimeSeriesDataPointList": {
+      "base": null,
+      "refs": {
+        "Datum$TimeSeriesValue": "<p> Indicates if the data point is of timeseries data type. </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "TimeSeriesDataPoint$Time": "<p>The timestamp when the measure value was collected.</p>"
+      }
+    },
+    "Type": {
+      "base": "<p>Contains the data type of a column in a query result set. The data type can be scalar or complex. The supported scalar data types are integers, boolean, string, double, timestamp, date, time, and intervals. The supported complex data types are arrays, rows, and timeseries.</p>",
+      "refs": {
+        "ColumnInfo$Type": "<p> The data type of the result set column. The data type can be a scalar or complex. Scalar data types are integers, strings, doubles, booleans, and others. Complex data types are types such as arrays, rows, and others. </p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p> Invalid or malformed request. </p>",
+      "refs": {
+      }
+    }
+  }
+}

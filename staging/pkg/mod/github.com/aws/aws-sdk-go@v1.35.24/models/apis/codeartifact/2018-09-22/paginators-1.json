@@ -1,0 +1,40 @@
+{
+  "pagination": {
+    "ListDomains": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "domains"
+    },
+    "ListPackageVersionAssets": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "assets"
+    },
+    "ListPackageVersions": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "versions"
+    },
+    "ListPackages": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "packages"
+    },
+    "ListRepositories": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "repositories"
+    },
+    "ListRepositoriesInDomain": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "repositories"
+    }
+  }
+}

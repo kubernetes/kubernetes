@@ -1,0 +1,431 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:OqtcJqmTwWEu1aJ5qurlgh7PbwVEhJkUHj1bvcZ1iig=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:07 GMT
+      Etag:
+      - '"0x8D6E3BCE093C1CB"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3781d224-e01e-00b7-6da5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:vymnTogzIRuBGv5kIwjEMbh9+jOoP3rgnBHozhcjfbY=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-blob-content-length:
+      - "10485760"
+      x-ms-blob-sequence-number:
+      - "0"
+      x-ms-blob-type:
+      - PageBlob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:07 GMT
+      Etag:
+      - '"0x8D6E3BCE0966754"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3781d23c-e01e-00b7-01a5-15d5a7000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et finibus
+      massa convallis. Donec eget lacinia nibh. Ut ut cursus odio. Quisque id justo
+      interdum, maximus ex a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium.
+      Curabitur fermentum quam ac dolor venenatis, vitae scelerisque ex posuere. Donec
+      ut ante porttitor, ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida
+      dolor facilisis sollicitudin. Fusce ac ultrices libero. Donec erat lectus, hendrerit
+      volutpat nisl quis, porta accumsan nibh. Pellentesque hendrerit nisi id mi porttitor
+      maximus. Phasellus vitae venenatis velit. Quisque id felis nec lacus iaculis
+      porttitor. Maecenas egestas tortor et nulla dapibus varius. In hac habitasse
+      platea dictumst.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer
+      feugiat eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et
+      finibus massa convallis. Donec eget lacinia nibh. Ut ut cursus odio.
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:ofwJLuK8rMHFqngF3r7j7NmT6ogy1acdTITaPHA55Xg=
+      Content-Length:
+      - "1024"
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-blob-type:
+      - PageBlob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-page-write:
+      - update
+      x-ms-range:
+      - bytes=0-1023
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate?comp=page
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Content-Md5:
+      - 0rZVY1m4cHz874drfCSd/w==
+      Date:
+      - Tue, 28 May 2019 22:36:07 GMT
+      Etag:
+      - '"0x8D6E3BCE098B1AA"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Request-Id:
+      - 3781d25e-e01e-00b7-1ea5-15d5a7000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et finibus
+      massa convallis. Donec eget lacinia nibh. Ut ut cursus odio. Quisque id justo
+      interdum, maximus ex a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium.
+      Curabitur fermentum quam ac dolor venenatis, vitae scelerisque ex posuere. Donec
+      ut ante porttitor, ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida
+      dolor facilisis sollicitudin. Fusce ac
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:hCs+RYeoCKCVValNadaSWM/Hju2GNOSEz5ibE4icWcw=
+      Content-Length:
+      - "512"
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-blob-type:
+      - PageBlob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-page-write:
+      - update
+      x-ms-range:
+      - bytes=1024-1535
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate?comp=page
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Content-Md5:
+      - 2Xr7q2sERdQmQ41hZ7sPvQ==
+      Date:
+      - Tue, 28 May 2019 22:36:07 GMT
+      Etag:
+      - '"0x8D6E3BCE09A3891"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Request-Id:
+      - 3781d272-e01e-00b7-31a5-15d5a7000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:26qqDKBflwZF+pM/hGHCh4oUNLn17hCxtpB7VItYQuk=
+      Range:
+      - bytes=0-1535
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate
+    method: GET
+  response:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et finibus
+      massa convallis. Donec eget lacinia nibh. Ut ut cursus odio. Quisque id justo
+      interdum, maximus ex a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium.
+      Curabitur fermentum quam ac dolor venenatis, vitae scelerisque ex posuere. Donec
+      ut ante porttitor, ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida
+      dolor facilisis sollicitudin. Fusce ac ultrices libero. Donec erat lectus, hendrerit
+      volutpat nisl quis, porta accumsan nibh. Pellentesque hendrerit nisi id mi porttitor
+      maximus. Phasellus vitae venenatis velit. Quisque id felis nec lacus iaculis
+      porttitor. Maecenas egestas tortor et nulla dapibus varius. In hac habitasse
+      platea dictumst.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer
+      feugiat eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et
+      finibus massa convallis. Donec eget lacinia nibh. Ut ut cursus odio.Lorem ipsum
+      dolor sit amet, consectetur adipiscing elit. Integer feugiat eleifend scelerisque.
+      Phasellus tempor turpis eget magna pretium, et finibus massa convallis. Donec
+      eget lacinia nibh. Ut ut cursus odio. Quisque id justo interdum, maximus ex
+      a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium. Curabitur fermentum
+      quam ac dolor venenatis, vitae scelerisque ex posuere. Donec ut ante porttitor,
+      ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida dolor facilisis
+      sollicitudin. Fusce ac
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - "1536"
+      Content-Range:
+      - bytes 0-1535/10485760
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Tue, 28 May 2019 22:36:07 GMT
+      Etag:
+      - '"0x8D6E3BCE09A3891"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Blob-Type:
+      - PageBlob
+      X-Ms-Creation-Time:
+      - Tue, 28 May 2019 22:36:08 GMT
+      X-Ms-Lease-State:
+      - available
+      X-Ms-Lease-Status:
+      - unlocked
+      X-Ms-Request-Id:
+      - 3781d27b-e01e-00b7-3aa5-15d5a7000000
+      X-Ms-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 206 Partial Content
+    code: 206
+    duration: ""
+- request:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et finibus
+      massa convallis. Donec eget lacinia nibh. Ut ut cursus odio. Quisque id justo
+      interdum, maximus ex a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium.
+      Curabitur fermentum quam ac dolor venenatis, vitae scelerisque ex posuere. Donec
+      ut ante porttitor, ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida
+      dolor facilisis sollicitudin. Fusce ac
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:QLqaz9EaQveCxlb7ZuNI6y4PQEApwYYiWXrMNj11veM=
+      Content-Length:
+      - "512"
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-blob-type:
+      - PageBlob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-page-write:
+      - update
+      x-ms-range:
+      - bytes=0-511
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate?comp=page
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Content-Md5:
+      - 2Xr7q2sERdQmQ41hZ7sPvQ==
+      Date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Etag:
+      - '"0x8D6E3BCE09D1F52"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Request-Id:
+      - 3781d28e-e01e-00b7-4aa5-15d5a7000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:26qqDKBflwZF+pM/hGHCh4oUNLn17hCxtpB7VItYQuk=
+      Range:
+      - bytes=0-1535
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu/blob/32pageblobsuitetestputpagesupdate
+    method: GET
+  response:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et finibus
+      massa convallis. Donec eget lacinia nibh. Ut ut cursus odio. Quisque id justo
+      interdum, maximus ex a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium.
+      Curabitur fermentum quam ac dolor venenatis, vitae scelerisque ex posuere. Donec
+      ut ante porttitor, ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida
+      dolor facilisis sollicitudin. Fusce ac ultrices libero. Donec erat lectus, hendrerit
+      volutpat nisl quis, porta accumsan nibh. Pellentesque hendrerit nisi id mi porttitor
+      maximus. Phasellus vitae venenatis velit. Quisque id felis nec lacus iaculis
+      porttitor. Maecenas egestas tortor et nulla dapibus varius. In hac habitasse
+      platea dictumst.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer
+      feugiat eleifend scelerisque. Phasellus tempor turpis eget magna pretium, et
+      finibus massa convallis. Donec eget lacinia nibh. Ut ut cursus odio.Lorem ipsum
+      dolor sit amet, consectetur adipiscing elit. Integer feugiat eleifend scelerisque.
+      Phasellus tempor turpis eget magna pretium, et finibus massa convallis. Donec
+      eget lacinia nibh. Ut ut cursus odio. Quisque id justo interdum, maximus ex
+      a, dapibus leo. Nullam mattis arcu nec justo vehicula pretium. Curabitur fermentum
+      quam ac dolor venenatis, vitae scelerisque ex posuere. Donec ut ante porttitor,
+      ultricies ante ac, pulvinar metus. Nunc suscipit elit gravida dolor facilisis
+      sollicitudin. Fusce ac
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - "1536"
+      Content-Range:
+      - bytes 0-1535/10485760
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Etag:
+      - '"0x8D6E3BCE09D1F52"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Blob-Type:
+      - PageBlob
+      X-Ms-Creation-Time:
+      - Tue, 28 May 2019 22:36:08 GMT
+      X-Ms-Lease-State:
+      - available
+      X-Ms-Lease-Status:
+      - unlocked
+      X-Ms-Request-Id:
+      - 3781d2c0-e01e-00b7-77a5-15d5a7000000
+      X-Ms-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 206 Partial Content
+    code: 206
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:l6KHIKy0Xr46nV3ijkJjoluVlhQAyVDLG88CAnhPK7o=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-32pageblobsuitetestputpagesu?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3781d2d0-e01e-00b7-07a5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

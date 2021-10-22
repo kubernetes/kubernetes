@@ -1,0 +1,299 @@
+{
+  "version": "2.0",
+  "service": "<p>Detective uses machine learning and purpose-built visualizations to help you analyze and investigate security issues across your Amazon Web Services (AWS) workloads. Detective automatically extracts time-based events such as login attempts, API calls, and network traffic from AWS CloudTrail and Amazon Virtual Private Cloud (Amazon VPC) flow logs. It also extracts findings detected by Amazon GuardDuty.</p> <p>The Detective API primarily supports the creation and management of behavior graphs. A behavior graph contains the extracted data from a set of member accounts, and is created and managed by a master account.</p> <p>Every behavior graph is specific to a Region. You can only use the API to manage graphs that belong to the Region that is associated with the currently selected endpoint.</p> <p>A Detective master account can use the Detective API to do the following:</p> <ul> <li> <p>Enable and disable Detective. Enabling Detective creates a new behavior graph.</p> </li> <li> <p>View the list of member accounts in a behavior graph.</p> </li> <li> <p>Add member accounts to a behavior graph.</p> </li> <li> <p>Remove member accounts from a behavior graph.</p> </li> </ul> <p>A member account can use the Detective API to do the following:</p> <ul> <li> <p>View the list of behavior graphs that they are invited to.</p> </li> <li> <p>Accept an invitation to contribute to a behavior graph.</p> </li> <li> <p>Decline an invitation to contribute to a behavior graph.</p> </li> <li> <p>Remove their account from a behavior graph.</p> </li> </ul> <p>All API actions are logged as CloudTrail events. See <a href=\"https://docs.aws.amazon.com/detective/latest/adminguide/logging-using-cloudtrail.html\">Logging Detective API Calls with CloudTrail</a>.</p>",
+  "operations": {
+    "AcceptInvitation": "<p>Accepts an invitation for the member account to contribute data to a behavior graph. This operation can only be called by an invited member account. </p> <p>The request provides the ARN of behavior graph.</p> <p>The member account status in the graph must be <code>INVITED</code>.</p>",
+    "CreateGraph": "<p>Creates a new behavior graph for the calling account, and sets that account as the master account. This operation is called by the account that is enabling Detective.</p> <p>Before you try to enable Detective, make sure that your account has been enrolled in Amazon GuardDuty for at least 48 hours. If you do not meet this requirement, you cannot enable Detective. If you do meet the GuardDuty prerequisite, then when you make the request to enable Detective, it checks whether your data volume is within the Detective quota. If it exceeds the quota, then you cannot enable Detective. </p> <p>The operation also enables Detective for the calling account in the currently selected Region. It returns the ARN of the new behavior graph.</p> <p> <code>CreateGraph</code> triggers a process to create the corresponding data tables for the new behavior graph.</p> <p>An account can only be the master account for one behavior graph within a Region. If the same account calls <code>CreateGraph</code> with the same master account, it always returns the same behavior graph ARN. It does not create a new behavior graph.</p>",
+    "CreateMembers": "<p>Sends a request to invite the specified AWS accounts to be member accounts in the behavior graph. This operation can only be called by the master account for a behavior graph. </p> <p> <code>CreateMembers</code> verifies the accounts and then sends invitations to the verified accounts.</p> <p>The request provides the behavior graph ARN and the list of accounts to invite.</p> <p>The response separates the requested accounts into two lists:</p> <ul> <li> <p>The accounts that <code>CreateMembers</code> was able to start the verification for. This list includes member accounts that are being verified, that have passed verification and are being sent an invitation, and that have failed verification.</p> </li> <li> <p>The accounts that <code>CreateMembers</code> was unable to process. This list includes accounts that were already invited to be member accounts in the behavior graph.</p> </li> </ul>",
+    "DeleteGraph": "<p>Disables the specified behavior graph and queues it to be deleted. This operation removes the graph from each member account's list of behavior graphs.</p> <p> <code>DeleteGraph</code> can only be called by the master account for a behavior graph.</p>",
+    "DeleteMembers": "<p>Deletes one or more member accounts from the master account behavior graph. This operation can only be called by a Detective master account. That account cannot use <code>DeleteMembers</code> to delete their own account from the behavior graph. To disable a behavior graph, the master account uses the <code>DeleteGraph</code> API method.</p>",
+    "DisassociateMembership": "<p>Removes the member account from the specified behavior graph. This operation can only be called by a member account that has the <code>ENABLED</code> status.</p>",
+    "GetMembers": "<p>Returns the membership details for specified member accounts for a behavior graph.</p>",
+    "ListGraphs": "<p>Returns the list of behavior graphs that the calling account is a master of. This operation can only be called by a master account.</p> <p>Because an account can currently only be the master of one behavior graph within a Region, the results always contain a single graph.</p>",
+    "ListInvitations": "<p>Retrieves the list of open and accepted behavior graph invitations for the member account. This operation can only be called by a member account.</p> <p>Open invitations are invitations that the member account has not responded to.</p> <p>The results do not include behavior graphs for which the member account declined the invitation. The results also do not include behavior graphs that the member account resigned from or was removed from.</p>",
+    "ListMembers": "<p>Retrieves the list of member accounts for a behavior graph. Does not return member accounts that were removed from the behavior graph.</p>",
+    "RejectInvitation": "<p>Rejects an invitation to contribute the account data to a behavior graph. This operation must be called by a member account that has the <code>INVITED</code> status.</p>",
+    "StartMonitoringMember": "<p>Sends a request to enable data ingest for a member account that has a status of <code>ACCEPTED_BUT_DISABLED</code>.</p> <p>For valid member accounts, the status is updated as follows.</p> <ul> <li> <p>If Detective enabled the member account, then the new status is <code>ENABLED</code>.</p> </li> <li> <p>If Detective cannot enable the member account, the status remains <code>ACCEPTED_BUT_DISABLED</code>. </p> </li> </ul>"
+  },
+  "shapes": {
+    "AcceptInvitationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Account": {
+      "base": "<p>An AWS account that is the master of or a member of a behavior graph.</p>",
+      "refs": {
+        "AccountList$member": null
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "Account$AccountId": "<p>The account identifier of the AWS account.</p>",
+        "AccountIdList$member": null,
+        "MemberDetail$AccountId": "<p>The AWS account identifier for the member account.</p>",
+        "MemberDetail$MasterId": "<p>The AWS account identifier of the master account for the behavior graph.</p>",
+        "StartMonitoringMemberRequest$AccountId": "<p>The account ID of the member account to try to enable.</p> <p>The account must be an invited member account with a status of <code>ACCEPTED_BUT_DISABLED</code>. </p>",
+        "UnprocessedAccount$AccountId": "<p>The AWS account identifier of the member account that was not processed.</p>"
+      }
+    },
+    "AccountIdList": {
+      "base": null,
+      "refs": {
+        "DeleteMembersRequest$AccountIds": "<p>The list of AWS account identifiers for the member accounts to delete from the behavior graph.</p>",
+        "DeleteMembersResponse$AccountIds": "<p>The list of AWS account identifiers for the member accounts that Detective successfully deleted from the behavior graph.</p>",
+        "GetMembersRequest$AccountIds": "<p>The list of AWS account identifiers for the member account for which to return member details.</p> <p>You cannot use <code>GetMembers</code> to retrieve information about member accounts that were removed from the behavior graph.</p>"
+      }
+    },
+    "AccountList": {
+      "base": null,
+      "refs": {
+        "CreateMembersRequest$Accounts": "<p>The list of AWS accounts to invite to become member accounts in the behavior graph. For each invited account, the account list contains the account identifier and the AWS account root user email address.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>The request attempted an invalid action.</p>",
+      "refs": {
+      }
+    },
+    "CreateGraphResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGraphRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateMembershipRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EmailAddress": {
+      "base": null,
+      "refs": {
+        "Account$EmailAddress": "<p>The AWS account root user email address for the AWS account.</p>",
+        "MemberDetail$EmailAddress": "<p>The AWS account root user email address for the member account.</p>"
+      }
+    },
+    "EmailMessage": {
+      "base": null,
+      "refs": {
+        "CreateMembersRequest$Message": "<p>Customized message text to include in the invitation email message to the invited member accounts.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "ConflictException$Message": null,
+        "InternalServerException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ServiceQuotaExceededException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "GetMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Graph": {
+      "base": "<p>A behavior graph in Detective.</p>",
+      "refs": {
+        "GraphList$member": null
+      }
+    },
+    "GraphArn": {
+      "base": null,
+      "refs": {
+        "AcceptInvitationRequest$GraphArn": "<p>The ARN of the behavior graph that the member account is accepting the invitation for.</p> <p>The member account status in the behavior graph must be <code>INVITED</code>.</p>",
+        "CreateGraphResponse$GraphArn": "<p>The ARN of the new behavior graph.</p>",
+        "CreateMembersRequest$GraphArn": "<p>The ARN of the behavior graph to invite the member accounts to contribute their data to.</p>",
+        "DeleteGraphRequest$GraphArn": "<p>The ARN of the behavior graph to disable.</p>",
+        "DeleteMembersRequest$GraphArn": "<p>The ARN of the behavior graph to delete members from.</p>",
+        "DisassociateMembershipRequest$GraphArn": "<p>The ARN of the behavior graph to remove the member account from.</p> <p>The member account's member status in the behavior graph must be <code>ENABLED</code>.</p>",
+        "GetMembersRequest$GraphArn": "<p>The ARN of the behavior graph for which to request the member details.</p>",
+        "Graph$Arn": "<p>The ARN of the behavior graph.</p>",
+        "ListMembersRequest$GraphArn": "<p>The ARN of the behavior graph for which to retrieve the list of member accounts.</p>",
+        "MemberDetail$GraphArn": "<p>The ARN of the behavior graph that the member account was invited to.</p>",
+        "RejectInvitationRequest$GraphArn": "<p>The ARN of the behavior graph to reject the invitation to.</p> <p>The member account's current member status in the behavior graph must be <code>INVITED</code>.</p>",
+        "StartMonitoringMemberRequest$GraphArn": "<p>The ARN of the behavior graph.</p>"
+      }
+    },
+    "GraphList": {
+      "base": null,
+      "refs": {
+        "ListGraphsResponse$GraphList": "<p>A list of behavior graphs that the account is a master for.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>The request was valid but failed because of a problem with the service.</p>",
+      "refs": {
+      }
+    },
+    "ListGraphsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGraphsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInvitationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInvitationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MemberDetail": {
+      "base": "<p>Details about a member account that was invited to contribute to a behavior graph.</p>",
+      "refs": {
+        "MemberDetailList$member": null
+      }
+    },
+    "MemberDetailList": {
+      "base": null,
+      "refs": {
+        "CreateMembersResponse$Members": "<p>The set of member account invitation requests that Detective was able to process. This includes accounts that are being verified, that failed verification, and that passed verification and are being sent an invitation.</p>",
+        "GetMembersResponse$MemberDetails": "<p>The member account details that Detective is returning in response to the request.</p>",
+        "ListInvitationsResponse$Invitations": "<p>The list of behavior graphs for which the member account has open or accepted invitations.</p>",
+        "ListMembersResponse$MemberDetails": "<p>The list of member accounts in the behavior graph.</p> <p>The results include member accounts that did not pass verification and member accounts that have not yet accepted the invitation to the behavior graph. The results do not include member accounts that were removed from the behavior graph.</p>"
+      }
+    },
+    "MemberDisabledReason": {
+      "base": null,
+      "refs": {
+        "MemberDetail$DisabledReason": "<p>For member accounts with a status of <code>ACCEPTED_BUT_DISABLED</code>, the reason that the member account is not enabled.</p> <p>The reason can have one of the following values:</p> <ul> <li> <p> <code>VOLUME_TOO_HIGH</code> - Indicates that adding the member account would cause the data volume for the behavior graph to be too high.</p> </li> <li> <p> <code>VOLUME_UNKNOWN</code> - Indicates that Detective is unable to verify the data volume for the member account. This is usually because the member account is not enrolled in Amazon GuardDuty. </p> </li> </ul>"
+      }
+    },
+    "MemberResultsLimit": {
+      "base": null,
+      "refs": {
+        "ListGraphsRequest$MaxResults": "<p>The maximum number of graphs to return at a time. The total must be less than the overall limit on the number of results to return, which is currently 200.</p>",
+        "ListInvitationsRequest$MaxResults": "<p>The maximum number of behavior graph invitations to return in the response. The total must be less than the overall limit on the number of results to return, which is currently 200.</p>",
+        "ListMembersRequest$MaxResults": "<p>The maximum number of member accounts to include in the response. The total must be less than the overall limit on the number of results to return, which is currently 200.</p>"
+      }
+    },
+    "MemberStatus": {
+      "base": null,
+      "refs": {
+        "MemberDetail$Status": "<p>The current membership status of the member account. The status can have one of the following values:</p> <ul> <li> <p> <code>INVITED</code> - Indicates that the member was sent an invitation but has not yet responded.</p> </li> <li> <p> <code>VERIFICATION_IN_PROGRESS</code> - Indicates that Detective is verifying that the account identifier and email address provided for the member account match. If they do match, then Detective sends the invitation. If the email address and account identifier don't match, then the member cannot be added to the behavior graph.</p> </li> <li> <p> <code>VERIFICATION_FAILED</code> - Indicates that the account and email address provided for the member account do not match, and Detective did not send an invitation to the account.</p> </li> <li> <p> <code>ENABLED</code> - Indicates that the member account accepted the invitation to contribute to the behavior graph.</p> </li> <li> <p> <code>ACCEPTED_BUT_DISABLED</code> - Indicates that the member account accepted the invitation but is prevented from contributing data to the behavior graph. <code>DisabledReason</code> provides the reason why the member account is not enabled.</p> </li> </ul> <p>Member accounts that declined an invitation or that were removed from the behavior graph are not included.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListGraphsRequest$NextToken": "<p>For requests to get the next page of results, the pagination token that was returned with the previous set of results. The initial request does not include a pagination token.</p>",
+        "ListGraphsResponse$NextToken": "<p>If there are more behavior graphs remaining in the results, then this is the pagination token to use to request the next page of behavior graphs.</p>",
+        "ListInvitationsRequest$NextToken": "<p>For requests to retrieve the next page of results, the pagination token that was returned with the previous page of results. The initial request does not include a pagination token.</p>",
+        "ListInvitationsResponse$NextToken": "<p>If there are more behavior graphs remaining in the results, then this is the pagination token to use to request the next page of behavior graphs.</p>",
+        "ListMembersRequest$NextToken": "<p>For requests to retrieve the next page of member account results, the pagination token that was returned with the previous page of results. The initial request does not include a pagination token.</p>",
+        "ListMembersResponse$NextToken": "<p>If there are more member accounts remaining in the results, then this is the pagination token to use to request the next page of member accounts.</p>"
+      }
+    },
+    "Percentage": {
+      "base": null,
+      "refs": {
+        "MemberDetail$PercentOfGraphUtilization": "<p>The member account data volume as a percentage of the maximum allowed data volume. 0 indicates 0 percent, and 100 indicates 100 percent.</p> <p>Note that this is not the percentage of the behavior graph data volume.</p> <p>For example, the data volume for the behavior graph is 80 GB per day. The maximum data volume is 160 GB per day. If the data volume for the member account is 40 GB per day, then <code>PercentOfGraphUtilization</code> is 25. It represents 25% of the maximum allowed data volume. </p>"
+      }
+    },
+    "RejectInvitationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The request refers to a nonexistent resource.</p>",
+      "refs": {
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>This request cannot be completed for one of the following reasons.</p> <ul> <li> <p>The request would cause the number of member accounts in the behavior graph to exceed the maximum allowed. A behavior graph cannot have more than 1000 member accounts.</p> </li> <li> <p>The request would cause the data rate for the behavior graph to exceed the maximum allowed.</p> </li> <li> <p>Detective is unable to verify the data rate for the member account. This is usually because the member account is not enrolled in Amazon GuardDuty. </p> </li> </ul>",
+      "refs": {
+      }
+    },
+    "StartMonitoringMemberRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Graph$CreatedTime": "<p>The date and time that the behavior graph was created. The value is in milliseconds since the epoch.</p>",
+        "MemberDetail$InvitedTime": "<p>The date and time that Detective sent the invitation to the member account. The value is in milliseconds since the epoch.</p>",
+        "MemberDetail$UpdatedTime": "<p>The date and time that the member account was last updated. The value is in milliseconds since the epoch.</p>",
+        "MemberDetail$PercentOfGraphUtilizationUpdatedTime": "<p>The date and time when the graph utilization percentage was last updated.</p>"
+      }
+    },
+    "UnprocessedAccount": {
+      "base": "<p>A member account that was included in a request but for which the request could not be processed.</p>",
+      "refs": {
+        "UnprocessedAccountList$member": null
+      }
+    },
+    "UnprocessedAccountList": {
+      "base": null,
+      "refs": {
+        "CreateMembersResponse$UnprocessedAccounts": "<p>The list of accounts for which Detective was unable to process the invitation request. For each account, the list provides the reason why the request could not be processed. The list includes accounts that are already member accounts in the behavior graph.</p>",
+        "DeleteMembersResponse$UnprocessedAccounts": "<p>The list of member accounts that Detective was not able to delete from the behavior graph. For each member account, provides the reason that the deletion could not be processed.</p>",
+        "GetMembersResponse$UnprocessedAccounts": "<p>The requested member accounts for which Detective was unable to return member details.</p> <p>For each account, provides the reason why the request could not be processed.</p>"
+      }
+    },
+    "UnprocessedReason": {
+      "base": null,
+      "refs": {
+        "UnprocessedAccount$Reason": "<p>The reason that the member account request could not be processed.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The request parameters are invalid.</p>",
+      "refs": {
+      }
+    }
+  }
+}

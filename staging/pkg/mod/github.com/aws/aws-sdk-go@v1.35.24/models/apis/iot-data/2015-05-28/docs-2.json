@@ -1,0 +1,193 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS IoT</fullname> <p>AWS IoT-Data enables secure, bi-directional communication between Internet-connected things (such as sensors, actuators, embedded devices, or smart appliances) and the AWS cloud. It implements a broker for applications and things to publish messages over HTTP (Publish) and retrieve, update, and delete shadows. A shadow is a persistent representation of your things and their state in the AWS cloud.</p> <p>Find the endpoint address for actions in the AWS IoT data plane by running this CLI command:</p> <p> <code>aws iot describe-endpoint --endpoint-type iot:Data-ATS</code> </p> <p>The service name used by <a href=\"https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html\">AWS Signature Version 4</a> to sign requests is: <i>iotdevicegateway</i>.</p>",
+  "operations": {
+    "DeleteThingShadow": "<p>Deletes the shadow for the specified thing.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/iot/latest/developerguide/API_DeleteThingShadow.html\">DeleteThingShadow</a> in the AWS IoT Developer Guide.</p>",
+    "GetThingShadow": "<p>Gets the shadow for the specified thing.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/iot/latest/developerguide/API_GetThingShadow.html\">GetThingShadow</a> in the AWS IoT Developer Guide.</p>",
+    "ListNamedShadowsForThing": "<p>Lists the shadows for the specified thing.</p>",
+    "Publish": "<p>Publishes state information.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/iot/latest/developerguide/protocols.html#http\">HTTP Protocol</a> in the AWS IoT Developer Guide.</p>",
+    "UpdateThingShadow": "<p>Updates the shadow for the specified thing.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/iot/latest/developerguide/API_UpdateThingShadow.html\">UpdateThingShadow</a> in the AWS IoT Developer Guide.</p>"
+  },
+  "shapes": {
+    "ConflictException": {
+      "base": "<p>The specified version does not match the version of the document.</p>",
+      "refs": {
+      }
+    },
+    "DeleteThingShadowRequest": {
+      "base": "<p>The input for the DeleteThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteThingShadowResponse": {
+      "base": "<p>The output from the DeleteThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "GetThingShadowRequest": {
+      "base": "<p>The input for the GetThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "GetThingShadowResponse": {
+      "base": "<p>The output from the GetThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "InternalFailureException": {
+      "base": "<p>An unexpected error has occurred.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request is not valid.</p>",
+      "refs": {
+      }
+    },
+    "JsonDocument": {
+      "base": null,
+      "refs": {
+        "DeleteThingShadowResponse$payload": "<p>The state information, in JSON format.</p>",
+        "GetThingShadowResponse$payload": "<p>The state information, in JSON format.</p>",
+        "UpdateThingShadowRequest$payload": "<p>The state information, in JSON format.</p>",
+        "UpdateThingShadowResponse$payload": "<p>The state information, in JSON format.</p>"
+      }
+    },
+    "ListNamedShadowsForThingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNamedShadowsForThingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MethodNotAllowedException": {
+      "base": "<p>The specified combination of HTTP verb and URI is not supported.</p>",
+      "refs": {
+      }
+    },
+    "NamedShadowList": {
+      "base": null,
+      "refs": {
+        "ListNamedShadowsForThingResponse$results": "<p>The list of shadows for the specified thing.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListNamedShadowsForThingRequest$nextToken": "<p>The token to retrieve the next set of results.</p>",
+        "ListNamedShadowsForThingResponse$nextToken": "<p>The token for the next set of results, or null if there are no additional results.</p>"
+      }
+    },
+    "PageSize": {
+      "base": null,
+      "refs": {
+        "ListNamedShadowsForThingRequest$pageSize": "<p>The result page size.</p>"
+      }
+    },
+    "Payload": {
+      "base": null,
+      "refs": {
+        "PublishRequest$payload": "<p>The state information, in JSON format.</p>"
+      }
+    },
+    "PublishRequest": {
+      "base": "<p>The input for the Publish operation.</p>",
+      "refs": {
+      }
+    },
+    "Qos": {
+      "base": null,
+      "refs": {
+        "PublishRequest$qos": "<p>The Quality of Service (QoS) level.</p>"
+      }
+    },
+    "RequestEntityTooLargeException": {
+      "base": "<p>The payload exceeds the maximum size allowed.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The service is temporarily unavailable.</p>",
+      "refs": {
+      }
+    },
+    "ShadowName": {
+      "base": null,
+      "refs": {
+        "DeleteThingShadowRequest$shadowName": "<p>The name of the shadow.</p>",
+        "GetThingShadowRequest$shadowName": "<p>The name of the shadow.</p>",
+        "NamedShadowList$member": null,
+        "UpdateThingShadowRequest$shadowName": "<p>The name of the shadow.</p>"
+      }
+    },
+    "ThingName": {
+      "base": null,
+      "refs": {
+        "DeleteThingShadowRequest$thingName": "<p>The name of the thing.</p>",
+        "GetThingShadowRequest$thingName": "<p>The name of the thing.</p>",
+        "ListNamedShadowsForThingRequest$thingName": "<p>The name of the thing.</p>",
+        "UpdateThingShadowRequest$thingName": "<p>The name of the thing.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The rate exceeds the limit.</p>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "ListNamedShadowsForThingResponse$timestamp": "<p>The Epoch date and time the response was generated by AWS IoT.</p>"
+      }
+    },
+    "Topic": {
+      "base": null,
+      "refs": {
+        "PublishRequest$topic": "<p>The name of the MQTT topic.</p>"
+      }
+    },
+    "UnauthorizedException": {
+      "base": "<p>You are not authorized to perform this operation.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedDocumentEncodingException": {
+      "base": "<p>The document encoding is not supported.</p>",
+      "refs": {
+      }
+    },
+    "UpdateThingShadowRequest": {
+      "base": "<p>The input for the UpdateThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateThingShadowResponse": {
+      "base": "<p>The output from the UpdateThingShadow operation.</p>",
+      "refs": {
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "ConflictException$message": "<p>The message for the exception.</p>",
+        "InternalFailureException$message": "<p>The message for the exception.</p>",
+        "InvalidRequestException$message": "<p>The message for the exception.</p>",
+        "MethodNotAllowedException$message": "<p>The message for the exception.</p>",
+        "RequestEntityTooLargeException$message": "<p>The message for the exception.</p>",
+        "ResourceNotFoundException$message": "<p>The message for the exception.</p>",
+        "ServiceUnavailableException$message": "<p>The message for the exception.</p>",
+        "ThrottlingException$message": "<p>The message for the exception.</p>",
+        "UnauthorizedException$message": "<p>The message for the exception.</p>",
+        "UnsupportedDocumentEncodingException$message": "<p>The message for the exception.</p>"
+      }
+    }
+  }
+}

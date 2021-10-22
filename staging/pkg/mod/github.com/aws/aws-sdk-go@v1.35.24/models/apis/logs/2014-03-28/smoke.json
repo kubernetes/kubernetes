@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeLogGroups",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "GetLogEvents",
+            "input": {
+                "logGroupName": "fakegroup",
+                "logStreamName": "fakestream"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

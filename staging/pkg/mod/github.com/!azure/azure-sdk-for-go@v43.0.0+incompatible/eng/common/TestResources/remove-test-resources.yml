@@ -1,0 +1,48 @@
+# Removes resources from a cloud type specified by the variable (not parameter)
+# 'CloudType'. Use this as part of a matrix to remove resources from a
+# particular cloud instance. Normally we would use template variables instead of
+# parameters but matrix variables are not available during template expansion
+# so any benefits of parameters are lost.
+
+# Assumes steps in deploy-test-resources.yml was run previously. Requires
+# environment variable: AZURE_RESOURCEGROUP_NAME and Az PowerShell module
+
+steps:
+  - pwsh: >
+      eng/common/TestResources/Remove-TestResources.ps1
+      -ResourceGroupName "${env:AZURE_RESOURCEGROUP_NAME}"
+      -TenantId '$(aad-azure-sdk-test-tenant-id)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret)'
+      -Environment 'AzureCloud'
+      -Force
+      -Verbose
+    displayName: Remove test resources (AzureCloud)
+    condition: and(ne(variables['AZURE_RESOURCEGROUP_NAME'], ''), eq(variables['CloudType'], 'AzureCloud'))
+    continueOnError: true
+
+  - pwsh: >
+      eng/common/TestResources/Remove-TestResources.ps1
+      -ResourceGroupName "${env:AZURE_RESOURCEGROUP_NAME}"
+      -TenantId '$(aad-azure-sdk-test-tenant-id-gov)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id-gov)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret-gov)'
+      -Environment 'AzureUSGovernment'
+      -Force
+      -Verbose
+    displayName: Remove test resources (AzureUSGovernment)
+    condition: and(ne(variables['AZURE_RESOURCEGROUP_NAME'], ''), eq(variables['CloudType'], 'AzureUSGovernment'))
+    continueOnError: true
+
+  - pwsh: >
+      eng/common/TestResources/Remove-TestResources.ps1
+      -ResourceGroupName "${env:AZURE_RESOURCEGROUP_NAME}"
+      -TenantId '$(aad-azure-sdk-test-tenant-id-cn)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id-cn)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret-cn)'
+      -Environment 'AzureChinaCloud'
+      -Force
+      -Verbose
+    displayName: Remove test resources (AzureChinaCloud)
+    condition: and(ne(variables['AZURE_RESOURCEGROUP_NAME'], ''), eq(variables['CloudType'], 'AzureChinaCloud'))
+    continueOnError: true

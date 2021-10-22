@@ -1,0 +1,1513 @@
+{
+  "version": "1.0",
+  "examples": {
+    "AddLayerVersionPermission": [
+      {
+        "input": {
+          "Action": "lambda:GetLayerVersion",
+          "LayerName": "my-layer",
+          "Principal": "223456789012",
+          "StatementId": "xaccount",
+          "VersionNumber": 1
+        },
+        "output": {
+          "RevisionId": "35d87451-f796-4a3f-a618-95a3671b0a0c",
+          "Statement": "{\"Sid\":\"xaccount\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::223456789012:root\"},\"Action\":\"lambda:GetLayerVersion\",\"Resource\":\"arn:aws:lambda:us-east-2:123456789012:layer:my-layer:1\"}"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example grants permission for the account 223456789012 to use version 1 of a layer named my-layer.",
+        "id": "to-add-permissions-to-a-layer-version-1586479797163",
+        "title": "To add permissions to a layer version"
+      }
+    ],
+    "AddPermission": [
+      {
+        "input": {
+          "Action": "lambda:InvokeFunction",
+          "FunctionName": "my-function",
+          "Principal": "s3.amazonaws.com",
+          "SourceAccount": "123456789012",
+          "SourceArn": "arn:aws:s3:::my-bucket-1xpuxmplzrlbh/*",
+          "StatementId": "s3"
+        },
+        "output": {
+          "Statement": "{\"Sid\":\"s3\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"s3.amazonaws.com\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-east-2:123456789012:function:my-function\",\"Condition\":{\"StringEquals\":{\"AWS:SourceAccount\":\"123456789012\"},\"ArnLike\":{\"AWS:SourceArn\":\"arn:aws:s3:::my-bucket-1xpuxmplzrlbh\"}}}"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example adds permission for Amazon S3 to invoke a Lambda function named my-function for notifications from a bucket named my-bucket-1xpuxmplzrlbh in account 123456789012.",
+        "id": "add-permission-1474651469455",
+        "title": "To grant Amazon S3 permission to invoke a function"
+      },
+      {
+        "input": {
+          "Action": "lambda:InvokeFunction",
+          "FunctionName": "my-function",
+          "Principal": "223456789012",
+          "StatementId": "xaccount"
+        },
+        "output": {
+          "Statement": "{\"Sid\":\"xaccount\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::223456789012:root\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-east-2:123456789012:function:my-function\"}"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example adds permission for account 223456789012 invoke a Lambda function named my-function.",
+        "id": "add-permission-1474651469456",
+        "title": "To grant another account permission to invoke a function"
+      }
+    ],
+    "CreateAlias": [
+      {
+        "input": {
+          "Description": "alias for live version of function",
+          "FunctionName": "my-function",
+          "FunctionVersion": "1",
+          "Name": "LIVE"
+        },
+        "output": {
+          "AliasArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:LIVE",
+          "Description": "alias for live version of function",
+          "FunctionVersion": "1",
+          "Name": "LIVE",
+          "RevisionId": "873282ed-xmpl-4dc8-a069-d0c647e470c6"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates an alias named LIVE that points to version 1 of the my-function Lambda function.",
+        "id": "to-create-an-alias-for-a-lambda-function-1586480324259",
+        "title": "To create an alias for a Lambda function"
+      }
+    ],
+    "CreateEventSourceMapping": [
+      {
+        "input": {
+          "BatchSize": 5,
+          "EventSourceArn": "arn:aws:sqs:us-west-2:123456789012:my-queue",
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "BatchSize": 5,
+          "EventSourceArn": "arn:aws:sqs:us-west-2:123456789012:my-queue",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "LastModified": 1569284520.333,
+          "State": "Creating",
+          "StateTransitionReason": "USER_INITIATED",
+          "UUID": "a1b2c3d4-5678-90ab-cdef-11111EXAMPLE"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a mapping between an SQS queue and the my-function Lambda function.",
+        "id": "to-create-a-mapping-between-an-event-source-and-an-aws-lambda-function-1586480555467",
+        "title": "To create a mapping between an event source and an AWS Lambda function"
+      }
+    ],
+    "CreateFunction": [
+      {
+        "input": {
+          "Code": {
+            "S3Bucket": "my-bucket-1xpuxmplzrlbh",
+            "S3Key": "function.zip"
+          },
+          "Description": "Process image objects from Amazon S3.",
+          "Environment": {
+            "Variables": {
+              "BUCKET": "my-bucket-1xpuxmplzrlbh",
+              "PREFIX": "inbound"
+            }
+          },
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+          "MemorySize": 256,
+          "Publish": true,
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "Tags": {
+            "DEPARTMENT": "Assets"
+          },
+          "Timeout": 15,
+          "TracingConfig": {
+            "Mode": "Active"
+          }
+        },
+        "output": {
+          "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+          "CodeSize": 5797206,
+          "Description": "Process image objects from Amazon S3.",
+          "Environment": {
+            "Variables": {
+              "BUCKET": "my-bucket-1xpuxmplzrlbh",
+              "PREFIX": "inbound"
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+          "LastModified": "2020-04-10T19:06:32.563+0000",
+          "LastUpdateStatus": "Successful",
+          "MemorySize": 256,
+          "RevisionId": "b75dcd81-xmpl-48a8-a75a-93ba8b5b9727",
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "State": "Active",
+          "Timeout": 15,
+          "TracingConfig": {
+            "Mode": "Active"
+          },
+          "Version": "1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a function with a deployment package in Amazon S3 and enables X-Ray tracing and environment variable encryption.",
+        "id": "to-create-a-function-1586492061186",
+        "title": "To create a function"
+      }
+    ],
+    "DeleteAlias": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Name": "BLUE"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes an alias named BLUE from a function named my-function",
+        "id": "to-delete-a-lambda-function-alias-1481660370804",
+        "title": "To delete a Lambda function alias"
+      }
+    ],
+    "DeleteEventSourceMapping": [
+      {
+        "input": {
+          "UUID": "14e0db71-xmpl-4eb5-b481-8945cf9d10c2"
+        },
+        "output": {
+          "BatchSize": 5,
+          "EventSourceArn": "arn:aws:sqs:us-west-2:123456789012:my-queue",
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function",
+          "LastModified": "${timestamp}",
+          "State": "Enabled",
+          "StateTransitionReason": "USER_INITIATED",
+          "UUID": "14e0db71-xmpl-4eb5-b481-8945cf9d10c2"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes an event source mapping. To get a mapping's UUID, use ListEventSourceMappings.",
+        "id": "to-delete-a-lambda-function-event-source-mapping-1481658973862",
+        "title": "To delete a Lambda function event source mapping"
+      }
+    ],
+    "DeleteFunction": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes version 1 of a Lambda function named my-function.",
+        "id": "to-delete-a-lambda-function-1481648553696",
+        "title": "To delete a version of a Lambda function"
+      }
+    ],
+    "DeleteFunctionConcurrency": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes the reserved concurrent execution limit from a function named my-function.",
+        "id": "to-remove-the-reserved-concurrent-execution-limit-from-a-function-1586480714680",
+        "title": "To remove the reserved concurrent execution limit from a function"
+      }
+    ],
+    "DeleteFunctionEventInvokeConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "GREEN"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes the asynchronous invocation configuration for the GREEN alias of a function named my-function.",
+        "id": "to-delete-an-asynchronous-invocation-configuration-1586481102187",
+        "title": "To delete an asynchronous invocation configuration"
+      }
+    ],
+    "DeleteLayerVersion": [
+      {
+        "input": {
+          "LayerName": "my-layer",
+          "VersionNumber": 2
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes version 2 of a layer named my-layer.",
+        "id": "to-delete-a-version-of-a-lambda-layer-1586481157547",
+        "title": "To delete a version of a Lambda layer"
+      }
+    ],
+    "DeleteProvisionedConcurrencyConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "GREEN"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes the provisioned concurrency configuration for the GREEN alias of a function named my-function.",
+        "id": "to-delete-a-provisioned-concurrency-configuration-1586481032551",
+        "title": "To delete a provisioned concurrency configuration"
+      }
+    ],
+    "GetAccountSettings": [
+      {
+        "input": {
+        },
+        "output": {
+          "AccountLimit": {
+            "CodeSizeUnzipped": 262144000,
+            "CodeSizeZipped": 52428800,
+            "ConcurrentExecutions": 1000,
+            "TotalCodeSize": 80530636800,
+            "UnreservedConcurrentExecutions": 1000
+          },
+          "AccountUsage": {
+            "FunctionCount": 4,
+            "TotalCodeSize": 9426
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation takes no parameters and returns details about storage and concurrency quotas in the current Region.",
+        "id": "to-get-account-settings-1481657495274",
+        "title": "To get account settings"
+      }
+    ],
+    "GetAlias": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Name": "BLUE"
+        },
+        "output": {
+          "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function:BLUE",
+          "Description": "Production environment BLUE.",
+          "FunctionVersion": "3",
+          "Name": "BLUE",
+          "RevisionId": "594f41fb-xmpl-4c20-95c7-6ca5f2a92c93"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns details about an alias named BLUE for a function named my-function",
+        "id": "to-retrieve-a-lambda-function-alias-1481648742254",
+        "title": "To get a Lambda function alias"
+      }
+    ],
+    "GetEventSourceMapping": [
+      {
+        "input": {
+          "UUID": "14e0db71-xmpl-4eb5-b481-8945cf9d10c2"
+        },
+        "output": {
+          "BatchSize": 500,
+          "BisectBatchOnFunctionError": false,
+          "DestinationConfig": {
+          },
+          "EventSourceArn": "arn:aws:sqs:us-east-2:123456789012:mySQSqueue",
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:myFunction",
+          "LastModified": "${timestamp}",
+          "LastProcessingResult": "No records processed",
+          "MaximumRecordAgeInSeconds": 604800,
+          "MaximumRetryAttempts": 10000,
+          "State": "Creating",
+          "StateTransitionReason": "User action",
+          "UUID": "14e0db71-xmpl-4eb5-b481-8945cf9d10c2"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns details about an event source mapping. To get a mapping's UUID, use ListEventSourceMappings.",
+        "id": "to-get-a-lambda-functions-event-source-mapping-1481661622799",
+        "title": "To get a Lambda function's event source mapping"
+      }
+    ],
+    "GetFunction": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Code": {
+            "Location": "https://awslambda-us-west-2-tasks.s3.us-west-2.amazonaws.com/snapshots/123456789012/my-function-e7d9d1ed-xmpl-4f79-904a-4b87f2681f30?versionId=sH3TQwBOaUy...",
+            "RepositoryType": "S3"
+          },
+          "Configuration": {
+            "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+            "CodeSize": 5797206,
+            "Description": "Process image objects from Amazon S3.",
+            "Environment": {
+              "Variables": {
+                "BUCKET": "my-bucket-1xpuxmplzrlbh",
+                "PREFIX": "inbound"
+              }
+            },
+            "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+            "FunctionName": "my-function",
+            "Handler": "index.handler",
+            "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+            "LastModified": "2020-04-10T19:06:32.563+0000",
+            "LastUpdateStatus": "Successful",
+            "MemorySize": 256,
+            "RevisionId": "b75dcd81-xmpl-48a8-a75a-93ba8b5b9727",
+            "Role": "arn:aws:iam::123456789012:role/lambda-role",
+            "Runtime": "nodejs12.x",
+            "State": "Active",
+            "Timeout": 15,
+            "TracingConfig": {
+              "Mode": "Active"
+            },
+            "Version": "$LATEST"
+          },
+          "Tags": {
+            "DEPARTMENT": "Assets"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns code and configuration details for version 1 of a function named my-function.",
+        "id": "to-get-a-lambda-function-1481661622799",
+        "title": "To get a Lambda function"
+      }
+    ],
+    "GetFunctionConcurrency": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "ReservedConcurrentExecutions": 250
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the reserved concurrency setting for a function named my-function.",
+        "id": "to-get-the-reserved-concurrency-setting-for-a-function-1586481279992",
+        "title": "To get the reserved concurrency setting for a function"
+      }
+    ],
+    "GetFunctionConfiguration": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "1"
+        },
+        "output": {
+          "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+          "CodeSize": 5797206,
+          "Description": "Process image objects from Amazon S3.",
+          "Environment": {
+            "Variables": {
+              "BUCKET": "my-bucket-1xpuxmplzrlbh",
+              "PREFIX": "inbound"
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+          "LastModified": "2020-04-10T19:06:32.563+0000",
+          "LastUpdateStatus": "Successful",
+          "MemorySize": 256,
+          "RevisionId": "b75dcd81-xmpl-48a8-a75a-93ba8b5b9727",
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "State": "Active",
+          "Timeout": 15,
+          "TracingConfig": {
+            "Mode": "Active"
+          },
+          "Version": "$LATEST"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns and configuration details for version 1 of a function named my-function.",
+        "id": "to-get-a-lambda-functions-event-source-mapping-1481661622799",
+        "title": "To get a Lambda function's event source mapping"
+      }
+    ],
+    "GetFunctionEventInvokeConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "BLUE"
+        },
+        "output": {
+          "DestinationConfig": {
+            "OnFailure": {
+              "Destination": "arn:aws:sqs:us-east-2:123456789012:failed-invocations"
+            },
+            "OnSuccess": {
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:BLUE",
+          "LastModified": "${timestamp}",
+          "MaximumEventAgeInSeconds": 3600,
+          "MaximumRetryAttempts": 0
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the asynchronous invocation configuration for the BLUE alias of a function named my-function.",
+        "id": "to-get-an-asynchronous-invocation-configuration-1586481338463",
+        "title": "To get an asynchronous invocation configuration"
+      }
+    ],
+    "GetLayerVersion": [
+      {
+        "input": {
+          "LayerName": "my-layer",
+          "VersionNumber": 1
+        },
+        "output": {
+          "CompatibleRuntimes": [
+            "python3.6",
+            "python3.7"
+          ],
+          "Content": {
+            "CodeSha256": "tv9jJO+rPbXUUXuRKi7CwHzKtLDkDRJLB3cC3Z/ouXo=",
+            "CodeSize": 169,
+            "Location": "https://awslambda-us-east-2-layers.s3.us-east-2.amazonaws.com/snapshots/123456789012/my-layer-4aaa2fbb-ff77-4b0a-ad92-5b78a716a96a?versionId=27iWyA73cCAYqyH..."
+          },
+          "CreatedDate": "2018-11-14T23:03:52.894+0000",
+          "Description": "My Python layer",
+          "LayerArn": "arn:aws:lambda:us-east-2:123456789012:layer:my-layer",
+          "LayerVersionArn": "arn:aws:lambda:us-east-2:123456789012:layer:my-layer:1",
+          "LicenseInfo": "MIT",
+          "Version": 1
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns information for version 1 of a layer named my-layer.",
+        "id": "to-get-information-about-a-lambda-layer-version-1586481457839",
+        "title": "To get information about a Lambda layer version"
+      }
+    ],
+    "GetLayerVersionByArn": [
+      {
+        "input": {
+          "Arn": "arn:aws:lambda:ca-central-1:123456789012:layer:blank-python-lib:3"
+        },
+        "output": {
+          "CompatibleRuntimes": [
+            "python3.8"
+          ],
+          "Content": {
+            "CodeSha256": "6x+xmpl/M3BnQUk7gS9sGmfeFsR/npojXoA3fZUv4eU=",
+            "CodeSize": 9529009,
+            "Location": "https://awslambda-us-east-2-layers.s3.us-east-2.amazonaws.com/snapshots/123456789012/blank-python-lib-e5212378-xmpl-44ee-8398-9d8ec5113949?versionId=WbZnvf..."
+          },
+          "CreatedDate": "2020-03-31T00:35:18.949+0000",
+          "Description": "Dependencies for the blank-python sample app.",
+          "LayerArn": "arn:aws:lambda:us-east-2:123456789012:layer:blank-python-lib",
+          "LayerVersionArn": "arn:aws:lambda:us-east-2:123456789012:layer:blank-python-lib:3",
+          "Version": 3
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns information about the layer version with the specified Amazon Resource Name (ARN).",
+        "id": "to-get-information-about-a-lambda-layer-version-1586481457839",
+        "title": "To get information about a Lambda layer version"
+      }
+    ],
+    "GetPolicy": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Policy": "{\"Version\":\"2012-10-17\",\"Id\":\"default\",\"Statement\":[{\"Sid\":\"xaccount\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::123456789012:root\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-east-2:123456789012:function:my-function:1\"}]}",
+          "RevisionId": "4843f2f6-7c59-4fda-b484-afd0bc0e22b8"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns the resource-based policy for version 1 of a Lambda function named my-function.",
+        "id": "to-retrieve-a-lambda-function-policy-1481649319053",
+        "title": "To retrieve a Lambda function policy"
+      }
+    ],
+    "GetProvisionedConcurrencyConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "BLUE"
+        },
+        "output": {
+          "AllocatedProvisionedConcurrentExecutions": 100,
+          "AvailableProvisionedConcurrentExecutions": 100,
+          "LastModified": "2019-12-31T20:28:49+0000",
+          "RequestedProvisionedConcurrentExecutions": 100,
+          "Status": "READY"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example displays details for the provisioned concurrency configuration for the BLUE alias of the specified function.",
+        "id": "to-view-a-provisioned-concurrency-configuration-1586490192690",
+        "title": "To view a provisioned concurrency configuration"
+      },
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "BLUE"
+        },
+        "output": {
+          "AllocatedProvisionedConcurrentExecutions": 100,
+          "AvailableProvisionedConcurrentExecutions": 100,
+          "LastModified": "2019-12-31T20:28:49+0000",
+          "RequestedProvisionedConcurrentExecutions": 100,
+          "Status": "READY"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns details for the provisioned concurrency configuration for the BLUE alias of the specified function.",
+        "id": "to-get-a-provisioned-concurrency-configuration-1586490192690",
+        "title": "To get a provisioned concurrency configuration"
+      }
+    ],
+    "Invoke": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Payload": "{}",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Payload": "200 SUCCESS",
+          "StatusCode": 200
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example invokes version 1 of a function named my-function with an empty event payload.",
+        "id": "to-invoke-a-lambda-function-1481659683915",
+        "title": "To invoke a Lambda function"
+      },
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "InvocationType": "Event",
+          "Payload": "{}",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Payload": "",
+          "StatusCode": 202
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example invokes version 1 of a function named my-function asynchronously.",
+        "id": "to-invoke-a-lambda-function-async-1481659683915",
+        "title": "To invoke a Lambda function asynchronously"
+      }
+    ],
+    "InvokeAsync": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "InvokeArgs": "{}"
+        },
+        "output": {
+          "Status": 202
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example invokes a Lambda function asynchronously",
+        "id": "to-invoke-a-lambda-function-asynchronously-1481649694923",
+        "title": "To invoke a Lambda function asynchronously"
+      }
+    ],
+    "ListAliases": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "Aliases": [
+            {
+              "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function:BETA",
+              "Description": "Production environment BLUE.",
+              "FunctionVersion": "2",
+              "Name": "BLUE",
+              "RevisionId": "a410117f-xmpl-494e-8035-7e204bb7933b",
+              "RoutingConfig": {
+                "AdditionalVersionWeights": {
+                  "1": 0.7
+                }
+              }
+            },
+            {
+              "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function:LIVE",
+              "Description": "Production environment GREEN.",
+              "FunctionVersion": "1",
+              "Name": "GREEN",
+              "RevisionId": "21d40116-xmpl-40ba-9360-3ea284da1bb5"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of aliases for a function named my-function.",
+        "id": "to-list-a-functions-aliases-1481650199732",
+        "title": "To list a function's aliases"
+      }
+    ],
+    "ListEventSourceMappings": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "EventSourceMappings": [
+            {
+              "BatchSize": 5,
+              "EventSourceArn": "arn:aws:sqs:us-west-2:123456789012:mySQSqueue",
+              "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+              "LastModified": 1569284520.333,
+              "State": "Enabled",
+              "StateTransitionReason": "USER_INITIATED",
+              "UUID": "a1b2c3d4-5678-90ab-cdef-11111EXAMPLE"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of the event source mappings for a function named my-function.",
+        "id": "to-list-the-event-source-mappings-for-a-function-1586490285906",
+        "title": "To list the event source mappings for a function"
+      }
+    ],
+    "ListFunctionEventInvokeConfigs": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "FunctionEventInvokeConfigs": [
+            {
+              "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:GREEN",
+              "LastModified": 1577824406.719,
+              "MaximumEventAgeInSeconds": 1800,
+              "MaximumRetryAttempts": 2
+            },
+            {
+              "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:BLUE",
+              "LastModified": 1577824396.653,
+              "MaximumEventAgeInSeconds": 3600,
+              "MaximumRetryAttempts": 0
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of asynchronous invocation configurations for a function named my-function.",
+        "id": "to-view-a-list-of-asynchronous-invocation-configurations-1586490355611",
+        "title": "To view a list of asynchronous invocation configurations"
+      }
+    ],
+    "ListFunctions": [
+      {
+        "input": {
+        },
+        "output": {
+          "Functions": [
+            {
+              "CodeSha256": "dBG9m8SGdmlEjw/JYXlhhvCrAv5TxvXsbL/RMr0fT/I=",
+              "CodeSize": 294,
+              "Description": "",
+              "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:helloworld",
+              "FunctionName": "helloworld",
+              "Handler": "helloworld.handler",
+              "LastModified": "2019-09-23T18:32:33.857+0000",
+              "MemorySize": 128,
+              "RevisionId": "1718e831-badf-4253-9518-d0644210af7b",
+              "Role": "arn:aws:iam::123456789012:role/service-role/MyTestFunction-role-zgur6bf4",
+              "Runtime": "nodejs10.x",
+              "Timeout": 3,
+              "TracingConfig": {
+                "Mode": "PassThrough"
+              },
+              "Version": "$LATEST"
+            },
+            {
+              "CodeSha256": "sU0cJ2/hOZevwV/lTxCuQqK3gDZP3i8gUoqUUVRmY6E=",
+              "CodeSize": 266,
+              "Description": "",
+              "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+              "FunctionName": "my-function",
+              "Handler": "index.handler",
+              "LastModified": "2019-10-01T16:47:28.490+0000",
+              "MemorySize": 256,
+              "RevisionId": "93017fc9-59cb-41dc-901b-4845ce4bf668",
+              "Role": "arn:aws:iam::123456789012:role/service-role/helloWorldPython-role-uy3l9qyq",
+              "Runtime": "nodejs10.x",
+              "Timeout": 3,
+              "TracingConfig": {
+                "Mode": "PassThrough"
+              },
+              "Version": "$LATEST",
+              "VpcConfig": {
+                "SecurityGroupIds": [
+
+                ],
+                "SubnetIds": [
+
+                ],
+                "VpcId": ""
+              }
+            }
+          ],
+          "NextMarker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation returns a list of Lambda functions.",
+        "id": "to-get-a-list-of-lambda-functions-1481650507425",
+        "title": "To get a list of Lambda functions"
+      }
+    ],
+    "ListLayerVersions": [
+      {
+        "input": {
+          "LayerName": "blank-java-lib"
+        },
+        "output": {
+          "LayerVersions": [
+            {
+              "CompatibleRuntimes": [
+                "java8"
+              ],
+              "CreatedDate": "2020-03-18T23:38:42.284+0000",
+              "Description": "Dependencies for the blank-java sample app.",
+              "LayerVersionArn": "arn:aws:lambda:us-east-2:123456789012:layer:blank-java-lib:7",
+              "Version": 7
+            },
+            {
+              "CompatibleRuntimes": [
+                "java8"
+              ],
+              "CreatedDate": "2020-03-17T07:24:21.960+0000",
+              "Description": "Dependencies for the blank-java sample app.",
+              "LayerVersionArn": "arn:aws:lambda:us-east-2:123456789012:layer:blank-java-lib:6",
+              "Version": 6
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example displays information about the versions for the layer named blank-java-lib",
+        "id": "to-list-versions-of-a-layer-1586490857297",
+        "title": "To list versions of a layer"
+      }
+    ],
+    "ListLayers": [
+      {
+        "input": {
+          "CompatibleRuntime": "python3.7"
+        },
+        "output": {
+          "Layers": [
+            {
+              "LatestMatchingVersion": {
+                "CompatibleRuntimes": [
+                  "python3.6",
+                  "python3.7"
+                ],
+                "CreatedDate": "2018-11-15T00:37:46.592+0000",
+                "Description": "My layer",
+                "LayerVersionArn": "arn:aws:lambda:us-east-2:123456789012:layer:my-layer:2",
+                "Version": 2
+              },
+              "LayerArn": "arn:aws:lambda:us-east-2:123456789012:layer:my-layer",
+              "LayerName": "my-layer"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns information about layers that are compatible with the Python 3.7 runtime.",
+        "id": "to-list-the-layers-that-are-compatible-with-your-functions-runtime-1586490857297",
+        "title": "To list the layers that are compatible with your function's runtime"
+      }
+    ],
+    "ListProvisionedConcurrencyConfigs": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "ProvisionedConcurrencyConfigs": [
+            {
+              "AllocatedProvisionedConcurrentExecutions": 100,
+              "AvailableProvisionedConcurrentExecutions": 100,
+              "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:GREEN",
+              "LastModified": "2019-12-31T20:29:00+0000",
+              "RequestedProvisionedConcurrentExecutions": 100,
+              "Status": "READY"
+            },
+            {
+              "AllocatedProvisionedConcurrentExecutions": 100,
+              "AvailableProvisionedConcurrentExecutions": 100,
+              "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:BLUE",
+              "LastModified": "2019-12-31T20:28:49+0000",
+              "RequestedProvisionedConcurrentExecutions": 100,
+              "Status": "READY"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of provisioned concurrency configurations for a function named my-function.",
+        "id": "to-get-a-list-of-provisioned-concurrency-configurations-1586491032592",
+        "title": "To get a list of provisioned concurrency configurations"
+      }
+    ],
+    "ListTags": [
+      {
+        "input": {
+          "Resource": "arn:aws:lambda:us-west-2:123456789012:function:my-function"
+        },
+        "output": {
+          "Tags": {
+            "Category": "Web Tools",
+            "Department": "Sales"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example displays the tags attached to the my-function Lambda function.",
+        "id": "to-retrieve-the-list-of-tags-for-a-lambda-function-1586491111498",
+        "title": "To retrieve the list of tags for a Lambda function"
+      }
+    ],
+    "ListVersionsByFunction": [
+      {
+        "input": {
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "Versions": [
+            {
+              "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+              "CodeSize": 5797206,
+              "Description": "Process image objects from Amazon S3.",
+              "Environment": {
+                "Variables": {
+                  "BUCKET": "my-bucket-1xpuxmplzrlbh",
+                  "PREFIX": "inbound"
+                }
+              },
+              "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+              "FunctionName": "my-function",
+              "Handler": "index.handler",
+              "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+              "LastModified": "2020-04-10T19:06:32.563+0000",
+              "MemorySize": 256,
+              "RevisionId": "850ca006-2d98-4ff4-86db-8766e9d32fe9",
+              "Role": "arn:aws:iam::123456789012:role/lambda-role",
+              "Runtime": "nodejs12.x",
+              "Timeout": 15,
+              "TracingConfig": {
+                "Mode": "Active"
+              },
+              "Version": "$LATEST"
+            },
+            {
+              "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+              "CodeSize": 5797206,
+              "Description": "Process image objects from Amazon S3.",
+              "Environment": {
+                "Variables": {
+                  "BUCKET": "my-bucket-1xpuxmplzrlbh",
+                  "PREFIX": "inbound"
+                }
+              },
+              "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+              "FunctionName": "my-function",
+              "Handler": "index.handler",
+              "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+              "LastModified": "2020-04-10T19:06:32.563+0000",
+              "MemorySize": 256,
+              "RevisionId": "b75dcd81-xmpl-48a8-a75a-93ba8b5b9727",
+              "Role": "arn:aws:iam::123456789012:role/lambda-role",
+              "Runtime": "nodejs12.x",
+              "Timeout": 5,
+              "TracingConfig": {
+                "Mode": "Active"
+              },
+              "Version": "1"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a list of versions of a function named my-function",
+        "id": "to-list-versions-1481650603750",
+        "title": "To list versions of a function"
+      }
+    ],
+    "PublishLayerVersion": [
+      {
+        "input": {
+          "CompatibleRuntimes": [
+            "python3.6",
+            "python3.7"
+          ],
+          "Content": {
+            "S3Bucket": "lambda-layers-us-west-2-123456789012",
+            "S3Key": "layer.zip"
+          },
+          "Description": "My Python layer",
+          "LayerName": "my-layer",
+          "LicenseInfo": "MIT"
+        },
+        "output": {
+          "CompatibleRuntimes": [
+            "python3.6",
+            "python3.7"
+          ],
+          "Content": {
+            "CodeSha256": "tv9jJO+rPbXUUXuRKi7CwHzKtLDkDRJLB3cC3Z/ouXo=",
+            "CodeSize": 169,
+            "Location": "https://awslambda-us-west-2-layers.s3.us-west-2.amazonaws.com/snapshots/123456789012/my-layer-4aaa2fbb-ff77-4b0a-ad92-5b78a716a96a?versionId=27iWyA73cCAYqyH..."
+          },
+          "CreatedDate": "2018-11-14T23:03:52.894+0000",
+          "Description": "My Python layer",
+          "LayerArn": "arn:aws:lambda:us-west-2:123456789012:layer:my-layer",
+          "LayerVersionArn": "arn:aws:lambda:us-west-2:123456789012:layer:my-layer:1",
+          "LicenseInfo": "MIT",
+          "Version": 1
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a new Python library layer version. The command retrieves the layer content a file named layer.zip in the specified S3 bucket.",
+        "id": "to-create-a-lambda-layer-version-1586491213595",
+        "title": "To create a Lambda layer version"
+      }
+    ],
+    "PublishVersion": [
+      {
+        "input": {
+          "CodeSha256": "",
+          "Description": "",
+          "FunctionName": "myFunction"
+        },
+        "output": {
+          "CodeSha256": "YFgDgEKG3ugvF1+pX64gV6tu9qNuIYNUdgJm8nCxsm4=",
+          "CodeSize": 5797206,
+          "Description": "Process image objects from Amazon S3.",
+          "Environment": {
+            "Variables": {
+              "BUCKET": "my-bucket-1xpuxmplzrlbh",
+              "PREFIX": "inbound"
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "KMSKeyArn": "arn:aws:kms:us-west-2:123456789012:key/b0844d6c-xmpl-4463-97a4-d49f50839966",
+          "LastModified": "2020-04-10T19:06:32.563+0000",
+          "LastUpdateStatus": "Successful",
+          "MemorySize": 256,
+          "RevisionId": "b75dcd81-xmpl-48a8-a75a-93ba8b5b9727",
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "State": "Active",
+          "Timeout": 5,
+          "TracingConfig": {
+            "Mode": "Active"
+          },
+          "Version": "1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation publishes a version of a Lambda function",
+        "id": "to-publish-a-version-of-a-lambda-function-1481650704986",
+        "title": "To publish a version of a Lambda function"
+      }
+    ],
+    "PutFunctionConcurrency": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "ReservedConcurrentExecutions": 100
+        },
+        "output": {
+          "ReservedConcurrentExecutions": 100
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures 100 reserved concurrent executions for the my-function function.",
+        "id": "to-configure-a-reserved-concurrency-limit-for-a-function-1586491405956",
+        "title": "To configure a reserved concurrency limit for a function"
+      }
+    ],
+    "PutFunctionEventInvokeConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "MaximumEventAgeInSeconds": 3600,
+          "MaximumRetryAttempts": 0
+        },
+        "output": {
+          "DestinationConfig": {
+            "OnFailure": {
+            },
+            "OnSuccess": {
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:$LATEST",
+          "LastModified": "${timestamp}",
+          "MaximumEventAgeInSeconds": 3600,
+          "MaximumRetryAttempts": 0
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example sets a maximum event age of one hour and disables retries for the specified function.",
+        "id": "to-configure-error-handling-for-asynchronous-invocation-1586491524021",
+        "title": "To configure error handling for asynchronous invocation"
+      }
+    ],
+    "PutProvisionedConcurrencyConfig": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "ProvisionedConcurrentExecutions": 100,
+          "Qualifier": "BLUE"
+        },
+        "output": {
+          "AllocatedProvisionedConcurrentExecutions": 0,
+          "LastModified": "2019-11-21T19:32:12+0000",
+          "RequestedProvisionedConcurrentExecutions": 100,
+          "Status": "IN_PROGRESS"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example allocates 100 provisioned concurrency for the BLUE alias of the specified function.",
+        "id": "to-allocate-provisioned-concurrency-1586491651377",
+        "title": "To allocate provisioned concurrency"
+      }
+    ],
+    "RemoveLayerVersionPermission": [
+      {
+        "input": {
+          "LayerName": "my-layer",
+          "StatementId": "xaccount",
+          "VersionNumber": 1
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes permission for an account to configure a layer version.",
+        "id": "to-delete-layer-version-permissions-1586491829416",
+        "title": "To delete layer-version permissions"
+      }
+    ],
+    "RemovePermission": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "Qualifier": "PROD",
+          "StatementId": "xaccount"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example removes a permissions statement named xaccount from the PROD alias of a function named my-function.",
+        "id": "to-remove-a-lambda-functions-permissions-1481661337021",
+        "title": "To remove a Lambda function's permissions"
+      }
+    ],
+    "TagResource": [
+      {
+        "input": {
+          "Resource": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "Tags": {
+            "DEPARTMENT": "Department A"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example adds a tag with the key name DEPARTMENT and a value of 'Department A' to the specified Lambda function.",
+        "id": "to-add-tags-to-an-existing-lambda-function-1586491890446",
+        "title": "To add tags to an existing Lambda function"
+      }
+    ],
+    "UntagResource": [
+      {
+        "input": {
+          "Resource": "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+          "TagKeys": [
+            "DEPARTMENT"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example removes the tag with the key name DEPARTMENT tag from the my-function Lambda function.",
+        "id": "to-remove-tags-from-an-existing-lambda-function-1586491956425",
+        "title": "To remove tags from an existing Lambda function"
+      }
+    ],
+    "UpdateAlias": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "FunctionVersion": "2",
+          "Name": "BLUE",
+          "RoutingConfig": {
+            "AdditionalVersionWeights": {
+              "1": 0.7
+            }
+          }
+        },
+        "output": {
+          "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:my-function:BLUE",
+          "Description": "Production environment BLUE.",
+          "FunctionVersion": "2",
+          "Name": "BLUE",
+          "RevisionId": "594f41fb-xmpl-4c20-95c7-6ca5f2a92c93",
+          "RoutingConfig": {
+            "AdditionalVersionWeights": {
+              "1": 0.7
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example updates the alias named BLUE to send 30% of traffic to version 2 and 70% to version 1.",
+        "id": "to-update-a-function-alias-1481650817950",
+        "title": "To update a function alias"
+      }
+    ],
+    "UpdateEventSourceMapping": [
+      {
+        "input": {
+          "BatchSize": 123,
+          "Enabled": true,
+          "FunctionName": "myFunction",
+          "UUID": "1234xCy789012"
+        },
+        "output": {
+          "BatchSize": 123,
+          "EventSourceArn": "arn:aws:s3:::examplebucket/*",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "LastProcessingResult": "",
+          "State": "",
+          "StateTransitionReason": "",
+          "UUID": "1234xCy789012"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation updates a Lambda function event source mapping",
+        "id": "to-update-a-lambda-function-event-source-mapping-1481650907413",
+        "title": "To update a Lambda function event source mapping"
+      }
+    ],
+    "UpdateFunctionCode": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "S3Bucket": "my-bucket-1xpuxmplzrlbh",
+          "S3Key": "function.zip"
+        },
+        "output": {
+          "CodeSha256": "PFn4S+er27qk+UuZSTKEQfNKG/XNn7QJs90mJgq6oH8=",
+          "CodeSize": 308,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function",
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "LastModified": "2019-08-14T22:26:11.234+0000",
+          "MemorySize": 128,
+          "RevisionId": "873282ed-xmpl-4dc8-a069-d0c647e470c6",
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "Timeout": 3,
+          "TracingConfig": {
+            "Mode": "PassThrough"
+          },
+          "Version": "$LATEST"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example replaces the code of the unpublished ($LATEST) version of a function named my-function with the contents of the specified zip file in Amazon S3.",
+        "id": "to-update-a-lambda-functions-code-1481650992672",
+        "title": "To update a Lambda function's code"
+      }
+    ],
+    "UpdateFunctionConfiguration": [
+      {
+        "input": {
+          "FunctionName": "my-function",
+          "MemorySize": 256
+        },
+        "output": {
+          "CodeSha256": "PFn4S+er27qk+UuZSTKEQfNKG/XNn7QJs90mJgq6oH8=",
+          "CodeSize": 308,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function",
+          "FunctionName": "my-function",
+          "Handler": "index.handler",
+          "LastModified": "2019-08-14T22:26:11.234+0000",
+          "MemorySize": 256,
+          "RevisionId": "873282ed-xmpl-4dc8-a069-d0c647e470c6",
+          "Role": "arn:aws:iam::123456789012:role/lambda-role",
+          "Runtime": "nodejs12.x",
+          "Timeout": 3,
+          "TracingConfig": {
+            "Mode": "PassThrough"
+          },
+          "Version": "$LATEST"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example modifies the memory size to be 256 MB for the unpublished ($LATEST) version of a function named my-function.",
+        "id": "to-update-a-lambda-functions-configuration-1481651096447",
+        "title": "To update a Lambda function's configuration"
+      }
+    ],
+    "UpdateFunctionEventInvokeConfig": [
+      {
+        "input": {
+          "DestinationConfig": {
+            "OnFailure": {
+              "Destination": "arn:aws:sqs:us-east-2:123456789012:destination"
+            }
+          },
+          "FunctionName": "my-function"
+        },
+        "output": {
+          "DestinationConfig": {
+            "OnFailure": {
+              "Destination": "arn:aws:sqs:us-east-2:123456789012:destination"
+            },
+            "OnSuccess": {
+            }
+          },
+          "FunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:my-function:$LATEST",
+          "LastModified": 1573687896.493,
+          "MaximumEventAgeInSeconds": 3600,
+          "MaximumRetryAttempts": 0
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example adds an on-failure destination to the existing asynchronous invocation configuration for a function named my-function.",
+        "id": "to-update-an-asynchronous-invocation-configuration-1586492061186",
+        "title": "To update an asynchronous invocation configuration"
+      }
+    ]
+  }
+}

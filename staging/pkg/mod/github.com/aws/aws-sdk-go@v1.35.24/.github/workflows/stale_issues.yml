@@ -1,0 +1,45 @@
+name: "Close stale issues"
+
+# Controls when the action will run.
+on:
+  schedule:
+  - cron: "0 0 * * *"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    name: Stale issue job
+    steps:
+    - uses: aws-actions/stale-issue-cleanup@v2
+      with:
+        # Setting messages to an empty string will cause the automation to skip
+        # that category
+        ancient-issue-message: We have noticed this issue has not received attention in 1 year. We will close this issue for now. If you think this is in error, please feel free to comment and reopen the issue.
+        stale-issue-message: This issue has not received a response in 1 week. If you want to keep this issue open, please just leave a comment below and auto-close will be canceled.
+
+        # These labels are required
+        stale-issue-label: closing-soon
+        exempt-issue-label: no-autoclose
+        stale-pr-label: no-pr-activity
+        exempt-pr-label: awaiting-approval
+        response-requested-label: response-requested
+
+        # Don't set closed-for-staleness label to skip closing very old issues
+        # regardless of label
+        closed-for-staleness-label: closed-for-staleness
+
+        # Issue timing
+        days-before-stale: 7
+        days-before-close: 4
+        days-before-ancient: 365
+
+        # If you don't want to mark a issue as being ancient based on a
+        # threshold of "upvotes", you can set this here. An "upvote" is
+        # the total number of +1, heart, hooray, and rocket reactions
+        # on an issue.
+        minimum-upvotes-to-exempt: 10
+
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        # loglevel: DEBUG
+        # Set dry-run to true to not perform label or close actions.
+        # dry-run: true

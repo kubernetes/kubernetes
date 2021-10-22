@@ -1,0 +1,745 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS Transfer Family is a fully managed service that enables the transfer of files over the File Transfer Protocol (FTP), File Transfer Protocol over SSL (FTPS), or Secure Shell (SSH) File Transfer Protocol (SFTP) directly into and out of Amazon Simple Storage Service (Amazon S3). AWS helps you seamlessly migrate your file transfer workflows to AWS Transfer Family by integrating with existing authentication systems, and providing DNS routing with Amazon Route 53 so nothing changes for your customers and partners, or their applications. With your data in Amazon S3, you can use it with AWS services for processing, analytics, machine learning, and archiving. Getting started with AWS Transfer Family is easy since there is no infrastructure to buy and set up.</p>",
+  "operations": {
+    "CreateServer": "<p>Instantiates an autoscaling virtual server based on the selected file transfer protocol in AWS. When you make updates to your file transfer protocol-enabled server or when you work with users, use the service-generated <code>ServerId</code> property that is assigned to the newly created server.</p>",
+    "CreateUser": "<p>Creates a user and associates them with an existing file transfer protocol-enabled server. You can only create and associate users with servers that have the <code>IdentityProviderType</code> set to <code>SERVICE_MANAGED</code>. Using parameters for <code>CreateUser</code>, you can specify the user name, set the home directory, store the user's public key, and assign the user's AWS Identity and Access Management (IAM) role. You can also optionally add a scope-down policy, and assign metadata with tags that can be used to group and search for users.</p>",
+    "DeleteServer": "<p>Deletes the file transfer protocol-enabled server that you specify.</p> <p>No response returns from this operation.</p>",
+    "DeleteSshPublicKey": "<p>Deletes a user's Secure Shell (SSH) public key.</p> <p>No response is returned from this operation.</p>",
+    "DeleteUser": "<p>Deletes the user belonging to a file transfer protocol-enabled server you specify.</p> <p>No response returns from this operation.</p> <note> <p>When you delete a user from a server, the user's information is lost.</p> </note>",
+    "DescribeSecurityPolicy": "<p>Describes the security policy that is attached to your file transfer protocol-enabled server. The response contains a description of the security policy's properties. For more information about security policies, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html\">Working with security policies</a>.</p>",
+    "DescribeServer": "<p>Describes a file transfer protocol-enabled server that you specify by passing the <code>ServerId</code> parameter.</p> <p>The response contains a description of a server's properties. When you set <code>EndpointType</code> to VPC, the response will contain the <code>EndpointDetails</code>.</p>",
+    "DescribeUser": "<p>Describes the user assigned to the specific file transfer protocol-enabled server, as identified by its <code>ServerId</code> property.</p> <p>The response from this call returns the properties of the user associated with the <code>ServerId</code> value that was specified.</p>",
+    "ImportSshPublicKey": "<p>Adds a Secure Shell (SSH) public key to a user account identified by a <code>UserName</code> value assigned to the specific file transfer protocol-enabled server, identified by <code>ServerId</code>.</p> <p>The response returns the <code>UserName</code> value, the <code>ServerId</code> value, and the name of the <code>SshPublicKeyId</code>.</p>",
+    "ListSecurityPolicies": "<p>Lists the security policies that are attached to your file transfer protocol-enabled servers.</p>",
+    "ListServers": "<p>Lists the file transfer protocol-enabled servers that are associated with your AWS account.</p>",
+    "ListTagsForResource": "<p>Lists all of the tags associated with the Amazon Resource Number (ARN) you specify. The resource can be a user, server, or role.</p>",
+    "ListUsers": "<p>Lists the users for a file transfer protocol-enabled server that you specify by passing the <code>ServerId</code> parameter.</p>",
+    "StartServer": "<p>Changes the state of a file transfer protocol-enabled server from <code>OFFLINE</code> to <code>ONLINE</code>. It has no impact on a server that is already <code>ONLINE</code>. An <code>ONLINE</code> server can accept and process file transfer jobs.</p> <p>The state of <code>STARTING</code> indicates that the server is in an intermediate state, either not fully able to respond, or not fully online. The values of <code>START_FAILED</code> can indicate an error condition.</p> <p>No response is returned from this call.</p>",
+    "StopServer": "<p>Changes the state of a file transfer protocol-enabled server from <code>ONLINE</code> to <code>OFFLINE</code>. An <code>OFFLINE</code> server cannot accept and process file transfer jobs. Information tied to your server, such as server and user properties, are not affected by stopping your server.</p> <note> <p>Stopping the server will not reduce or impact your file transfer protocol endpoint billing; you must delete the server to stop being billed.</p> </note> <p>The state of <code>STOPPING</code> indicates that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>STOP_FAILED</code> can indicate an error condition.</p> <p>No response is returned from this call.</p>",
+    "TagResource": "<p>Attaches a key-value pair to a resource, as identified by its Amazon Resource Name (ARN). Resources are users, servers, roles, and other entities.</p> <p>There is no response returned from this call.</p>",
+    "TestIdentityProvider": "<p>If the <code>IdentityProviderType</code> of a file transfer protocol-enabled server is <code>API_Gateway</code>, tests whether your API Gateway is set up successfully. We highly recommend that you call this operation to test your authentication method as soon as you create your server. By doing so, you can troubleshoot issues with the API Gateway integration to ensure that your users can successfully use the service.</p>",
+    "UntagResource": "<p>Detaches a key-value pair from a resource, as identified by its Amazon Resource Name (ARN). Resources are users, servers, roles, and other entities.</p> <p>No response is returned from this call.</p>",
+    "UpdateServer": "<p>Updates the file transfer protocol-enabled server's properties after that server has been created.</p> <p>The <code>UpdateServer</code> call returns the <code>ServerId</code> of the server you updated.</p>",
+    "UpdateUser": "<p>Assigns new properties to a user. Parameters you pass modify any or all of the following: the home directory, role, and policy for the <code>UserName</code> and <code>ServerId</code> you specify.</p> <p>The response returns the <code>ServerId</code> and the <code>UserName</code> for the updated user.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AddressAllocationId": {
+      "base": null,
+      "refs": {
+        "AddressAllocationIds$member": null
+      }
+    },
+    "AddressAllocationIds": {
+      "base": null,
+      "refs": {
+        "EndpointDetails$AddressAllocationIds": "<p>A list of address allocation IDs that are required to attach an Elastic IP address to your server's endpoint.</p> <note> <p>This property can only be set when <code>EndpointType</code> is set to <code>VPC</code> and it is only valid in the <code>UpdateServer</code> API.</p> </note>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "DescribedServer$Arn": "<p>Specifies the unique Amazon Resource Name (ARN) of the server.</p>",
+        "DescribedUser$Arn": "<p>Specifies the unique Amazon Resource Name (ARN) for the user that was requested to be described.</p>",
+        "ListTagsForResourceRequest$Arn": "<p>Requests the tags associated with a particular Amazon Resource Name (ARN). An ARN is an identifier for a specific AWS resource, such as a server, user, or role.</p>",
+        "ListTagsForResourceResponse$Arn": "<p>The ARN you specified to list the tags of.</p>",
+        "ListedServer$Arn": "<p>Specifies the unique Amazon Resource Name (ARN) for a server to be listed.</p>",
+        "ListedUser$Arn": "<p>Provides the unique Amazon Resource Name (ARN) for the user that you want to learn about.</p>",
+        "TagResourceRequest$Arn": "<p>An Amazon Resource Name (ARN) for a specific AWS resource, such as a server, user, or role.</p>",
+        "UntagResourceRequest$Arn": "<p>The value of the resource that will have the tag removed. An Amazon Resource Name (ARN) is an identifier for a specific AWS resource, such as a server, user, or role.</p>"
+      }
+    },
+    "Certificate": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$Certificate": "<p>The Amazon Resource Name (ARN) of the AWS Certificate Manager (ACM) certificate. Required when <code>Protocols</code> is set to <code>FTPS</code>.</p> <p>To request a new public certificate, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-public.html\">Request a public certificate</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>To import an existing certificate into ACM, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html\">Importing certificates into ACM</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>To request a private certificate to use FTPS through private IP addresses, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-private.html\">Request a private certificate</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>Certificates with the following cryptographic algorithms and key sizes are supported:</p> <ul> <li> <p>2048-bit RSA (RSA_2048)</p> </li> <li> <p>4096-bit RSA (RSA_4096)</p> </li> <li> <p>Elliptic Prime Curve 256 bit (EC_prime256v1)</p> </li> <li> <p>Elliptic Prime Curve 384 bit (EC_secp384r1)</p> </li> <li> <p>Elliptic Prime Curve 521 bit (EC_secp521r1)</p> </li> </ul> <note> <p>The certificate must be a valid SSL/TLS X.509 version 3 certificate with FQDN or IP address specified and information about the issuer.</p> </note>",
+        "DescribedServer$Certificate": "<p>Specifies the ARN of the AWS Certificate Manager (ACM) certificate. Required when <code>Protocols</code> is set to <code>FTPS</code>.</p>",
+        "UpdateServerRequest$Certificate": "<p>The Amazon Resource Name (ARN) of the AWS Certificate Manager (ACM) certificate. Required when <code>Protocols</code> is set to <code>FTPS</code>.</p> <p>To request a new public certificate, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-public.html\">Request a public certificate</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>To import an existing certificate into ACM, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html\">Importing certificates into ACM</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>To request a private certificate to use FTPS through private IP addresses, see <a href=\"https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-private.html\">Request a private certificate</a> in the <i> AWS Certificate Manager User Guide</i>.</p> <p>Certificates with the following cryptographic algorithms and key sizes are supported:</p> <ul> <li> <p>2048-bit RSA (RSA_2048)</p> </li> <li> <p>4096-bit RSA (RSA_4096)</p> </li> <li> <p>Elliptic Prime Curve 256 bit (EC_prime256v1)</p> </li> <li> <p>Elliptic Prime Curve 384 bit (EC_secp384r1)</p> </li> <li> <p>Elliptic Prime Curve 521 bit (EC_secp521r1)</p> </li> </ul> <note> <p>The certificate must be a valid SSL/TLS X.509 version 3 certificate with FQDN or IP address specified and information about the issuer.</p> </note>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>This exception is thrown when the <code>UpdatServer</code> is called for a file transfer protocol-enabled server that has VPC as the endpoint type and the server's <code>VpcEndpointID</code> is not in the available state.</p>",
+      "refs": {
+      }
+    },
+    "CreateServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateServerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DateImported": {
+      "base": null,
+      "refs": {
+        "SshPublicKey$DateImported": "<p>Specifies the date that the public key was added to the user account.</p>"
+      }
+    },
+    "DeleteServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSshPublicKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSecurityPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSecurityPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeServerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribedSecurityPolicy": {
+      "base": "<p>Describes the properties of a security policy that was specified. For more information about security policies, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html\">Working with security policies</a>.</p>",
+      "refs": {
+        "DescribeSecurityPolicyResponse$SecurityPolicy": "<p>An array containing the properties of the security policy.</p>"
+      }
+    },
+    "DescribedServer": {
+      "base": "<p>Describes the properties of a file transfer protocol-enabled server that was specified.</p>",
+      "refs": {
+        "DescribeServerResponse$Server": "<p>An array containing the properties of a server with the <code>ServerID</code> you specified.</p>"
+      }
+    },
+    "DescribedUser": {
+      "base": "<p>Describes the properties of a user that was specified.</p>",
+      "refs": {
+        "DescribeUserResponse$User": "<p>An array containing the properties of the user account for the <code>ServerID</code> value that you specified.</p>"
+      }
+    },
+    "EndpointDetails": {
+      "base": "<p>The virtual private cloud (VPC) endpoint settings that are configured for your file transfer protocol-enabled server. With a VPC endpoint, you can restrict access to your server and resources only within your VPC. To control incoming internet traffic, invoke the <code>UpdateServer</code> API and attach an Elastic IP to your server's endpoint.</p>",
+      "refs": {
+        "CreateServerRequest$EndpointDetails": "<p>The virtual private cloud (VPC) endpoint settings that are configured for your server. When you host your endpoint within your VPC, you can make it accessible only to resources within your VPC, or you can attach Elastic IPs and make it accessible to clients over the internet. Your VPC's default security groups are automatically assigned to your endpoint.</p>",
+        "DescribedServer$EndpointDetails": "<p>Specifies the virtual private cloud (VPC) endpoint settings that you configured for your server.</p>",
+        "UpdateServerRequest$EndpointDetails": "<p>The virtual private cloud (VPC) endpoint settings that are configured for your server. With a VPC endpoint, you can restrict access to your server to resources only within your VPC. To control incoming internet traffic, you will need to associate one or more Elastic IP addresses with your server's endpoint.</p>"
+      }
+    },
+    "EndpointType": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$EndpointType": "<p>The type of VPC endpoint that you want your server to connect to. You can choose to connect to the public internet or a VPC endpoint. With a VPC endpoint, you can restrict access to your server and resources only within your VPC.</p> <note> <p>It is recommended that you use <code>VPC</code> as the <code>EndpointType</code>. With this endpoint type, you have the option to directly associate up to three Elastic IPv4 addresses (BYO IP included) with your server's endpoint and use VPC security groups to restrict traffic by the client's public IP address. This is not possible with <code>EndpointType</code> set to <code>VPC_ENDPOINT</code>.</p> </note>",
+        "DescribedServer$EndpointType": "<p>Defines the type of endpoint that your server is connected to. If your server is connected to a VPC endpoint, your server isn't accessible over the public internet.</p>",
+        "ListedServer$EndpointType": "<p>Specifies the type of VPC endpoint that your server is connected to. If your server is connected to a VPC endpoint, your server isn't accessible over the public internet.</p>",
+        "UpdateServerRequest$EndpointType": "<p>The type of endpoint that you want your server to connect to. You can choose to connect to the public internet or a VPC endpoint. With a VPC endpoint, you can restrict access to your server and resources only within your VPC.</p> <note> <p>It is recommended that you use <code>VPC</code> as the <code>EndpointType</code>. With this endpoint type, you have the option to directly associate up to three Elastic IPv4 addresses (BYO IP included) with your server's endpoint and use VPC security groups to restrict traffic by the client's public IP address. This is not possible with <code>EndpointType</code> set to <code>VPC_ENDPOINT</code>.</p> </note>"
+      }
+    },
+    "Fips": {
+      "base": null,
+      "refs": {
+        "DescribedSecurityPolicy$Fips": "<p>Specifies whether this policy enables Federal Information Processing Standards (FIPS).</p>"
+      }
+    },
+    "HomeDirectory": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$HomeDirectory": "<p>The landing directory (folder) for a user when they log in to the server using the client.</p> <p>An example is <i> <code>your-Amazon-S3-bucket-name&gt;/home/username</code> </i>.</p>",
+        "DescribedUser$HomeDirectory": "<p>Specifies the landing directory (or folder), which is the location that files are written to or read from in an Amazon S3 bucket, for the described user. An example is <i> <code>your-Amazon-S3-bucket-name&gt;/home/username</code> </i>.</p>",
+        "ListedUser$HomeDirectory": "<p>Specifies the location that files are written to or read from an Amazon S3 bucket for the user you specify by their ARN.</p>",
+        "UpdateUserRequest$HomeDirectory": "<p>Specifies the landing directory (folder) for a user when they log in to the server using their file transfer protocol client.</p> <p>An example is <code>your-Amazon-S3-bucket-name&gt;/home/username</code>.</p>"
+      }
+    },
+    "HomeDirectoryMapEntry": {
+      "base": "<p>Represents an object that contains entries and targets for <code>HomeDirectoryMappings</code>.</p>",
+      "refs": {
+        "HomeDirectoryMappings$member": null
+      }
+    },
+    "HomeDirectoryMappings": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$HomeDirectoryMappings": "<p>Logical directory mappings that specify what Amazon S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual Amazon S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your IAM role provides access to paths in <code>Target</code>. The following is an example.</p> <p> <code>'[ \"/bucket2/documentation\", { \"Entry\": \"your-personal-report.pdf\", \"Target\": \"/bucket3/customized-reports/${transfer:UserName}.pdf\" } ]'</code> </p> <p>In most cases, you can use this value instead of the scope-down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value.</p> <note> <p>If the target of a logical directory entry does not exist in Amazon S3, the entry will be ignored. As a workaround, you can use the Amazon S3 API to create 0 byte objects as place holders for your directory. If using the CLI, use the <code>s3api</code> call instead of <code>s3</code> so you can use the put-object operation. For example, you use the following: <code>aws s3api put-object --bucket bucketname --key path/to/folder/</code>. Make sure that the end of the key name ends in a '/' for it to be considered a folder.</p> </note>",
+        "DescribedUser$HomeDirectoryMappings": "<p>Specifies the logical directory mappings that specify what Amazon S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual Amazon S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your AWS Identity and Access Management (IAM) role provides access to paths in <code>Target</code>.</p> <p>In most cases, you can use this value instead of the scope-down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value.</p>",
+        "UpdateUserRequest$HomeDirectoryMappings": "<p>Logical directory mappings that specify what Amazon S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual Amazon S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your IAM role provides access to paths in <code>Target</code>. The following is an example.</p> <p> <code>'[ \"/bucket2/documentation\", { \"Entry\": \"your-personal-report.pdf\", \"Target\": \"/bucket3/customized-reports/${transfer:UserName}.pdf\" } ]'</code> </p> <p>In most cases, you can use this value instead of the scope-down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value.</p> <note> <p>If the target of a logical directory entry does not exist in Amazon S3, the entry will be ignored. As a workaround, you can use the Amazon S3 API to create 0 byte objects as place holders for your directory. If using the CLI, use the <code>s3api</code> call instead of <code>s3</code> so you can use the put-object operation. For example, you use the following: <code>aws s3api put-object --bucket bucketname --key path/to/folder/</code>. Make sure that the end of the key name ends in a / for it to be considered a folder.</p> </note>"
+      }
+    },
+    "HomeDirectoryType": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$HomeDirectoryType": "<p>The type of landing directory (folder) you want your users' home directory to be when they log into the server. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their file transfer protocol clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make Amazon S3 paths visible to your users.</p>",
+        "DescribedUser$HomeDirectoryType": "<p>Specifies the type of landing directory (folder) you mapped for your users to see when they log into the file transfer protocol-enabled server. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their file transfer protocol clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make Amazon S3 paths visible to your users.</p>",
+        "ListedUser$HomeDirectoryType": "<p>Specifies the type of landing directory (folder) you mapped for your users' home directory. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their file transfer protocol clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make Amazon S3 paths visible to your users.</p>",
+        "UpdateUserRequest$HomeDirectoryType": "<p>The type of landing directory (folder) you want your users' home directory to be when they log into the server. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their file transfer protocol clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make Amazon S3 paths visible to your users.</p>"
+      }
+    },
+    "HostKey": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$HostKey": "<p>The RSA private key as generated by the <code>ssh-keygen -N \"\" -m PEM -f my-new-server-key</code> command.</p> <important> <p>If you aren't planning to migrate existing users from an existing SFTP-enabled server to a new server, don't update the host key. Accidentally changing a server's host key can be disruptive.</p> </important> <p>For more information, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/edit-server-config.html#configuring-servers-change-host-key\">Change the host key for your SFTP-enabled server</a> in the <i>AWS Transfer Family User Guide</i>.</p>",
+        "UpdateServerRequest$HostKey": "<p>The RSA private key as generated by <code>ssh-keygen -N \"\" -m PEM -f my-new-server-key</code>.</p> <important> <p>If you aren't planning to migrate existing users from an existing server to a new server, don't update the host key. Accidentally changing a server's host key can be disruptive.</p> </important> <p>For more information, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/edit-server-config.html#configuring-servers-change-host-key\">Change the host key for your SFTP-enabled server</a> in the <i>AWS Transfer Family User Guide</i>.</p>"
+      }
+    },
+    "HostKeyFingerprint": {
+      "base": null,
+      "refs": {
+        "DescribedServer$HostKeyFingerprint": "<p>Specifies the Base64-encoded SHA256 fingerprint of the server's host key. This value is equivalent to the output of the <code>ssh-keygen -l -f my-new-server-key</code> command.</p>"
+      }
+    },
+    "IdentityProviderDetails": {
+      "base": "<p>Returns information related to the type of user authentication that is in use for a file transfer protocol-enabled server's users. A server can have only one method of authentication.</p>",
+      "refs": {
+        "CreateServerRequest$IdentityProviderDetails": "<p>Required when <code>IdentityProviderType</code> is set to <code>API_GATEWAY</code>. Accepts an array containing all of the information required to call a customer-supplied authentication API, including the API Gateway URL. Not required when <code>IdentityProviderType</code> is set to <code>SERVICE_MANAGED</code>.</p>",
+        "DescribedServer$IdentityProviderDetails": "<p>Specifies information to call a customer-supplied authentication API. This field is not populated when the <code>IdentityProviderType</code> of a server is <code>SERVICE_MANAGED</code>.</p>",
+        "UpdateServerRequest$IdentityProviderDetails": "<p>An array containing all of the information required to call a customer's authentication API method.</p>"
+      }
+    },
+    "IdentityProviderType": {
+      "base": "<p>Returns information related to the type of user authentication that is in use for a file transfer protocol-enabled server's users. For <code>SERVICE_MANAGED</code> authentication, the Secure Shell (SSH) public keys are stored with a user on the server instance. For <code>API_GATEWAY</code> authentication, your custom authentication method is implemented by using an API call. The server can have only one method of authentication.</p>",
+      "refs": {
+        "CreateServerRequest$IdentityProviderType": "<p>Specifies the mode of authentication for a server. The default value is <code>SERVICE_MANAGED</code>, which allows you to store and access user credentials within the AWS Transfer Family service. Use the <code>API_GATEWAY</code> value to integrate with an identity provider of your choosing. The <code>API_GATEWAY</code> setting requires you to provide an API Gateway endpoint URL to call for authentication using the <code>IdentityProviderDetails</code> parameter.</p>",
+        "DescribedServer$IdentityProviderType": "<p>Specifies the mode of authentication method enabled for this service. A value of <code>SERVICE_MANAGED</code> means that you are using this server to store and access user credentials within the service. A value of <code>API_GATEWAY</code> indicates that you have integrated an API Gateway endpoint that will be invoked for authenticating your user into the service.</p>",
+        "ListedServer$IdentityProviderType": "<p>Specifies the authentication method used to validate a user for a server that was specified. This can include Secure Shell (SSH), user name and password combinations, or your own custom authentication method. Valid values include <code>SERVICE_MANAGED</code> or <code>API_GATEWAY</code>.</p>"
+      }
+    },
+    "ImportSshPublicKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportSshPublicKeyResponse": {
+      "base": "<p>Identifies the user, the server they belong to, and the identifier of the SSH public key associated with that user. A user can have more than one key on each server that they are associated with.</p>",
+      "refs": {
+      }
+    },
+    "InternalServiceError": {
+      "base": "<p>This exception is thrown when an error occurs in the AWS Transfer Family service.</p>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The <code>NextToken</code> parameter that was passed is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>This exception is thrown when the client submits a malformed request.</p>",
+      "refs": {
+      }
+    },
+    "ListSecurityPoliciesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSecurityPoliciesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListedServer": {
+      "base": "<p>Returns properties of a file transfer protocol-enabled server that was specified.</p>",
+      "refs": {
+        "ListedServers$member": null
+      }
+    },
+    "ListedServers": {
+      "base": null,
+      "refs": {
+        "ListServersResponse$Servers": "<p>An array of servers that were listed.</p>"
+      }
+    },
+    "ListedUser": {
+      "base": "<p>Returns properties of the user that you specify.</p>",
+      "refs": {
+        "ListedUsers$member": null
+      }
+    },
+    "ListedUsers": {
+      "base": null,
+      "refs": {
+        "ListUsersResponse$Users": "<p>Returns the user accounts and their properties for the <code>ServerId</code> value that you specify.</p>"
+      }
+    },
+    "MapEntry": {
+      "base": null,
+      "refs": {
+        "HomeDirectoryMapEntry$Entry": "<p>Represents an entry and a target for <code>HomeDirectoryMappings</code>.</p>"
+      }
+    },
+    "MapTarget": {
+      "base": null,
+      "refs": {
+        "HomeDirectoryMapEntry$Target": "<p>Represents the map target that is used in a <code>HomeDirectorymapEntry</code>.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListSecurityPoliciesRequest$MaxResults": "<p>Specifies the number of security policies to return as a response to the <code>ListSecurityPolicies</code> query.</p>",
+        "ListServersRequest$MaxResults": "<p>Specifies the number of servers to return as a response to the <code>ListServers</code> query.</p>",
+        "ListTagsForResourceRequest$MaxResults": "<p>Specifies the number of tags to return as a response to the <code>ListTagsForResource</code> request.</p>",
+        "ListUsersRequest$MaxResults": "<p>Specifies the number of users to return as a response to the <code>ListUsers</code> request.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "ConflictException$Message": null,
+        "InternalServiceError$Message": null,
+        "InvalidNextTokenException$Message": null,
+        "InvalidRequestException$Message": null,
+        "ResourceExistsException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "TestIdentityProviderResponse$Message": "<p>A message that indicates whether the test was successful or not.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListSecurityPoliciesRequest$NextToken": "<p>When additional results are obtained from the <code>ListSecurityPolicies</code> command, a <code>NextToken</code> parameter is returned in the output. You can then pass the <code>NextToken</code> parameter in a subsequent command to continue listing additional security policies.</p>",
+        "ListSecurityPoliciesResponse$NextToken": "<p>When you can get additional results from the <code>ListSecurityPolicies</code> operation, a <code>NextToken</code> parameter is returned in the output. In a following command, you can pass in the <code>NextToken</code> parameter to continue listing security policies.</p>",
+        "ListServersRequest$NextToken": "<p>When additional results are obtained from the <code>ListServers</code> command, a <code>NextToken</code> parameter is returned in the output. You can then pass the <code>NextToken</code> parameter in a subsequent command to continue listing additional servers.</p>",
+        "ListServersResponse$NextToken": "<p>When you can get additional results from the <code>ListServers</code> operation, a <code>NextToken</code> parameter is returned in the output. In a following command, you can pass in the <code>NextToken</code> parameter to continue listing additional servers.</p>",
+        "ListTagsForResourceRequest$NextToken": "<p>When you request additional results from the <code>ListTagsForResource</code> operation, a <code>NextToken</code> parameter is returned in the input. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional tags.</p>",
+        "ListTagsForResourceResponse$NextToken": "<p>When you can get additional results from the <code>ListTagsForResource</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional tags.</p>",
+        "ListUsersRequest$NextToken": "<p>When you can get additional results from the <code>ListUsers</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional users.</p>",
+        "ListUsersResponse$NextToken": "<p>When you can get additional results from the <code>ListUsers</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional users.</p>"
+      }
+    },
+    "NullableRole": {
+      "base": null,
+      "refs": {
+        "UpdateServerRequest$LoggingRole": "<p>Changes the AWS Identity and Access Management (IAM) role that allows Amazon S3 events to be logged in Amazon CloudWatch, turning logging on or off.</p>"
+      }
+    },
+    "Policy": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$Policy": "<p>A scope-down policy for your user so you can use the same IAM role across multiple users. This policy scopes down user access to portions of their Amazon S3 bucket. Variables that you can use inside this policy include <code>${Transfer:UserName}</code>, <code>${Transfer:HomeDirectory}</code>, and <code>${Transfer:HomeBucket}</code>.</p> <note> <p>For scope-down policies, AWS Transfer Family stores the policy as a JSON blob, instead of the Amazon Resource Name (ARN) of the policy. You save the policy as a JSON blob and pass it in the <code>Policy</code> argument.</p> <p>For an example of a scope-down policy, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/users.html#users-policies-scope-down\">Creating a scope-down policy</a>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html\">AssumeRole</a> in the <i>AWS Security Token Service API Reference</i>.</p> </note>",
+        "DescribedUser$Policy": "<p>Specifies the name of the policy in use for the described user.</p>",
+        "UpdateUserRequest$Policy": "<p>Allows you to supply a scope-down policy for your user so you can use the same IAM role across multiple users. The policy scopes down user access to portions of your Amazon S3 bucket. Variables you can use inside this policy include <code>${Transfer:UserName}</code>, <code>${Transfer:HomeDirectory}</code>, and <code>${Transfer:HomeBucket}</code>.</p> <note> <p>For scope-down policies, AWS Transfer Family stores the policy as a JSON blob, instead of the Amazon Resource Name (ARN) of the policy. You save the policy as a JSON blob and pass it in the <code>Policy</code> argument.</p> <p>For an example of a scope-down policy, see <a href=\"https://docs.aws.amazon.com/transfer/latest/userguide/users.html#users-policies-scope-down\">Creating a scope-down policy</a>.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html\">AssumeRole</a> in the <i>AWS Security Token Service API Reference</i>.</p> </note>"
+      }
+    },
+    "Protocol": {
+      "base": null,
+      "refs": {
+        "Protocols$member": null,
+        "TestIdentityProviderRequest$ServerProtocol": "<p>The type of file transfer protocol to be tested.</p> <p>The available protocols are:</p> <ul> <li> <p>Secure Shell (SSH) File Transfer Protocol (SFTP)</p> </li> <li> <p>File Transfer Protocol Secure (FTPS)</p> </li> <li> <p>File Transfer Protocol (FTP)</p> </li> </ul>"
+      }
+    },
+    "Protocols": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$Protocols": "<p>Specifies the file transfer protocol or protocols over which your file transfer protocol client can connect to your server's endpoint. The available protocols are:</p> <ul> <li> <p> <code>SFTP</code> (Secure Shell (SSH) File Transfer Protocol): File transfer over SSH</p> </li> <li> <p> <code>FTPS</code> (File Transfer Protocol Secure): File transfer with TLS encryption</p> </li> <li> <p> <code>FTP</code> (File Transfer Protocol): Unencrypted file transfer</p> </li> </ul> <note> <p>If you select <code>FTPS</code>, you must choose a certificate stored in AWS Certificate Manager (ACM) which will be used to identify your server when clients connect to it over FTPS.</p> <p>If <code>Protocol</code> includes either <code>FTP</code> or <code>FTPS</code>, then the <code>EndpointType</code> must be <code>VPC</code> and the <code>IdentityProviderType</code> must be <code>API_GATEWAY</code>.</p> <p>If <code>Protocol</code> includes <code>FTP</code>, then <code>AddressAllocationIds</code> cannot be associated.</p> <p>If <code>Protocol</code> is set only to <code>SFTP</code>, the <code>EndpointType</code> can be set to <code>PUBLIC</code> and the <code>IdentityProviderType</code> can be set to <code>SERVICE_MANAGED</code>.</p> </note>",
+        "DescribedServer$Protocols": "<p>Specifies the file transfer protocol or protocols over which your file transfer protocol client can connect to your server's endpoint. The available protocols are:</p> <ul> <li> <p> <code>SFTP</code> (Secure Shell (SSH) File Transfer Protocol): File transfer over SSH</p> </li> <li> <p> <code>FTPS</code> (File Transfer Protocol Secure): File transfer with TLS encryption</p> </li> <li> <p> <code>FTP</code> (File Transfer Protocol): Unencrypted file transfer</p> </li> </ul>",
+        "UpdateServerRequest$Protocols": "<p>Specifies the file transfer protocol or protocols over which your file transfer protocol client can connect to your server's endpoint. The available protocols are:</p> <ul> <li> <p>Secure Shell (SSH) File Transfer Protocol (SFTP): File transfer over SSH</p> </li> <li> <p>File Transfer Protocol Secure (FTPS): File transfer with TLS encryption</p> </li> <li> <p>File Transfer Protocol (FTP): Unencrypted file transfer</p> </li> </ul> <note> <p>If you select <code>FTPS</code>, you must choose a certificate stored in AWS Certificate Manager (ACM) which will be used to identify your server when clients connect to it over FTPS.</p> <p>If <code>Protocol</code> includes either <code>FTP</code> or <code>FTPS</code>, then the <code>EndpointType</code> must be <code>VPC</code> and the <code>IdentityProviderType</code> must be <code>API_GATEWAY</code>.</p> <p>If <code>Protocol</code> includes <code>FTP</code>, then <code>AddressAllocationIds</code> cannot be associated.</p> <p>If <code>Protocol</code> is set only to <code>SFTP</code>, the <code>EndpointType</code> can be set to <code>PUBLIC</code> and the <code>IdentityProviderType</code> can be set to <code>SERVICE_MANAGED</code>.</p> </note>"
+      }
+    },
+    "Resource": {
+      "base": null,
+      "refs": {
+        "ResourceExistsException$Resource": null,
+        "ResourceNotFoundException$Resource": null
+      }
+    },
+    "ResourceExistsException": {
+      "base": "<p>The requested resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>This exception is thrown when a resource is not found by the AWS Transfer Family service.</p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "ResourceExistsException$ResourceType": null,
+        "ResourceNotFoundException$ResourceType": null
+      }
+    },
+    "Response": {
+      "base": null,
+      "refs": {
+        "TestIdentityProviderResponse$Response": "<p>The response that is returned from your API Gateway.</p>"
+      }
+    },
+    "RetryAfterSeconds": {
+      "base": null,
+      "refs": {
+        "ThrottlingException$RetryAfterSeconds": null
+      }
+    },
+    "Role": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$LoggingRole": "<p>Allows the service to write your users' activity to your Amazon CloudWatch logs for monitoring and auditing purposes.</p>",
+        "CreateUserRequest$Role": "<p>The IAM role that controls your users' access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows the server to access your resources when servicing your users' transfer requests.</p>",
+        "DescribedServer$LoggingRole": "<p>Specifies the AWS Identity and Access Management (IAM) role that allows a server to turn on Amazon CloudWatch logging for Amazon S3 events. When set, user activity can be viewed in your CloudWatch logs.</p>",
+        "DescribedUser$Role": "<p>Specifies the IAM role that controls your users' access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows a server to access your resources when servicing your users' transfer requests.</p>",
+        "IdentityProviderDetails$InvocationRole": "<p>Provides the type of <code>InvocationRole</code> used to authenticate the user account.</p>",
+        "ListedServer$LoggingRole": "<p>Specifies the AWS Identity and Access Management (IAM) role that allows a server to turn on Amazon CloudWatch logging.</p>",
+        "ListedUser$Role": "<p>Specifies the role that is in use by this user. A <i>role</i> is an AWS Identity and Access Management (IAM) entity that, in this case, allows a file transfer protocol-enabled server to act on a user's behalf. It allows the server to inherit the trust relationship that enables that user to perform file operations to their Amazon S3 bucket.</p>",
+        "UpdateUserRequest$Role": "<p>The IAM role that controls your users' access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows the server to access your resources when servicing your users' transfer requests.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "SecurityGroupIds$member": null
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "EndpointDetails$SecurityGroupIds": "<p>A list of security groups IDs that are available to attach to your server's endpoint.</p> <note> <p>This property can only be set when <code>EndpointType</code> is set to <code>VPC</code>.</p> <p>You can only edit the <code>SecurityGroupIds</code> property in the <code>UpdateServer</code> API and only if you are changing the <code>EndpointType</code> from <code>PUBLIC</code> or <code>VPC_ENDPOINT</code> to <code>VPC</code>.</p> </note>"
+      }
+    },
+    "SecurityPolicyName": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$SecurityPolicyName": "<p>Specifies the name of the security policy that is attached to the server.</p>",
+        "DescribeSecurityPolicyRequest$SecurityPolicyName": "<p>Specifies the name of the security policy that is attached to the server.</p>",
+        "DescribedSecurityPolicy$SecurityPolicyName": "<p>Specifies the name of the security policy that is attached to the server.</p>",
+        "DescribedServer$SecurityPolicyName": "<p>Specifies the name of the security policy that is attached to the server.</p>",
+        "SecurityPolicyNames$member": null,
+        "UpdateServerRequest$SecurityPolicyName": "<p>Specifies the name of the security policy that is attached to the server.</p>"
+      }
+    },
+    "SecurityPolicyNames": {
+      "base": null,
+      "refs": {
+        "ListSecurityPoliciesResponse$SecurityPolicyNames": "<p>An array of security policies that were listed.</p>"
+      }
+    },
+    "SecurityPolicyOption": {
+      "base": null,
+      "refs": {
+        "SecurityPolicyOptions$member": null
+      }
+    },
+    "SecurityPolicyOptions": {
+      "base": null,
+      "refs": {
+        "DescribedSecurityPolicy$SshCiphers": "<p>Specifies the enabled Secure Shell (SSH) cipher encryption algorithms in the security policy that is attached to the server.</p>",
+        "DescribedSecurityPolicy$SshKexs": "<p>Specifies the enabled SSH key exchange (KEX) encryption algorithms in the security policy that is attached to the server.</p>",
+        "DescribedSecurityPolicy$SshMacs": "<p>Specifies the enabled SSH message authentication code (MAC) encryption algorithms in the security policy that is attached to the server.</p>",
+        "DescribedSecurityPolicy$TlsCiphers": "<p>Specifies the enabled Transport Layer Security (TLS) cipher encryption algorithms in the security policy that is attached to the server.</p>"
+      }
+    },
+    "ServerId": {
+      "base": null,
+      "refs": {
+        "CreateServerResponse$ServerId": "<p>The service-assigned ID of the server that is created.</p>",
+        "CreateUserRequest$ServerId": "<p>A system-assigned unique identifier for a server instance. This is the specific server that you added your user to.</p>",
+        "CreateUserResponse$ServerId": "<p>The ID of the server that the user is attached to.</p>",
+        "DeleteServerRequest$ServerId": "<p>A unique system-assigned identifier for a server instance.</p>",
+        "DeleteSshPublicKeyRequest$ServerId": "<p>A system-assigned unique identifier for a file transfer protocol-enabled server instance that has the user assigned to it.</p>",
+        "DeleteUserRequest$ServerId": "<p>A system-assigned unique identifier for a server instance that has the user assigned to it.</p>",
+        "DescribeServerRequest$ServerId": "<p>A system-assigned unique identifier for a server.</p>",
+        "DescribeUserRequest$ServerId": "<p>A system-assigned unique identifier for a server that has this user assigned.</p>",
+        "DescribeUserResponse$ServerId": "<p>A system-assigned unique identifier for a server that has this user assigned.</p>",
+        "DescribedServer$ServerId": "<p>Specifies the unique system-assigned identifier for a server that you instantiate.</p>",
+        "ImportSshPublicKeyRequest$ServerId": "<p>A system-assigned unique identifier for a server.</p>",
+        "ImportSshPublicKeyResponse$ServerId": "<p>A system-assigned unique identifier for a server.</p>",
+        "ListUsersRequest$ServerId": "<p>A system-assigned unique identifier for a server that has users assigned to it.</p>",
+        "ListUsersResponse$ServerId": "<p>A system-assigned unique identifier for a server that the users are assigned to.</p>",
+        "ListedServer$ServerId": "<p>Specifies the unique system assigned identifier for the servers that were listed.</p>",
+        "StartServerRequest$ServerId": "<p>A system-assigned unique identifier for a server that you start.</p>",
+        "StopServerRequest$ServerId": "<p>A system-assigned unique identifier for a server that you stopped.</p>",
+        "TestIdentityProviderRequest$ServerId": "<p>A system-assigned identifier for a specific server. That server's user authentication method is tested with a user name and password.</p>",
+        "UpdateServerRequest$ServerId": "<p>A system-assigned unique identifier for a server instance that the user account is assigned to.</p>",
+        "UpdateServerResponse$ServerId": "<p>A system-assigned unique identifier for a server that the user account is assigned to.</p>",
+        "UpdateUserRequest$ServerId": "<p>A system-assigned unique identifier for a server instance that the user account is assigned to.</p>",
+        "UpdateUserResponse$ServerId": "<p>A system-assigned unique identifier for a server instance that the user account is assigned to.</p>"
+      }
+    },
+    "ServiceErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "ServiceUnavailableException$Message": null
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The request has failed because the AWS Transfer Family service is not available.</p>",
+      "refs": {
+      }
+    },
+    "SourceIp": {
+      "base": null,
+      "refs": {
+        "TestIdentityProviderRequest$SourceIp": "<p>The source IP address of the user account to be tested.</p>"
+      }
+    },
+    "SshPublicKey": {
+      "base": "<p>Provides information about the public Secure Shell (SSH) key that is associated with a user account for the specific file transfer protocol-enabled server (as identified by <code>ServerId</code>). The information returned includes the date the key was imported, the public key contents, and the public key ID. A user can store more than one SSH public key associated with their user name on a specific server.</p>",
+      "refs": {
+        "SshPublicKeys$member": null
+      }
+    },
+    "SshPublicKeyBody": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$SshPublicKeyBody": "<p>The public portion of the Secure Shell (SSH) key used to authenticate the user to the server.</p>",
+        "ImportSshPublicKeyRequest$SshPublicKeyBody": "<p>The public key portion of an SSH key pair.</p>",
+        "SshPublicKey$SshPublicKeyBody": "<p>Specifies the content of the SSH public key as specified by the <code>PublicKeyId</code>.</p>"
+      }
+    },
+    "SshPublicKeyCount": {
+      "base": null,
+      "refs": {
+        "ListedUser$SshPublicKeyCount": "<p>Specifies the number of SSH public keys stored for the user you specified.</p>"
+      }
+    },
+    "SshPublicKeyId": {
+      "base": null,
+      "refs": {
+        "DeleteSshPublicKeyRequest$SshPublicKeyId": "<p>A unique identifier used to reference your user's specific SSH key.</p>",
+        "ImportSshPublicKeyResponse$SshPublicKeyId": "<p>The name given to a public key by the system that was imported.</p>",
+        "SshPublicKey$SshPublicKeyId": "<p>Specifies the <code>SshPublicKeyId</code> parameter contains the identifier of the public key.</p>"
+      }
+    },
+    "SshPublicKeys": {
+      "base": null,
+      "refs": {
+        "DescribedUser$SshPublicKeys": "<p>Specifies the public key portion of the Secure Shell (SSH) keys stored for the described user.</p>"
+      }
+    },
+    "StartServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "State": {
+      "base": "<p>Describes the condition of a file transfer protocol-enabled server with respect to its ability to perform file operations. There are six possible states: <code>OFFLINE</code>, <code>ONLINE</code>, <code>STARTING</code>, <code>STOPPING</code>, <code>START_FAILED</code>, and <code>STOP_FAILED</code>.</p> <p> <code>OFFLINE</code> indicates that the server exists, but that it is not available for file operations. <code>ONLINE</code> indicates that the server is available to perform file operations. <code>STARTING</code> indicates that the server's was instantiated, but the server is not yet available to perform file operations. Under normal conditions, it can take a couple of minutes for the server to be completely operational. Both <code>START_FAILED</code> and <code>STOP_FAILED</code> are error conditions.</p>",
+      "refs": {
+        "DescribedServer$State": "<p>Specifies the condition of a server for the server that was described. A value of <code>ONLINE</code> indicates that the server can accept jobs and transfer files. A <code>State</code> value of <code>OFFLINE</code> means that the server cannot perform file transfer operations.</p> <p>The states of <code>STARTING</code> and <code>STOPPING</code> indicate that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>START_FAILED</code> or <code>STOP_FAILED</code> can indicate an error condition.</p>",
+        "ListedServer$State": "<p>Specifies the condition of a server for the server that was described. A value of <code>ONLINE</code> indicates that the server can accept jobs and transfer files. A <code>State</code> value of <code>OFFLINE</code> means that the server cannot perform file transfer operations.</p> <p>The states of <code>STARTING</code> and <code>STOPPING</code> indicate that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>START_FAILED</code> or <code>STOP_FAILED</code> can indicate an error condition.</p>"
+      }
+    },
+    "StatusCode": {
+      "base": null,
+      "refs": {
+        "TestIdentityProviderResponse$StatusCode": "<p>The HTTP status code that is the response from your API Gateway.</p>"
+      }
+    },
+    "StopServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "EndpointDetails$SubnetIds": "<p>A list of subnet IDs that are required to host your server endpoint in your VPC.</p> <note> <p>This property can only be set when <code>EndpointType</code> is set to <code>VPC</code>.</p> </note>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Creates a key-value pair for a specific resource. Tags are metadata that you can use to search for and group a resource for various purposes. You can apply tags to servers, users, and roles. A tag key can take more than one value. For example, to group servers for accounting purposes, you might create a tag called <code>Group</code> and assign the values <code>Research</code> and <code>Accounting</code> to that group.</p>",
+      "refs": {
+        "Tags$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The name assigned to the tag that you create.</p>",
+        "TagKeys$member": null
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>TagKeys are key-value pairs assigned to ARNs that can be used to group and search for resources by type. This metadata can be attached to resources for any purpose.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>Contains one or more values that you assigned to the key name you create.</p>"
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateServerRequest$Tags": "<p>Key-value pairs that can be used to group and search for servers.</p>",
+        "CreateUserRequest$Tags": "<p>Key-value pairs that can be used to group and search for users. Tags are metadata attached to users for any purpose.</p>",
+        "DescribedServer$Tags": "<p>Specifies the key-value pairs that you can use to search for and group servers that were assigned to the server that was described.</p>",
+        "DescribedUser$Tags": "<p>Specifies the key-value pairs for the user requested. Tag can be used to search for and group users for a variety of purposes.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>Key-value pairs that are assigned to a resource, usually for the purpose of grouping and searching for items. Tags are metadata that you define.</p>",
+        "TagResourceRequest$Tags": "<p>Key-value pairs assigned to ARNs that you can use to group and search for resources by type. You can attach this metadata to user accounts for any purpose.</p>"
+      }
+    },
+    "TestIdentityProviderRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TestIdentityProviderResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request was denied due to request throttling.</p> <p> HTTP Status Code: 400</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateServerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateServerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserResponse": {
+      "base": "<p> <code>UpdateUserResponse</code> returns the user name and identifier for the request to update a user's properties.</p>",
+      "refs": {
+      }
+    },
+    "Url": {
+      "base": null,
+      "refs": {
+        "IdentityProviderDetails$Url": "<p>Provides the location of the service endpoint used to authenticate users.</p>",
+        "TestIdentityProviderResponse$Url": "<p>The endpoint of the service used to authenticate a user.</p>"
+      }
+    },
+    "UserCount": {
+      "base": null,
+      "refs": {
+        "DescribedServer$UserCount": "<p>Specifies the number of users that are assigned to a server you specified with the <code>ServerId</code>.</p>",
+        "ListedServer$UserCount": "<p>Specifies the number of users that are assigned to a server you specified with the <code>ServerId</code>.</p>"
+      }
+    },
+    "UserName": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$UserName": "<p>A unique string that identifies a user and is associated with a as specified by the <code>ServerId</code>. This user name must be a minimum of 3 and a maximum of 100 characters long. The following are valid characters: a-z, A-Z, 0-9, underscore '_', hyphen '-', period '.', and at sign '@'. The user name can't start with a hyphen, period, or at sign.</p>",
+        "CreateUserResponse$UserName": "<p>A unique string that identifies a user account associated with a server.</p>",
+        "DeleteSshPublicKeyRequest$UserName": "<p>A unique string that identifies a user whose public key is being deleted.</p>",
+        "DeleteUserRequest$UserName": "<p>A unique string that identifies a user that is being deleted from a server.</p>",
+        "DescribeUserRequest$UserName": "<p>The name of the user assigned to one or more servers. User names are part of the sign-in credentials to use the AWS Transfer Family service and perform file transfer tasks.</p>",
+        "DescribedUser$UserName": "<p>Specifies the name of the user that was requested to be described. User names are used for authentication purposes. This is the string that will be used by your user when they log in to your server.</p>",
+        "ImportSshPublicKeyRequest$UserName": "<p>The name of the user account that is assigned to one or more servers.</p>",
+        "ImportSshPublicKeyResponse$UserName": "<p>A user name assigned to the <code>ServerID</code> value that you specified.</p>",
+        "ListedUser$UserName": "<p>Specifies the name of the user whose ARN was specified. User names are used for authentication purposes.</p>",
+        "TestIdentityProviderRequest$UserName": "<p>The name of the user account to be tested.</p>",
+        "UpdateUserRequest$UserName": "<p>A unique string that identifies a user and is associated with a server as specified by the <code>ServerId</code>. This user name must be a minimum of 3 and a maximum of 100 characters long. The following are valid characters: a-z, A-Z, 0-9, underscore '_', hyphen '-', period '.', and at sign '@'. The user name can't start with a hyphen, period, or at sign.</p>",
+        "UpdateUserResponse$UserName": "<p>The unique identifier for a user that is assigned to a server instance that was specified in the request.</p>"
+      }
+    },
+    "UserPassword": {
+      "base": null,
+      "refs": {
+        "TestIdentityProviderRequest$UserPassword": "<p>The password of the user account to be tested.</p>"
+      }
+    },
+    "VpcEndpointId": {
+      "base": null,
+      "refs": {
+        "EndpointDetails$VpcEndpointId": "<p>The ID of the VPC endpoint.</p> <note> <p>This property can only be set when <code>EndpointType</code> is set to <code>VPC_ENDPOINT</code>.</p> </note>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "EndpointDetails$VpcId": "<p>The VPC ID of the VPC in which a server's endpoint will be hosted.</p> <note> <p>This property can only be set when <code>EndpointType</code> is set to <code>VPC</code>.</p> </note>"
+      }
+    }
+  }
+}

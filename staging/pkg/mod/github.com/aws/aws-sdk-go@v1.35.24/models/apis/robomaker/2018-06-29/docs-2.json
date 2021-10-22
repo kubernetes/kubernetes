@@ -1,0 +1,2099 @@
+{
+  "version": "2.0",
+  "service": "<p>This section provides documentation for the AWS RoboMaker API operations.</p>",
+  "operations": {
+    "BatchDeleteWorlds": "<p>Deletes one or more worlds in a batch operation.</p>",
+    "BatchDescribeSimulationJob": "<p>Describes one or more simulation jobs.</p>",
+    "CancelDeploymentJob": "<p>Cancels the specified deployment job.</p>",
+    "CancelSimulationJob": "<p>Cancels the specified simulation job.</p>",
+    "CancelSimulationJobBatch": "<p>Cancels a simulation job batch. When you cancel a simulation job batch, you are also cancelling all of the active simulation jobs created as part of the batch. </p>",
+    "CancelWorldExportJob": "<p>Cancels the specified export job.</p>",
+    "CancelWorldGenerationJob": "<p>Cancels the specified world generator job.</p>",
+    "CreateDeploymentJob": "<p>Deploys a specific version of a robot application to robots in a fleet.</p> <p>The robot application must have a numbered <code>applicationVersion</code> for consistency reasons. To create a new version, use <code>CreateRobotApplicationVersion</code> or see <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/create-robot-application-version.html\">Creating a Robot Application Version</a>. </p> <note> <p>After 90 days, deployment jobs expire and will be deleted. They will no longer be accessible. </p> </note>",
+    "CreateFleet": "<p>Creates a fleet, a logical group of robots running the same robot application.</p>",
+    "CreateRobot": "<p>Creates a robot.</p>",
+    "CreateRobotApplication": "<p>Creates a robot application. </p>",
+    "CreateRobotApplicationVersion": "<p>Creates a version of a robot application.</p>",
+    "CreateSimulationApplication": "<p>Creates a simulation application.</p>",
+    "CreateSimulationApplicationVersion": "<p>Creates a simulation application with a specific revision id.</p>",
+    "CreateSimulationJob": "<p>Creates a simulation job.</p> <note> <p>After 90 days, simulation jobs expire and will be deleted. They will no longer be accessible. </p> </note>",
+    "CreateWorldExportJob": "<p>Creates a world export job.</p>",
+    "CreateWorldGenerationJob": "<p>Creates worlds using the specified template.</p>",
+    "CreateWorldTemplate": "<p>Creates a world template.</p>",
+    "DeleteFleet": "<p>Deletes a fleet.</p>",
+    "DeleteRobot": "<p>Deletes a robot.</p>",
+    "DeleteRobotApplication": "<p>Deletes a robot application.</p>",
+    "DeleteSimulationApplication": "<p>Deletes a simulation application.</p>",
+    "DeleteWorldTemplate": "<p>Deletes a world template.</p>",
+    "DeregisterRobot": "<p>Deregisters a robot.</p>",
+    "DescribeDeploymentJob": "<p>Describes a deployment job.</p>",
+    "DescribeFleet": "<p>Describes a fleet.</p>",
+    "DescribeRobot": "<p>Describes a robot.</p>",
+    "DescribeRobotApplication": "<p>Describes a robot application.</p>",
+    "DescribeSimulationApplication": "<p>Describes a simulation application.</p>",
+    "DescribeSimulationJob": "<p>Describes a simulation job.</p>",
+    "DescribeSimulationJobBatch": "<p>Describes a simulation job batch.</p>",
+    "DescribeWorld": "<p>Describes a world.</p>",
+    "DescribeWorldExportJob": "<p>Describes a world export job.</p>",
+    "DescribeWorldGenerationJob": "<p>Describes a world generation job.</p>",
+    "DescribeWorldTemplate": "<p>Describes a world template.</p>",
+    "GetWorldTemplateBody": "<p>Gets the world template body.</p>",
+    "ListDeploymentJobs": "<p>Returns a list of deployment jobs for a fleet. You can optionally provide filters to retrieve specific deployment jobs. </p>",
+    "ListFleets": "<p>Returns a list of fleets. You can optionally provide filters to retrieve specific fleets. </p>",
+    "ListRobotApplications": "<p>Returns a list of robot application. You can optionally provide filters to retrieve specific robot applications.</p>",
+    "ListRobots": "<p>Returns a list of robots. You can optionally provide filters to retrieve specific robots.</p>",
+    "ListSimulationApplications": "<p>Returns a list of simulation applications. You can optionally provide filters to retrieve specific simulation applications. </p>",
+    "ListSimulationJobBatches": "<p>Returns a list simulation job batches. You can optionally provide filters to retrieve specific simulation batch jobs. </p>",
+    "ListSimulationJobs": "<p>Returns a list of simulation jobs. You can optionally provide filters to retrieve specific simulation jobs. </p>",
+    "ListTagsForResource": "<p>Lists all tags on a AWS RoboMaker resource.</p>",
+    "ListWorldExportJobs": "<p>Lists world export jobs.</p>",
+    "ListWorldGenerationJobs": "<p>Lists world generator jobs.</p>",
+    "ListWorldTemplates": "<p>Lists world templates.</p>",
+    "ListWorlds": "<p>Lists worlds.</p>",
+    "RegisterRobot": "<p>Registers a robot with a fleet.</p>",
+    "RestartSimulationJob": "<p>Restarts a running simulation job.</p>",
+    "StartSimulationJobBatch": "<p>Starts a new simulation job batch. The batch is defined using one or more <code>SimulationJobRequest</code> objects. </p>",
+    "SyncDeploymentJob": "<p>Syncrhonizes robots in a fleet to the latest deployment. This is helpful if robots were added after a deployment.</p>",
+    "TagResource": "<p>Adds or edits tags for a AWS RoboMaker resource.</p> <p>Each tag consists of a tag key and a tag value. Tag keys and tag values are both required, but tag values can be empty strings. </p> <p>For information about the rules that apply to tag keys and tag values, see <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/allocation-tag-restrictions.html\">User-Defined Tag Restrictions</a> in the <i>AWS Billing and Cost Management User Guide</i>. </p>",
+    "UntagResource": "<p>Removes the specified tags from the specified AWS RoboMaker resource.</p> <p>To remove a tag, specify the tag key. To change the tag value of an existing tag key, use <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/API_TagResource.html\"> <code>TagResource</code> </a>. </p>",
+    "UpdateRobotApplication": "<p>Updates a robot application.</p>",
+    "UpdateSimulationApplication": "<p>Updates a simulation application.</p>",
+    "UpdateWorldTemplate": "<p>Updates a world template.</p>"
+  },
+  "shapes": {
+    "Architecture": {
+      "base": null,
+      "refs": {
+        "CreateRobotRequest$architecture": "<p>The target architecture of the robot.</p>",
+        "CreateRobotResponse$architecture": "<p>The target architecture of the robot.</p>",
+        "DescribeRobotResponse$architecture": "<p>The target architecture of the robot application.</p>",
+        "Robot$architecture": "<p>The architecture of the robot.</p>",
+        "Source$architecture": "<p>The taget processor architecture for the application.</p>",
+        "SourceConfig$architecture": "<p>The target processor architecture for the application.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "Arns$member": null,
+        "CancelDeploymentJobRequest$job": "<p>The deployment job ARN to cancel.</p>",
+        "CancelSimulationJobBatchRequest$batch": "<p>The id of the batch to cancel.</p>",
+        "CancelSimulationJobRequest$job": "<p>The simulation job ARN to cancel.</p>",
+        "CancelWorldExportJobRequest$job": "<p>The Amazon Resource Name (arn) of the world export job to cancel.</p>",
+        "CancelWorldGenerationJobRequest$job": "<p>The Amazon Resource Name (arn) of the world generator job to cancel.</p>",
+        "CreateDeploymentJobRequest$fleet": "<p>The Amazon Resource Name (ARN) of the fleet to deploy.</p>",
+        "CreateDeploymentJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the deployment job.</p>",
+        "CreateDeploymentJobResponse$fleet": "<p>The target fleet for the deployment job.</p>",
+        "CreateFleetResponse$arn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "CreateRobotApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot application.</p>",
+        "CreateRobotApplicationVersionRequest$application": "<p>The application information for the robot application.</p>",
+        "CreateRobotApplicationVersionResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot application.</p>",
+        "CreateRobotResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "CreateSimulationApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the simulation application.</p>",
+        "CreateSimulationApplicationVersionRequest$application": "<p>The application information for the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$arn": "<p>The Amazon Resource Name (ARN) of the simulation application.</p>",
+        "CreateSimulationJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the simulation job.</p>",
+        "CreateWorldExportJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the world export job.</p>",
+        "CreateWorldGenerationJobRequest$template": "<p>The Amazon Resource Name (arn) of the world template describing the worlds you want to create.</p>",
+        "CreateWorldGenerationJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the world generator job.</p>",
+        "CreateWorldGenerationJobResponse$template": "<p>The Amazon Resource Name (arn) of the world template.</p>",
+        "CreateWorldTemplateResponse$arn": "<p>The Amazon Resource Name (ARN) of the world template.</p>",
+        "DeleteFleetRequest$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DeleteRobotApplicationRequest$application": "<p>The Amazon Resource Name (ARN) of the the robot application.</p>",
+        "DeleteRobotRequest$robot": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "DeleteSimulationApplicationRequest$application": "<p>The application information for the simulation application to delete.</p>",
+        "DeleteWorldTemplateRequest$template": "<p>The Amazon Resource Name (arn) of the world template you want to delete.</p>",
+        "DeploymentApplicationConfig$application": "<p>The Amazon Resource Name (ARN) of the robot application.</p>",
+        "DeploymentJob$arn": "<p>The Amazon Resource Name (ARN) of the deployment job.</p>",
+        "DeploymentJob$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DeregisterRobotRequest$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DeregisterRobotRequest$robot": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "DeregisterRobotResponse$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DeregisterRobotResponse$robot": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "DescribeDeploymentJobRequest$job": "<p>The Amazon Resource Name (ARN) of the deployment job.</p>",
+        "DescribeDeploymentJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the deployment job.</p>",
+        "DescribeDeploymentJobResponse$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DescribeFleetRequest$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DescribeFleetResponse$arn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DescribeFleetResponse$lastDeploymentJob": "<p>The Amazon Resource Name (ARN) of the last deployment job.</p>",
+        "DescribeRobotApplicationRequest$application": "<p>The Amazon Resource Name (ARN) of the robot application.</p>",
+        "DescribeRobotApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot application.</p>",
+        "DescribeRobotRequest$robot": "<p>The Amazon Resource Name (ARN) of the robot to be described.</p>",
+        "DescribeRobotResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "DescribeRobotResponse$fleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DescribeRobotResponse$lastDeploymentJob": "<p>The Amazon Resource Name (ARN) of the last deployment job.</p>",
+        "DescribeSimulationApplicationRequest$application": "<p>The application information for the simulation application.</p>",
+        "DescribeSimulationApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the robot simulation application.</p>",
+        "DescribeSimulationJobBatchRequest$batch": "<p>The id of the batch to describe.</p>",
+        "DescribeSimulationJobBatchResponse$arn": "<p>The Amazon Resource Name (ARN) of the batch.</p>",
+        "DescribeSimulationJobRequest$job": "<p>The Amazon Resource Name (ARN) of the simulation job to be described.</p>",
+        "DescribeSimulationJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the simulation job.</p>",
+        "DescribeWorldExportJobRequest$job": "<p>The Amazon Resource Name (arn) of the world export job to describe.</p>",
+        "DescribeWorldExportJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the world export job.</p>",
+        "DescribeWorldGenerationJobRequest$job": "<p>The Amazon Resource Name (arn) of the world generation job to describe.</p>",
+        "DescribeWorldGenerationJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the world generation job.</p>",
+        "DescribeWorldGenerationJobResponse$template": "<p>The Amazon Resource Name (arn) of the world template.</p>",
+        "DescribeWorldRequest$world": "<p>The Amazon Resource Name (arn) of the world you want to describe.</p>",
+        "DescribeWorldResponse$arn": "<p>The Amazon Resource Name (arn) of the world.</p>",
+        "DescribeWorldResponse$generationJob": "<p>The Amazon Resource Name (arn) of the world generation job that generated the world.</p>",
+        "DescribeWorldResponse$template": "<p>The world template.</p>",
+        "DescribeWorldTemplateRequest$template": "<p>The Amazon Resource Name (arn) of the world template you want to describe.</p>",
+        "DescribeWorldTemplateResponse$arn": "<p>The Amazon Resource Name (ARN) of the world template.</p>",
+        "Fleet$arn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "Fleet$lastDeploymentJob": "<p>The Amazon Resource Name (ARN) of the last deployment job.</p>",
+        "GetWorldTemplateBodyRequest$template": "<p>The Amazon Resource Name (arn) of the world template.</p>",
+        "GetWorldTemplateBodyRequest$generationJob": "<p>The Amazon Resource Name (arn) of the world generator job.</p>",
+        "ListTagsForResourceRequest$resourceArn": "<p>The AWS RoboMaker Amazon Resource Name (ARN) with tags to be listed.</p>",
+        "RegisterRobotRequest$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "RegisterRobotRequest$robot": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "RegisterRobotResponse$fleet": "<p>The Amazon Resource Name (ARN) of the fleet that the robot will join.</p>",
+        "RegisterRobotResponse$robot": "<p>Information about the robot registration.</p>",
+        "RestartSimulationJobRequest$job": "<p>The Amazon Resource Name (ARN) of the simulation job.</p>",
+        "Robot$arn": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "Robot$fleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "Robot$lastDeploymentJob": "<p>The Amazon Resource Name (ARN) of the last deployment job.</p>",
+        "RobotApplicationConfig$application": "<p>The application information for the robot application.</p>",
+        "RobotApplicationSummary$arn": "<p>The Amazon Resource Name (ARN) of the robot.</p>",
+        "RobotDeployment$arn": "<p>The robot deployment Amazon Resource Name (ARN).</p>",
+        "SimulationApplicationConfig$application": "<p>The application information for the simulation application.</p>",
+        "SimulationApplicationSummary$arn": "<p>The Amazon Resource Name (ARN) of the simulation application.</p>",
+        "SimulationJob$arn": "<p>The Amazon Resource Name (ARN) of the simulation job.</p>",
+        "SimulationJobBatchSummary$arn": "<p>The Amazon Resource Name (ARN) of the batch.</p>",
+        "SimulationJobSummary$arn": "<p>The Amazon Resource Name (ARN) of the simulation job.</p>",
+        "StartSimulationJobBatchResponse$arn": "<p>The Amazon Resource Name (arn) of the batch.</p>",
+        "SyncDeploymentJobRequest$fleet": "<p>The target fleet for the synchronization.</p>",
+        "SyncDeploymentJobResponse$arn": "<p>The Amazon Resource Name (ARN) of the synchronization request.</p>",
+        "SyncDeploymentJobResponse$fleet": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the AWS RoboMaker resource you are tagging.</p>",
+        "TemplateSummary$arn": "<p>The Amazon Resource Name (ARN) of the template.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the AWS RoboMaker resource you are removing tags.</p>",
+        "UpdateRobotApplicationRequest$application": "<p>The application information for the robot application.</p>",
+        "UpdateRobotApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the updated robot application.</p>",
+        "UpdateSimulationApplicationRequest$application": "<p>The application information for the simulation application.</p>",
+        "UpdateSimulationApplicationResponse$arn": "<p>The Amazon Resource Name (ARN) of the updated simulation application.</p>",
+        "UpdateWorldTemplateRequest$template": "<p>The Amazon Resource Name (arn) of the world template to update.</p>",
+        "UpdateWorldTemplateResponse$arn": "<p>The Amazon Resource Name (arn) of the world template.</p>",
+        "WorldConfig$world": "<p>The world generated by Simulation WorldForge.</p>",
+        "WorldExportJobSummary$arn": "<p>The Amazon Resource Name (ARN) of the world export job.</p>",
+        "WorldGenerationJobSummary$arn": "<p>The Amazon Resource Name (ARN) of the world generator job.</p>",
+        "WorldGenerationJobSummary$template": "<p>The Amazon Resource Name (arn) of the world template.</p>",
+        "WorldSummary$arn": "<p>The Amazon Resource Name (ARN) of the world.</p>",
+        "WorldSummary$generationJob": "<p>The Amazon Resource Name (arn) of the world generation job.</p>",
+        "WorldSummary$template": "<p>The Amazon Resource Name (arn) of the world template.</p>"
+      }
+    },
+    "Arns": {
+      "base": null,
+      "refs": {
+        "BatchDeleteWorldsRequest$worlds": "<p>A list of Amazon Resource Names (arns) that correspond to worlds to delete.</p>",
+        "BatchDeleteWorldsResponse$unprocessedWorlds": "<p>A list of unprocessed worlds associated with the call. These worlds were not deleted.</p>",
+        "BatchDescribeSimulationJobRequest$jobs": "<p>A list of Amazon Resource Names (ARNs) of simulation jobs to describe.</p>",
+        "BatchDescribeSimulationJobResponse$unprocessedJobs": "<p>A list of unprocessed simulation job Amazon Resource Names (ARNs).</p>",
+        "CreateWorldExportJobRequest$worlds": "<p>A list of Amazon Resource Names (arns) that correspond to worlds to export.</p>",
+        "DescribeWorldExportJobResponse$worlds": "<p>A list of Amazon Resource Names (arns) that correspond to worlds to be exported.</p>",
+        "FinishedWorldsSummary$succeededWorlds": "<p>A list of worlds that succeeded.</p>",
+        "WorldExportJobSummary$worlds": "<p>A list of worlds.</p>"
+      }
+    },
+    "BatchDeleteWorldsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDeleteWorldsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDescribeSimulationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDescribeSimulationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPolicy": {
+      "base": "<p>Information about the batch policy.</p>",
+      "refs": {
+        "DescribeSimulationJobBatchResponse$batchPolicy": "<p>The batch policy.</p>",
+        "StartSimulationJobBatchRequest$batchPolicy": "<p>The batch policy.</p>",
+        "StartSimulationJobBatchResponse$batchPolicy": "<p>The batch policy.</p>"
+      }
+    },
+    "BatchTimeoutInSeconds": {
+      "base": null,
+      "refs": {
+        "BatchPolicy$timeoutInSeconds": "<p>The amount of time, in seconds, to wait for the batch to complete. </p> <p>If a batch times out, and there are pending requests that were failing due to an internal failure (like <code>InternalServiceError</code>), they will be moved to the failed list and the batch status will be <code>Failed</code>. If the pending requests were failing for any other reason, the failed pending requests will be moved to the failed list and the batch status will be <code>TimedOut</code>. </p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "LaunchConfig$streamUI": "<p>Boolean indicating whether a streaming session will be configured for the application. If <code>True</code>, AWS RoboMaker will configure a connection so you can interact with your application as it is running in the simulation. You must configure and luanch the component. It must have a graphical user interface. </p>",
+        "PortMapping$enableOnPublicIp": "<p>A Boolean indicating whether to enable this port mapping on public IP.</p>",
+        "VPCConfig$assignPublicIp": "<p>A boolean indicating whether to assign a public IP address.</p>",
+        "VPCConfigResponse$assignPublicIp": "<p>A boolean indicating if a public IP was assigned.</p>"
+      }
+    },
+    "BoxedBoolean": {
+      "base": null,
+      "refs": {
+        "LoggingConfig$recordAllRosTopics": "<p>A boolean indicating whether to record all ROS topics.</p>",
+        "SimulationJobRequest$useDefaultApplications": "<p>Boolean indicating whether to use default simulation tool applications.</p>"
+      }
+    },
+    "CancelDeploymentJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelDeploymentJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelSimulationJobBatchRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelSimulationJobBatchResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelSimulationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelSimulationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelWorldExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelWorldExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelWorldGenerationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelWorldGenerationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateSimulationJobRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateSimulationJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldExportJobRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldExportJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldGenerationJobRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldGenerationJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldTemplateRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "CreateWorldTemplateResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "DescribeSimulationJobBatchResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "DescribeSimulationJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "DescribeWorldExportJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "DescribeWorldGenerationJobResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "DescribeWorldTemplateResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "SimulationJob$clientRequestToken": "<p>A unique identifier for this <code>SimulationJob</code> request.</p>",
+        "StartSimulationJobBatchRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "StartSimulationJobBatchResponse$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "SyncDeploymentJobRequest$clientRequestToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>"
+      }
+    },
+    "Command": {
+      "base": null,
+      "refs": {
+        "DeploymentLaunchConfig$packageName": "<p>The package name.</p>",
+        "DeploymentLaunchConfig$launchFile": "<p>The launch file name.</p>",
+        "LaunchConfig$packageName": "<p>The package name.</p>",
+        "LaunchConfig$launchFile": "<p>The launch file name.</p>"
+      }
+    },
+    "Compute": {
+      "base": "<p>Compute information for the simulation job.</p>",
+      "refs": {
+        "CreateSimulationJobRequest$compute": "<p>Compute information for the simulation job.</p>",
+        "SimulationJobRequest$compute": "<p>Compute information for the simulation job</p>"
+      }
+    },
+    "ComputeResponse": {
+      "base": "<p>Compute information for the simulation job</p>",
+      "refs": {
+        "CreateSimulationJobResponse$compute": "<p>Compute information for the simulation job.</p>",
+        "DescribeSimulationJobResponse$compute": "<p>Compute information for the simulation job.</p>",
+        "SimulationJob$compute": "<p>Compute information for the simulation job</p>"
+      }
+    },
+    "ConcurrentDeploymentException": {
+      "base": "<p>The failure percentage threshold percentage was met.</p>",
+      "refs": {
+      }
+    },
+    "CreateDeploymentJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDeploymentJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFleetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFleetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotApplicationVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotApplicationVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRobotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationApplicationVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationApplicationVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSimulationJobRequests": {
+      "base": null,
+      "refs": {
+        "DescribeSimulationJobBatchResponse$pendingRequests": "<p>A list of pending simulation job requests. These requests have not yet been created into simulation jobs.</p>",
+        "StartSimulationJobBatchRequest$createSimulationJobRequests": "<p>A list of simulation job requests to create in the batch.</p>",
+        "StartSimulationJobBatchResponse$pendingRequests": "<p>A list of pending simulation job requests. These requests have not yet been created into simulation jobs.</p>"
+      }
+    },
+    "CreateSimulationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldGenerationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldGenerationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorldTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatedAt": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the fleet was created.</p>",
+        "CreateFleetResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the fleet was created.</p>",
+        "CreateRobotResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the robot was created.</p>",
+        "CreateWorldExportJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world export job was created.</p>",
+        "CreateWorldGenerationJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world generator job was created.</p>",
+        "CreateWorldTemplateResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world template was created.</p>",
+        "DeploymentJob$createdAt": "<p>The time, in milliseconds since the epoch, when the deployment job was created.</p>",
+        "DescribeDeploymentJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the deployment job was created.</p>",
+        "DescribeFleetResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the fleet was created.</p>",
+        "DescribeFleetResponse$lastDeploymentTime": "<p>The time of the last deployment.</p>",
+        "DescribeRobotResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the robot was created.</p>",
+        "DescribeRobotResponse$lastDeploymentTime": "<p>The time of the last deployment job.</p>",
+        "DescribeSimulationJobBatchResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch was created.</p>",
+        "DescribeWorldExportJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world export job was created.</p>",
+        "DescribeWorldGenerationJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world generation job was created.</p>",
+        "DescribeWorldResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world was created.</p>",
+        "DescribeWorldTemplateResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world template was created.</p>",
+        "Fleet$createdAt": "<p>The time, in milliseconds since the epoch, when the fleet was created.</p>",
+        "Fleet$lastDeploymentTime": "<p>The time of the last deployment.</p>",
+        "Robot$createdAt": "<p>The time, in milliseconds since the epoch, when the robot was created.</p>",
+        "Robot$lastDeploymentTime": "<p>The time of the last deployment.</p>",
+        "RobotDeployment$deploymentStartTime": "<p>The time, in milliseconds since the epoch, when the deployment was started.</p>",
+        "RobotDeployment$deploymentFinishTime": "<p>The time, in milliseconds since the epoch, when the deployment finished.</p>",
+        "SimulationJobBatchSummary$createdAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch was created.</p>",
+        "StartSimulationJobBatchResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch was created.</p>",
+        "SyncDeploymentJobResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the fleet was created.</p>",
+        "TemplateSummary$createdAt": "<p>The time, in milliseconds since the epoch, when the template was created.</p>",
+        "UpdateWorldTemplateResponse$createdAt": "<p>The time, in milliseconds since the epoch, when the world template was created.</p>",
+        "WorldExportJobSummary$createdAt": "<p>The time, in milliseconds since the epoch, when the world export job was created.</p>",
+        "WorldGenerationJobSummary$createdAt": "<p>The time, in milliseconds since the epoch, when the world generator job was created.</p>",
+        "WorldSummary$createdAt": "<p>The time, in milliseconds since the epoch, when the world was created.</p>"
+      }
+    },
+    "DataSource": {
+      "base": "<p>Information about a data source.</p>",
+      "refs": {
+        "DataSources$member": null
+      }
+    },
+    "DataSourceConfig": {
+      "base": "<p>Information about a data source.</p>",
+      "refs": {
+        "DataSourceConfigs$member": null
+      }
+    },
+    "DataSourceConfigs": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$dataSources": "<p>Specify data sources to mount read-only files from S3 into your simulation. These files are available under <code>/opt/robomaker/datasources/data_source_name</code>. </p> <note> <p>There is a limit of 100 files and a combined size of 25GB for all <code>DataSourceConfig</code> objects. </p> </note>",
+        "SimulationJobRequest$dataSources": "<p>Specify data sources to mount read-only files from S3 into your simulation. These files are available under <code>/opt/robomaker/datasources/data_source_name</code>. </p> <note> <p>There is a limit of 100 files and a combined size of 25GB for all <code>DataSourceConfig</code> objects. </p> </note>"
+      }
+    },
+    "DataSourceNames": {
+      "base": null,
+      "refs": {
+        "SimulationJobSummary$dataSourceNames": "<p>The names of the data sources.</p>"
+      }
+    },
+    "DataSources": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobResponse$dataSources": "<p>The data sources for the simulation job.</p>",
+        "DescribeSimulationJobResponse$dataSources": "<p>The data sources for the simulation job.</p>",
+        "SimulationJob$dataSources": "<p>The data sources for the simulation job.</p>"
+      }
+    },
+    "DeleteFleetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFleetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRobotApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRobotApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRobotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRobotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSimulationApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSimulationApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWorldTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWorldTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeploymentApplicationConfig": {
+      "base": "<p>Information about a deployment application configuration.</p>",
+      "refs": {
+        "DeploymentApplicationConfigs$member": null
+      }
+    },
+    "DeploymentApplicationConfigs": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobRequest$deploymentApplicationConfigs": "<p>The deployment application configuration.</p>",
+        "CreateDeploymentJobResponse$deploymentApplicationConfigs": "<p>The deployment application configuration.</p>",
+        "DeploymentJob$deploymentApplicationConfigs": "<p>The deployment application configuration.</p>",
+        "DescribeDeploymentJobResponse$deploymentApplicationConfigs": "<p>The deployment application configuration.</p>",
+        "SyncDeploymentJobResponse$deploymentApplicationConfigs": "<p>Information about the deployment application configurations.</p>"
+      }
+    },
+    "DeploymentConfig": {
+      "base": "<p>Information about a deployment configuration.</p>",
+      "refs": {
+        "CreateDeploymentJobRequest$deploymentConfig": "<p>The requested deployment configuration.</p>",
+        "CreateDeploymentJobResponse$deploymentConfig": "<p>The deployment configuration.</p>",
+        "DeploymentJob$deploymentConfig": "<p>The deployment configuration.</p>",
+        "DescribeDeploymentJobResponse$deploymentConfig": "<p>The deployment configuration.</p>",
+        "SyncDeploymentJobResponse$deploymentConfig": "<p>Information about the deployment configuration.</p>"
+      }
+    },
+    "DeploymentJob": {
+      "base": "<p>Information about a deployment job.</p>",
+      "refs": {
+        "DeploymentJobs$member": null
+      }
+    },
+    "DeploymentJobErrorCode": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobResponse$failureCode": "<p>The failure code of the simulation job if it failed:</p> <dl> <dt>BadPermissionError</dt> <dd> <p>AWS Greengrass requires a service-level role permission to access other services. The role must include the <a href=\"https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/service-role/AWSGreengrassResourceAccessRolePolicy$jsonEditor\"> <code>AWSGreengrassResourceAccessRolePolicy</code> managed policy</a>. </p> </dd> <dt>ExtractingBundleFailure</dt> <dd> <p>The robot application could not be extracted from the bundle.</p> </dd> <dt>FailureThresholdBreached</dt> <dd> <p>The percentage of robots that could not be updated exceeded the percentage set for the deployment.</p> </dd> <dt>GreengrassDeploymentFailed</dt> <dd> <p>The robot application could not be deployed to the robot.</p> </dd> <dt>GreengrassGroupVersionDoesNotExist</dt> <dd> <p>The AWS Greengrass group or version associated with a robot is missing.</p> </dd> <dt>InternalServerError</dt> <dd> <p>An internal error has occurred. Retry your request, but if the problem persists, contact us with details.</p> </dd> <dt>MissingRobotApplicationArchitecture</dt> <dd> <p>The robot application does not have a source that matches the architecture of the robot.</p> </dd> <dt>MissingRobotDeploymentResource</dt> <dd> <p>One or more of the resources specified for the robot application are missing. For example, does the robot application have the correct launch package and launch file?</p> </dd> <dt>PostLaunchFileFailure</dt> <dd> <p>The post-launch script failed.</p> </dd> <dt>PreLaunchFileFailure</dt> <dd> <p>The pre-launch script failed.</p> </dd> <dt>ResourceNotFound</dt> <dd> <p>One or more deployment resources are missing. For example, do robot application source bundles still exist? </p> </dd> <dt>RobotDeploymentNoResponse</dt> <dd> <p>There is no response from the robot. It might not be powered on or connected to the internet.</p> </dd> </dl>",
+        "DeploymentJob$failureCode": "<p>The deployment job failure code.</p>",
+        "DescribeDeploymentJobResponse$failureCode": "<p>The deployment job failure code.</p>",
+        "RobotDeployment$failureCode": "<p>The robot deployment failure code.</p>",
+        "SyncDeploymentJobResponse$failureCode": "<p>The failure code if the job fails:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>"
+      }
+    },
+    "DeploymentJobs": {
+      "base": null,
+      "refs": {
+        "ListDeploymentJobsResponse$deploymentJobs": "<p>A list of deployment jobs that meet the criteria of the request.</p>"
+      }
+    },
+    "DeploymentLaunchConfig": {
+      "base": "<p>Configuration information for a deployment launch.</p>",
+      "refs": {
+        "DeploymentApplicationConfig$launchConfig": "<p>The launch configuration.</p>"
+      }
+    },
+    "DeploymentStatus": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobResponse$status": "<p>The status of the deployment job.</p>",
+        "DeploymentJob$status": "<p>The status of the deployment job.</p>",
+        "DescribeDeploymentJobResponse$status": "<p>The status of the deployment job.</p>",
+        "DescribeFleetResponse$lastDeploymentStatus": "<p>The status of the last deployment.</p>",
+        "Fleet$lastDeploymentStatus": "<p>The status of the last fleet deployment.</p>",
+        "SyncDeploymentJobResponse$status": "<p>The status of the synchronization job.</p>"
+      }
+    },
+    "DeploymentTimeout": {
+      "base": null,
+      "refs": {
+        "DeploymentConfig$robotDeploymentTimeoutInSeconds": "<p>The amount of time, in seconds, to wait for deployment to a single robot to complete. Choose a time between 1 minute and 7 days. The default is 5 hours.</p>"
+      }
+    },
+    "DeploymentVersion": {
+      "base": null,
+      "refs": {
+        "DeploymentApplicationConfig$applicationVersion": "<p>The version of the application.</p>"
+      }
+    },
+    "DeregisterRobotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterRobotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDeploymentJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDeploymentJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFleetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFleetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRobotApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRobotApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRobotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRobotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationJobBatchRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationJobBatchResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSimulationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldGenerationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldGenerationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorldTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnvironmentVariableKey": {
+      "base": null,
+      "refs": {
+        "EnvironmentVariableMap$key": null
+      }
+    },
+    "EnvironmentVariableMap": {
+      "base": null,
+      "refs": {
+        "DeploymentLaunchConfig$environmentVariables": "<p>An array of key/value pairs specifying environment variables for the robot application</p>",
+        "LaunchConfig$environmentVariables": "<p>The environment variables for the application launch.</p>"
+      }
+    },
+    "EnvironmentVariableValue": {
+      "base": null,
+      "refs": {
+        "EnvironmentVariableMap$value": null
+      }
+    },
+    "FailedAt": {
+      "base": null,
+      "refs": {
+        "FailedCreateSimulationJobRequest$failedAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch failed.</p>"
+      }
+    },
+    "FailedCreateSimulationJobRequest": {
+      "base": "<p>Information about a failed create simulation job request.</p>",
+      "refs": {
+        "FailedCreateSimulationJobRequests$member": null
+      }
+    },
+    "FailedCreateSimulationJobRequests": {
+      "base": null,
+      "refs": {
+        "DescribeSimulationJobBatchResponse$failedRequests": "<p>A list of failed create simulation job requests. The request failed to be created into a simulation job. Failed requests do not have a simulation job ID. </p>",
+        "StartSimulationJobBatchResponse$failedRequests": "<p>A list of failed simulation job requests. The request failed to be created into a simulation job. Failed requests do not have a simulation job ID. </p>"
+      }
+    },
+    "FailureBehavior": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$failureBehavior": "<p>The failure behavior the simulation job.</p> <dl> <dt>Continue</dt> <dd> <p>Restart the simulation job in the same host instance.</p> </dd> <dt>Fail</dt> <dd> <p>Stop the simulation job and terminate the instance.</p> </dd> </dl>",
+        "CreateSimulationJobResponse$failureBehavior": "<p>the failure behavior for the simulation job.</p>",
+        "DescribeSimulationJobResponse$failureBehavior": "<p>The failure behavior for the simulation job.</p>",
+        "SimulationJob$failureBehavior": "<p>The failure behavior the simulation job.</p> <dl> <dt>Continue</dt> <dd> <p>Restart the simulation job in the same host instance.</p> </dd> <dt>Fail</dt> <dd> <p>Stop the simulation job and terminate the instance.</p> </dd> </dl>",
+        "SimulationJobRequest$failureBehavior": "<p>The failure behavior the simulation job.</p> <dl> <dt>Continue</dt> <dd> <p>Restart the simulation job in the same host instance.</p> </dd> <dt>Fail</dt> <dd> <p>Stop the simulation job and terminate the instance.</p> </dd> </dl>"
+      }
+    },
+    "FailureSummary": {
+      "base": "<p>Information about worlds that failed.</p>",
+      "refs": {
+        "FinishedWorldsSummary$failureSummary": "<p>Information about worlds that failed.</p>"
+      }
+    },
+    "Filter": {
+      "base": "<p>Information about a filter.</p>",
+      "refs": {
+        "Filters$member": null
+      }
+    },
+    "FilterValues": {
+      "base": null,
+      "refs": {
+        "Filter$values": "<p>A list of values.</p>"
+      }
+    },
+    "Filters": {
+      "base": null,
+      "refs": {
+        "ListDeploymentJobsRequest$filters": "<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>fleetName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>InProgress</code> or the status <code>Pending</code>.</p>",
+        "ListFleetsRequest$filters": "<p>Optional filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>",
+        "ListRobotApplicationsRequest$filters": "<p>Optional filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>",
+        "ListRobotsRequest$filters": "<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>fleetName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>Registered</code> or the status <code>Available</code>.</p>",
+        "ListSimulationApplicationsRequest$filters": "<p>Optional list of filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>",
+        "ListSimulationJobBatchesRequest$filters": "<p>Optional filters to limit results.</p>",
+        "ListSimulationJobsRequest$filters": "<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>simulationApplicationName</code> and <code>robotApplicationName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>Preparing</code> or the status <code>Running</code>.</p>",
+        "ListWorldExportJobsRequest$filters": "<p>Optional filters to limit results. You can use <code>generationJobId</code> and <code>templateId</code>.</p>",
+        "ListWorldGenerationJobsRequest$filters": "<p>Optional filters to limit results. You can use <code>status</code> and <code>templateId</code>.</p>",
+        "ListWorldsRequest$filters": "<p>Optional filters to limit results. You can use <code>status</code>.</p>"
+      }
+    },
+    "FinishedWorldsSummary": {
+      "base": "<p>Information about worlds that finished.</p>",
+      "refs": {
+        "DescribeWorldGenerationJobResponse$finishedWorldsSummary": "<p>Summary information about finished worlds.</p>"
+      }
+    },
+    "Fleet": {
+      "base": "<p>Information about a fleet.</p>",
+      "refs": {
+        "Fleets$member": null
+      }
+    },
+    "Fleets": {
+      "base": null,
+      "refs": {
+        "ListFleetsResponse$fleetDetails": "<p>A list of fleet details meeting the request criteria.</p>"
+      }
+    },
+    "FloorplanCount": {
+      "base": null,
+      "refs": {
+        "WorldCount$floorplanCount": "<p>The number of unique floorplans.</p>"
+      }
+    },
+    "GenericInteger": {
+      "base": null,
+      "refs": {
+        "ProgressDetail$estimatedTimeRemainingSeconds": "<p>Estimated amount of time in seconds remaining in the step. This currently only applies to the <code>Downloading/Extracting</code> step of the deployment. It is empty for other steps.</p>"
+      }
+    },
+    "GenericString": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobResponse$failureReason": "<p>The failure reason of the deployment job if it failed.</p>",
+        "DeploymentJob$failureReason": "<p>A short description of the reason why the deployment job failed.</p>",
+        "DescribeDeploymentJobResponse$failureReason": "<p>A short description of the reason why the deployment job failed.</p>",
+        "DescribeSimulationJobBatchResponse$failureReason": "<p>The reason the simulation job batch failed.</p>",
+        "DescribeSimulationJobResponse$failureReason": "<p>Details about why the simulation job failed. For more information about troubleshooting, see <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/troubleshooting.html\">Troubleshooting</a>.</p>",
+        "DescribeWorldExportJobResponse$failureReason": "<p>The reason why the world export job failed.</p>",
+        "DescribeWorldGenerationJobResponse$failureReason": "<p>The reason why the world generation job failed.</p>",
+        "FailedCreateSimulationJobRequest$failureReason": "<p>The failure reason of the simulation job request.</p>",
+        "NetworkInterface$networkInterfaceId": "<p>The ID of the network interface.</p>",
+        "NetworkInterface$privateIpAddress": "<p>The IPv4 address of the network interface within the subnet.</p>",
+        "NetworkInterface$publicIpAddress": "<p>The IPv4 public address of the network interface.</p>",
+        "ProgressDetail$targetResource": "<p>The Amazon Resource Name (ARN) of the deployment job.</p>",
+        "RobotDeployment$failureReason": "<p>A short description of the reason why the robot deployment failed.</p>",
+        "SimulationJob$failureReason": "<p>The reason why the simulation job failed.</p>",
+        "StartSimulationJobBatchResponse$failureReason": "<p>The reason the simulation job batch failed.</p>",
+        "SyncDeploymentJobResponse$failureReason": "<p>The failure reason if the job fails.</p>",
+        "VPCConfigResponse$vpcId": "<p>The VPC ID associated with your simulation job.</p>",
+        "WorldFailure$sampleFailureReason": "<p>The sample reason why the world failed. World errors are aggregated. A sample is used as the <code>sampleFailureReason</code>. </p>"
+      }
+    },
+    "GetWorldTemplateBodyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetWorldTemplateBodyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IamRole": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$iamRole": "<p>The IAM role name that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf. This is how credentials are passed in to your simulation job. </p>",
+        "CreateSimulationJobResponse$iamRole": "<p>The IAM role that allows the simulation job to call the AWS APIs that are specified in its associated policies on your behalf.</p>",
+        "CreateWorldExportJobRequest$iamRole": "<p>The IAM role that the world export process uses to access the Amazon S3 bucket and put the export.</p>",
+        "CreateWorldExportJobResponse$iamRole": "<p>The IAM role that the world export process uses to access the Amazon S3 bucket and put the export. </p>",
+        "DescribeSimulationJobResponse$iamRole": "<p>The IAM role that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf.</p>",
+        "DescribeWorldExportJobResponse$iamRole": "<p>The IAM role that the world export process uses to access the Amazon S3 bucket and put the export.</p>",
+        "SimulationJob$iamRole": "<p>The IAM role that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf. This is how credentials are passed in to your simulation job. </p>",
+        "SimulationJobRequest$iamRole": "<p>The IAM role name that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf. This is how credentials are passed in to your simulation job. </p>"
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "CreateRobotRequest$greengrassGroupId": "<p>The Greengrass group id.</p>",
+        "CreateRobotResponse$greengrassGroupId": "<p>The Amazon Resource Name (ARN) of the Greengrass group associated with the robot.</p>",
+        "DescribeRobotResponse$greengrassGroupId": "<p>The Greengrass group id.</p>",
+        "Robot$greenGrassGroupId": "<p>The Greengrass group associated with the robot.</p>"
+      }
+    },
+    "IdempotentParameterMismatchException": {
+      "base": "<p>The request uses the same client token as a previous, but non-identical request. Do not reuse a client token with different requests, unless the requests are identical. </p>",
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "FailureSummary$totalFailureCount": "<p>The total number of failures.</p>",
+        "FinishedWorldsSummary$finishedCount": "<p>The total number of finished worlds.</p>",
+        "SimulationJobBatchSummary$failedRequestCount": "<p>The number of failed simulation job requests.</p>",
+        "SimulationJobBatchSummary$pendingRequestCount": "<p>The number of pending simulation job requests.</p>",
+        "SimulationJobBatchSummary$createdRequestCount": "<p>The number of created simulation job requests.</p>",
+        "WorldFailure$failureCount": "<p>The number of failed worlds.</p>",
+        "WorldGenerationJobSummary$succeededWorldCount": "<p>The number of worlds that were generated.</p>",
+        "WorldGenerationJobSummary$failedWorldCount": "<p>The number of worlds that failed.</p>"
+      }
+    },
+    "InteriorCountPerFloorplan": {
+      "base": null,
+      "refs": {
+        "WorldCount$interiorCountPerFloorplan": "<p>The number of unique interiors per floorplan.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>AWS RoboMaker experienced a service issue. Try your call again.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>A parameter specified in a request is not valid, is unsupported, or cannot be used. The returned message provides an explanation of the error value.</p>",
+      "refs": {
+      }
+    },
+    "JobDuration": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$maxJobDurationInSeconds": "<p>The maximum simulation job duration in seconds (up to 14 days or 1,209,600 seconds. When <code>maxJobDurationInSeconds</code> is reached, the simulation job will status will transition to <code>Completed</code>.</p>",
+        "CreateSimulationJobResponse$maxJobDurationInSeconds": "<p>The maximum simulation job duration in seconds. </p>",
+        "DescribeSimulationJobResponse$maxJobDurationInSeconds": "<p>The maximum job duration in seconds. The value must be 8 days (691,200 seconds) or less.</p>",
+        "SimulationJob$maxJobDurationInSeconds": "<p>The maximum simulation job duration in seconds. The value must be 8 days (691,200 seconds) or less.</p>",
+        "SimulationJobRequest$maxJobDurationInSeconds": "<p>The maximum simulation job duration in seconds. The value must be 8 days (691,200 seconds) or less.</p>"
+      }
+    },
+    "Json": {
+      "base": null,
+      "refs": {
+        "CreateWorldTemplateRequest$templateBody": "<p>The world template body.</p>",
+        "GetWorldTemplateBodyResponse$templateBody": "<p>The world template body.</p>",
+        "UpdateWorldTemplateRequest$templateBody": "<p>The world template body.</p>"
+      }
+    },
+    "LastStartedAt": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobResponse$lastStartedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>",
+        "DescribeSimulationJobResponse$lastStartedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>",
+        "SimulationJob$lastStartedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>"
+      }
+    },
+    "LastUpdatedAt": {
+      "base": null,
+      "refs": {
+        "CreateRobotApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>",
+        "CreateRobotApplicationVersionResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>",
+        "CreateSimulationApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>",
+        "CreateSimulationApplicationVersionResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>",
+        "CreateSimulationJobResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>",
+        "DescribeRobotApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>",
+        "DescribeSimulationApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>",
+        "DescribeSimulationJobBatchResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch was last updated.</p>",
+        "DescribeSimulationJobResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>",
+        "DescribeWorldTemplateResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the world template was last updated.</p>",
+        "RobotApplicationSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>",
+        "SimulationApplicationSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>",
+        "SimulationJob$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>",
+        "SimulationJobBatchSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job batch was last updated.</p>",
+        "SimulationJobSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>",
+        "TemplateSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the template was last updated.</p>",
+        "UpdateRobotApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>",
+        "UpdateSimulationApplicationResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>",
+        "UpdateWorldTemplateResponse$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the world template was last updated.</p>"
+      }
+    },
+    "LaunchConfig": {
+      "base": "<p>Information about a launch configuration.</p>",
+      "refs": {
+        "RobotApplicationConfig$launchConfig": "<p>The launch configuration for the robot application.</p>",
+        "SimulationApplicationConfig$launchConfig": "<p>The launch configuration for the simulation application.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p>",
+      "refs": {
+      }
+    },
+    "ListDeploymentJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDeploymentJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFleetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFleetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRobotApplicationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRobotApplicationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRobotsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRobotsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationApplicationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationApplicationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationJobBatchesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationJobBatchesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSimulationJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldExportJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldExportJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldGenerationJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldGenerationJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldTemplatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldTemplatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWorldsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LoggingConfig": {
+      "base": "<p>The logging configuration.</p>",
+      "refs": {
+        "CreateSimulationJobRequest$loggingConfig": "<p>The logging configuration.</p>",
+        "CreateSimulationJobResponse$loggingConfig": "<p>The logging configuration.</p>",
+        "DescribeSimulationJobResponse$loggingConfig": "<p>The logging configuration.</p>",
+        "SimulationJob$loggingConfig": "<p>The logging configuration.</p>",
+        "SimulationJobRequest$loggingConfig": null
+      }
+    },
+    "MaxConcurrency": {
+      "base": null,
+      "refs": {
+        "BatchPolicy$maxConcurrency": "<p>The number of active simulation jobs create as part of the batch that can be in an active state at the same time. </p> <p>Active states include: <code>Pending</code>,<code>Preparing</code>, <code>Running</code>, <code>Restarting</code>, <code>RunningFailed</code> and <code>Terminating</code>. All other states are terminal states. </p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListDeploymentJobsRequest$maxResults": "<p>When this parameter is used, <code>ListDeploymentJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListDeploymentJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 200. If this parameter is not used, then <code>ListDeploymentJobs</code> returns up to 200 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListFleetsRequest$maxResults": "<p>When this parameter is used, <code>ListFleets</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListFleets</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 200. If this parameter is not used, then <code>ListFleets</code> returns up to 200 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListRobotApplicationsRequest$maxResults": "<p>When this parameter is used, <code>ListRobotApplications</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListRobotApplications</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListRobotApplications</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListRobotsRequest$maxResults": "<p>When this parameter is used, <code>ListRobots</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListRobots</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 200. If this parameter is not used, then <code>ListRobots</code> returns up to 200 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListSimulationApplicationsRequest$maxResults": "<p>When this parameter is used, <code>ListSimulationApplications</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListSimulationApplications</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListSimulationApplications</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListSimulationJobBatchesRequest$maxResults": "<p>When this parameter is used, <code>ListSimulationJobBatches</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListSimulationJobBatches</code> request with the returned <code>nextToken</code> value. </p>",
+        "ListSimulationJobsRequest$maxResults": "<p>When this parameter is used, <code>ListSimulationJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListSimulationJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 1000. If this parameter is not used, then <code>ListSimulationJobs</code> returns up to 1000 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListWorldExportJobsRequest$maxResults": "<p>When this parameter is used, <code>ListWorldExportJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListWorldExportJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListWorldExportJobs</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListWorldGenerationJobsRequest$maxResults": "<p>When this parameter is used, <code>ListWorldGeneratorJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListWorldGeneratorJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListWorldGeneratorJobs</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListWorldTemplatesRequest$maxResults": "<p>When this parameter is used, <code>ListWorldTemplates</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListWorldTemplates</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListWorldTemplates</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>",
+        "ListWorldsRequest$maxResults": "<p>When this parameter is used, <code>ListWorlds</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListWorlds</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListWorlds</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "CreateFleetRequest$name": "<p>The name of the fleet.</p>",
+        "CreateFleetResponse$name": "<p>The name of the fleet.</p>",
+        "CreateRobotApplicationRequest$name": "<p>The name of the robot application.</p>",
+        "CreateRobotApplicationResponse$name": "<p>The name of the robot application.</p>",
+        "CreateRobotApplicationVersionResponse$name": "<p>The name of the robot application.</p>",
+        "CreateRobotRequest$name": "<p>The name for the robot.</p>",
+        "CreateRobotResponse$name": "<p>The name of the robot.</p>",
+        "CreateSimulationApplicationRequest$name": "<p>The name of the simulation application.</p>",
+        "CreateSimulationApplicationResponse$name": "<p>The name of the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$name": "<p>The name of the simulation application.</p>",
+        "DataSource$name": "<p>The name of the data source.</p>",
+        "DataSourceConfig$name": "<p>The name of the data source.</p>",
+        "DataSourceNames$member": null,
+        "DescribeFleetResponse$name": "<p>The name of the fleet.</p>",
+        "DescribeRobotApplicationResponse$name": "<p>The name of the robot application.</p>",
+        "DescribeRobotResponse$name": "<p>The name of the robot.</p>",
+        "DescribeSimulationApplicationResponse$name": "<p>The name of the simulation application.</p>",
+        "DescribeSimulationJobResponse$name": "<p>The name of the simulation job.</p>",
+        "Filter$name": "<p>The name of the filter.</p>",
+        "FilterValues$member": null,
+        "Fleet$name": "<p>The name of the fleet.</p>",
+        "Robot$name": "<p>The name of the robot.</p>",
+        "RobotApplicationNames$member": null,
+        "RobotApplicationSummary$name": "<p>The name of the robot application.</p>",
+        "SimulationApplicationNames$member": null,
+        "SimulationApplicationSummary$name": "<p>The name of the simulation application.</p>",
+        "SimulationJob$name": "<p>The name of the simulation job.</p>",
+        "SimulationJobSummary$name": "<p>The name of the simulation job.</p>",
+        "UpdateRobotApplicationResponse$name": "<p>The name of the robot application.</p>",
+        "UpdateSimulationApplicationResponse$name": "<p>The name of the simulation application.</p>"
+      }
+    },
+    "NetworkInterface": {
+      "base": "<p>Describes a network interface.</p>",
+      "refs": {
+        "DescribeSimulationJobResponse$networkInterface": "<p>The network interface information for the simulation job.</p>",
+        "SimulationJob$networkInterface": "<p>Information about a network interface.</p>"
+      }
+    },
+    "NonEmptyString": {
+      "base": null,
+      "refs": {
+        "SecurityGroups$member": null,
+        "Subnets$member": null
+      }
+    },
+    "NonSystemPort": {
+      "base": null,
+      "refs": {
+        "PortMapping$applicationPort": "<p>The port number on the application.</p>"
+      }
+    },
+    "OutputLocation": {
+      "base": "<p>The output location.</p>",
+      "refs": {
+        "CreateSimulationJobRequest$outputLocation": "<p>Location for output files generated by the simulation job.</p>",
+        "CreateSimulationJobResponse$outputLocation": "<p>Simulation job output files location.</p>",
+        "CreateWorldExportJobRequest$outputLocation": null,
+        "CreateWorldExportJobResponse$outputLocation": null,
+        "DescribeSimulationJobResponse$outputLocation": "<p>Location for output files generated by the simulation job.</p>",
+        "DescribeWorldExportJobResponse$outputLocation": null,
+        "SimulationJob$outputLocation": "<p>Location for output files generated by the simulation job.</p>",
+        "SimulationJobRequest$outputLocation": null
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListDeploymentJobsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListDeploymentJobs</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListDeploymentJobsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListDeploymentJobs</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListFleetsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListFleets</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>",
+        "ListFleetsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListFleets</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListRobotApplicationsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListRobotApplications</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListRobotApplicationsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListRobotApplications</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListRobotsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListRobots</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListRobotsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListRobots</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationApplicationsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationApplications</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationApplicationsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationApplications</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationJobBatchesRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationJobBatches</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationJobBatchesResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationJobBatches</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationJobsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationJobs</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListSimulationJobsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListSimulationJobs</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldExportJobsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldExportJobs</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldExportJobsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldExportJobsRequest</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldGenerationJobsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldGenerationJobsRequest</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldGenerationJobsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldGeneratorJobsRequest</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldTemplatesRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldTemplates</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldTemplatesResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorldTemplates</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldsRequest$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorlds</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>",
+        "ListWorldsResponse$nextToken": "<p>If the previous paginated request did not return all of the remaining results, the response object's <code>nextToken</code> parameter value is set to a token. To retrieve the next set of results, call <code>ListWorlds</code> again and assign that token to the request object's <code>nextToken</code> parameter. If there are no remaining results, the previous response object's NextToken parameter is set to null. </p>"
+      }
+    },
+    "Path": {
+      "base": null,
+      "refs": {
+        "DeploymentLaunchConfig$preLaunchFile": "<p>The deployment pre-launch file. This file will be executed prior to the launch file.</p>",
+        "DeploymentLaunchConfig$postLaunchFile": "<p>The deployment post-launch file. This file will be executed after the launch file.</p>"
+      }
+    },
+    "PercentDone": {
+      "base": null,
+      "refs": {
+        "ProgressDetail$percentDone": "<p>Precentage of the step that is done. This currently only applies to the <code>Downloading/Extracting</code> step of the deployment. It is empty for other steps.</p>"
+      }
+    },
+    "Percentage": {
+      "base": null,
+      "refs": {
+        "DeploymentConfig$concurrentDeploymentPercentage": "<p>The percentage of robots receiving the deployment at the same time.</p>",
+        "DeploymentConfig$failureThresholdPercentage": "<p>The percentage of deployments that need to fail before stopping deployment.</p>"
+      }
+    },
+    "Port": {
+      "base": null,
+      "refs": {
+        "PortMapping$jobPort": "<p>The port number on the simulation job instance to use as a remote connection point. </p>"
+      }
+    },
+    "PortForwardingConfig": {
+      "base": "<p>Configuration information for port forwarding.</p>",
+      "refs": {
+        "LaunchConfig$portForwardingConfig": "<p>The port forwarding configuration.</p>"
+      }
+    },
+    "PortMapping": {
+      "base": "<p>An object representing a port mapping.</p>",
+      "refs": {
+        "PortMappingList$member": null
+      }
+    },
+    "PortMappingList": {
+      "base": null,
+      "refs": {
+        "PortForwardingConfig$portMappings": "<p>The port mappings for the configuration.</p>"
+      }
+    },
+    "ProgressDetail": {
+      "base": "<p>Information about the progress of a deployment job.</p>",
+      "refs": {
+        "RobotDeployment$progressDetail": "<p>Information about how the deployment is progressing.</p>"
+      }
+    },
+    "RegisterRobotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterRobotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RenderingEngine": {
+      "base": "<p>Information about a rendering engine.</p>",
+      "refs": {
+        "CreateSimulationApplicationRequest$renderingEngine": "<p>The rendering engine for the simulation application.</p>",
+        "CreateSimulationApplicationResponse$renderingEngine": "<p>The rendering engine for the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$renderingEngine": "<p>The rendering engine for the simulation application.</p>",
+        "DescribeSimulationApplicationResponse$renderingEngine": "<p>The rendering engine for the simulation application.</p>",
+        "UpdateSimulationApplicationRequest$renderingEngine": "<p>The rendering engine for the simulation application.</p>",
+        "UpdateSimulationApplicationResponse$renderingEngine": "<p>The rendering engine for the simulation application.</p>"
+      }
+    },
+    "RenderingEngineType": {
+      "base": null,
+      "refs": {
+        "RenderingEngine$name": "<p>The name of the rendering engine.</p>"
+      }
+    },
+    "RenderingEngineVersionType": {
+      "base": null,
+      "refs": {
+        "RenderingEngine$version": "<p>The version of the rendering engine.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "RestartSimulationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestartSimulationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevisionId": {
+      "base": null,
+      "refs": {
+        "CreateRobotApplicationResponse$revisionId": "<p>The revision id of the robot application.</p>",
+        "CreateRobotApplicationVersionRequest$currentRevisionId": "<p>The current revision id for the robot application. If you provide a value and it matches the latest revision ID, a new version will be created.</p>",
+        "CreateRobotApplicationVersionResponse$revisionId": "<p>The revision id of the robot application.</p>",
+        "CreateSimulationApplicationResponse$revisionId": "<p>The revision id of the simulation application.</p>",
+        "CreateSimulationApplicationVersionRequest$currentRevisionId": "<p>The current revision id for the simulation application. If you provide a value and it matches the latest revision ID, a new version will be created.</p>",
+        "CreateSimulationApplicationVersionResponse$revisionId": "<p>The revision ID of the simulation application.</p>",
+        "DescribeRobotApplicationResponse$revisionId": "<p>The revision id of the robot application.</p>",
+        "DescribeSimulationApplicationResponse$revisionId": "<p>The revision id of the simulation application.</p>",
+        "UpdateRobotApplicationRequest$currentRevisionId": "<p>The revision id for the robot application.</p>",
+        "UpdateRobotApplicationResponse$revisionId": "<p>The revision id of the robot application.</p>",
+        "UpdateSimulationApplicationRequest$currentRevisionId": "<p>The revision id for the robot application.</p>",
+        "UpdateSimulationApplicationResponse$revisionId": "<p>The revision id of the simulation application.</p>"
+      }
+    },
+    "Robot": {
+      "base": "<p>Information about a robot.</p>",
+      "refs": {
+        "Robots$member": null
+      }
+    },
+    "RobotApplicationConfig": {
+      "base": "<p>Application configuration information for a robot.</p>",
+      "refs": {
+        "RobotApplicationConfigs$member": null
+      }
+    },
+    "RobotApplicationConfigs": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$robotApplications": "<p>The robot application to use in the simulation job.</p>",
+        "CreateSimulationJobResponse$robotApplications": "<p>The robot application used by the simulation job.</p>",
+        "DescribeSimulationJobResponse$robotApplications": "<p>A list of robot applications.</p>",
+        "SimulationJob$robotApplications": "<p>A list of robot applications.</p>",
+        "SimulationJobRequest$robotApplications": "<p>The robot applications to use in the simulation job.</p>"
+      }
+    },
+    "RobotApplicationNames": {
+      "base": null,
+      "refs": {
+        "SimulationJobSummary$robotApplicationNames": "<p>A list of simulation job robot application names.</p>"
+      }
+    },
+    "RobotApplicationSummaries": {
+      "base": null,
+      "refs": {
+        "ListRobotApplicationsResponse$robotApplicationSummaries": "<p>A list of robot application summaries that meet the criteria of the request.</p>"
+      }
+    },
+    "RobotApplicationSummary": {
+      "base": "<p>Summary information for a robot application.</p>",
+      "refs": {
+        "RobotApplicationSummaries$member": null
+      }
+    },
+    "RobotDeployment": {
+      "base": "<p>Information about a robot deployment.</p>",
+      "refs": {
+        "RobotDeploymentSummary$member": null
+      }
+    },
+    "RobotDeploymentStep": {
+      "base": null,
+      "refs": {
+        "ProgressDetail$currentProgress": "<p>The current progress status.</p> <dl> <dt>Validating</dt> <dd> <p>Validating the deployment.</p> </dd> <dt>DownloadingExtracting</dt> <dd> <p>Downloading and extracting the bundle on the robot.</p> </dd> <dt>ExecutingPreLaunch</dt> <dd> <p>Executing pre-launch script(s) if provided.</p> </dd> <dt>Launching</dt> <dd> <p>Launching the robot application.</p> </dd> <dt>ExecutingPostLaunch</dt> <dd> <p>Executing post-launch script(s) if provided.</p> </dd> <dt>Finished</dt> <dd> <p>Deployment is complete.</p> </dd> </dl>"
+      }
+    },
+    "RobotDeploymentSummary": {
+      "base": null,
+      "refs": {
+        "DescribeDeploymentJobResponse$robotDeploymentSummary": "<p>A list of robot deployment summaries.</p>"
+      }
+    },
+    "RobotSoftwareSuite": {
+      "base": "<p>Information about a robot software suite (ROS distribution).</p>",
+      "refs": {
+        "CreateRobotApplicationRequest$robotSoftwareSuite": "<p>The robot software suite (ROS distribuition) used by the robot application.</p>",
+        "CreateRobotApplicationResponse$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the robot application.</p>",
+        "CreateRobotApplicationVersionResponse$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the robot application.</p>",
+        "CreateSimulationApplicationRequest$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the simulation application.</p>",
+        "CreateSimulationApplicationResponse$robotSoftwareSuite": "<p>Information about the robot software suite (ROS distribution).</p>",
+        "CreateSimulationApplicationVersionResponse$robotSoftwareSuite": "<p>Information about the robot software suite (ROS distribution).</p>",
+        "DescribeRobotApplicationResponse$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the robot application.</p>",
+        "DescribeSimulationApplicationResponse$robotSoftwareSuite": "<p>Information about the robot software suite (ROS distribution).</p>",
+        "RobotApplicationSummary$robotSoftwareSuite": "<p>Information about a robot software suite (ROS distribution).</p>",
+        "SimulationApplicationSummary$robotSoftwareSuite": "<p>Information about a robot software suite (ROS distribution).</p>",
+        "UpdateRobotApplicationRequest$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the robot application.</p>",
+        "UpdateRobotApplicationResponse$robotSoftwareSuite": "<p>The robot software suite (ROS distribution) used by the robot application.</p>",
+        "UpdateSimulationApplicationRequest$robotSoftwareSuite": "<p>Information about the robot software suite (ROS distribution).</p>",
+        "UpdateSimulationApplicationResponse$robotSoftwareSuite": "<p>Information about the robot software suite (ROS distribution).</p>"
+      }
+    },
+    "RobotSoftwareSuiteType": {
+      "base": null,
+      "refs": {
+        "RobotSoftwareSuite$name": "<p>The name of the robot software suite (ROS distribution).</p>"
+      }
+    },
+    "RobotSoftwareSuiteVersionType": {
+      "base": null,
+      "refs": {
+        "RobotSoftwareSuite$version": "<p>The version of the robot software suite (ROS distribution).</p>"
+      }
+    },
+    "RobotStatus": {
+      "base": null,
+      "refs": {
+        "DescribeRobotResponse$status": "<p>The status of the fleet.</p>",
+        "Robot$status": "<p>The status of the robot.</p>",
+        "RobotDeployment$status": "<p>The status of the robot deployment.</p>"
+      }
+    },
+    "Robots": {
+      "base": null,
+      "refs": {
+        "DescribeFleetResponse$robots": "<p>A list of robots.</p>",
+        "ListRobotsResponse$robots": "<p>A list of robots that meet the criteria of the request.</p>"
+      }
+    },
+    "S3Bucket": {
+      "base": null,
+      "refs": {
+        "DataSource$s3Bucket": "<p>The S3 bucket where the data files are located.</p>",
+        "DataSourceConfig$s3Bucket": "<p>The S3 bucket where the data files are located.</p>",
+        "OutputLocation$s3Bucket": "<p>The S3 bucket for output.</p>",
+        "S3Object$bucket": "<p>The bucket containing the object.</p>",
+        "Source$s3Bucket": "<p>The s3 bucket name.</p>",
+        "SourceConfig$s3Bucket": "<p>The Amazon S3 bucket name.</p>",
+        "TemplateLocation$s3Bucket": "<p>The Amazon S3 bucket name.</p>"
+      }
+    },
+    "S3Etag": {
+      "base": null,
+      "refs": {
+        "S3KeyOutput$etag": "<p>The etag for the object.</p>",
+        "S3Object$etag": "<p>The etag of the object.</p>",
+        "Source$etag": "<p>A hash of the object specified by <code>s3Bucket</code> and <code>s3Key</code>.</p>"
+      }
+    },
+    "S3Key": {
+      "base": null,
+      "refs": {
+        "OutputLocation$s3Prefix": "<p>The S3 folder in the <code>s3Bucket</code> where output files will be placed.</p>",
+        "S3KeyOutput$s3Key": "<p>The S3 key.</p>",
+        "S3Keys$member": null,
+        "S3Object$key": "<p>The key of the object.</p>",
+        "Source$s3Key": "<p>The s3 object key.</p>",
+        "SourceConfig$s3Key": "<p>The s3 object key.</p>",
+        "TemplateLocation$s3Key": "<p>The list of S3 keys identifying the data source files.</p>"
+      }
+    },
+    "S3KeyOutput": {
+      "base": "<p>Information about S3 keys.</p>",
+      "refs": {
+        "S3KeyOutputs$member": null
+      }
+    },
+    "S3KeyOutputs": {
+      "base": null,
+      "refs": {
+        "DataSource$s3Keys": "<p>The list of S3 keys identifying the data source files.</p>"
+      }
+    },
+    "S3Keys": {
+      "base": null,
+      "refs": {
+        "DataSourceConfig$s3Keys": "<p>The list of S3 keys identifying the data source files.</p>"
+      }
+    },
+    "S3Object": {
+      "base": "<p>Information about an S3 object.</p>",
+      "refs": {
+        "DeploymentConfig$downloadConditionFile": "<p>The download condition file.</p>"
+      }
+    },
+    "SecurityGroups": {
+      "base": null,
+      "refs": {
+        "VPCConfig$securityGroups": "<p>A list of one or more security groups IDs in your VPC.</p>",
+        "VPCConfigResponse$securityGroups": "<p>A list of security group IDs associated with the simulation job.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The request has failed due to a temporary failure of the server.</p>",
+      "refs": {
+      }
+    },
+    "SimulationApplicationConfig": {
+      "base": "<p>Information about a simulation application configuration.</p>",
+      "refs": {
+        "SimulationApplicationConfigs$member": null
+      }
+    },
+    "SimulationApplicationConfigs": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobRequest$simulationApplications": "<p>The simulation application to use in the simulation job.</p>",
+        "CreateSimulationJobResponse$simulationApplications": "<p>The simulation application used by the simulation job.</p>",
+        "DescribeSimulationJobResponse$simulationApplications": "<p>A list of simulation applications.</p>",
+        "SimulationJob$simulationApplications": "<p>A list of simulation applications.</p>",
+        "SimulationJobRequest$simulationApplications": "<p>The simulation applications to use in the simulation job.</p>"
+      }
+    },
+    "SimulationApplicationNames": {
+      "base": null,
+      "refs": {
+        "SimulationJobSummary$simulationApplicationNames": "<p>A list of simulation job simulation application names.</p>"
+      }
+    },
+    "SimulationApplicationSummaries": {
+      "base": null,
+      "refs": {
+        "ListSimulationApplicationsResponse$simulationApplicationSummaries": "<p>A list of simulation application summaries that meet the criteria of the request.</p>"
+      }
+    },
+    "SimulationApplicationSummary": {
+      "base": "<p>Summary information for a simulation application.</p>",
+      "refs": {
+        "SimulationApplicationSummaries$member": null
+      }
+    },
+    "SimulationJob": {
+      "base": "<p>Information about a simulation job.</p>",
+      "refs": {
+        "SimulationJobs$member": null
+      }
+    },
+    "SimulationJobBatchErrorCode": {
+      "base": null,
+      "refs": {
+        "DescribeSimulationJobBatchResponse$failureCode": "<p>The failure code of the simulation job batch.</p>",
+        "StartSimulationJobBatchResponse$failureCode": "<p>The failure code if the simulation job batch failed.</p>"
+      }
+    },
+    "SimulationJobBatchStatus": {
+      "base": null,
+      "refs": {
+        "DescribeSimulationJobBatchResponse$status": "<p>The status of the batch.</p> <dl> <dt>Pending</dt> <dd> <p>The simulation job batch request is pending.</p> </dd> <dt>InProgress</dt> <dd> <p>The simulation job batch is in progress. </p> </dd> <dt>Failed</dt> <dd> <p>The simulation job batch failed. One or more simulation job requests could not be completed due to an internal failure (like <code>InternalServiceError</code>). See <code>failureCode</code> and <code>failureReason</code> for more information.</p> </dd> <dt>Completed</dt> <dd> <p>The simulation batch job completed. A batch is complete when (1) there are no pending simulation job requests in the batch and none of the failed simulation job requests are due to <code>InternalServiceError</code> and (2) when all created simulation jobs have reached a terminal state (for example, <code>Completed</code> or <code>Failed</code>). </p> </dd> <dt>Canceled</dt> <dd> <p>The simulation batch job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The simulation batch job is being cancelled.</p> </dd> <dt>Completing</dt> <dd> <p>The simulation batch job is completing.</p> </dd> <dt>TimingOut</dt> <dd> <p>The simulation job batch is timing out.</p> <p>If a batch timing out, and there are pending requests that were failing due to an internal failure (like <code>InternalServiceError</code>), the batch status will be <code>Failed</code>. If there are no such failing request, the batch status will be <code>TimedOut</code>. </p> </dd> <dt>TimedOut</dt> <dd> <p>The simulation batch job timed out.</p> </dd> </dl>",
+        "SimulationJobBatchSummary$status": "<p>The status of the simulation job batch.</p> <dl> <dt>Pending</dt> <dd> <p>The simulation job batch request is pending.</p> </dd> <dt>InProgress</dt> <dd> <p>The simulation job batch is in progress. </p> </dd> <dt>Failed</dt> <dd> <p>The simulation job batch failed. One or more simulation job requests could not be completed due to an internal failure (like <code>InternalServiceError</code>). See <code>failureCode</code> and <code>failureReason</code> for more information.</p> </dd> <dt>Completed</dt> <dd> <p>The simulation batch job completed. A batch is complete when (1) there are no pending simulation job requests in the batch and none of the failed simulation job requests are due to <code>InternalServiceError</code> and (2) when all created simulation jobs have reached a terminal state (for example, <code>Completed</code> or <code>Failed</code>). </p> </dd> <dt>Canceled</dt> <dd> <p>The simulation batch job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The simulation batch job is being cancelled.</p> </dd> <dt>Completing</dt> <dd> <p>The simulation batch job is completing.</p> </dd> <dt>TimingOut</dt> <dd> <p>The simulation job batch is timing out.</p> <p>If a batch timing out, and there are pending requests that were failing due to an internal failure (like <code>InternalServiceError</code>), the batch status will be <code>Failed</code>. If there are no such failing request, the batch status will be <code>TimedOut</code>. </p> </dd> <dt>TimedOut</dt> <dd> <p>The simulation batch job timed out.</p> </dd> </dl>",
+        "StartSimulationJobBatchResponse$status": "<p>The status of the simulation job batch.</p> <dl> <dt>Pending</dt> <dd> <p>The simulation job batch request is pending.</p> </dd> <dt>InProgress</dt> <dd> <p>The simulation job batch is in progress. </p> </dd> <dt>Failed</dt> <dd> <p>The simulation job batch failed. One or more simulation job requests could not be completed due to an internal failure (like <code>InternalServiceError</code>). See <code>failureCode</code> and <code>failureReason</code> for more information.</p> </dd> <dt>Completed</dt> <dd> <p>The simulation batch job completed. A batch is complete when (1) there are no pending simulation job requests in the batch and none of the failed simulation job requests are due to <code>InternalServiceError</code> and (2) when all created simulation jobs have reached a terminal state (for example, <code>Completed</code> or <code>Failed</code>). </p> </dd> <dt>Canceled</dt> <dd> <p>The simulation batch job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The simulation batch job is being cancelled.</p> </dd> <dt>Completing</dt> <dd> <p>The simulation batch job is completing.</p> </dd> <dt>TimingOut</dt> <dd> <p>The simulation job batch is timing out.</p> <p>If a batch timing out, and there are pending requests that were failing due to an internal failure (like <code>InternalServiceError</code>), the batch status will be <code>Failed</code>. If there are no such failing request, the batch status will be <code>TimedOut</code>. </p> </dd> <dt>TimedOut</dt> <dd> <p>The simulation batch job timed out.</p> </dd> </dl>"
+      }
+    },
+    "SimulationJobBatchSummaries": {
+      "base": null,
+      "refs": {
+        "ListSimulationJobBatchesResponse$simulationJobBatchSummaries": "<p>A list of simulation job batch summaries.</p>"
+      }
+    },
+    "SimulationJobBatchSummary": {
+      "base": "<p>Information about a simulation job batch.</p>",
+      "refs": {
+        "SimulationJobBatchSummaries$member": null
+      }
+    },
+    "SimulationJobErrorCode": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobResponse$failureCode": "<p>The failure code of the simulation job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>",
+        "DescribeSimulationJobResponse$failureCode": "<p>The failure code of the simulation job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>",
+        "FailedCreateSimulationJobRequest$failureCode": "<p>The failure code.</p>",
+        "SimulationJob$failureCode": "<p>The failure code of the simulation job if it failed.</p>"
+      }
+    },
+    "SimulationJobRequest": {
+      "base": "<p>Information about a simulation job request.</p>",
+      "refs": {
+        "CreateSimulationJobRequests$member": null,
+        "FailedCreateSimulationJobRequest$request": "<p>The simulation job request.</p>"
+      }
+    },
+    "SimulationJobStatus": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobResponse$status": "<p>The status of the simulation job.</p>",
+        "DescribeSimulationJobResponse$status": "<p>The status of the simulation job.</p>",
+        "SimulationJob$status": "<p>Status of the simulation job.</p>",
+        "SimulationJobSummary$status": "<p>The status of the simulation job.</p>"
+      }
+    },
+    "SimulationJobSummaries": {
+      "base": null,
+      "refs": {
+        "DescribeSimulationJobBatchResponse$createdRequests": "<p>A list of created simulation job summaries.</p>",
+        "ListSimulationJobsResponse$simulationJobSummaries": "<p>A list of simulation job summaries that meet the criteria of the request.</p>",
+        "StartSimulationJobBatchResponse$createdRequests": "<p>A list of created simulation job request summaries.</p>"
+      }
+    },
+    "SimulationJobSummary": {
+      "base": "<p>Summary information for a simulation job.</p>",
+      "refs": {
+        "SimulationJobSummaries$member": null
+      }
+    },
+    "SimulationJobs": {
+      "base": null,
+      "refs": {
+        "BatchDescribeSimulationJobResponse$jobs": "<p>A list of simulation jobs.</p>"
+      }
+    },
+    "SimulationSoftwareSuite": {
+      "base": "<p>Information about a simulation software suite.</p>",
+      "refs": {
+        "CreateSimulationApplicationRequest$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>",
+        "CreateSimulationApplicationResponse$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>",
+        "DescribeSimulationApplicationResponse$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>",
+        "SimulationApplicationSummary$simulationSoftwareSuite": "<p>Information about a simulation software suite.</p>",
+        "UpdateSimulationApplicationRequest$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>",
+        "UpdateSimulationApplicationResponse$simulationSoftwareSuite": "<p>The simulation software suite used by the simulation application.</p>"
+      }
+    },
+    "SimulationSoftwareSuiteType": {
+      "base": null,
+      "refs": {
+        "SimulationSoftwareSuite$name": "<p>The name of the simulation software suite.</p>"
+      }
+    },
+    "SimulationSoftwareSuiteVersionType": {
+      "base": null,
+      "refs": {
+        "SimulationSoftwareSuite$version": "<p>The version of the simulation software suite.</p>"
+      }
+    },
+    "SimulationTimeMillis": {
+      "base": null,
+      "refs": {
+        "CreateSimulationJobResponse$simulationTimeMillis": "<p>The simulation job execution duration in milliseconds.</p>",
+        "DescribeSimulationJobResponse$simulationTimeMillis": "<p>The simulation job execution duration in milliseconds.</p>",
+        "SimulationJob$simulationTimeMillis": "<p>The simulation job execution duration in milliseconds.</p>"
+      }
+    },
+    "SimulationUnit": {
+      "base": null,
+      "refs": {
+        "Compute$simulationUnitLimit": "<p>The simulation unit limit. Your simulation is allocated CPU and memory proportional to the supplied simulation unit limit. A simulation unit is 1 vcpu and 2GB of memory. You are only billed for the SU utilization you consume up to the maximim value provided. The default is 15. </p>",
+        "ComputeResponse$simulationUnitLimit": "<p>The simulation unit limit. Your simulation is allocated CPU and memory proportional to the supplied simulation unit limit. A simulation unit is 1 vcpu and 2GB of memory. You are only billed for the SU utilization you consume up to the maximim value provided. The default is 15. </p>"
+      }
+    },
+    "Source": {
+      "base": "<p>Information about a source.</p>",
+      "refs": {
+        "Sources$member": null
+      }
+    },
+    "SourceConfig": {
+      "base": "<p>Information about a source configuration.</p>",
+      "refs": {
+        "SourceConfigs$member": null
+      }
+    },
+    "SourceConfigs": {
+      "base": null,
+      "refs": {
+        "CreateRobotApplicationRequest$sources": "<p>The sources of the robot application.</p>",
+        "CreateSimulationApplicationRequest$sources": "<p>The sources of the simulation application.</p>",
+        "UpdateRobotApplicationRequest$sources": "<p>The sources of the robot application.</p>",
+        "UpdateSimulationApplicationRequest$sources": "<p>The sources of the simulation application.</p>"
+      }
+    },
+    "Sources": {
+      "base": null,
+      "refs": {
+        "CreateRobotApplicationResponse$sources": "<p>The sources of the robot application.</p>",
+        "CreateRobotApplicationVersionResponse$sources": "<p>The sources of the robot application.</p>",
+        "CreateSimulationApplicationResponse$sources": "<p>The sources of the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$sources": "<p>The sources of the simulation application.</p>",
+        "DescribeRobotApplicationResponse$sources": "<p>The sources of the robot application.</p>",
+        "DescribeSimulationApplicationResponse$sources": "<p>The sources of the simulation application.</p>",
+        "UpdateRobotApplicationResponse$sources": "<p>The sources of the robot application.</p>",
+        "UpdateSimulationApplicationResponse$sources": "<p>The sources of the simulation application.</p>"
+      }
+    },
+    "StartSimulationJobBatchRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartSimulationJobBatchResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Subnets": {
+      "base": null,
+      "refs": {
+        "VPCConfig$subnets": "<p>A list of one or more subnet IDs in your VPC.</p>",
+        "VPCConfigResponse$subnets": "<p>A list of subnet IDs associated with the simulation job.</p>"
+      }
+    },
+    "SyncDeploymentJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SyncDeploymentJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>A map that contains tag keys and tag values that will be unattached from the resource.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentJobRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the deployment job.</p>",
+        "CreateDeploymentJobResponse$tags": "<p>The list of all tags added to the deployment job.</p>",
+        "CreateFleetRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the fleet.</p>",
+        "CreateFleetResponse$tags": "<p>The list of all tags added to the fleet.</p>",
+        "CreateRobotApplicationRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the robot application.</p>",
+        "CreateRobotApplicationResponse$tags": "<p>The list of all tags added to the robot application.</p>",
+        "CreateRobotRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the robot.</p>",
+        "CreateRobotResponse$tags": "<p>The list of all tags added to the robot.</p>",
+        "CreateSimulationApplicationRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the simulation application.</p>",
+        "CreateSimulationApplicationResponse$tags": "<p>The list of all tags added to the simulation application.</p>",
+        "CreateSimulationJobRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the simulation job.</p>",
+        "CreateSimulationJobResponse$tags": "<p>The list of all tags added to the simulation job.</p>",
+        "CreateWorldExportJobRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the world export job.</p>",
+        "CreateWorldExportJobResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world export job.</p>",
+        "CreateWorldGenerationJobRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the world generator job.</p>",
+        "CreateWorldGenerationJobResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world generator job.</p>",
+        "CreateWorldTemplateRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the world template.</p>",
+        "CreateWorldTemplateResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world template.</p>",
+        "DescribeDeploymentJobResponse$tags": "<p>The list of all tags added to the specified deployment job.</p>",
+        "DescribeFleetResponse$tags": "<p>The list of all tags added to the specified fleet.</p>",
+        "DescribeRobotApplicationResponse$tags": "<p>The list of all tags added to the specified robot application.</p>",
+        "DescribeRobotResponse$tags": "<p>The list of all tags added to the specified robot.</p>",
+        "DescribeSimulationApplicationResponse$tags": "<p>The list of all tags added to the specified simulation application.</p>",
+        "DescribeSimulationJobBatchResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the simulation job batch.</p>",
+        "DescribeSimulationJobResponse$tags": "<p>The list of all tags added to the specified simulation job.</p>",
+        "DescribeWorldExportJobResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world export job.</p>",
+        "DescribeWorldGenerationJobResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world generation job.</p>",
+        "DescribeWorldResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world.</p>",
+        "DescribeWorldTemplateResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the world template.</p>",
+        "ListTagsForResourceResponse$tags": "<p>The list of all tags added to the specified resource.</p>",
+        "SimulationJob$tags": "<p>A map that contains tag keys and tag values that are attached to the simulation job.</p>",
+        "SimulationJobRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the simulation job request.</p>",
+        "StartSimulationJobBatchRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the deployment job batch.</p>",
+        "StartSimulationJobBatchResponse$tags": "<p>A map that contains tag keys and tag values that are attached to the deployment job batch.</p>",
+        "TagResourceRequest$tags": "<p>A map that contains tag keys and tag values that are attached to the resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "TemplateLocation": {
+      "base": "<p>Information about a template location.</p>",
+      "refs": {
+        "CreateWorldTemplateRequest$templateLocation": "<p>The location of the world template.</p>",
+        "UpdateWorldTemplateRequest$templateLocation": "<p>The location of the world template.</p>"
+      }
+    },
+    "TemplateName": {
+      "base": null,
+      "refs": {
+        "CreateWorldTemplateRequest$name": "<p>The name of the world template.</p>",
+        "CreateWorldTemplateResponse$name": "<p>The name of the world template.</p>",
+        "DescribeWorldTemplateResponse$name": "<p>The name of the world template.</p>",
+        "TemplateSummary$name": "<p>The name of the template.</p>",
+        "UpdateWorldTemplateRequest$name": "<p>The name of the template.</p>",
+        "UpdateWorldTemplateResponse$name": "<p>The name of the world template.</p>"
+      }
+    },
+    "TemplateSummaries": {
+      "base": null,
+      "refs": {
+        "ListWorldTemplatesResponse$templateSummaries": "<p>Summary information for templates.</p>"
+      }
+    },
+    "TemplateSummary": {
+      "base": "<p>Summary information for a template.</p>",
+      "refs": {
+        "TemplateSummaries$member": null
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>AWS RoboMaker is temporarily unable to process the request. Try your call again.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRobotApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRobotApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSimulationApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSimulationApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWorldTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWorldTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VPCConfig": {
+      "base": "<p>If your simulation job accesses resources in a VPC, you provide this parameter identifying the list of security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security group and two subnet IDs.</p>",
+      "refs": {
+        "CreateSimulationJobRequest$vpcConfig": "<p>If your simulation job accesses resources in a VPC, you provide this parameter identifying the list of security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security group and one subnet ID. </p>",
+        "SimulationJobRequest$vpcConfig": null
+      }
+    },
+    "VPCConfigResponse": {
+      "base": "<p>VPC configuration associated with your simulation job.</p>",
+      "refs": {
+        "CreateSimulationJobResponse$vpcConfig": "<p>Information about the vpc configuration.</p>",
+        "DescribeSimulationJobResponse$vpcConfig": "<p>The VPC configuration.</p>",
+        "SimulationJob$vpcConfig": "<p>VPC configuration information.</p>"
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "CreateRobotApplicationResponse$version": "<p>The version of the robot application.</p>",
+        "CreateRobotApplicationVersionResponse$version": "<p>The version of the robot application.</p>",
+        "CreateSimulationApplicationResponse$version": "<p>The version of the simulation application.</p>",
+        "CreateSimulationApplicationVersionResponse$version": "<p>The version of the simulation application.</p>",
+        "DeleteRobotApplicationRequest$applicationVersion": "<p>The version of the robot application to delete.</p>",
+        "DeleteSimulationApplicationRequest$applicationVersion": "<p>The version of the simulation application to delete.</p>",
+        "DescribeRobotApplicationRequest$applicationVersion": "<p>The version of the robot application to describe.</p>",
+        "DescribeRobotApplicationResponse$version": "<p>The version of the robot application.</p>",
+        "DescribeSimulationApplicationRequest$applicationVersion": "<p>The version of the simulation application to describe.</p>",
+        "DescribeSimulationApplicationResponse$version": "<p>The version of the simulation application.</p>",
+        "RobotApplicationConfig$applicationVersion": "<p>The version of the robot application.</p>",
+        "RobotApplicationSummary$version": "<p>The version of the robot application.</p>",
+        "SimulationApplicationConfig$applicationVersion": "<p>The version of the simulation application.</p>",
+        "SimulationApplicationSummary$version": "<p>The version of the simulation application.</p>",
+        "UpdateRobotApplicationResponse$version": "<p>The version of the robot application.</p>",
+        "UpdateSimulationApplicationResponse$version": "<p>The version of the robot application.</p>"
+      }
+    },
+    "VersionQualifier": {
+      "base": null,
+      "refs": {
+        "ListRobotApplicationsRequest$versionQualifier": "<p>The version qualifier of the robot application.</p>",
+        "ListSimulationApplicationsRequest$versionQualifier": "<p>The version qualifier of the simulation application.</p>"
+      }
+    },
+    "WorldConfig": {
+      "base": "<p>Configuration information for a world.</p>",
+      "refs": {
+        "WorldConfigs$member": null
+      }
+    },
+    "WorldConfigs": {
+      "base": null,
+      "refs": {
+        "SimulationApplicationConfig$worldConfigs": "<p>A list of world configurations.</p>"
+      }
+    },
+    "WorldCount": {
+      "base": "<p>The number of worlds that will be created. You can configure the number of unique floorplans and the number of unique interiors for each floor plan. For example, if you want 1 world with 20 unique interiors, you set <code>floorplanCount = 1</code> and <code>interiorCountPerFloorplan = 20</code>. This will result in 20 worlds (<code>floorplanCount</code> * <code>interiorCountPerFloorplan)</code>. </p> <p>If you set <code>floorplanCount = 4</code> and <code>interiorCountPerFloorplan = 5</code>, there will be 20 worlds with 5 unique floor plans. </p>",
+      "refs": {
+        "CreateWorldGenerationJobRequest$worldCount": "<p>Information about the world count.</p>",
+        "CreateWorldGenerationJobResponse$worldCount": "<p>Information about the world count. </p>",
+        "DescribeWorldGenerationJobResponse$worldCount": "<p>Information about the world count.</p>",
+        "WorldGenerationJobSummary$worldCount": "<p>Information about the world count.</p>"
+      }
+    },
+    "WorldExportJobErrorCode": {
+      "base": null,
+      "refs": {
+        "CreateWorldExportJobResponse$failureCode": "<p>The failure code of the world export job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>LimitExceeded</dt> <dd> <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p> </dd> <dt>ResourceNotFound</dt> <dd> <p>The specified resource could not be found. </p> </dd> <dt>RequestThrottled</dt> <dd> <p>The request was throttled.</p> </dd> <dt>InvalidInput</dt> <dd> <p>An input parameter in the request is not valid.</p> </dd> </dl>",
+        "DescribeWorldExportJobResponse$failureCode": "<p>The failure code of the world export job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>LimitExceeded</dt> <dd> <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p> </dd> <dt>ResourceNotFound</dt> <dd> <p>The specified resource could not be found. </p> </dd> <dt>RequestThrottled</dt> <dd> <p>The request was throttled.</p> </dd> <dt>InvalidInput</dt> <dd> <p>An input parameter in the request is not valid.</p> </dd> </dl>"
+      }
+    },
+    "WorldExportJobStatus": {
+      "base": null,
+      "refs": {
+        "CreateWorldExportJobResponse$status": "<p>The status of the world export job.</p> <dl> <dt>Pending</dt> <dd> <p>The world export job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world export job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world export job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world export job failed. See <code>failureCode</code> for more information. </p> </dd> <dt>Canceled</dt> <dd> <p>The world export job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world export job is being cancelled.</p> </dd> </dl>",
+        "DescribeWorldExportJobResponse$status": "<p>The status of the world export job.</p> <dl> <dt>Pending</dt> <dd> <p>The world export job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world export job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world export job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world export job failed. See <code>failureCode</code> and <code>failureReason</code> for more information. </p> </dd> <dt>Canceled</dt> <dd> <p>The world export job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world export job is being cancelled.</p> </dd> </dl>",
+        "WorldExportJobSummary$status": "<p>The status of the world export job.</p> <dl> <dt>Pending</dt> <dd> <p>The world export job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world export job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world export job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world export job failed. See <code>failureCode</code> for more information. </p> </dd> <dt>Canceled</dt> <dd> <p>The world export job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world export job is being cancelled.</p> </dd> </dl>"
+      }
+    },
+    "WorldExportJobSummaries": {
+      "base": null,
+      "refs": {
+        "ListWorldExportJobsResponse$worldExportJobSummaries": "<p>Summary information for world export jobs.</p>"
+      }
+    },
+    "WorldExportJobSummary": {
+      "base": "<p>Information about a world export job.</p>",
+      "refs": {
+        "WorldExportJobSummaries$member": null
+      }
+    },
+    "WorldFailure": {
+      "base": "<p>Information about a failed world.</p>",
+      "refs": {
+        "WorldFailures$member": null
+      }
+    },
+    "WorldFailures": {
+      "base": null,
+      "refs": {
+        "FailureSummary$failures": "<p>The worlds that failed.</p>"
+      }
+    },
+    "WorldGenerationJobErrorCode": {
+      "base": null,
+      "refs": {
+        "CreateWorldGenerationJobResponse$failureCode": "<p>The failure code of the world generator job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>LimitExceeded</dt> <dd> <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p> </dd> <dt>ResourceNotFound</dt> <dd> <p>The specified resource could not be found. </p> </dd> <dt>RequestThrottled</dt> <dd> <p>The request was throttled.</p> </dd> <dt>InvalidInput</dt> <dd> <p>An input parameter in the request is not valid.</p> </dd> </dl>",
+        "DescribeWorldGenerationJobResponse$failureCode": "<p>The failure code of the world generation job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>LimitExceeded</dt> <dd> <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p> </dd> <dt>ResourceNotFound</dt> <dd> <p>The specified resource could not be found. </p> </dd> <dt>RequestThrottled</dt> <dd> <p>The request was throttled.</p> </dd> <dt>InvalidInput</dt> <dd> <p>An input parameter in the request is not valid.</p> </dd> </dl>",
+        "WorldFailure$failureCode": "<p>The failure code of the world export job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>LimitExceeded</dt> <dd> <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p> </dd> <dt>ResourceNotFound</dt> <dd> <p>The specified resource could not be found. </p> </dd> <dt>RequestThrottled</dt> <dd> <p>The request was throttled.</p> </dd> <dt>InvalidInput</dt> <dd> <p>An input parameter in the request is not valid.</p> </dd> </dl>"
+      }
+    },
+    "WorldGenerationJobStatus": {
+      "base": null,
+      "refs": {
+        "CreateWorldGenerationJobResponse$status": "<p>The status of the world generator job.</p> <dl> <dt>Pending</dt> <dd> <p>The world generator job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world generator job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world generator job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world generator job failed. See <code>failureCode</code> for more information. </p> </dd> <dt>PartialFailed</dt> <dd> <p>Some worlds did not generate.</p> </dd> <dt>Canceled</dt> <dd> <p>The world generator job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world generator job is being cancelled.</p> </dd> </dl>",
+        "DescribeWorldGenerationJobResponse$status": "<p>The status of the world generation job:</p> <dl> <dt>Pending</dt> <dd> <p>The world generation job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world generation job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world generation job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world generation job failed. See <code>failureCode</code> for more information. </p> </dd> <dt>PartialFailed</dt> <dd> <p>Some worlds did not generate.</p> </dd> <dt>Canceled</dt> <dd> <p>The world generation job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world generation job is being cancelled.</p> </dd> </dl>",
+        "WorldGenerationJobSummary$status": "<p>The status of the world generator job:</p> <dl> <dt>Pending</dt> <dd> <p>The world generator job request is pending.</p> </dd> <dt>Running</dt> <dd> <p>The world generator job is running. </p> </dd> <dt>Completed</dt> <dd> <p>The world generator job completed. </p> </dd> <dt>Failed</dt> <dd> <p>The world generator job failed. See <code>failureCode</code> for more information. </p> </dd> <dt>PartialFailed</dt> <dd> <p>Some worlds did not generate.</p> </dd> <dt>Canceled</dt> <dd> <p>The world generator job was cancelled.</p> </dd> <dt>Canceling</dt> <dd> <p>The world generator job is being cancelled.</p> </dd> </dl>"
+      }
+    },
+    "WorldGenerationJobSummaries": {
+      "base": null,
+      "refs": {
+        "ListWorldGenerationJobsResponse$worldGenerationJobSummaries": "<p>Summary information for world generator jobs.</p>"
+      }
+    },
+    "WorldGenerationJobSummary": {
+      "base": "<p>Information about a world generator job.</p>",
+      "refs": {
+        "WorldGenerationJobSummaries$member": null
+      }
+    },
+    "WorldSummaries": {
+      "base": null,
+      "refs": {
+        "ListWorldsResponse$worldSummaries": "<p>Summary information for worlds.</p>"
+      }
+    },
+    "WorldSummary": {
+      "base": "<p>Information about a world.</p>",
+      "refs": {
+        "WorldSummaries$member": null
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "ConcurrentDeploymentException$message": null,
+        "IdempotentParameterMismatchException$message": null,
+        "InternalServerException$message": null,
+        "InvalidParameterException$message": null,
+        "LimitExceededException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ServiceUnavailableException$message": null,
+        "ThrottlingException$message": null
+      }
+    }
+  }
+}

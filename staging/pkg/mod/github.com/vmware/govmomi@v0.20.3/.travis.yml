@@ -1,0 +1,95 @@
+# Use the newer Travis-CI build templates based on the
+# Debian Linux distribution "Trusty" release.
+os:             linux
+dist:           trusty
+
+# Disable sudo for all builds by default. This ensures all jobs use
+# Travis-CI's containerized build environment unless specified otherwise.
+# The container builds have *much* shorter queue times than the VM-based
+# build environment on which the sudo builds depend.
+sudo:           false
+services:       false
+
+# Set the version of Go.
+language:       go
+go:             1.11
+
+# Always set the project's Go import path to ensure that forked
+# builds get cloned to the correct location.
+go_import_path: github.com/vmware/govmomi
+
+# Ensure all the jobs know where the temp directory is.
+env:
+  global: TMPDIR=/tmp
+
+jobs:
+  include:
+
+    # The "lint" stage runs the various linters against the project.
+    - &lint-stage
+      stage:         lint
+      env:           LINTER=govet
+      install:       true
+      script:        make "${LINTER}"
+
+    - <<:            *lint-stage
+      env:           LINTER=goimports
+
+    # The "build" stage verifies the program can be built against the 
+    # various GOOS and GOARCH combinations found in the Go releaser
+    # config file, ".goreleaser.yml".
+    - &build-stage
+      stage:         build
+      env:           GOOS=linux GOARCH=amd64
+      install:       true
+      script:        make install
+
+    - <<:            *build-stage
+      env:           GOOS=linux   GOARCH=386
+
+    - <<:            *build-stage
+      env:           GOOS=darwin  GOARCH=amd64
+    - <<:            *build-stage
+      env:           GOOS=darwin  GOARCH=386
+
+    - <<:            *build-stage
+      env:           GOOS=freebsd GOARCH=amd64
+    - <<:            *build-stage
+      env:           GOOS=freebsd GOARCH=386
+
+    - <<:            *build-stage
+      env:           GOOS=windows GOARCH=amd64
+    - <<:            *build-stage
+      env:           GOOS=windows GOARCH=386
+
+    # The test stage executes the test target.
+    - stage:         test
+      install:       true
+      script:        make test
+
+    # The deploy stage deploys the build artifacts using goreleaser.
+    #
+    # This stage will only be activated when there is an annotated tag present
+    # or when the text "/ci-deploy" is present in the commit message. However,
+    # the "deploy" phase of the build will still only be executed on non-PR
+    # builds as that restriction is baked into Travis-CI.
+    #
+    # Finally, this stage requires the Travis-CI VM infrastructure in order to
+    # leverage Docker. This will increase the amount of time the jobs sit
+    # in the queue, waiting to be built. However, it's a necessity as Travis-CI
+    # only allows the use of Docker with VM builds.
+    - stage:         deploy
+      if:            tag IS present OR commit_message =~ /\/ci-deploy/
+      sudo:          required
+      services:      docker
+      install:       true
+      script:        make install
+      after_success: docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
+      deploy:
+      - provider:     script
+        skip_cleanup: true
+        script:       curl -sL http://git.io/goreleaser | bash
+      addons:
+        apt:
+          update:     true
+          packages:   xmlstarlet

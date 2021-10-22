@@ -1,0 +1,40 @@
+{
+  "pagination": {
+    "ListDatasetGroups": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "DatasetGroups"
+    },
+    "ListDatasetImportJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "DatasetImportJobs"
+    },
+    "ListDatasets": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Datasets"
+    },
+    "ListForecastExportJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ForecastExportJobs"
+    },
+    "ListForecasts": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Forecasts"
+    },
+    "ListPredictors": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Predictors"
+    }
+  }
+}

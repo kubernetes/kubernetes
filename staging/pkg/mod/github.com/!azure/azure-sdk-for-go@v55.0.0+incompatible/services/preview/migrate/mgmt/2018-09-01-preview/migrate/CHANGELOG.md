@@ -1,0 +1,35 @@
+# Change History
+
+## Additive Changes
+
+### New Funcs
+
+1. ApplyClause.MarshalJSON() ([]byte, error)
+1. EdmReferentialConstraintPropertyPair.MarshalJSON() ([]byte, error)
+1. FilterClause.MarshalJSON() ([]byte, error)
+1. IEdmEntityContainer.MarshalJSON() ([]byte, error)
+1. IEdmEntityContainerElement.MarshalJSON() ([]byte, error)
+1. IEdmExpression.MarshalJSON() ([]byte, error)
+1. IEdmModel.MarshalJSON() ([]byte, error)
+1. IEdmNavigationProperty.MarshalJSON() ([]byte, error)
+1. IEdmNavigationPropertyBinding.MarshalJSON() ([]byte, error)
+1. IEdmNavigationSource.MarshalJSON() ([]byte, error)
+1. IEdmPathExpression.MarshalJSON() ([]byte, error)
+1. IEdmProperty.MarshalJSON() ([]byte, error)
+1. IEdmReferentialConstraint.MarshalJSON() ([]byte, error)
+1. IEdmSchemaElement.MarshalJSON() ([]byte, error)
+1. IEdmStructuralProperty.MarshalJSON() ([]byte, error)
+1. IEdmStructuredType.MarshalJSON() ([]byte, error)
+1. IEdmTerm.MarshalJSON() ([]byte, error)
+1. IEdmType.MarshalJSON() ([]byte, error)
+1. IEdmTypeReference.MarshalJSON() ([]byte, error)
+1. IEdmVocabularyAnnotation.MarshalJSON() ([]byte, error)
+1. ODataPath.MarshalJSON() ([]byte, error)
+1. ODataQueryContext.MarshalJSON() ([]byte, error)
+1. ODataQueryOptions1.MarshalJSON() ([]byte, error)
+1. ODataRawQueryOptions.MarshalJSON() ([]byte, error)
+1. OperationDisplay.MarshalJSON() ([]byte, error)
+1. RangeVariable.MarshalJSON() ([]byte, error)
+1. SelectExpandClause.MarshalJSON() ([]byte, error)
+1. SingleValueNode.MarshalJSON() ([]byte, error)
+1. TransformationNode.MarshalJSON() ([]byte, error)

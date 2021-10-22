@@ -1,0 +1,1166 @@
+{
+  "basePath": "/customsearch/",
+  "baseUrl": "https://www.googleapis.com/customsearch/",
+  "batchPath": "batch/customsearch/v1",
+  "description": "Searches over a website or collection of websites",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/custom-search/v1/using_rest",
+  "etag": "\"J3WqvAcMk4eQjJXvfSI4Yr8VouA/2iWcS6EAVqIO3py2_4I7tTajAB4\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "customsearch:v1",
+  "kind": "discovery#restDescription",
+  "name": "customsearch",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "cse": {
+      "methods": {
+        "list": {
+          "description": "Returns metadata about the search performed, metadata about the custom search engine used for the search, and the search results.",
+          "httpMethod": "GET",
+          "id": "search.cse.list",
+          "parameterOrder": [
+            "q"
+          ],
+          "parameters": {
+            "c2coff": {
+              "description": "Turns off the translation between zh-CN and zh-TW.",
+              "location": "query",
+              "type": "string"
+            },
+            "cr": {
+              "description": "Country restrict(s).",
+              "location": "query",
+              "type": "string"
+            },
+            "cx": {
+              "description": "The custom search engine ID to scope this search query",
+              "location": "query",
+              "type": "string"
+            },
+            "dateRestrict": {
+              "description": "Specifies all search results are from a time period",
+              "location": "query",
+              "type": "string"
+            },
+            "exactTerms": {
+              "description": "Identifies a phrase that all documents in the search results must contain",
+              "location": "query",
+              "type": "string"
+            },
+            "excludeTerms": {
+              "description": "Identifies a word or phrase that should not appear in any documents in the search results",
+              "location": "query",
+              "type": "string"
+            },
+            "fileType": {
+              "description": "Returns images of a specified type. Some of the allowed values are: bmp, gif, png, jpg, svg, pdf, ...",
+              "location": "query",
+              "type": "string"
+            },
+            "filter": {
+              "description": "Controls turning on or off the duplicate content filter.",
+              "enum": [
+                "0",
+                "1"
+              ],
+              "enumDescriptions": [
+                "Turns off duplicate content filter.",
+                "Turns on duplicate content filter."
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "gl": {
+              "description": "Geolocation of end user.",
+              "location": "query",
+              "type": "string"
+            },
+            "googlehost": {
+              "description": "The local Google domain to use to perform the search.",
+              "location": "query",
+              "type": "string"
+            },
+            "highRange": {
+              "description": "Creates a range in form as_nlo value..as_nhi value and attempts to append it to query",
+              "location": "query",
+              "type": "string"
+            },
+            "hl": {
+              "description": "Sets the user interface language.",
+              "location": "query",
+              "type": "string"
+            },
+            "hq": {
+              "description": "Appends the extra query terms to the query.",
+              "location": "query",
+              "type": "string"
+            },
+            "imgColorType": {
+              "description": "Returns black and white, grayscale, or color images: mono, gray, and color.",
+              "enum": [
+                "color",
+                "gray",
+                "mono"
+              ],
+              "enumDescriptions": [
+                "color",
+                "gray",
+                "mono"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "imgDominantColor": {
+              "description": "Returns images of a specific dominant color: red, orange, yellow, green, teal, blue, purple, pink, white, gray, black and brown.",
+              "enum": [
+                "black",
+                "blue",
+                "brown",
+                "gray",
+                "green",
+                "orange",
+                "pink",
+                "purple",
+                "red",
+                "teal",
+                "white",
+                "yellow"
+              ],
+              "enumDescriptions": [
+                "black",
+                "blue",
+                "brown",
+                "gray",
+                "green",
+                "orange",
+                "pink",
+                "purple",
+                "red",
+                "teal",
+                "white",
+                "yellow"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "imgSize": {
+              "description": "Returns images of a specified size, where size can be one of: icon, small, medium, large, xlarge, xxlarge, and huge.",
+              "enum": [
+                "huge",
+                "icon",
+                "large",
+                "medium",
+                "small",
+                "xlarge",
+                "xxlarge"
+              ],
+              "enumDescriptions": [
+                "huge",
+                "icon",
+                "large",
+                "medium",
+                "small",
+                "xlarge",
+                "xxlarge"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "imgType": {
+              "description": "Returns images of a type, which can be one of: clipart, face, lineart, news, and photo.",
+              "enum": [
+                "clipart",
+                "face",
+                "lineart",
+                "news",
+                "photo"
+              ],
+              "enumDescriptions": [
+                "clipart",
+                "face",
+                "lineart",
+                "news",
+                "photo"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "linkSite": {
+              "description": "Specifies that all search results should contain a link to a particular URL",
+              "location": "query",
+              "type": "string"
+            },
+            "lowRange": {
+              "description": "Creates a range in form as_nlo value..as_nhi value and attempts to append it to query",
+              "location": "query",
+              "type": "string"
+            },
+            "lr": {
+              "description": "The language restriction for the search results",
+              "enum": [
+                "lang_ar",
+                "lang_bg",
+                "lang_ca",
+                "lang_cs",
+                "lang_da",
+                "lang_de",
+                "lang_el",
+                "lang_en",
+                "lang_es",
+                "lang_et",
+                "lang_fi",
+                "lang_fr",
+                "lang_hr",
+                "lang_hu",
+                "lang_id",
+                "lang_is",
+                "lang_it",
+                "lang_iw",
+                "lang_ja",
+                "lang_ko",
+                "lang_lt",
+                "lang_lv",
+                "lang_nl",
+                "lang_no",
+                "lang_pl",
+                "lang_pt",
+                "lang_ro",
+                "lang_ru",
+                "lang_sk",
+                "lang_sl",
+                "lang_sr",
+                "lang_sv",
+                "lang_tr",
+                "lang_zh-CN",
+                "lang_zh-TW"
+              ],
+              "enumDescriptions": [
+                "Arabic",
+                "Bulgarian",
+                "Catalan",
+                "Czech",
+                "Danish",
+                "German",
+                "Greek",
+                "English",
+                "Spanish",
+                "Estonian",
+                "Finnish",
+                "French",
+                "Croatian",
+                "Hungarian",
+                "Indonesian",
+                "Icelandic",
+                "Italian",
+                "Hebrew",
+                "Japanese",
+                "Korean",
+                "Lithuanian",
+                "Latvian",
+                "Dutch",
+                "Norwegian",
+                "Polish",
+                "Portuguese",
+                "Romanian",
+                "Russian",
+                "Slovak",
+                "Slovenian",
+                "Serbian",
+                "Swedish",
+                "Turkish",
+                "Chinese (Simplified)",
+                "Chinese (Traditional)"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "num": {
+              "default": "10",
+              "description": "Number of search results to return",
+              "format": "uint32",
+              "location": "query",
+              "type": "integer"
+            },
+            "orTerms": {
+              "description": "Provides additional search terms to check for in a document, where each document in the search results must contain at least one of the additional search terms",
+              "location": "query",
+              "type": "string"
+            },
+            "q": {
+              "description": "Query",
+              "location": "query",
+              "required": true,
+              "type": "string"
+            },
+            "relatedSite": {
+              "description": "Specifies that all search results should be pages that are related to the specified URL",
+              "location": "query",
+              "type": "string"
+            },
+            "rights": {
+              "description": "Filters based on licensing. Supported values include: cc_publicdomain, cc_attribute, cc_sharealike, cc_noncommercial, cc_nonderived and combinations of these.",
+              "location": "query",
+              "type": "string"
+            },
+            "safe": {
+              "default": "off",
+              "description": "Search safety level",
+              "enum": [
+                "active",
+                "high",
+                "medium",
+                "off"
+              ],
+              "enumDescriptions": [
+                "Enables safe search filtering.",
+                "(Deprecated) Same as active.",
+                "(Deprecated) Same as active.",
+                "Disables safe search filtering."
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "searchType": {
+              "description": "Specifies the search type: image.",
+              "enum": [
+                "image"
+              ],
+              "enumDescriptions": [
+                "custom image search"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "siteSearch": {
+              "description": "Specifies all search results should be pages from a given site",
+              "location": "query",
+              "type": "string"
+            },
+            "siteSearchFilter": {
+              "description": "Controls whether to include or exclude results from the site named in the as_sitesearch parameter",
+              "enum": [
+                "e",
+                "i"
+              ],
+              "enumDescriptions": [
+                "exclude",
+                "include"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "sort": {
+              "description": "The sort expression to apply to the results",
+              "location": "query",
+              "type": "string"
+            },
+            "start": {
+              "description": "The index of the first result to return",
+              "format": "uint32",
+              "location": "query",
+              "type": "integer"
+            }
+          },
+          "path": "v1",
+          "response": {
+            "$ref": "Search"
+          }
+        }
+      },
+      "resources": {
+        "siterestrict": {
+          "methods": {
+            "list": {
+              "description": "Returns metadata about the search performed, metadata about the custom search engine used for the search, and the search results. Uses a small set of url patterns.",
+              "httpMethod": "GET",
+              "id": "search.cse.siterestrict.list",
+              "parameterOrder": [
+                "q"
+              ],
+              "parameters": {
+                "c2coff": {
+                  "description": "Turns off the translation between zh-CN and zh-TW.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "cr": {
+                  "description": "Country restrict(s).",
+                  "location": "query",
+                  "type": "string"
+                },
+                "cx": {
+                  "description": "The custom search engine ID to scope this search query",
+                  "location": "query",
+                  "type": "string"
+                },
+                "dateRestrict": {
+                  "description": "Specifies all search results are from a time period",
+                  "location": "query",
+                  "type": "string"
+                },
+                "exactTerms": {
+                  "description": "Identifies a phrase that all documents in the search results must contain",
+                  "location": "query",
+                  "type": "string"
+                },
+                "excludeTerms": {
+                  "description": "Identifies a word or phrase that should not appear in any documents in the search results",
+                  "location": "query",
+                  "type": "string"
+                },
+                "fileType": {
+                  "description": "Returns images of a specified type. Some of the allowed values are: bmp, gif, png, jpg, svg, pdf, ...",
+                  "location": "query",
+                  "type": "string"
+                },
+                "filter": {
+                  "description": "Controls turning on or off the duplicate content filter.",
+                  "enum": [
+                    "0",
+                    "1"
+                  ],
+                  "enumDescriptions": [
+                    "Turns off duplicate content filter.",
+                    "Turns on duplicate content filter."
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "gl": {
+                  "description": "Geolocation of end user.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "googlehost": {
+                  "description": "The local Google domain to use to perform the search.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "highRange": {
+                  "description": "Creates a range in form as_nlo value..as_nhi value and attempts to append it to query",
+                  "location": "query",
+                  "type": "string"
+                },
+                "hl": {
+                  "description": "Sets the user interface language.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "hq": {
+                  "description": "Appends the extra query terms to the query.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "imgColorType": {
+                  "description": "Returns black and white, grayscale, or color images: mono, gray, and color.",
+                  "enum": [
+                    "color",
+                    "gray",
+                    "mono"
+                  ],
+                  "enumDescriptions": [
+                    "color",
+                    "gray",
+                    "mono"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "imgDominantColor": {
+                  "description": "Returns images of a specific dominant color: red, orange, yellow, green, teal, blue, purple, pink, white, gray, black and brown.",
+                  "enum": [
+                    "black",
+                    "blue",
+                    "brown",
+                    "gray",
+                    "green",
+                    "orange",
+                    "pink",
+                    "purple",
+                    "red",
+                    "teal",
+                    "white",
+                    "yellow"
+                  ],
+                  "enumDescriptions": [
+                    "black",
+                    "blue",
+                    "brown",
+                    "gray",
+                    "green",
+                    "orange",
+                    "pink",
+                    "purple",
+                    "red",
+                    "teal",
+                    "white",
+                    "yellow"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "imgSize": {
+                  "description": "Returns images of a specified size, where size can be one of: icon, small, medium, large, xlarge, xxlarge, and huge.",
+                  "enum": [
+                    "huge",
+                    "icon",
+                    "large",
+                    "medium",
+                    "small",
+                    "xlarge",
+                    "xxlarge"
+                  ],
+                  "enumDescriptions": [
+                    "huge",
+                    "icon",
+                    "large",
+                    "medium",
+                    "small",
+                    "xlarge",
+                    "xxlarge"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "imgType": {
+                  "description": "Returns images of a type, which can be one of: clipart, face, lineart, news, and photo.",
+                  "enum": [
+                    "clipart",
+                    "face",
+                    "lineart",
+                    "news",
+                    "photo"
+                  ],
+                  "enumDescriptions": [
+                    "clipart",
+                    "face",
+                    "lineart",
+                    "news",
+                    "photo"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "linkSite": {
+                  "description": "Specifies that all search results should contain a link to a particular URL",
+                  "location": "query",
+                  "type": "string"
+                },
+                "lowRange": {
+                  "description": "Creates a range in form as_nlo value..as_nhi value and attempts to append it to query",
+                  "location": "query",
+                  "type": "string"
+                },
+                "lr": {
+                  "description": "The language restriction for the search results",
+                  "enum": [
+                    "lang_ar",
+                    "lang_bg",
+                    "lang_ca",
+                    "lang_cs",
+                    "lang_da",
+                    "lang_de",
+                    "lang_el",
+                    "lang_en",
+                    "lang_es",
+                    "lang_et",
+                    "lang_fi",
+                    "lang_fr",
+                    "lang_hr",
+                    "lang_hu",
+                    "lang_id",
+                    "lang_is",
+                    "lang_it",
+                    "lang_iw",
+                    "lang_ja",
+                    "lang_ko",
+                    "lang_lt",
+                    "lang_lv",
+                    "lang_nl",
+                    "lang_no",
+                    "lang_pl",
+                    "lang_pt",
+                    "lang_ro",
+                    "lang_ru",
+                    "lang_sk",
+                    "lang_sl",
+                    "lang_sr",
+                    "lang_sv",
+                    "lang_tr",
+                    "lang_zh-CN",
+                    "lang_zh-TW"
+                  ],
+                  "enumDescriptions": [
+                    "Arabic",
+                    "Bulgarian",
+                    "Catalan",
+                    "Czech",
+                    "Danish",
+                    "German",
+                    "Greek",
+                    "English",
+                    "Spanish",
+                    "Estonian",
+                    "Finnish",
+                    "French",
+                    "Croatian",
+                    "Hungarian",
+                    "Indonesian",
+                    "Icelandic",
+                    "Italian",
+                    "Hebrew",
+                    "Japanese",
+                    "Korean",
+                    "Lithuanian",
+                    "Latvian",
+                    "Dutch",
+                    "Norwegian",
+                    "Polish",
+                    "Portuguese",
+                    "Romanian",
+                    "Russian",
+                    "Slovak",
+                    "Slovenian",
+                    "Serbian",
+                    "Swedish",
+                    "Turkish",
+                    "Chinese (Simplified)",
+                    "Chinese (Traditional)"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "num": {
+                  "default": "10",
+                  "description": "Number of search results to return",
+                  "format": "uint32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "orTerms": {
+                  "description": "Provides additional search terms to check for in a document, where each document in the search results must contain at least one of the additional search terms",
+                  "location": "query",
+                  "type": "string"
+                },
+                "q": {
+                  "description": "Query",
+                  "location": "query",
+                  "required": true,
+                  "type": "string"
+                },
+                "relatedSite": {
+                  "description": "Specifies that all search results should be pages that are related to the specified URL",
+                  "location": "query",
+                  "type": "string"
+                },
+                "rights": {
+                  "description": "Filters based on licensing. Supported values include: cc_publicdomain, cc_attribute, cc_sharealike, cc_noncommercial, cc_nonderived and combinations of these.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "safe": {
+                  "default": "off",
+                  "description": "Search safety level",
+                  "enum": [
+                    "high",
+                    "medium",
+                    "off"
+                  ],
+                  "enumDescriptions": [
+                    "Enables highest level of safe search filtering.",
+                    "Enables moderate safe search filtering.",
+                    "Disables safe search filtering."
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "searchType": {
+                  "description": "Specifies the search type: image.",
+                  "enum": [
+                    "image"
+                  ],
+                  "enumDescriptions": [
+                    "custom image search"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "siteSearch": {
+                  "description": "Specifies all search results should be pages from a given site",
+                  "location": "query",
+                  "type": "string"
+                },
+                "siteSearchFilter": {
+                  "description": "Controls whether to include or exclude results from the site named in the as_sitesearch parameter",
+                  "enum": [
+                    "e",
+                    "i"
+                  ],
+                  "enumDescriptions": [
+                    "exclude",
+                    "include"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                },
+                "sort": {
+                  "description": "The sort expression to apply to the results",
+                  "location": "query",
+                  "type": "string"
+                },
+                "start": {
+                  "description": "The index of the first result to return",
+                  "format": "uint32",
+                  "location": "query",
+                  "type": "integer"
+                }
+              },
+              "path": "v1/siterestrict",
+              "response": {
+                "$ref": "Search"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20181001",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "Context": {
+      "id": "Context",
+      "properties": {
+        "facets": {
+          "items": {
+            "items": {
+              "properties": {
+                "anchor": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "label_with_op": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Promotion": {
+      "id": "Promotion",
+      "properties": {
+        "bodyLines": {
+          "items": {
+            "properties": {
+              "htmlTitle": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "displayLink": {
+          "type": "string"
+        },
+        "htmlTitle": {
+          "type": "string"
+        },
+        "image": {
+          "properties": {
+            "height": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            },
+            "width": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "link": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Query": {
+      "id": "Query",
+      "properties": {
+        "count": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "cr": {
+          "type": "string"
+        },
+        "cx": {
+          "type": "string"
+        },
+        "dateRestrict": {
+          "type": "string"
+        },
+        "disableCnTwTranslation": {
+          "type": "string"
+        },
+        "exactTerms": {
+          "type": "string"
+        },
+        "excludeTerms": {
+          "type": "string"
+        },
+        "fileType": {
+          "type": "string"
+        },
+        "filter": {
+          "type": "string"
+        },
+        "gl": {
+          "type": "string"
+        },
+        "googleHost": {
+          "type": "string"
+        },
+        "highRange": {
+          "type": "string"
+        },
+        "hl": {
+          "type": "string"
+        },
+        "hq": {
+          "type": "string"
+        },
+        "imgColorType": {
+          "type": "string"
+        },
+        "imgDominantColor": {
+          "type": "string"
+        },
+        "imgSize": {
+          "type": "string"
+        },
+        "imgType": {
+          "type": "string"
+        },
+        "inputEncoding": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "linkSite": {
+          "type": "string"
+        },
+        "lowRange": {
+          "type": "string"
+        },
+        "orTerms": {
+          "type": "string"
+        },
+        "outputEncoding": {
+          "type": "string"
+        },
+        "relatedSite": {
+          "type": "string"
+        },
+        "rights": {
+          "type": "string"
+        },
+        "safe": {
+          "type": "string"
+        },
+        "searchTerms": {
+          "type": "string"
+        },
+        "searchType": {
+          "type": "string"
+        },
+        "siteSearch": {
+          "type": "string"
+        },
+        "siteSearchFilter": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "startIndex": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "startPage": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "totalResults": {
+          "format": "int64",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Result": {
+      "id": "Result",
+      "properties": {
+        "cacheId": {
+          "type": "string"
+        },
+        "displayLink": {
+          "type": "string"
+        },
+        "fileFormat": {
+          "type": "string"
+        },
+        "formattedUrl": {
+          "type": "string"
+        },
+        "htmlFormattedUrl": {
+          "type": "string"
+        },
+        "htmlSnippet": {
+          "type": "string"
+        },
+        "htmlTitle": {
+          "type": "string"
+        },
+        "image": {
+          "properties": {
+            "byteSize": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "contextLink": {
+              "type": "string"
+            },
+            "height": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "thumbnailHeight": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "thumbnailLink": {
+              "type": "string"
+            },
+            "thumbnailWidth": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "width": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "kind": {
+          "default": "customsearch#result",
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "properties": {
+              "displayName": {
+                "type": "string"
+              },
+              "label_with_op": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "link": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "pagemap": {
+          "additionalProperties": {
+            "items": {
+              "additionalProperties": {
+                "type": "any"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "snippet": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Search": {
+      "id": "Search",
+      "properties": {
+        "context": {
+          "$ref": "Context"
+        },
+        "items": {
+          "items": {
+            "$ref": "Result"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "customsearch#search",
+          "type": "string"
+        },
+        "promotions": {
+          "items": {
+            "$ref": "Promotion"
+          },
+          "type": "array"
+        },
+        "queries": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "Query"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "searchInformation": {
+          "properties": {
+            "formattedSearchTime": {
+              "type": "string"
+            },
+            "formattedTotalResults": {
+              "type": "string"
+            },
+            "searchTime": {
+              "format": "double",
+              "type": "number"
+            },
+            "totalResults": {
+              "format": "int64",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "spelling": {
+          "properties": {
+            "correctedQuery": {
+              "type": "string"
+            },
+            "htmlCorrectedQuery": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "url": {
+          "properties": {
+            "template": {
+              "default": "https://www.googleapis.com/customsearch/v1?q={searchTerms}\u0026num={count?}\u0026start={startIndex?}\u0026lr={language?}\u0026safe={safe?}\u0026cx={cx?}\u0026sort={sort?}\u0026filter={filter?}\u0026gl={gl?}\u0026cr={cr?}\u0026googlehost={googleHost?}\u0026c2coff={disableCnTwTranslation?}\u0026hq={hq?}\u0026hl={hl?}\u0026siteSearch={siteSearch?}\u0026siteSearchFilter={siteSearchFilter?}\u0026exactTerms={exactTerms?}\u0026excludeTerms={excludeTerms?}\u0026linkSite={linkSite?}\u0026orTerms={orTerms?}\u0026relatedSite={relatedSite?}\u0026dateRestrict={dateRestrict?}\u0026lowRange={lowRange?}\u0026highRange={highRange?}\u0026searchType={searchType}\u0026fileType={fileType?}\u0026rights={rights?}\u0026imgSize={imgSize?}\u0026imgType={imgType?}\u0026imgColorType={imgColorType?}\u0026imgDominantColor={imgDominantColor?}\u0026alt=json",
+              "type": "string"
+            },
+            "type": {
+              "default": "application/json",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "customsearch/",
+  "title": "CustomSearch API",
+  "version": "v1"
+}

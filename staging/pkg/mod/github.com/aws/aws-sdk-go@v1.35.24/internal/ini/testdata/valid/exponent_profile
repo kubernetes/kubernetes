@@ -1,0 +1,4 @@
+[ default ]
+exponent = 1e4
+exponent_2 = 1E-4
+exponent_should_be_string = 0x1ob

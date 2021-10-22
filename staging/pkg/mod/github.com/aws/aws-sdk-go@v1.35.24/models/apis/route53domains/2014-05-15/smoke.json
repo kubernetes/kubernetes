@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-east-1",
+    "testCases": [
+        {
+            "operationName": "ListDomains",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "GetDomainDetail",
+            "input": {
+                "DomainName": "fake-domain-name"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

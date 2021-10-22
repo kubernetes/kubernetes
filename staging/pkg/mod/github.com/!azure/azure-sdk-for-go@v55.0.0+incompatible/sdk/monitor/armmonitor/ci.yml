@@ -1,0 +1,15 @@
+# NOTE: Please refer to https://aka.ms/azsdk/engsys/ci-yaml before editing this file.
+trigger:
+  paths:
+    include:
+    - sdk/monitor/armmonitor
+
+pr:
+  paths:
+    include:
+    - sdk/monitor/armmonitor
+
+stages:
+- template: ../../../eng/pipelines/templates/jobs/archetype-sdk-client-samples.yml
+  parameters:
+    ServiceDirectory: 'monitor/armmonitor'

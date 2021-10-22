@@ -1,0 +1,1074 @@
+{
+  "version": "1.0",
+  "examples": {
+    "AddTagsToResource": [
+      {
+        "input": {
+          "ResourceArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E",
+          "Tags": [
+            {
+              "Key": "Acount",
+              "Value": "1633456"
+            }
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+            "ResourceArn": "Required. Use the ARN of the resource you want to tag.",
+            "Tags": "Required. Use the Key/Value pair format."
+          },
+          "output": {
+          }
+        },
+        "description": "Adds metadata tags to an AWS DMS resource, including replication instance, endpoint, security group, and migration task. These tags can also be used with cost allocation reporting to track cost associated with AWS DMS resources, or used in a Condition statement in an IAM policy for AWS DMS.",
+        "id": "add-tags-to-resource-1481744141435",
+        "title": "Add tags to resource"
+      }
+    ],
+    "CreateEndpoint": [
+      {
+        "input": {
+          "CertificateArn": "",
+          "DatabaseName": "testdb",
+          "EndpointIdentifier": "test-endpoint-1",
+          "EndpointType": "source",
+          "EngineName": "mysql",
+          "ExtraConnectionAttributes": "",
+          "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+          "Password": "pasword",
+          "Port": 3306,
+          "ServerName": "mydb.cx1llnox7iyx.us-west-2.rds.amazonaws.com",
+          "SslMode": "require",
+          "Tags": [
+            {
+              "Key": "Acount",
+              "Value": "143327655"
+            }
+          ],
+          "Username": "username"
+        },
+        "output": {
+          "Endpoint": {
+            "EndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:RAAR3R22XSH46S3PWLC3NJAWKM",
+            "EndpointIdentifier": "test-endpoint-1",
+            "EndpointType": "source",
+            "EngineName": "mysql",
+            "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+            "Port": 3306,
+            "ServerName": "mydb.cx1llnox7iyx.us-west-2.rds.amazonaws.com",
+            "Status": "active",
+            "Username": "username"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates an endpoint using the provided settings.",
+        "id": "create-endpoint-1481746254348",
+        "title": "Create endpoint"
+      }
+    ],
+    "CreateReplicationInstance": [
+      {
+        "input": {
+          "AllocatedStorage": 123,
+          "AutoMinorVersionUpgrade": true,
+          "AvailabilityZone": "",
+          "EngineVersion": "",
+          "KmsKeyId": "",
+          "MultiAZ": true,
+          "PreferredMaintenanceWindow": "",
+          "PubliclyAccessible": true,
+          "ReplicationInstanceClass": "",
+          "ReplicationInstanceIdentifier": "",
+          "ReplicationSubnetGroupIdentifier": "",
+          "Tags": [
+            {
+              "Key": "string",
+              "Value": "string"
+            }
+          ],
+          "VpcSecurityGroupIds": [
+
+          ]
+        },
+        "output": {
+          "ReplicationInstance": {
+            "AllocatedStorage": 5,
+            "AutoMinorVersionUpgrade": true,
+            "EngineVersion": "1.5.0",
+            "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+            "PendingModifiedValues": {
+            },
+            "PreferredMaintenanceWindow": "sun:06:00-sun:14:00",
+            "PubliclyAccessible": true,
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationInstanceClass": "dms.t2.micro",
+            "ReplicationInstanceIdentifier": "test-rep-1",
+            "ReplicationInstanceStatus": "creating",
+            "ReplicationSubnetGroup": {
+              "ReplicationSubnetGroupDescription": "default",
+              "ReplicationSubnetGroupIdentifier": "default",
+              "SubnetGroupStatus": "Complete",
+              "Subnets": [
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1d"
+                  },
+                  "SubnetIdentifier": "subnet-f6dd91af",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1b"
+                  },
+                  "SubnetIdentifier": "subnet-3605751d",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1c"
+                  },
+                  "SubnetIdentifier": "subnet-c2daefb5",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1e"
+                  },
+                  "SubnetIdentifier": "subnet-85e90cb8",
+                  "SubnetStatus": "Active"
+                }
+              ],
+              "VpcId": "vpc-6741a603"
+            }
+          }
+        },
+        "comments": {
+          "output": {
+          }
+        },
+        "description": "Creates the replication instance using the specified parameters.",
+        "id": "create-replication-instance-1481746705295",
+        "title": "Create replication instance"
+      }
+    ],
+    "CreateReplicationSubnetGroup": [
+      {
+        "input": {
+          "ReplicationSubnetGroupDescription": "US West subnet group",
+          "ReplicationSubnetGroupIdentifier": "us-west-2ab-vpc-215ds366",
+          "SubnetIds": [
+            "subnet-e145356n",
+            "subnet-58f79200"
+          ],
+          "Tags": [
+            {
+              "Key": "Acount",
+              "Value": "145235"
+            }
+          ]
+        },
+        "output": {
+          "ReplicationSubnetGroup": {
+          }
+        },
+        "comments": {
+          "output": {
+          }
+        },
+        "description": "Creates a replication subnet group given a list of the subnet IDs in a VPC.",
+        "id": "create-replication-subnet-group-1481747297930",
+        "title": "Create replication subnet group"
+      }
+    ],
+    "CreateReplicationTask": [
+      {
+        "input": {
+          "CdcStartTime": "2016-12-14T18:25:43Z",
+          "MigrationType": "full-load",
+          "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+          "ReplicationTaskIdentifier": "task1",
+          "ReplicationTaskSettings": "",
+          "SourceEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+          "TableMappings": "file://mappingfile.json",
+          "Tags": [
+            {
+              "Key": "Acount",
+              "Value": "24352226"
+            }
+          ],
+          "TargetEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+        },
+        "output": {
+          "ReplicationTask": {
+            "MigrationType": "full-load",
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:task:OEAMB3NXSTZ6LFYZFEPPBBXPYM",
+            "ReplicationTaskCreationDate": "2016-12-14T18:25:43Z",
+            "ReplicationTaskIdentifier": "task1",
+            "ReplicationTaskSettings": "{\"TargetMetadata\":{\"TargetSchema\":\"\",\"SupportLobs\":true,\"FullLobMode\":true,\"LobChunkSize\":64,\"LimitedSizeLobMode\":false,\"LobMaxSize\":0},\"FullLoadSettings\":{\"FullLoadEnabled\":true,\"ApplyChangesEnabled\":false,\"TargetTablePrepMode\":\"DROP_AND_CREATE\",\"CreatePkAfterFullLoad\":false,\"StopTaskCachedChangesApplied\":false,\"StopTaskCachedChangesNotApplied\":false,\"ResumeEnabled\":false,\"ResumeMinTableSize\":100000,\"ResumeOnlyClusteredPKTables\":true,\"MaxFullLoadSubTasks\":8,\"TransactionConsistencyTimeout\":600,\"CommitRate\":10000},\"Logging\":{\"EnableLogging\":false}}",
+            "SourceEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+            "Status": "creating",
+            "TableMappings": "file://mappingfile.json",
+            "TargetEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates a replication task using the specified parameters.",
+        "id": "create-replication-task-1481747646288",
+        "title": "Create replication task"
+      }
+    ],
+    "DeleteCertificate": [
+      {
+        "input": {
+          "CertificateArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUSM457DE6XFJCJQ"
+        },
+        "output": {
+          "Certificate": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the specified certificate.",
+        "id": "delete-certificate-1481751957981",
+        "title": "Delete Certificate"
+      }
+    ],
+    "DeleteConnection": [
+      {
+        "input": {
+          "EndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:RAAR3R22XSH46S3PWLC3NJAWKM",
+          "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ"
+        },
+        "output": {
+          "Connection": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the connection between the replication instance and the endpoint.",
+        "id": "delete-connection-1481751957981",
+        "title": "Delete Connection"
+      }
+    ],
+    "DeleteEndpoint": [
+      {
+        "input": {
+          "EndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:RAAR3R22XSH46S3PWLC3NJAWKM"
+        },
+        "output": {
+          "Endpoint": {
+            "EndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:RAAR3R22XSH46S3PWLC3NJAWKM",
+            "EndpointIdentifier": "test-endpoint-1",
+            "EndpointType": "source",
+            "EngineName": "mysql",
+            "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+            "Port": 3306,
+            "ServerName": "mydb.cx1llnox7iyx.us-west-2.rds.amazonaws.com",
+            "Status": "active",
+            "Username": "username"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the specified endpoint. All tasks associated with the endpoint must be deleted before you can delete the endpoint.\n",
+        "id": "delete-endpoint-1481752425530",
+        "title": "Delete Endpoint"
+      }
+    ],
+    "DeleteReplicationInstance": [
+      {
+        "input": {
+          "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ"
+        },
+        "output": {
+          "ReplicationInstance": {
+            "AllocatedStorage": 5,
+            "AutoMinorVersionUpgrade": true,
+            "EngineVersion": "1.5.0",
+            "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+            "PendingModifiedValues": {
+            },
+            "PreferredMaintenanceWindow": "sun:06:00-sun:14:00",
+            "PubliclyAccessible": true,
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationInstanceClass": "dms.t2.micro",
+            "ReplicationInstanceIdentifier": "test-rep-1",
+            "ReplicationInstanceStatus": "creating",
+            "ReplicationSubnetGroup": {
+              "ReplicationSubnetGroupDescription": "default",
+              "ReplicationSubnetGroupIdentifier": "default",
+              "SubnetGroupStatus": "Complete",
+              "Subnets": [
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1d"
+                  },
+                  "SubnetIdentifier": "subnet-f6dd91af",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1b"
+                  },
+                  "SubnetIdentifier": "subnet-3605751d",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1c"
+                  },
+                  "SubnetIdentifier": "subnet-c2daefb5",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1e"
+                  },
+                  "SubnetIdentifier": "subnet-85e90cb8",
+                  "SubnetStatus": "Active"
+                }
+              ],
+              "VpcId": "vpc-6741a603"
+            }
+          }
+        },
+        "comments": {
+          "output": {
+          }
+        },
+        "description": "Deletes the specified replication instance. You must delete any migration tasks that are associated with the replication instance before you can delete it.\n\n",
+        "id": "delete-replication-instance-1481752552839",
+        "title": "Delete Replication Instance"
+      }
+    ],
+    "DeleteReplicationSubnetGroup": [
+      {
+        "input": {
+          "ReplicationSubnetGroupIdentifier": "us-west-2ab-vpc-215ds366"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes a replication subnet group.",
+        "id": "delete-replication-subnet-group-1481752728597",
+        "title": "Delete Replication Subnet Group"
+      }
+    ],
+    "DeleteReplicationTask": [
+      {
+        "input": {
+          "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ"
+        },
+        "output": {
+          "ReplicationTask": {
+            "MigrationType": "full-load",
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:task:OEAMB3NXSTZ6LFYZFEPPBBXPYM",
+            "ReplicationTaskCreationDate": "2016-12-14T18:25:43Z",
+            "ReplicationTaskIdentifier": "task1",
+            "ReplicationTaskSettings": "{\"TargetMetadata\":{\"TargetSchema\":\"\",\"SupportLobs\":true,\"FullLobMode\":true,\"LobChunkSize\":64,\"LimitedSizeLobMode\":false,\"LobMaxSize\":0},\"FullLoadSettings\":{\"FullLoadEnabled\":true,\"ApplyChangesEnabled\":false,\"TargetTablePrepMode\":\"DROP_AND_CREATE\",\"CreatePkAfterFullLoad\":false,\"StopTaskCachedChangesApplied\":false,\"StopTaskCachedChangesNotApplied\":false,\"ResumeEnabled\":false,\"ResumeMinTableSize\":100000,\"ResumeOnlyClusteredPKTables\":true,\"MaxFullLoadSubTasks\":8,\"TransactionConsistencyTimeout\":600,\"CommitRate\":10000},\"Logging\":{\"EnableLogging\":false}}",
+            "SourceEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+            "Status": "creating",
+            "TableMappings": "file://mappingfile.json",
+            "TargetEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the specified replication task.",
+        "id": "delete-replication-task-1481752903506",
+        "title": "Delete Replication Task"
+      }
+    ],
+    "DescribeAccountAttributes": [
+      {
+        "input": {
+        },
+        "output": {
+          "AccountQuotas": [
+            {
+              "AccountQuotaName": "ReplicationInstances",
+              "Max": 20,
+              "Used": 0
+            },
+            {
+              "AccountQuotaName": "AllocatedStorage",
+              "Max": 20,
+              "Used": 0
+            },
+            {
+              "AccountQuotaName": "Endpoints",
+              "Max": 20,
+              "Used": 0
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists all of the AWS DMS attributes for a customer account. The attributes include AWS DMS quotas for the account, such as the number of replication instances allowed. The description for a quota includes the quota name, current usage toward that quota, and the quota's maximum value. This operation does not take any parameters.",
+        "id": "describe-acount-attributes-1481753085663",
+        "title": "Describe acount attributes"
+      }
+    ],
+    "DescribeCertificates": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Certificates": [
+
+          ],
+          "Marker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Provides a description of the certificate.",
+        "id": "describe-certificates-1481753186244",
+        "title": "Describe certificates"
+      }
+    ],
+    "DescribeConnections": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Connections": [
+            {
+              "EndpointArn": "arn:aws:dms:us-east-arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+              "EndpointIdentifier": "testsrc1",
+              "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+              "ReplicationInstanceIdentifier": "test",
+              "Status": "successful"
+            }
+          ],
+          "Marker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Describes the status of the connections that have been made between the replication instance and an endpoint. Connections are created when you test an endpoint.",
+        "id": "describe-connections-1481754477953",
+        "title": "Describe connections"
+      }
+    ],
+    "DescribeEndpointTypes": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "SupportedEndpointTypes": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the type of endpoints available.",
+        "id": "describe-endpoint-types-1481754742591",
+        "title": "Describe endpoint types"
+      }
+    ],
+    "DescribeEndpoints": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Endpoints": [
+
+          ],
+          "Marker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the endpoints for your account in the current region.",
+        "id": "describe-endpoints-1481754926060",
+        "title": "Describe endpoints"
+      }
+    ],
+    "DescribeOrderableReplicationInstances": [
+      {
+        "input": {
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "OrderableReplicationInstances": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the replication instance types that can be created in the specified region.",
+        "id": "describe-orderable-replication-instances-1481755123669",
+        "title": "Describe orderable replication instances"
+      }
+    ],
+    "DescribeRefreshSchemasStatus": [
+      {
+        "input": {
+          "EndpointArn": ""
+        },
+        "output": {
+          "RefreshSchemasStatus": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns the status of the refresh-schemas operation.",
+        "id": "describe-refresh-schema-status-1481755303497",
+        "title": "Describe refresh schema status"
+      }
+    ],
+    "DescribeReplicationInstances": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "ReplicationInstances": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns the status of the refresh-schemas operation.",
+        "id": "describe-replication-instances-1481755443952",
+        "title": "Describe replication instances"
+      }
+    ],
+    "DescribeReplicationSubnetGroups": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "ReplicationSubnetGroups": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the replication subnet groups.",
+        "id": "describe-replication-subnet-groups-1481755621284",
+        "title": "Describe replication subnet groups"
+      }
+    ],
+    "DescribeReplicationTasks": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Name": "string",
+              "Values": [
+                "string",
+                "string"
+              ]
+            }
+          ],
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "ReplicationTasks": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about replication tasks for your account in the current region.",
+        "id": "describe-replication-tasks-1481755777563",
+        "title": "Describe replication tasks"
+      }
+    ],
+    "DescribeSchemas": [
+      {
+        "input": {
+          "EndpointArn": "",
+          "Marker": "",
+          "MaxRecords": 123
+        },
+        "output": {
+          "Marker": "",
+          "Schemas": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the schema for the specified endpoint.",
+        "id": "describe-schemas-1481755933924",
+        "title": "Describe schemas"
+      }
+    ],
+    "DescribeTableStatistics": [
+      {
+        "input": {
+          "Marker": "",
+          "MaxRecords": 123,
+          "ReplicationTaskArn": ""
+        },
+        "output": {
+          "Marker": "",
+          "ReplicationTaskArn": "",
+          "TableStatistics": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns table statistics on the database migration task, including table name, rows inserted, rows updated, and rows deleted.",
+        "id": "describe-table-statistics-1481756071890",
+        "title": "Describe table statistics"
+      }
+    ],
+    "ImportCertificate": [
+      {
+        "input": {
+          "CertificateIdentifier": "",
+          "CertificatePem": ""
+        },
+        "output": {
+          "Certificate": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Uploads the specified certificate.",
+        "id": "import-certificate-1481756197206",
+        "title": "Import certificate"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "ResourceArn": ""
+        },
+        "output": {
+          "TagList": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists all tags for an AWS DMS resource.",
+        "id": "list-tags-for-resource-1481761095501",
+        "title": "List tags for resource"
+      }
+    ],
+    "ModifyEndpoint": [
+      {
+        "input": {
+          "CertificateArn": "",
+          "DatabaseName": "",
+          "EndpointArn": "",
+          "EndpointIdentifier": "",
+          "EndpointType": "source",
+          "EngineName": "",
+          "ExtraConnectionAttributes": "",
+          "Password": "",
+          "Port": 123,
+          "ServerName": "",
+          "SslMode": "require",
+          "Username": ""
+        },
+        "output": {
+          "Endpoint": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Modifies the specified endpoint.",
+        "id": "modify-endpoint-1481761649937",
+        "title": "Modify endpoint"
+      }
+    ],
+    "ModifyReplicationInstance": [
+      {
+        "input": {
+          "AllocatedStorage": 123,
+          "AllowMajorVersionUpgrade": true,
+          "ApplyImmediately": true,
+          "AutoMinorVersionUpgrade": true,
+          "EngineVersion": "1.5.0",
+          "MultiAZ": true,
+          "PreferredMaintenanceWindow": "sun:06:00-sun:14:00",
+          "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+          "ReplicationInstanceClass": "dms.t2.micro",
+          "ReplicationInstanceIdentifier": "test-rep-1",
+          "VpcSecurityGroupIds": [
+
+          ]
+        },
+        "output": {
+          "ReplicationInstance": {
+            "AllocatedStorage": 5,
+            "AutoMinorVersionUpgrade": true,
+            "EngineVersion": "1.5.0",
+            "KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/4c1731d6-5435-ed4d-be13-d53411a7cfbd",
+            "PendingModifiedValues": {
+            },
+            "PreferredMaintenanceWindow": "sun:06:00-sun:14:00",
+            "PubliclyAccessible": true,
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationInstanceClass": "dms.t2.micro",
+            "ReplicationInstanceIdentifier": "test-rep-1",
+            "ReplicationInstanceStatus": "available",
+            "ReplicationSubnetGroup": {
+              "ReplicationSubnetGroupDescription": "default",
+              "ReplicationSubnetGroupIdentifier": "default",
+              "SubnetGroupStatus": "Complete",
+              "Subnets": [
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1d"
+                  },
+                  "SubnetIdentifier": "subnet-f6dd91af",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1b"
+                  },
+                  "SubnetIdentifier": "subnet-3605751d",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1c"
+                  },
+                  "SubnetIdentifier": "subnet-c2daefb5",
+                  "SubnetStatus": "Active"
+                },
+                {
+                  "SubnetAvailabilityZone": {
+                    "Name": "us-east-1e"
+                  },
+                  "SubnetIdentifier": "subnet-85e90cb8",
+                  "SubnetStatus": "Active"
+                }
+              ],
+              "VpcId": "vpc-6741a603"
+            }
+          }
+        },
+        "comments": {
+          "output": {
+          }
+        },
+        "description": "Modifies the replication instance to apply new settings. You can change one or more parameters by specifying these parameters and the new values in the request. Some settings are applied during the maintenance window.",
+        "id": "modify-replication-instance-1481761784746",
+        "title": "Modify replication instance"
+      }
+    ],
+    "ModifyReplicationSubnetGroup": [
+      {
+        "input": {
+          "ReplicationSubnetGroupDescription": "",
+          "ReplicationSubnetGroupIdentifier": "",
+          "SubnetIds": [
+
+          ]
+        },
+        "output": {
+          "ReplicationSubnetGroup": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Modifies the settings for the specified replication subnet group.",
+        "id": "modify-replication-subnet-group-1481762275392",
+        "title": "Modify replication subnet group"
+      }
+    ],
+    "RefreshSchemas": [
+      {
+        "input": {
+          "EndpointArn": "",
+          "ReplicationInstanceArn": ""
+        },
+        "output": {
+          "RefreshSchemasStatus": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Populates the schema for the specified endpoint. This is an asynchronous operation and can take several minutes. You can check the status of this operation by calling the describe-refresh-schemas-status operation.",
+        "id": "refresh-schema-1481762399111",
+        "title": "Refresh schema"
+      }
+    ],
+    "RemoveTagsFromResource": [
+      {
+        "input": {
+          "ResourceArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E",
+          "TagKeys": [
+
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Removes metadata tags from an AWS DMS resource.",
+        "id": "remove-tags-from-resource-1481762571330",
+        "title": "Remove tags from resource"
+      }
+    ],
+    "StartReplicationTask": [
+      {
+        "input": {
+          "CdcStartTime": "2016-12-14T13:33:20Z",
+          "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+          "StartReplicationTaskType": "start-replication"
+        },
+        "output": {
+          "ReplicationTask": {
+            "MigrationType": "full-load",
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:task:OEAMB3NXSTZ6LFYZFEPPBBXPYM",
+            "ReplicationTaskCreationDate": "2016-12-14T18:25:43Z",
+            "ReplicationTaskIdentifier": "task1",
+            "ReplicationTaskSettings": "{\"TargetMetadata\":{\"TargetSchema\":\"\",\"SupportLobs\":true,\"FullLobMode\":true,\"LobChunkSize\":64,\"LimitedSizeLobMode\":false,\"LobMaxSize\":0},\"FullLoadSettings\":{\"FullLoadEnabled\":true,\"ApplyChangesEnabled\":false,\"TargetTablePrepMode\":\"DROP_AND_CREATE\",\"CreatePkAfterFullLoad\":false,\"StopTaskCachedChangesApplied\":false,\"StopTaskCachedChangesNotApplied\":false,\"ResumeEnabled\":false,\"ResumeMinTableSize\":100000,\"ResumeOnlyClusteredPKTables\":true,\"MaxFullLoadSubTasks\":8,\"TransactionConsistencyTimeout\":600,\"CommitRate\":10000},\"Logging\":{\"EnableLogging\":false}}",
+            "SourceEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+            "Status": "creating",
+            "TableMappings": "file://mappingfile.json",
+            "TargetEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Starts the replication task.",
+        "id": "start-replication-task-1481762706778",
+        "title": "Start replication task"
+      }
+    ],
+    "StopReplicationTask": [
+      {
+        "input": {
+          "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+        },
+        "output": {
+          "ReplicationTask": {
+            "MigrationType": "full-load",
+            "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ",
+            "ReplicationTaskArn": "arn:aws:dms:us-east-1:123456789012:task:OEAMB3NXSTZ6LFYZFEPPBBXPYM",
+            "ReplicationTaskCreationDate": "2016-12-14T18:25:43Z",
+            "ReplicationTaskIdentifier": "task1",
+            "ReplicationTaskSettings": "{\"TargetMetadata\":{\"TargetSchema\":\"\",\"SupportLobs\":true,\"FullLobMode\":true,\"LobChunkSize\":64,\"LimitedSizeLobMode\":false,\"LobMaxSize\":0},\"FullLoadSettings\":{\"FullLoadEnabled\":true,\"ApplyChangesEnabled\":false,\"TargetTablePrepMode\":\"DROP_AND_CREATE\",\"CreatePkAfterFullLoad\":false,\"StopTaskCachedChangesApplied\":false,\"StopTaskCachedChangesNotApplied\":false,\"ResumeEnabled\":false,\"ResumeMinTableSize\":100000,\"ResumeOnlyClusteredPKTables\":true,\"MaxFullLoadSubTasks\":8,\"TransactionConsistencyTimeout\":600,\"CommitRate\":10000},\"Logging\":{\"EnableLogging\":false}}",
+            "SourceEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ZW5UAN6P4E77EC7YWHK4RZZ3BE",
+            "Status": "creating",
+            "TableMappings": "file://mappingfile.json",
+            "TargetEndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:ASXWXJZLNWNT5HTWCGV2BUJQ7E"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Stops the replication task.",
+        "id": "stop-replication-task-1481762924947",
+        "title": "Stop replication task"
+      }
+    ],
+    "TestConnection": [
+      {
+        "input": {
+          "EndpointArn": "arn:aws:dms:us-east-1:123456789012:endpoint:RAAR3R22XSH46S3PWLC3NJAWKM",
+          "ReplicationInstanceArn": "arn:aws:dms:us-east-1:123456789012:rep:6UTDJGBOUS3VI3SUWA66XFJCJQ"
+        },
+        "output": {
+          "Connection": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Tests the connection between the replication instance and the endpoint.",
+        "id": "test-conection-1481763017636",
+        "title": "Test conection"
+      }
+    ]
+  }
+}

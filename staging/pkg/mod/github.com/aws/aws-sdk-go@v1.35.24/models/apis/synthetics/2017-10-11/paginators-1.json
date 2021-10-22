@@ -1,0 +1,24 @@
+{
+  "pagination": {
+    "DescribeCanaries": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    },
+    "DescribeCanariesLastRun": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    },
+    "DescribeRuntimeVersions": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    },
+    "GetCanaryRuns": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    }
+  }
+}

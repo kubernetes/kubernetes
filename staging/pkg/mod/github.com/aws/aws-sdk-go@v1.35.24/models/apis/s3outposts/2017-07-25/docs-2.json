@@ -1,0 +1,165 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon S3 on Outposts provides access to S3 on Outposts operations.</p>",
+  "operations": {
+    "CreateEndpoint": "<p>S3 on Outposts access points simplify managing data access at scale for shared datasets in Amazon S3 on Outposts. S3 on Outposts uses endpoints to connect to Outposts buckets so that you can perform actions within your virtual private cloud (VPC). </p> <p>This action creates an endpoint and associates it with the specified Outpost. </p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_DeleteEndpoint.html\">DeleteEndpoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_ListEndpoints.html\">ListEndpoints</a> </p> </li> </ul>",
+    "DeleteEndpoint": "<p>S3 on Outposts access points simplify managing data access at scale for shared datasets in Amazon S3 on Outposts. S3 on Outposts uses endpoints to connect to Outposts buckets so that you can perform actions within your virtual private cloud (VPC). </p> <p>This action deletes an endpoint. </p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_CreateEndpoint.html\">CreateEndpoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_ListEndpoints.html\">ListEndpoints</a> </p> </li> </ul>",
+    "ListEndpoints": "<p>S3 on Outposts access points simplify managing data access at scale for shared datasets in Amazon S3 on Outposts. S3 on Outposts uses endpoints to connect to Outposts buckets so that you can perform actions within your virtual private cloud (VPC). </p> <p>This action lists endpoints associated with the Outpost. </p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_CreateEndpoint.html\">CreateEndpoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3outposts_DeleteEndpoint.html\">DeleteEndpoint</a> </p> </li> </ul>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>Access was denied for this action.</p>",
+      "refs": {
+      }
+    },
+    "CidrBlock": {
+      "base": null,
+      "refs": {
+        "Endpoint$CidrBlock": "<p>The VPC CIDR committed by this endpoint.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>There was a conflict with this action, and it could not be completed.</p>",
+      "refs": {
+      }
+    },
+    "CreateEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEndpointResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreationTime": {
+      "base": null,
+      "refs": {
+        "Endpoint$CreationTime": "<p>The time the endpoint was created.</p>"
+      }
+    },
+    "DeleteEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Endpoint": {
+      "base": "<p>S3 on Outposts access points simplify managing data access at scale for shared datasets in Amazon S3 on Outposts. S3 on Outposts uses endpoints to connect to Outposts buckets so that you can perform actions within your virtual private cloud (VPC). </p>",
+      "refs": {
+        "Endpoints$member": null
+      }
+    },
+    "EndpointArn": {
+      "base": null,
+      "refs": {
+        "CreateEndpointResult$EndpointArn": "<p>The Amazon Resource Name (ARN) of the endpoint.</p>",
+        "Endpoint$EndpointArn": "<p>The Amazon Resource Name (ARN) of the endpoint.</p>"
+      }
+    },
+    "EndpointId": {
+      "base": null,
+      "refs": {
+        "DeleteEndpointRequest$EndpointId": "<p>The ID of the end point.</p>"
+      }
+    },
+    "EndpointStatus": {
+      "base": null,
+      "refs": {
+        "Endpoint$Status": "<p>The status of the endpoint.</p>"
+      }
+    },
+    "Endpoints": {
+      "base": null,
+      "refs": {
+        "ListEndpointsResult$Endpoints": "<p>Returns an array of endpoints associated with AWS Outpost.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "ConflictException$Message": null,
+        "InternalServerException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>There was an exception with the internal server.</p>",
+      "refs": {
+      }
+    },
+    "ListEndpointsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEndpointsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListEndpointsRequest$MaxResults": "<p>The max number of endpoints that can be returned on the request.</p>"
+      }
+    },
+    "NetworkInterface": {
+      "base": "<p>The container for the network interface.</p>",
+      "refs": {
+        "NetworkInterfaces$member": null
+      }
+    },
+    "NetworkInterfaceId": {
+      "base": null,
+      "refs": {
+        "NetworkInterface$NetworkInterfaceId": "<p>The ID for the network interface.</p>"
+      }
+    },
+    "NetworkInterfaces": {
+      "base": null,
+      "refs": {
+        "Endpoint$NetworkInterfaces": "<p>The network interface of the endpoint.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListEndpointsRequest$NextToken": "<p>The next endpoint requested in the list.</p>",
+        "ListEndpointsResult$NextToken": "<p>The next endpoint returned in the list.</p>"
+      }
+    },
+    "OutpostId": {
+      "base": null,
+      "refs": {
+        "CreateEndpointRequest$OutpostId": "<p>The ID of the AWS Outpost. </p>",
+        "DeleteEndpointRequest$OutpostId": "<p>The ID of the AWS Outpost. </p>",
+        "Endpoint$OutpostsId": "<p>The ID of the AWS Outpost.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The requested resource was not found.</p>",
+      "refs": {
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "CreateEndpointRequest$SecurityGroupId": "<p>The ID of the security group to use with the endpoint.</p>"
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "CreateEndpointRequest$SubnetId": "<p>The ID of the subnet in the selected VPC.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>There was an exception validating this data.</p>",
+      "refs": {
+      }
+    }
+  }
+}

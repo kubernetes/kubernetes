@@ -1,0 +1,257 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS Single Sign-On (SSO) OpenID Connect (OIDC) is a web service that enables a client (such as AWS CLI or a native application) to register with AWS SSO. The service also enables the client to fetch the user’s access token upon successful authentication and authorization with AWS SSO. This service conforms with the OAuth 2.0 based implementation of the device authorization grant standard (<a href=\"https://tools.ietf.org/html/rfc8628\">https://tools.ietf.org/html/rfc8628</a>).</p> <p>For general information about AWS SSO, see <a href=\"https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html\">What is AWS Single Sign-On?</a> in the <i>AWS SSO User Guide</i>.</p> <p>This API reference guide describes the AWS SSO OIDC operations that you can call programatically and includes detailed information on data types and errors.</p> <note> <p>AWS provides SDKs that consist of libraries and sample code for various programming languages and platforms such as Java, Ruby, .Net, iOS, and Android. The SDKs provide a convenient way to create programmatic access to AWS SSO and other AWS services. For more information about the AWS SDKs, including how to download and install them, see <a href=\"http://aws.amazon.com/tools/\">Tools for Amazon Web Services</a>.</p> </note>",
+  "operations": {
+    "CreateToken": "<p>Creates and returns an access token for the authorized client. The access token issued will be used to fetch short-term credentials for the assigned roles in the AWS account.</p>",
+    "RegisterClient": "<p>Registers a client with AWS SSO. This allows clients to initiate device authorization. The output should be persisted for reuse through many authentication requests.</p>",
+    "StartDeviceAuthorization": "<p>Initiates device authorization by requesting a pair of verification codes from the authorization service.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AccessToken": {
+      "base": null,
+      "refs": {
+        "CreateTokenResponse$accessToken": "<p>An opaque token to access AWS SSO resources assigned to a user.</p>"
+      }
+    },
+    "AuthCode": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$code": "<p>The authorization code received from the authorization service. This parameter is required to perform an authorization grant request to get access to a token.</p>"
+      }
+    },
+    "AuthorizationPendingException": {
+      "base": "<p>Indicates that a request to authorize a client with an access user session token is pending.</p>",
+      "refs": {
+      }
+    },
+    "ClientId": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$clientId": "<p>The unique identifier string for each client. This value should come from the persisted result of the <a>RegisterClient</a> API.</p>",
+        "RegisterClientResponse$clientId": "<p>The unique identifier string for each client. This client uses this identifier to get authenticated by the service in subsequent calls.</p>",
+        "StartDeviceAuthorizationRequest$clientId": "<p>The unique identifier string for the client that is registered with AWS SSO. This value should come from the persisted result of the <a>RegisterClient</a> API operation.</p>"
+      }
+    },
+    "ClientName": {
+      "base": null,
+      "refs": {
+        "RegisterClientRequest$clientName": "<p>The friendly name of the client.</p>"
+      }
+    },
+    "ClientSecret": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$clientSecret": "<p>A secret string generated for the client. This value should come from the persisted result of the <a>RegisterClient</a> API.</p>",
+        "RegisterClientResponse$clientSecret": "<p>A secret string generated for the client. The client will use this string to get authenticated by the service in subsequent calls.</p>",
+        "StartDeviceAuthorizationRequest$clientSecret": "<p>A secret string that is generated for the client. This value should come from the persisted result of the <a>RegisterClient</a> API operation.</p>"
+      }
+    },
+    "ClientType": {
+      "base": null,
+      "refs": {
+        "RegisterClientRequest$clientType": "<p>The type of client. The service supports only <code>public</code> as a client type. Anything other than public will be rejected by the service.</p>"
+      }
+    },
+    "CreateTokenRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTokenResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeviceCode": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$deviceCode": "<p>Used only when calling this API for the device code grant type. This short-term code is used to identify this authentication attempt. This should come from an in-memory reference to the result of the <a>StartDeviceAuthorization</a> API.</p>",
+        "StartDeviceAuthorizationResponse$deviceCode": "<p>The short-lived code that is used by the device when polling for a session token.</p>"
+      }
+    },
+    "Error": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$error": null,
+        "AuthorizationPendingException$error": null,
+        "ExpiredTokenException$error": null,
+        "InternalServerException$error": null,
+        "InvalidClientException$error": null,
+        "InvalidClientMetadataException$error": null,
+        "InvalidGrantException$error": null,
+        "InvalidRequestException$error": null,
+        "InvalidScopeException$error": null,
+        "SlowDownException$error": null,
+        "UnauthorizedClientException$error": null,
+        "UnsupportedGrantTypeException$error": null
+      }
+    },
+    "ErrorDescription": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$error_description": null,
+        "AuthorizationPendingException$error_description": null,
+        "ExpiredTokenException$error_description": null,
+        "InternalServerException$error_description": null,
+        "InvalidClientException$error_description": null,
+        "InvalidClientMetadataException$error_description": null,
+        "InvalidGrantException$error_description": null,
+        "InvalidRequestException$error_description": null,
+        "InvalidScopeException$error_description": null,
+        "SlowDownException$error_description": null,
+        "UnauthorizedClientException$error_description": null,
+        "UnsupportedGrantTypeException$error_description": null
+      }
+    },
+    "ExpirationInSeconds": {
+      "base": null,
+      "refs": {
+        "CreateTokenResponse$expiresIn": "<p>Indicates the time in seconds when an access token will expire.</p>",
+        "StartDeviceAuthorizationResponse$expiresIn": "<p>Indicates the number of seconds in which the verification code will become invalid.</p>"
+      }
+    },
+    "ExpiredTokenException": {
+      "base": "<p>Indicates that the token issued by the service is expired and is no longer valid.</p>",
+      "refs": {
+      }
+    },
+    "GrantType": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$grantType": "<p>Supports grant types for authorization code, refresh token, and device code request.</p>"
+      }
+    },
+    "IdToken": {
+      "base": null,
+      "refs": {
+        "CreateTokenResponse$idToken": "<p>The identifier of the user that associated with the access token, if present.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>Indicates that an error from the service occurred while trying to process a request.</p>",
+      "refs": {
+      }
+    },
+    "IntervalInSeconds": {
+      "base": null,
+      "refs": {
+        "StartDeviceAuthorizationResponse$interval": "<p>Indicates the number of seconds the client must wait between attempts when polling for a session.</p>"
+      }
+    },
+    "InvalidClientException": {
+      "base": "<p>Indicates that the <code>clientId</code> or <code>clientSecret</code> in the request is invalid. For example, this can occur when a client sends an incorrect <code>clientId</code> or an expired <code>clientSecret</code>.</p>",
+      "refs": {
+      }
+    },
+    "InvalidClientMetadataException": {
+      "base": "<p>Indicates that the client information sent in the request during registration is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidGrantException": {
+      "base": "<p>Indicates that a request contains an invalid grant. This can occur if a client makes a <a>CreateToken</a> request with an invalid grant type.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>Indicates that something is wrong with the input to the request. For example, a required parameter might be missing or out of range.</p>",
+      "refs": {
+      }
+    },
+    "InvalidScopeException": {
+      "base": "<p>Indicates that the scope provided in the request is invalid.</p>",
+      "refs": {
+      }
+    },
+    "LongTimeStampType": {
+      "base": null,
+      "refs": {
+        "RegisterClientResponse$clientIdIssuedAt": "<p>Indicates the time at which the <code>clientId</code> and <code>clientSecret</code> were issued.</p>",
+        "RegisterClientResponse$clientSecretExpiresAt": "<p>Indicates the time at which the <code>clientId</code> and <code>clientSecret</code> will become invalid.</p>"
+      }
+    },
+    "RefreshToken": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$refreshToken": "<p>The token used to obtain an access token in the event that the access token is invalid or expired. This token is not issued by the service.</p>",
+        "CreateTokenResponse$refreshToken": "<p>A token that, if present, can be used to refresh a previously issued access token that might have expired.</p>"
+      }
+    },
+    "RegisterClientRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterClientResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Scope": {
+      "base": null,
+      "refs": {
+        "Scopes$member": null
+      }
+    },
+    "Scopes": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$scope": "<p>The list of scopes that is defined by the client. Upon authorization, this list is used to restrict permissions when granting an access token.</p>",
+        "RegisterClientRequest$scopes": "<p>The list of scopes that are defined by the client. Upon authorization, this list is used to restrict permissions when granting an access token.</p>"
+      }
+    },
+    "SlowDownException": {
+      "base": "<p>Indicates that the client is making the request too frequently and is more than the service can handle. </p>",
+      "refs": {
+      }
+    },
+    "StartDeviceAuthorizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartDeviceAuthorizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TokenType": {
+      "base": null,
+      "refs": {
+        "CreateTokenResponse$tokenType": "<p>Used to notify the client that the returned token is an access token. The supported type is <code>BearerToken</code>.</p>"
+      }
+    },
+    "URI": {
+      "base": null,
+      "refs": {
+        "CreateTokenRequest$redirectUri": "<p>The location of the application that will receive the authorization code. Users authorize the service to send the request to this location.</p>",
+        "RegisterClientResponse$authorizationEndpoint": "<p>The endpoint where the client can request authorization.</p>",
+        "RegisterClientResponse$tokenEndpoint": "<p>The endpoint where the client can get an access token.</p>",
+        "StartDeviceAuthorizationRequest$startUrl": "<p>The URL for the AWS SSO user portal. For more information, see <a href=\"https://docs.aws.amazon.com/singlesignon/latest/userguide/using-the-portal.html\">Using the User Portal</a> in the <i>AWS Single Sign-On User Guide</i>.</p>",
+        "StartDeviceAuthorizationResponse$verificationUri": "<p>The URI of the verification page that takes the <code>userCode</code> to authorize the device.</p>",
+        "StartDeviceAuthorizationResponse$verificationUriComplete": "<p>An alternate URL that the client can use to automatically launch a browser. This process skips the manual step in which the user visits the verification page and enters their code.</p>"
+      }
+    },
+    "UnauthorizedClientException": {
+      "base": "<p>Indicates that the client is not currently authorized to make the request. This can happen when a <code>clientId</code> is not issued for a public client.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedGrantTypeException": {
+      "base": "<p>Indicates that the grant type in the request is not supported by the service.</p>",
+      "refs": {
+      }
+    },
+    "UserCode": {
+      "base": null,
+      "refs": {
+        "StartDeviceAuthorizationResponse$userCode": "<p>A one-time user verification code. This is needed to authorize an in-use device.</p>"
+      }
+    }
+  }
+}

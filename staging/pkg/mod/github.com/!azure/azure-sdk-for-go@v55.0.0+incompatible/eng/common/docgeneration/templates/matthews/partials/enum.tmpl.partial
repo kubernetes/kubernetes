@@ -1,0 +1,24 @@
+{{>partials/class.header}}
+{{#children}}
+  {{#children}}
+    <h4 id="{{id}}"><a href="#collapsible-{{id}}" class="expander" data-toggle="collapse">{{name.0.value}}</a></h4>
+
+    <div id="collapsible-{{id}}" class="collapse in">
+      <p>{{{summary}}}</p>
+    </div>
+  {{/children}}
+{{/children}}
+
+{{#extensionMethods.0}}
+<h3 id="extensionmethods">{{__global.extensionMethods}}</h3>
+{{/extensionMethods.0}}
+{{#extensionMethods}}
+<div>
+  {{#definition}}
+    <xref uid="{{definition}}" fullName="{{fullName.0.value}}" name="{{nameWithType.0.value}}"/>
+  {{/definition}}
+  {{^definition}}
+    <xref uid="{{uid}}" fullName="{{fullName.0.value}}" name="{{nameWithType.0.value}}"/>
+  {{/definition}}
+</div>
+{{/extensionMethods}}

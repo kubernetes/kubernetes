@@ -1,0 +1,24 @@
+resources:
+  repositories:
+    - repository: azure-sdk-tools
+      type: github
+      name: Azure/azure-sdk-tools
+      endpoint: azure
+    - repository: azure-sdk-build-tools
+      type: git
+      name: internal/azure-sdk-build-tools
+
+trigger:
+  paths:
+    include:
+    - sdk/
+
+pr:
+  paths:
+    include:
+    - sdk/
+    
+stages:
+- template: ../eng/pipelines/templates/jobs/archetype-sdk-client.yml
+  parameters:
+    ServiceDirectory: ''

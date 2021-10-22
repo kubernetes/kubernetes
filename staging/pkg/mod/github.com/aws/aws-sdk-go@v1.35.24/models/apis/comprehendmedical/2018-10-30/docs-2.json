@@ -1,0 +1,781 @@
+{
+  "version": "2.0",
+  "service": "<p> Amazon Comprehend Medical extracts structured information from unstructured clinical text. Use these actions to gain insight in your documents. </p>",
+  "operations": {
+    "DescribeEntitiesDetectionV2Job": "<p>Gets the properties associated with a medical entities detection job. Use this operation to get the status of a detection job.</p>",
+    "DescribeICD10CMInferenceJob": "<p>Gets the properties associated with an InferICD10CM job. Use this operation to get the status of an inference job.</p>",
+    "DescribePHIDetectionJob": "<p>Gets the properties associated with a protected health information (PHI) detection job. Use this operation to get the status of a detection job.</p>",
+    "DescribeRxNormInferenceJob": "<p>Gets the properties associated with an InferRxNorm job. Use this operation to get the status of an inference job.</p>",
+    "DetectEntities": "<p>The <code>DetectEntities</code> operation is deprecated. You should use the <a>DetectEntitiesV2</a> operation instead.</p> <p> Inspects the clinical text for a variety of medical entities and returns specific information about them such as entity category, location, and confidence score on that information .</p>",
+    "DetectEntitiesV2": "<p>Inspects the clinical text for a variety of medical entities and returns specific information about them such as entity category, location, and confidence score on that information. Amazon Comprehend Medical only detects medical entities in English language texts.</p> <p>The <code>DetectEntitiesV2</code> operation replaces the <a>DetectEntities</a> operation. This new action uses a different model for determining the entities in your medical text and changes the way that some entities are returned in the output. You should use the <code>DetectEntitiesV2</code> operation in all new applications.</p> <p>The <code>DetectEntitiesV2</code> operation returns the <code>Acuity</code> and <code>Direction</code> entities as attributes instead of types. </p>",
+    "DetectPHI": "<p> Inspects the clinical text for protected health information (PHI) entities and returns the entity category, location, and confidence score for each entity. Amazon Comprehend Medical only detects entities in English language texts.</p>",
+    "InferICD10CM": "<p>InferICD10CM detects medical conditions as entities listed in a patient record and links those entities to normalized concept identifiers in the ICD-10-CM knowledge base from the Centers for Disease Control. Amazon Comprehend Medical only detects medical entities in English language texts.</p>",
+    "InferRxNorm": "<p>InferRxNorm detects medications as entities listed in a patient record and links to the normalized concept identifiers in the RxNorm database from the National Library of Medicine. Amazon Comprehend Medical only detects medical entities in English language texts.</p>",
+    "ListEntitiesDetectionV2Jobs": "<p>Gets a list of medical entity detection jobs that you have submitted.</p>",
+    "ListICD10CMInferenceJobs": "<p>Gets a list of InferICD10CM jobs that you have submitted.</p>",
+    "ListPHIDetectionJobs": "<p>Gets a list of protected health information (PHI) detection jobs that you have submitted.</p>",
+    "ListRxNormInferenceJobs": "<p>Gets a list of InferRxNorm jobs that you have submitted.</p>",
+    "StartEntitiesDetectionV2Job": "<p>Starts an asynchronous medical entity detection job for a collection of documents. Use the <code>DescribeEntitiesDetectionV2Job</code> operation to track the status of a job.</p>",
+    "StartICD10CMInferenceJob": "<p>Starts an asynchronous job to detect medical conditions and link them to the ICD-10-CM ontology. Use the <code>DescribeICD10CMInferenceJob</code> operation to track the status of a job.</p>",
+    "StartPHIDetectionJob": "<p>Starts an asynchronous job to detect protected health information (PHI). Use the <code>DescribePHIDetectionJob</code> operation to track the status of a job.</p>",
+    "StartRxNormInferenceJob": "<p>Starts an asynchronous job to detect medication entities and link them to the RxNorm ontology. Use the <code>DescribeRxNormInferenceJob</code> operation to track the status of a job.</p>",
+    "StopEntitiesDetectionV2Job": "<p>Stops a medical entities detection job in progress.</p>",
+    "StopICD10CMInferenceJob": "<p>Stops an InferICD10CM inference job in progress.</p>",
+    "StopPHIDetectionJob": "<p>Stops a protected health information (PHI) detection job in progress.</p>",
+    "StopRxNormInferenceJob": "<p>Stops an InferRxNorm inference job in progress.</p>"
+  },
+  "shapes": {
+    "AnyLengthString": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$Message": "<p>A description of the status of a job.</p>"
+      }
+    },
+    "Attribute": {
+      "base": "<p> An extracted segment of the text that is an attribute of an entity, or otherwise related to an entity, such as the dosage of a medication taken. It contains information about the attribute such as id, begin and end offset within the input text, and the segment of the input text. </p>",
+      "refs": {
+        "AttributeList$member": null,
+        "UnmappedAttribute$Attribute": "<p> The specific attribute that has been extracted but not mapped to an entity. </p>"
+      }
+    },
+    "AttributeList": {
+      "base": null,
+      "refs": {
+        "Entity$Attributes": "<p> The extracted attributes that relate to this entity.</p>"
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "Trait$Name": "<p> Provides a name or contextual description about the trait. </p>"
+      }
+    },
+    "BoundedLengthString": {
+      "base": null,
+      "refs": {
+        "DetectEntitiesRequest$Text": "<p> A UTF-8 text string containing the clinical content being examined for entities. Each string must contain fewer than 20,000 bytes of characters.</p>",
+        "DetectEntitiesV2Request$Text": "<p>A UTF-8 string containing the clinical content being examined for entities. Each string must contain fewer than 20,000 bytes of characters.</p>",
+        "DetectPHIRequest$Text": "<p> A UTF-8 text string containing the clinical content being examined for PHI entities. Each string must contain fewer than 20,000 bytes of characters.</p>"
+      }
+    },
+    "ClientRequestTokenString": {
+      "base": null,
+      "refs": {
+        "StartEntitiesDetectionV2JobRequest$ClientRequestToken": "<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>",
+        "StartICD10CMInferenceJobRequest$ClientRequestToken": "<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>",
+        "StartPHIDetectionJobRequest$ClientRequestToken": "<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>",
+        "StartRxNormInferenceJobRequest$ClientRequestToken": "<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>"
+      }
+    },
+    "ComprehendMedicalAsyncJobFilter": {
+      "base": "<p>Provides information for filtering a list of detection jobs.</p>",
+      "refs": {
+        "ListEntitiesDetectionV2JobsRequest$Filter": "<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>",
+        "ListICD10CMInferenceJobsRequest$Filter": "<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>",
+        "ListPHIDetectionJobsRequest$Filter": "<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>",
+        "ListRxNormInferenceJobsRequest$Filter": "<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>"
+      }
+    },
+    "ComprehendMedicalAsyncJobProperties": {
+      "base": "<p>Provides information about a detection job.</p>",
+      "refs": {
+        "ComprehendMedicalAsyncJobPropertiesList$member": null,
+        "DescribeEntitiesDetectionV2JobResponse$ComprehendMedicalAsyncJobProperties": "<p>An object that contains the properties associated with a detection job.</p>",
+        "DescribeICD10CMInferenceJobResponse$ComprehendMedicalAsyncJobProperties": "<p>An object that contains the properties associated with a detection job.</p>",
+        "DescribePHIDetectionJobResponse$ComprehendMedicalAsyncJobProperties": "<p>An object that contains the properties associated with a detection job.</p>",
+        "DescribeRxNormInferenceJobResponse$ComprehendMedicalAsyncJobProperties": "<p>An object that contains the properties associated with a detection job.</p>"
+      }
+    },
+    "ComprehendMedicalAsyncJobPropertiesList": {
+      "base": null,
+      "refs": {
+        "ListEntitiesDetectionV2JobsResponse$ComprehendMedicalAsyncJobPropertiesList": "<p>A list containing the properties of each job returned.</p>",
+        "ListICD10CMInferenceJobsResponse$ComprehendMedicalAsyncJobPropertiesList": "<p>A list containing the properties of each job that is returned.</p>",
+        "ListPHIDetectionJobsResponse$ComprehendMedicalAsyncJobPropertiesList": "<p>A list containing the properties of each job returned.</p>",
+        "ListRxNormInferenceJobsResponse$ComprehendMedicalAsyncJobPropertiesList": "<p>The maximum number of results to return in each page. The default is 100.</p>"
+      }
+    },
+    "DescribeEntitiesDetectionV2JobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEntitiesDetectionV2JobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeICD10CMInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeICD10CMInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePHIDetectionJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePHIDetectionJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRxNormInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRxNormInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectEntitiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectEntitiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectEntitiesV2Request": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectEntitiesV2Response": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectPHIRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetectPHIResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Entity": {
+      "base": "<p> Provides information about an extracted medical entity.</p>",
+      "refs": {
+        "EntityList$member": null
+      }
+    },
+    "EntityList": {
+      "base": null,
+      "refs": {
+        "DetectEntitiesResponse$Entities": "<p> The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in the detection and analysis. Attributes and traits of the entity are also returned.</p>",
+        "DetectEntitiesV2Response$Entities": "<p>The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence in the detection and analysis. Attributes and traits of the entity are also returned.</p>",
+        "DetectPHIResponse$Entities": "<p> The collection of PHI entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in its detection. </p>"
+      }
+    },
+    "EntitySubType": {
+      "base": null,
+      "refs": {
+        "Attribute$Type": "<p> The type of attribute. </p>",
+        "Entity$Type": "<p> Describes the specific type of entity with category of entities.</p>"
+      }
+    },
+    "EntityType": {
+      "base": null,
+      "refs": {
+        "Attribute$Category": "<p> The category of attribute. </p>",
+        "Entity$Category": "<p> The category of the entity.</p>",
+        "UnmappedAttribute$Type": "<p> The type of the attribute, could be one of the following values: \"MEDICATION\", \"MEDICAL_CONDITION\", \"ANATOMY\", \"TEST_AND_TREATMENT_PROCEDURE\" or \"PROTECTED_HEALTH_INFORMATION\". </p>"
+      }
+    },
+    "Float": {
+      "base": null,
+      "refs": {
+        "Attribute$Score": "<p> The level of confidence that Amazon Comprehend Medical has that the segment of text is correctly recognized as an attribute. </p>",
+        "Attribute$RelationshipScore": "<p> The level of confidence that Amazon Comprehend Medical has that this attribute is correctly related to this entity. </p>",
+        "Entity$Score": "<p>The level of confidence that Amazon Comprehend Medical has in the accuracy of the detection.</p>",
+        "ICD10CMAttribute$Score": "<p>The level of confidence that Amazon Comprehend Medical has that the segment of text is correctly recognized as an attribute.</p>",
+        "ICD10CMAttribute$RelationshipScore": "<p>The level of confidence that Amazon Comprehend Medical has that this attribute is correctly related to this entity.</p>",
+        "ICD10CMConcept$Score": "<p>The level of confidence that Amazon Comprehend Medical has that the entity is accurately linked to an ICD-10-CM concept.</p>",
+        "ICD10CMEntity$Score": "<p>The level of confidence that Amazon Comprehend Medical has in the accuracy of the detection.</p>",
+        "ICD10CMTrait$Score": "<p>The level of confidence that Amazon Comprehend Medical has that the segment of text is correctly recognized as a trait.</p>",
+        "RxNormAttribute$Score": "<p>The level of confidence that Comprehend Medical has that the segment of text is correctly recognized as an attribute.</p>",
+        "RxNormAttribute$RelationshipScore": "<p>The level of confidence that Amazon Comprehend Medical has that the attribute is accurately linked to an entity.</p>",
+        "RxNormConcept$Score": "<p>The level of confidence that Amazon Comprehend Medical has that the entity is accurately linked to the reported RxNorm concept.</p>",
+        "RxNormEntity$Score": "<p>The level of confidence that Amazon Comprehend Medical has in the accuracy of the detected entity.</p>",
+        "RxNormTrait$Score": "<p>The level of confidence that Amazon Comprehend Medical has in the accuracy of the detected trait.</p>",
+        "Trait$Score": "<p> The level of confidence that Amazon Comprehend Medical has in the accuracy of this trait.</p>"
+      }
+    },
+    "ICD10CMAttribute": {
+      "base": "<p>The detected attributes that relate to an entity. This includes an extracted segment of the text that is an attribute of an entity, or otherwise related to an entity. InferICD10CM detects the following attributes: <code>Direction</code>, <code>System, Organ or Site</code>, and <code>Acuity</code>.</p>",
+      "refs": {
+        "ICD10CMAttributeList$member": null
+      }
+    },
+    "ICD10CMAttributeList": {
+      "base": null,
+      "refs": {
+        "ICD10CMEntity$Attributes": "<p>The detected attributes that relate to the entity. An extracted segment of the text that is an attribute of an entity, or otherwise related to an entity, such as the nature of a medical condition.</p>"
+      }
+    },
+    "ICD10CMAttributeType": {
+      "base": null,
+      "refs": {
+        "ICD10CMAttribute$Type": "<p>The type of attribute. InferICD10CM detects entities of the type <code>DX_NAME</code>. </p>"
+      }
+    },
+    "ICD10CMConcept": {
+      "base": "<p> The ICD-10-CM concepts that the entity could refer to, along with a score indicating the likelihood of the match.</p>",
+      "refs": {
+        "ICD10CMConceptList$member": null
+      }
+    },
+    "ICD10CMConceptList": {
+      "base": null,
+      "refs": {
+        "ICD10CMEntity$ICD10CMConcepts": "<p>The ICD-10-CM concepts that the entity could refer to, along with a score indicating the likelihood of the match.</p>"
+      }
+    },
+    "ICD10CMEntity": {
+      "base": "<p>The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in the detection and analysis. Attributes and traits of the entity are also returned. </p>",
+      "refs": {
+        "ICD10CMEntityList$member": null
+      }
+    },
+    "ICD10CMEntityCategory": {
+      "base": null,
+      "refs": {
+        "ICD10CMEntity$Category": "<p> The category of the entity. InferICD10CM detects entities in the <code>MEDICAL_CONDITION</code> category. </p>"
+      }
+    },
+    "ICD10CMEntityList": {
+      "base": null,
+      "refs": {
+        "InferICD10CMResponse$Entities": "<p>The medical conditions detected in the text linked to ICD-10-CM concepts. If the action is successful, the service sends back an HTTP 200 response, as well as the entities detected.</p>"
+      }
+    },
+    "ICD10CMEntityType": {
+      "base": null,
+      "refs": {
+        "ICD10CMEntity$Type": "<p>Describes the specific type of entity with category of entities. InferICD10CM detects entities of the type <code>DX_NAME</code>.</p>"
+      }
+    },
+    "ICD10CMTrait": {
+      "base": "<p>Contextual information for the entity. The traits recognized by InferICD10CM are <code>DIAGNOSIS</code>, <code>SIGN</code>, <code>SYMPTOM</code>, and <code>NEGATION</code>.</p>",
+      "refs": {
+        "ICD10CMTraitList$member": null
+      }
+    },
+    "ICD10CMTraitList": {
+      "base": null,
+      "refs": {
+        "ICD10CMAttribute$Traits": "<p>The contextual information for the attribute. The traits recognized by InferICD10CM are <code>DIAGNOSIS</code>, <code>SIGN</code>, <code>SYMPTOM</code>, and <code>NEGATION</code>.</p>",
+        "ICD10CMEntity$Traits": "<p>Provides Contextual information for the entity. The traits recognized by InferICD10CM are <code>DIAGNOSIS</code>, <code>SIGN</code>, <code>SYMPTOM</code>, and <code>NEGATION.</code> </p>"
+      }
+    },
+    "ICD10CMTraitName": {
+      "base": null,
+      "refs": {
+        "ICD10CMTrait$Name": "<p>Provides a name or contextual description about the trait.</p>"
+      }
+    },
+    "IamRoleArn": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) that gives Amazon Comprehend Medical read access to your input data.</p>",
+        "StartEntitiesDetectionV2JobRequest$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>",
+        "StartICD10CMInferenceJobRequest$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>",
+        "StartPHIDetectionJobRequest$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>",
+        "StartRxNormInferenceJobRequest$DataAccessRoleArn": "<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>"
+      }
+    },
+    "InferICD10CMRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InferICD10CMResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InferRxNormRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InferRxNormResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InputDataConfig": {
+      "base": "<p>The input properties for an entities detection job. This includes the name of the S3 bucket and the path to the files to be analyzed. See <a>batch-manifest</a> for more information. </p>",
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$InputDataConfig": "<p>The input data configuration that you supplied when you created the detection job.</p>",
+        "StartEntitiesDetectionV2JobRequest$InputDataConfig": "<p>Specifies the format and location of the input data for the job.</p>",
+        "StartICD10CMInferenceJobRequest$InputDataConfig": "<p>Specifies the format and location of the input data for the job.</p>",
+        "StartPHIDetectionJobRequest$InputDataConfig": "<p>Specifies the format and location of the input data for the job.</p>",
+        "StartRxNormInferenceJobRequest$InputDataConfig": "<p>Specifies the format and location of the input data for the job.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Attribute$Id": "<p> The numeric identifier for this attribute. This is a monotonically increasing id unique within this response rather than a global unique identifier. </p>",
+        "Attribute$BeginOffset": "<p> The 0-based character offset in the input text that shows where the attribute begins. The offset returns the UTF-8 code point in the string. </p>",
+        "Attribute$EndOffset": "<p> The 0-based character offset in the input text that shows where the attribute ends. The offset returns the UTF-8 code point in the string.</p>",
+        "Entity$Id": "<p> The numeric identifier for the entity. This is a monotonically increasing id unique within this response rather than a global unique identifier. </p>",
+        "Entity$BeginOffset": "<p> The 0-based character offset in the input text that shows where the entity begins. The offset returns the UTF-8 code point in the string. </p>",
+        "Entity$EndOffset": "<p> The 0-based character offset in the input text that shows where the entity ends. The offset returns the UTF-8 code point in the string. </p>",
+        "ICD10CMAttribute$Id": "<p>The numeric identifier for this attribute. This is a monotonically increasing id unique within this response rather than a global unique identifier.</p>",
+        "ICD10CMAttribute$BeginOffset": "<p>The 0-based character offset in the input text that shows where the attribute begins. The offset returns the UTF-8 code point in the string.</p>",
+        "ICD10CMAttribute$EndOffset": "<p>The 0-based character offset in the input text that shows where the attribute ends. The offset returns the UTF-8 code point in the string.</p>",
+        "ICD10CMEntity$Id": "<p>The numeric identifier for the entity. This is a monotonically increasing id unique within this response rather than a global unique identifier.</p>",
+        "ICD10CMEntity$BeginOffset": "<p>The 0-based character offset in the input text that shows where the entity begins. The offset returns the UTF-8 code point in the string.</p>",
+        "ICD10CMEntity$EndOffset": "<p>The 0-based character offset in the input text that shows where the entity ends. The offset returns the UTF-8 code point in the string.</p>",
+        "RxNormAttribute$Id": "<p>The numeric identifier for this attribute. This is a monotonically increasing id unique within this response rather than a global unique identifier.</p>",
+        "RxNormAttribute$BeginOffset": "<p>The 0-based character offset in the input text that shows where the attribute begins. The offset returns the UTF-8 code point in the string.</p>",
+        "RxNormAttribute$EndOffset": "<p>The 0-based character offset in the input text that shows where the attribute ends. The offset returns the UTF-8 code point in the string.</p>",
+        "RxNormEntity$Id": "<p>The numeric identifier for the entity. This is a monotonically increasing id unique within this response rather than a global unique identifier.</p>",
+        "RxNormEntity$BeginOffset": "<p>The 0-based character offset in the input text that shows where the entity begins. The offset returns the UTF-8 code point in the string.</p>",
+        "RxNormEntity$EndOffset": "<p>The 0-based character offset in the input text that shows where the entity ends. The offset returns the UTF-8 code point in the string.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p> An internal server error occurred. Retry your request. </p>",
+      "refs": {
+      }
+    },
+    "InvalidEncodingException": {
+      "base": "<p> The input text was not in valid UTF-8 character encoding. Check your text then retry your request.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p> The request that you made is invalid. Check your request to determine why it's invalid and then retry the request.</p>",
+      "refs": {
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$JobId": "<p>The identifier assigned to the detection job.</p>",
+        "DescribeEntitiesDetectionV2JobRequest$JobId": "<p>The identifier that Amazon Comprehend Medical generated for the job. The <code>StartEntitiesDetectionV2Job</code> operation returns this identifier in its response.</p>",
+        "DescribeICD10CMInferenceJobRequest$JobId": "<p>The identifier that Amazon Comprehend Medical generated for the job. <code>The StartICD10CMInferenceJob</code> operation returns this identifier in its response.</p>",
+        "DescribePHIDetectionJobRequest$JobId": "<p>The identifier that Amazon Comprehend Medical generated for the job. The <code>StartPHIDetectionJob</code> operation returns this identifier in its response.</p>",
+        "DescribeRxNormInferenceJobRequest$JobId": "<p>The identifier that Amazon Comprehend Medical generated for the job. The StartRxNormInferenceJob operation returns this identifier in its response.</p>",
+        "StartEntitiesDetectionV2JobResponse$JobId": "<p>The identifier generated for the job. To get the status of a job, use this identifier with the <code>DescribeEntitiesDetectionV2Job</code> operation.</p>",
+        "StartICD10CMInferenceJobResponse$JobId": "<p>The identifier generated for the job. To get the status of a job, use this identifier with the <code>StartICD10CMInferenceJob</code> operation.</p>",
+        "StartPHIDetectionJobResponse$JobId": "<p>The identifier generated for the job. To get the status of a job, use this identifier with the <code>DescribePHIDetectionJob</code> operation.</p>",
+        "StartRxNormInferenceJobResponse$JobId": "<p>The identifier of the job.</p>",
+        "StopEntitiesDetectionV2JobRequest$JobId": "<p>The identifier of the medical entities job to stop.</p>",
+        "StopEntitiesDetectionV2JobResponse$JobId": "<p>The identifier of the medical entities detection job that was stopped.</p>",
+        "StopICD10CMInferenceJobRequest$JobId": "<p>The identifier of the job.</p>",
+        "StopICD10CMInferenceJobResponse$JobId": "<p>The identifier generated for the job. To get the status of job, use this identifier with the <code>DescribeICD10CMInferenceJob</code> operation.</p>",
+        "StopPHIDetectionJobRequest$JobId": "<p>The identifier of the PHI detection job to stop.</p>",
+        "StopPHIDetectionJobResponse$JobId": "<p>The identifier of the PHI detection job that was stopped.</p>",
+        "StopRxNormInferenceJobRequest$JobId": "<p>The identifier of the job.</p>",
+        "StopRxNormInferenceJobResponse$JobId": "<p>The identifier generated for the job. To get the status of job, use this identifier with the <code>DescribeRxNormInferenceJob</code> operation.</p>"
+      }
+    },
+    "JobName": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobFilter$JobName": "<p>Filters on the name of the job.</p>",
+        "ComprehendMedicalAsyncJobProperties$JobName": "<p>The name that you assigned to the detection job.</p>",
+        "StartEntitiesDetectionV2JobRequest$JobName": "<p>The identifier of the job.</p>",
+        "StartICD10CMInferenceJobRequest$JobName": "<p>The identifier of the job.</p>",
+        "StartPHIDetectionJobRequest$JobName": "<p>The identifier of the job.</p>",
+        "StartRxNormInferenceJobRequest$JobName": "<p>The identifier of the job.</p>"
+      }
+    },
+    "JobStatus": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobFilter$JobStatus": "<p>Filters the list of jobs based on job status. Returns only jobs with the specified status.</p>",
+        "ComprehendMedicalAsyncJobProperties$JobStatus": "<p>The current status of the detection job. If the status is <code>FAILED</code>, the <code>Message</code> field shows the reason for the failure.</p>"
+      }
+    },
+    "KMSKey": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$KMSKey": "<p>The AWS Key Management Service key, if any, used to encrypt the output files. </p>",
+        "StartEntitiesDetectionV2JobRequest$KMSKey": "<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>",
+        "StartICD10CMInferenceJobRequest$KMSKey": "<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>",
+        "StartPHIDetectionJobRequest$KMSKey": "<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>",
+        "StartRxNormInferenceJobRequest$KMSKey": "<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>"
+      }
+    },
+    "LanguageCode": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$LanguageCode": "<p>The language code of the input documents.</p>",
+        "StartEntitiesDetectionV2JobRequest$LanguageCode": "<p>The language of the input documents. All documents must be in the same language.</p>",
+        "StartICD10CMInferenceJobRequest$LanguageCode": "<p>The language of the input documents. All documents must be in the same language.</p>",
+        "StartPHIDetectionJobRequest$LanguageCode": "<p>The language of the input documents. All documents must be in the same language.</p>",
+        "StartRxNormInferenceJobRequest$LanguageCode": "<p>The language of the input documents. All documents must be in the same language.</p>"
+      }
+    },
+    "ListEntitiesDetectionV2JobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEntitiesDetectionV2JobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListICD10CMInferenceJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListICD10CMInferenceJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPHIDetectionJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPHIDetectionJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRxNormInferenceJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRxNormInferenceJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ManifestFilePath": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$ManifestFilePath": "<p>The path to the file that describes the results of a batch job.</p>"
+      }
+    },
+    "MaxResultsInteger": {
+      "base": null,
+      "refs": {
+        "ListEntitiesDetectionV2JobsRequest$MaxResults": "<p>The maximum number of results to return in each page. The default is 100.</p>",
+        "ListICD10CMInferenceJobsRequest$MaxResults": "<p>The maximum number of results to return in each page. The default is 100.</p>",
+        "ListPHIDetectionJobsRequest$MaxResults": "<p>The maximum number of results to return in each page. The default is 100.</p>",
+        "ListRxNormInferenceJobsRequest$MaxResults": "<p>Identifies the next page of results to return.</p>"
+      }
+    },
+    "ModelVersion": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$ModelVersion": "<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>"
+      }
+    },
+    "OntologyLinkingBoundedLengthString": {
+      "base": null,
+      "refs": {
+        "ICD10CMEntity$Text": "<p>The segment of input text that is matched to the detected entity.</p>",
+        "InferICD10CMRequest$Text": "<p>The input text used for analysis. The input for InferICD10CM is a string from 1 to 10000 characters.</p>",
+        "InferRxNormRequest$Text": "<p>The input text used for analysis. The input for InferRxNorm is a string from 1 to 10000 characters.</p>",
+        "RxNormEntity$Text": "<p>The segment of input text extracted from which the entity was detected.</p>"
+      }
+    },
+    "OutputDataConfig": {
+      "base": "<p>The output properties for a detection job.</p>",
+      "refs": {
+        "ComprehendMedicalAsyncJobProperties$OutputDataConfig": "<p>The output data configuration that you supplied when you created the detection job.</p>",
+        "StartEntitiesDetectionV2JobRequest$OutputDataConfig": "<p>Specifies where to send the output files.</p>",
+        "StartICD10CMInferenceJobRequest$OutputDataConfig": "<p>Specifies where to send the output files.</p>",
+        "StartPHIDetectionJobRequest$OutputDataConfig": "<p>Specifies where to send the output files.</p>",
+        "StartRxNormInferenceJobRequest$OutputDataConfig": "<p>Specifies where to send the output files.</p>"
+      }
+    },
+    "RelationshipType": {
+      "base": null,
+      "refs": {
+        "Attribute$RelationshipType": "<p>The type of relationship between the entity and attribute. Type for the relationship is <code>OVERLAP</code>, indicating that the entity occurred at the same time as the <code>Date_Expression</code>. </p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource identified by the specified Amazon Resource Name (ARN) was not found. Check the ARN and try your request again.</p>",
+      "refs": {
+      }
+    },
+    "RxNormAttribute": {
+      "base": "<p>The extracted attributes that relate to this entity. The attributes recognized by InferRxNorm are <code>DOSAGE</code>, <code>DURATION</code>, <code>FORM</code>, <code>FREQUENCY</code>, <code>RATE</code>, <code>ROUTE_OR_MODE</code>.</p>",
+      "refs": {
+        "RxNormAttributeList$member": null
+      }
+    },
+    "RxNormAttributeList": {
+      "base": null,
+      "refs": {
+        "RxNormEntity$Attributes": "<p>The extracted attributes that relate to the entity. The attributes recognized by InferRxNorm are <code>DOSAGE</code>, <code>DURATION</code>, <code>FORM</code>, <code>FREQUENCY</code>, <code>RATE</code>, <code>ROUTE_OR_MODE</code>, and <code>STRENGTH</code>.</p>"
+      }
+    },
+    "RxNormAttributeType": {
+      "base": null,
+      "refs": {
+        "RxNormAttribute$Type": "<p>The type of attribute. The types of attributes recognized by InferRxNorm are <code>BRAND_NAME</code> and <code>GENERIC_NAME</code>.</p>"
+      }
+    },
+    "RxNormConcept": {
+      "base": "<p>The RxNorm concept that the entity could refer to, along with a score indicating the likelihood of the match.</p>",
+      "refs": {
+        "RxNormConceptList$member": null
+      }
+    },
+    "RxNormConceptList": {
+      "base": null,
+      "refs": {
+        "RxNormEntity$RxNormConcepts": "<p> The RxNorm concepts that the entity could refer to, along with a score indicating the likelihood of the match.</p>"
+      }
+    },
+    "RxNormEntity": {
+      "base": "<p>The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in the detection and analysis. Attributes and traits of the entity are also returned. </p>",
+      "refs": {
+        "RxNormEntityList$member": null
+      }
+    },
+    "RxNormEntityCategory": {
+      "base": null,
+      "refs": {
+        "RxNormEntity$Category": "<p>The category of the entity. The recognized categories are <code>GENERIC</code> or <code>BRAND_NAME</code>.</p>"
+      }
+    },
+    "RxNormEntityList": {
+      "base": null,
+      "refs": {
+        "InferRxNormResponse$Entities": "<p>The medication entities detected in the text linked to RxNorm concepts. If the action is successful, the service sends back an HTTP 200 response, as well as the entities detected.</p>"
+      }
+    },
+    "RxNormEntityType": {
+      "base": null,
+      "refs": {
+        "RxNormEntity$Type": "<p> Describes the specific type of entity. For InferRxNorm, the recognized entity type is <code>MEDICATION</code>.</p>"
+      }
+    },
+    "RxNormTrait": {
+      "base": "<p>The contextual information for the entity. InferRxNorm recognizes the trait <code>NEGATION</code>, which is any indication that the patient is not taking a medication. </p>",
+      "refs": {
+        "RxNormTraitList$member": null
+      }
+    },
+    "RxNormTraitList": {
+      "base": null,
+      "refs": {
+        "RxNormAttribute$Traits": "<p>Contextual information for the attribute. InferRxNorm recognizes the trait <code>NEGATION</code> for attributes, i.e. that the patient is not taking a specific dose or form of a medication.</p>",
+        "RxNormEntity$Traits": "<p> Contextual information for the entity.</p>"
+      }
+    },
+    "RxNormTraitName": {
+      "base": null,
+      "refs": {
+        "RxNormTrait$Name": "<p>Provides a name or contextual description about the trait.</p>"
+      }
+    },
+    "S3Bucket": {
+      "base": null,
+      "refs": {
+        "InputDataConfig$S3Bucket": "<p>The URI of the S3 bucket that contains the input data. The bucket must be in the same region as the API endpoint that you are calling.</p> <p>Each file in the document collection must be less than 40 KB. You can store a maximum of 30 GB in the bucket.</p>",
+        "OutputDataConfig$S3Bucket": "<p>When you use the <code>OutputDataConfig</code> object with asynchronous operations, you specify the Amazon S3 location where you want to write the output data. The URI must be in the same region as the API endpoint that you are calling. The location is used as the prefix for the actual location of the output.</p>"
+      }
+    },
+    "S3Key": {
+      "base": null,
+      "refs": {
+        "InputDataConfig$S3Key": "<p>The path to the input data files in the S3 bucket.</p>",
+        "OutputDataConfig$S3Key": "<p>The path to the output data files in the S3 bucket. Amazon Comprehend Medical creates an output directory using the job ID so that the output from one job does not overwrite the output of another.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p> The Amazon Comprehend Medical service is temporarily unavailable. Please wait and then retry your request. </p>",
+      "refs": {
+      }
+    },
+    "StartEntitiesDetectionV2JobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartEntitiesDetectionV2JobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartICD10CMInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartICD10CMInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartPHIDetectionJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartPHIDetectionJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartRxNormInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartRxNormInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopEntitiesDetectionV2JobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopEntitiesDetectionV2JobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopICD10CMInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopICD10CMInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopPHIDetectionJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopPHIDetectionJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopRxNormInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopRxNormInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Attribute$Text": "<p> The segment of input text extracted as this attribute.</p>",
+        "DetectEntitiesResponse$PaginationToken": "<p> If the result of the previous request to <code>DetectEntities</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of entities.</p>",
+        "DetectEntitiesResponse$ModelVersion": "<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>",
+        "DetectEntitiesV2Response$PaginationToken": "<p>If the result to the <code>DetectEntitiesV2</code> operation was truncated, include the <code>PaginationToken</code> to fetch the next page of entities.</p>",
+        "DetectEntitiesV2Response$ModelVersion": "<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>",
+        "DetectPHIResponse$PaginationToken": "<p> If the result of the previous request to <code>DetectPHI</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of PHI entities. </p>",
+        "DetectPHIResponse$ModelVersion": "<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>",
+        "Entity$Text": "<p> The segment of input text extracted as this entity.</p>",
+        "ICD10CMAttribute$Text": "<p>The segment of input text which contains the detected attribute.</p>",
+        "ICD10CMConcept$Description": "<p>The long description of the ICD-10-CM code in the ontology.</p>",
+        "ICD10CMConcept$Code": "<p>The ICD-10-CM code that identifies the concept found in the knowledge base from the Centers for Disease Control.</p>",
+        "InferICD10CMResponse$PaginationToken": "<p>If the result of the previous request to <code>InferICD10CM</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of medical condition entities. </p>",
+        "InferICD10CMResponse$ModelVersion": "<p>The version of the model used to analyze the documents, in the format <i>n</i>.<i>n</i>.<i>n</i> You can use this information to track the model used for a particular batch of documents.</p>",
+        "InferRxNormResponse$PaginationToken": "<p>If the result of the previous request to <code>InferRxNorm</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of medication entities.</p>",
+        "InferRxNormResponse$ModelVersion": "<p>The version of the model used to analyze the documents, in the format <i>n</i>.<i>n</i>.<i>n</i> You can use this information to track the model used for a particular batch of documents.</p>",
+        "InternalServerException$Message": null,
+        "InvalidEncodingException$Message": null,
+        "InvalidRequestException$Message": null,
+        "ListEntitiesDetectionV2JobsRequest$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListEntitiesDetectionV2JobsResponse$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListICD10CMInferenceJobsRequest$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListICD10CMInferenceJobsResponse$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListPHIDetectionJobsRequest$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListPHIDetectionJobsResponse$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListRxNormInferenceJobsRequest$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ListRxNormInferenceJobsResponse$NextToken": "<p>Identifies the next page of results to return.</p>",
+        "ResourceNotFoundException$Message": null,
+        "RxNormAttribute$Text": "<p>The segment of input text which corresponds to the detected attribute.</p>",
+        "RxNormConcept$Description": "<p>The description of the RxNorm concept.</p>",
+        "RxNormConcept$Code": "<p>RxNorm concept ID, also known as the RxCUI.</p>",
+        "ServiceUnavailableException$Message": null,
+        "TextSizeLimitExceededException$Message": null,
+        "TooManyRequestsException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "TextSizeLimitExceededException": {
+      "base": "<p> The size of the text you submitted exceeds the size limit. Reduce the size of the text or use a smaller document and then retry your request. </p>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "ComprehendMedicalAsyncJobFilter$SubmitTimeBefore": "<p>Filters the list of jobs based on the time that the job was submitted for processing. Returns only jobs submitted before the specified time. Jobs are returned in ascending order, oldest to newest.</p>",
+        "ComprehendMedicalAsyncJobFilter$SubmitTimeAfter": "<p>Filters the list of jobs based on the time that the job was submitted for processing. Returns only jobs submitted after the specified time. Jobs are returned in descending order, newest to oldest.</p>",
+        "ComprehendMedicalAsyncJobProperties$SubmitTime": "<p>The time that the detection job was submitted for processing.</p>",
+        "ComprehendMedicalAsyncJobProperties$EndTime": "<p>The time that the detection job completed.</p>",
+        "ComprehendMedicalAsyncJobProperties$ExpirationTime": "<p>The date and time that job metadata is deleted from the server. Output files in your S3 bucket will not be deleted. After the metadata is deleted, the job will no longer appear in the results of the <code>ListEntitiesDetectionV2Job</code> or the <code>ListPHIDetectionJobs</code> operation.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p> You have made too many requests within a short period of time. Wait for a short time and then try your request again. Contact customer support for more information about a service limit increase. </p>",
+      "refs": {
+      }
+    },
+    "Trait": {
+      "base": "<p> Provides contextual information about the extracted entity. </p>",
+      "refs": {
+        "TraitList$member": null
+      }
+    },
+    "TraitList": {
+      "base": null,
+      "refs": {
+        "Attribute$Traits": "<p> Contextual information for this attribute. </p>",
+        "Entity$Traits": "<p>Contextual information for the entity.</p>"
+      }
+    },
+    "UnmappedAttribute": {
+      "base": "<p> An attribute that we extracted, but were unable to relate to an entity. </p>",
+      "refs": {
+        "UnmappedAttributeList$member": null
+      }
+    },
+    "UnmappedAttributeList": {
+      "base": null,
+      "refs": {
+        "DetectEntitiesResponse$UnmappedAttributes": "<p> Attributes extracted from the input text that we were unable to relate to an entity.</p>",
+        "DetectEntitiesV2Response$UnmappedAttributes": "<p>Attributes extracted from the input text that couldn't be related to an entity.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The filter that you specified for the operation is invalid. Check the filter values that you entered and try your request again.</p>",
+      "refs": {
+      }
+    }
+  }
+}

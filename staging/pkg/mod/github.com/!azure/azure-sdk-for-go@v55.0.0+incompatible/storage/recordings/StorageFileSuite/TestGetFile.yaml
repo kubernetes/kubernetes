@@ -1,0 +1,348 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:NR5Dko4Vl0Ro3lONuJMmGKavtL2kSccX5ATIePOieYs=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile?restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4E9EF430"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c0ab3919-301a-0049-3505-32dd06000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:DzAAEsZXK4ozEAXQ4G2rAncZnNEFyR2Rfphq6ZAe9x8=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-content-length:
+      - "1024"
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-type:
+      - file
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile/some.file
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4EA32DFE"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c0ab391b-301a-0049-3605-32dd06000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: !!binary |
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      ///////////////////////////////////w==
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:qvOcRBvUZ3xT5bRzpdyXIMP6KY3IpeUUJpNtK0lCDsU=
+      Content-Length:
+      - "1024"
+      Range:
+      - bytes=0-1023
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-version:
+      - "2018-03-28"
+      x-ms-write:
+      - update
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile/some.file?comp=range
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Content-Md5:
+      - mokYsRh42lBvdhvBycTOFw==
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4EB11333"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c0ab391c-301a-0049-3705-32dd06000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:jPh3ZUfYl8ogZCz4KIt1CdAI04CzC3MCv9z7CLDXfCE=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-meta-another:
+      - anothervalue
+      x-ms-meta-something:
+      - somethingvalue
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile/some.file?comp=metadata
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4EB44819"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c0ab391d-301a-0049-3805-32dd06000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:AKD1ONjf/8Tqw+dJ8zMwBuuyvf27oD5+EcOrfKJZwXg=
+      Range:
+      - bytes=0-1023
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile/some.file
+    method: GET
+  response:
+    body: !!binary |
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      ///////////////////////////////////w==
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - "1024"
+      Content-Range:
+      - bytes 0-1023/1024
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4EB44819"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Meta-Another:
+      - anothervalue
+      X-Ms-Meta-Something:
+      - somethingvalue
+      X-Ms-Request-Id:
+      - c0ab391e-301a-0049-3905-32dd06000000
+      X-Ms-Server-Encrypted:
+      - "true"
+      X-Ms-Type:
+      - File
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 206 Partial Content
+    code: 206
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:hsmyjv3Y28OEBgCO/FPE/90xFn0zWPkmSogQz+OGMrs=
+      Range:
+      - bytes=512-1023
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile/some.file
+    method: GET
+  response:
+    body: !!binary |
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////8=
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - "512"
+      Content-Range:
+      - bytes 512-1023/1024
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Etag:
+      - '"0x8D9001C4EB44819"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Meta-Another:
+      - anothervalue
+      X-Ms-Meta-Something:
+      - somethingvalue
+      X-Ms-Request-Id:
+      - c0ab391f-301a-0049-3a05-32dd06000000
+      X-Ms-Server-Encrypted:
+      - "true"
+      X-Ms-Type:
+      - File
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 206 Partial Content
+    code: 206
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:stHHXPeBh0kERx54R+4qRoLqCVIGZnxxc3a69vd+jW4=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        file
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-28storagefilesuitetestgetfile?restype=share
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:39:42 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c0ab3920-301a-0049-3b05-32dd06000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

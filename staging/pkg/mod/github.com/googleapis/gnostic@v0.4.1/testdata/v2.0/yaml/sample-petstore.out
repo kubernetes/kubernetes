@@ -1,0 +1,13 @@
+
+
+summary.txt -------------------- 
+Swagger: 2.0
+Host: petstore.swagger.io
+BasePath: /v1
+Info:
+  Title: Swagger Petstore
+  Version: 1.0.0
+Paths:
+  GET /pets
+  POST /pets
+  GET /pets/{petId}

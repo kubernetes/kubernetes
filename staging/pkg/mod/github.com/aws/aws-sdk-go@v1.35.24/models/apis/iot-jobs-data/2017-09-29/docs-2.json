@@ -1,0 +1,261 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS IoT Jobs is a service that allows you to define a set of jobs — remote operations that are sent to and executed on one or more devices connected to AWS IoT. For example, you can define a job that instructs a set of devices to download and install application or firmware updates, reboot, rotate certificates, or perform remote troubleshooting operations.</p> <p> To create a job, you make a job document which is a description of the remote operations to be performed, and you specify a list of targets that should perform the operations. The targets can be individual things, thing groups or both.</p> <p> AWS IoT Jobs sends a message to inform the targets that a job is available. The target starts the execution of the job by downloading the job document, performing the operations it specifies, and reporting its progress to AWS IoT. The Jobs service provides commands to track the progress of a job on a specific target and for all the targets of the job</p>",
+  "operations": {
+    "DescribeJobExecution": "<p>Gets details of a job execution.</p>",
+    "GetPendingJobExecutions": "<p>Gets the list of all jobs for a thing that are not in a terminal status.</p>",
+    "StartNextPendingJobExecution": "<p>Gets and starts the next pending (status IN_PROGRESS or QUEUED) job execution for a thing.</p>",
+    "UpdateJobExecution": "<p>Updates the status of a job execution.</p>"
+  },
+  "shapes": {
+    "ApproximateSecondsBeforeTimedOut": {
+      "base": null,
+      "refs": {
+        "JobExecution$approximateSecondsBeforeTimedOut": "<p>The estimated number of seconds that remain before the job execution status will be changed to <code>TIMED_OUT</code>.</p>"
+      }
+    },
+    "BinaryBlob": {
+      "base": null,
+      "refs": {
+        "ThrottlingException$payload": "<p>The payload associated with the exception.</p>"
+      }
+    },
+    "CertificateValidationException": {
+      "base": "<p>The certificate is invalid.</p>",
+      "refs": {
+      }
+    },
+    "DescribeJobExecutionJobId": {
+      "base": null,
+      "refs": {
+        "DescribeJobExecutionRequest$jobId": "<p>The unique identifier assigned to this job when it was created.</p>"
+      }
+    },
+    "DescribeJobExecutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeJobExecutionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DetailsKey": {
+      "base": null,
+      "refs": {
+        "DetailsMap$key": null
+      }
+    },
+    "DetailsMap": {
+      "base": null,
+      "refs": {
+        "JobExecution$statusDetails": "<p>A collection of name/value pairs that describe the status of the job execution.</p>",
+        "JobExecutionState$statusDetails": "<p>A collection of name/value pairs that describe the status of the job execution.</p>",
+        "StartNextPendingJobExecutionRequest$statusDetails": "<p>A collection of name/value pairs that describe the status of the job execution. If not specified, the statusDetails are unchanged.</p>",
+        "UpdateJobExecutionRequest$statusDetails": "<p> Optional. A collection of name/value pairs that describe the status of the job execution. If not specified, the statusDetails are unchanged.</p>"
+      }
+    },
+    "DetailsValue": {
+      "base": null,
+      "refs": {
+        "DetailsMap$value": null
+      }
+    },
+    "ExecutionNumber": {
+      "base": null,
+      "refs": {
+        "DescribeJobExecutionRequest$executionNumber": "<p>Optional. A number that identifies a particular job execution on a particular device. If not specified, the latest job execution is returned.</p>",
+        "JobExecution$executionNumber": "<p>A number that identifies a particular job execution on a particular device. It can be used later in commands that return or update job execution information.</p>",
+        "JobExecutionSummary$executionNumber": "<p>A number that identifies a particular job execution on a particular device.</p>",
+        "UpdateJobExecutionRequest$executionNumber": "<p>Optional. A number that identifies a particular job execution on a particular device.</p>"
+      }
+    },
+    "ExpectedVersion": {
+      "base": null,
+      "refs": {
+        "UpdateJobExecutionRequest$expectedVersion": "<p>Optional. The expected current version of the job execution. Each time you update the job execution, its version is incremented. If the version of the job execution stored in Jobs does not match, the update is rejected with a VersionMismatch error, and an ErrorResponse that contains the current job execution status data is returned. (This makes it unnecessary to perform a separate DescribeJobExecution request in order to obtain the job execution status data.)</p>"
+      }
+    },
+    "GetPendingJobExecutionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPendingJobExecutionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IncludeExecutionState": {
+      "base": null,
+      "refs": {
+        "UpdateJobExecutionRequest$includeJobExecutionState": "<p>Optional. When included and set to true, the response contains the JobExecutionState data. The default is false.</p>"
+      }
+    },
+    "IncludeJobDocument": {
+      "base": null,
+      "refs": {
+        "DescribeJobExecutionRequest$includeJobDocument": "<p>Optional. When set to true, the response contains the job document. The default is false.</p>",
+        "UpdateJobExecutionRequest$includeJobDocument": "<p>Optional. When set to true, the response contains the job document. The default is false.</p>"
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The contents of the request were invalid. For example, this code is returned when an UpdateJobExecution request contains invalid status details. The message contains details about the error.</p>",
+      "refs": {
+      }
+    },
+    "InvalidStateTransitionException": {
+      "base": "<p>An update attempted to change the job execution to a state that is invalid because of the job execution's current state (for example, an attempt to change a request in state SUCCESS to state IN_PROGRESS). In this case, the body of the error message also contains the executionState field.</p>",
+      "refs": {
+      }
+    },
+    "JobDocument": {
+      "base": null,
+      "refs": {
+        "JobExecution$jobDocument": "<p>The content of the job document.</p>",
+        "UpdateJobExecutionResponse$jobDocument": "<p>The contents of the Job Documents.</p>"
+      }
+    },
+    "JobExecution": {
+      "base": "<p>Contains data about a job execution.</p>",
+      "refs": {
+        "DescribeJobExecutionResponse$execution": "<p>Contains data about a job execution.</p>",
+        "StartNextPendingJobExecutionResponse$execution": "<p>A JobExecution object.</p>"
+      }
+    },
+    "JobExecutionState": {
+      "base": "<p>Contains data about the state of a job execution.</p>",
+      "refs": {
+        "UpdateJobExecutionResponse$executionState": "<p>A JobExecutionState object.</p>"
+      }
+    },
+    "JobExecutionStatus": {
+      "base": null,
+      "refs": {
+        "JobExecution$status": "<p>The status of the job execution. Can be one of: \"QUEUED\", \"IN_PROGRESS\", \"FAILED\", \"SUCCESS\", \"CANCELED\", \"REJECTED\", or \"REMOVED\".</p>",
+        "JobExecutionState$status": "<p>The status of the job execution. Can be one of: \"QUEUED\", \"IN_PROGRESS\", \"FAILED\", \"SUCCESS\", \"CANCELED\", \"REJECTED\", or \"REMOVED\".</p>",
+        "UpdateJobExecutionRequest$status": "<p>The new status for the job execution (IN_PROGRESS, FAILED, SUCCESS, or REJECTED). This must be specified on every update.</p>"
+      }
+    },
+    "JobExecutionSummary": {
+      "base": "<p>Contains a subset of information about a job execution.</p>",
+      "refs": {
+        "JobExecutionSummaryList$member": null
+      }
+    },
+    "JobExecutionSummaryList": {
+      "base": null,
+      "refs": {
+        "GetPendingJobExecutionsResponse$inProgressJobs": "<p>A list of JobExecutionSummary objects with status IN_PROGRESS.</p>",
+        "GetPendingJobExecutionsResponse$queuedJobs": "<p>A list of JobExecutionSummary objects with status QUEUED.</p>"
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "JobExecution$jobId": "<p>The unique identifier you assigned to this job when it was created.</p>",
+        "JobExecutionSummary$jobId": "<p>The unique identifier you assigned to this job when it was created.</p>",
+        "UpdateJobExecutionRequest$jobId": "<p>The unique identifier assigned to this job when it was created.</p>"
+      }
+    },
+    "LastUpdatedAt": {
+      "base": null,
+      "refs": {
+        "JobExecution$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the job execution was last updated. </p>",
+        "JobExecutionSummary$lastUpdatedAt": "<p>The time, in milliseconds since the epoch, when the job execution was last updated.</p>"
+      }
+    },
+    "QueuedAt": {
+      "base": null,
+      "refs": {
+        "JobExecution$queuedAt": "<p>The time, in milliseconds since the epoch, when the job execution was enqueued.</p>",
+        "JobExecutionSummary$queuedAt": "<p>The time, in milliseconds since the epoch, when the job execution was enqueued.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The service is temporarily unavailable.</p>",
+      "refs": {
+      }
+    },
+    "StartNextPendingJobExecutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartNextPendingJobExecutionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartedAt": {
+      "base": null,
+      "refs": {
+        "JobExecution$startedAt": "<p>The time, in milliseconds since the epoch, when the job execution was started.</p>",
+        "JobExecutionSummary$startedAt": "<p>The time, in milliseconds since the epoch, when the job execution started.</p>"
+      }
+    },
+    "StepTimeoutInMinutes": {
+      "base": null,
+      "refs": {
+        "StartNextPendingJobExecutionRequest$stepTimeoutInMinutes": "<p>Specifies the amount of time this device has to finish execution of this job. If the job execution status is not set to a terminal state before this timer expires, or before the timer is reset (by calling <code>UpdateJobExecution</code>, setting the status to <code>IN_PROGRESS</code> and specifying a new timeout value in field <code>stepTimeoutInMinutes</code>) the job execution status will be automatically set to <code>TIMED_OUT</code>. Note that setting this timeout has no effect on that job execution timeout which may have been specified when the job was created (<code>CreateJob</code> using field <code>timeoutConfig</code>).</p>",
+        "UpdateJobExecutionRequest$stepTimeoutInMinutes": "<p>Specifies the amount of time this device has to finish execution of this job. If the job execution status is not set to a terminal state before this timer expires, or before the timer is reset (by again calling <code>UpdateJobExecution</code>, setting the status to <code>IN_PROGRESS</code> and specifying a new timeout value in this field) the job execution status will be automatically set to <code>TIMED_OUT</code>. Note that setting or resetting this timeout has no effect on that job execution timeout which may have been specified when the job was created (<code>CreateJob</code> using field <code>timeoutConfig</code>).</p>"
+      }
+    },
+    "TerminalStateException": {
+      "base": "<p>The job is in a terminal state.</p>",
+      "refs": {
+      }
+    },
+    "ThingName": {
+      "base": null,
+      "refs": {
+        "DescribeJobExecutionRequest$thingName": "<p>The thing name associated with the device the job execution is running on.</p>",
+        "GetPendingJobExecutionsRequest$thingName": "<p>The name of the thing that is executing the job.</p>",
+        "JobExecution$thingName": "<p>The name of the thing that is executing the job.</p>",
+        "StartNextPendingJobExecutionRequest$thingName": "<p>The name of the thing associated with the device.</p>",
+        "UpdateJobExecutionRequest$thingName": "<p>The name of the thing associated with the device.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The rate exceeds the limit.</p>",
+      "refs": {
+      }
+    },
+    "UpdateJobExecutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateJobExecutionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VersionNumber": {
+      "base": null,
+      "refs": {
+        "JobExecution$versionNumber": "<p>The version of the job execution. Job execution versions are incremented each time they are updated by a device.</p>",
+        "JobExecutionState$versionNumber": "<p>The version of the job execution. Job execution versions are incremented each time they are updated by a device.</p>",
+        "JobExecutionSummary$versionNumber": "<p>The version of the job execution. Job execution versions are incremented each time AWS IoT Jobs receives an update from a device.</p>"
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "CertificateValidationException$message": "<p>Additional information about the exception.</p>",
+        "InvalidRequestException$message": "<p>The message for the exception.</p>",
+        "InvalidStateTransitionException$message": null,
+        "ResourceNotFoundException$message": "<p>The message for the exception.</p>",
+        "ServiceUnavailableException$message": "<p>The message for the exception.</p>",
+        "TerminalStateException$message": null,
+        "ThrottlingException$message": "<p>The message associated with the exception.</p>"
+      }
+    }
+  }
+}

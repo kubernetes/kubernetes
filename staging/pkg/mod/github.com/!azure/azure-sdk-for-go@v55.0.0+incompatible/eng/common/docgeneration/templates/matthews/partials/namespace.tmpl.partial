@@ -1,0 +1,17 @@
+<h1 id="{{id}}" data-uid="{{uid}}">{{>partials/title}}</h1>
+<div class="markdown level0 summary">{{{summary}}}</div>
+<div class="markdown level0 conceptual">{{{conceptual}}}</div>
+<div class="markdown level0 remarks">{{{remarks}}}</div>
+{{#children}}
+  <h3 id="{{id}}">{{>partials/namespaceSubtitle}}</h3>
+  <table>
+  {{#children}}
+    <tr>
+      <td>
+        <p><xref uid="{{uid}}" altProperty="fullName" displayProperty="name"/></p>
+        <p>{{{summary}}}</p>
+      </td>
+    </tr>
+  {{/children}}
+  </table>
+{{/children}}

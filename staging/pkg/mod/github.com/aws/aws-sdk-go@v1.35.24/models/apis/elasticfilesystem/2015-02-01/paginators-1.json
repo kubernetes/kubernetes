@@ -1,0 +1,24 @@
+{
+  "pagination": {
+    "DescribeAccessPoints": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "DescribeFileSystems": {
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "limit_key": "MaxItems"
+    },
+    "DescribeTags": {
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "limit_key": "MaxItems"
+    },
+    "ListTagsForResource": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

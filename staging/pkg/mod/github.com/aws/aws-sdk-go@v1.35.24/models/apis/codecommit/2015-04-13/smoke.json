@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListRepositories",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "ListBranches",
+            "input": {
+                "repositoryName": "fake-repo"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

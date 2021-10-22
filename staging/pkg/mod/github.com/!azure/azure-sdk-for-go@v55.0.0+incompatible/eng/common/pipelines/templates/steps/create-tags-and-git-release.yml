@@ -1,0 +1,23 @@
+parameters:
+  ArtifactLocation: 'not-specified'
+  PackageRepository: 'not-specified'
+  ReleaseSha: 'not-specified'
+  RepoId: $(Build.Repository.Name)
+  WorkingDirectory: ''
+  ScriptDirectory: eng/common/scripts
+
+steps:
+- task: PowerShell@2
+  displayName: 'Verify Package Tags and Create Git Releases'
+  inputs:
+    filePath: ${{ parameters.ScriptDirectory }}/create-tags-and-git-release.ps1
+    arguments: >
+      -artifactLocation ${{ parameters.ArtifactLocation }}
+      -packageRepository ${{ parameters.PackageRepository }}
+      -releaseSha ${{ parameters.ReleaseSha }}
+      -repoId ${{ parameters.RepoId }}
+      -workingDirectory '${{ parameters.WorkingDirectory }}'
+    pwsh: true
+  timeoutInMinutes: 5
+  env:
+    GH_TOKEN: $(azuresdk-github-pat)

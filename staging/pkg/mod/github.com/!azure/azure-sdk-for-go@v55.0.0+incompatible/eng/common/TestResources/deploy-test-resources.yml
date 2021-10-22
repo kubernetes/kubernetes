@@ -1,0 +1,60 @@
+parameters:
+  ServiceDirectory: not-set
+  ArmTemplateParameters: '@{}'
+  DeleteAfterHours: 8
+  Location: ''
+  SubscriptionConfiguration: $(sub-config-azure-cloud-test-resources)
+
+# SubscriptionConfiguration will be splatted into the parameters of the test
+# resources script. It should be JSON in the form:
+# {
+#   "SubscriptionId": "<subscription id>",
+#   "TenantId": "<tenant id>",
+#   "TestApplicationId": "<test app id>",
+#   "TestApplicationSecret": "<test app secret>",
+#   "ProvisionerApplicationId": "<provisioner app id>",
+#   "ProvisionerApplicationSecret": "<provisioner app secret>",
+#   "Environment": "AzureCloud | AzureGov | AzureChina | <other environment>"
+#   "EnvironmentVariables": {
+#       "SERVICE_MANAGEMENT_URL": "<service management url>",
+#       "STORAGE_ENDPOINT_SUFFIX": "<storage endpoint suffix>",
+#       "RESOURCE_MANAGER_URL": "<resource manager url>",
+#       "SEARCH_ENDPOINT_SUFFIX": "<search endpoint suffix>",
+#       "COSMOS_TABLES_ENDPOINT_SUFFIX": "<cosmos tables endpoint suffix>"
+#   },
+#   "ArmTemplateParameters": {
+#       "keyVaultDomainSuffix": "<keyVaultDomainSuffix>",
+#       "storageEndpointSuffix": "<storageEndpointSuffix>",
+#       "endpointSuffix": "<endpointSuffix>",
+#       "azureAuthorityHost": "<azureAuthorityHost>",
+#       "keyVaultEndpointSuffix": "<keyVaultEndpointSuffix>"
+#   }
+# }
+
+
+steps:
+  - template: /eng/common/pipelines/templates/steps/cache-ps-modules.yml
+
+  - template: /eng/common/TestResources/setup-environments.yml
+
+  - pwsh: |
+      eng/common/scripts/Import-AzModules.ps1
+
+      $subscriptionConfiguration = @'
+        ${{ parameters.SubscriptionConfiguration }}
+      '@ | ConvertFrom-Json -AsHashtable;
+
+      # The subscriptionConfiguration may have ArmTemplateParameters defined, so
+      # pass those in via the ArmTemplateParameters flag, and handle any
+      # additional parameters from the pipelines via AdditionalParameters
+      eng/common/TestResources/New-TestResources.ps1 `
+        -BaseName 'Generated' `
+        -ServiceDirectory '${{ parameters.ServiceDirectory }}' `
+        -Location '${{ parameters.Location }}' `
+        -DeleteAfterHours '${{ parameters.DeleteAfterHours }}' `
+        @subscriptionConfiguration `
+        -AdditionalParameters ${{ parameters.ArmTemplateParameters }} `
+        -CI `
+        -Force `
+        -Verbose | Out-Null
+    displayName: Deploy test resources

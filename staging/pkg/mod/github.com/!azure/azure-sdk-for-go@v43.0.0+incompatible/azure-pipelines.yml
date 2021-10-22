@@ -1,0 +1,85 @@
+trigger:
+  paths:
+    exclude:
+    - sdk/
+
+pr:
+  paths:
+    exclude:
+    - sdk/
+
+jobs:
+  - job: Build_Test
+    strategy:
+      matrix:
+        Linux_Go113:
+          vm.image: 'ubuntu-18.04'
+          go.version: '1.13'
+        Linux_Go114:
+          vm.image: 'ubuntu-18.04'
+          go.version: '1.14'
+
+    pool:
+      vmImage: $(vm.image)
+
+    variables:
+      GOPATH: '$(system.defaultWorkingDirectory)/work'
+      sdkPath: '$(GOPATH)/src/github.com/$(build.repository.name)'
+      IGNORE_BREAKING_CHANGES: true
+      go.list.filter: '| grep -v vendor'
+
+    steps:
+    - task: GoTool@0
+      inputs:
+        version: '$(go.version)'
+      displayName: "Select Go Version"
+
+    - script: |
+        set -e
+        mkdir -p '$(GOPATH)/bin'
+        mkdir -p '$(sdkPath)'
+        shopt -s dotglob extglob
+        mv !(work) '$(sdkPath)'
+        echo '##vso[task.prependpath]$(GOROOT)/bin'
+        echo '##vso[task.prependpath]$(GOPATH)/bin'
+      displayName: 'Create Go Workspace'
+    - script: |
+        set -e
+        go version
+        curl -sSL https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+        dep ensure -v
+        go get -u golang.org/x/lint/golint
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Install Dependencies'
+    - script: go vet -v $(go list ./... $(go.list.filter))
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Vet'
+    - script: go build -v $(go list ./... $(go.list.filter))
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Build'
+    - script: go test $(dirname $(find . -path ./vendor -prune -o -path ./sdk -prune -o -name '*_test.go' -print) | sort -u)
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Run Tests'
+    - script: go run ./tools/apidiff/main.go packages ./services FETCH_HEAD~1 FETCH_HEAD --copyrepo --breakingchanges || $IGNORE_BREAKING_CHANGES
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Display Breaking Changes'
+    - script: go run ./tools/pkgchk/main.go ./services --exceptions ./tools/pkgchk/exceptions.txt
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Verify Package Directory'
+    - script: grep -L -r --include *.go --exclude-dir vendor -P "Copyright (\d{4}|\(c\)) Microsoft" ./ | tee >&2
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Copyright Header Check'
+      failOnStderr: true
+      condition: succeededOrFailed()
+    - script: gofmt -s -l -w $(find . -path ./vendor -prune -o -name '*.go' -print) >&2
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Format Check'
+      failOnStderr: true
+      condition: succeededOrFailed()
+    - script: |
+        golint ./storage/... >&2
+        golint ./tools/... >&2
+      workingDirectory: '$(sdkPath)'
+      displayName: 'Linter Check'
+      failOnStderr: true
+      condition: succeededOrFailed()

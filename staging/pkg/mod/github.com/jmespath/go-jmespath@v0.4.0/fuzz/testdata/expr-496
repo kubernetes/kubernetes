@@ -1,0 +1,1 @@
+{"a": foo.bar, "b": foo.other} | *.baz

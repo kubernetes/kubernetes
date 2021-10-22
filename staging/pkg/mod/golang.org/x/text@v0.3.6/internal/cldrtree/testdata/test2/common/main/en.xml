@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ldml>
+	<identity>
+		<language type="en"/>
+	</identity>
+	<dates>
+		<calendars>
+			<calendar type="buddhist">
+				<eras>
+					<eraAbbr>
+						<era type="0">BE</era>
+					</eraAbbr>
+				</eras>
+			</calendar>
+			<calendar type="chinese">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<month type="1">Mo1</month>
+							<month type="2">Mo2</month>
+							<month type="3">Mo3</month>
+							<month type="4">Mo4</month>
+							<month type="5">Mo5</month>
+							<month type="6">Mo6</month>
+							<month type="7">Mo7</month>
+							<month type="8">Mo8</month>
+							<month type="9">Mo9</month>
+							<month type="10">Mo10</month>
+							<month type="11">Mo11</month>
+							<month type="12">Mo12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">First Month</month>
+							<month type="2">Second Month</month>
+							<month type="3">Third Month</month>
+							<month type="4">Fourth Month</month>
+							<month type="5">Fifth Month</month>
+							<month type="6">Sixth Month</month>
+							<month type="7">Seventh Month</month>
+							<month type="8">Eighth Month</month>
+							<month type="9">Ninth Month</month>
+							<month type="10">Tenth Month</month>
+							<month type="11">Eleventh Month</month>
+							<month type="12">Twelfth Month</month>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<cyclicNameSets>
+					<cyclicNameSet type="zodiacs">
+						<cyclicNameContext type="format">
+							<cyclicNameWidth type="abbreviated">
+								<cyclicName type="1">Rat</cyclicName>
+								<cyclicName type="2">Ox</cyclicName>
+								<cyclicName type="3">Tiger</cyclicName>
+								<cyclicName type="4">Rabbit</cyclicName>
+								<cyclicName type="5">Dragon</cyclicName>
+								<cyclicName type="6">Snake</cyclicName>
+								<cyclicName type="7">Horse</cyclicName>
+								<cyclicName type="8">Goat</cyclicName>
+								<cyclicName type="9">Monkey</cyclicName>
+								<cyclicName type="10">Rooster</cyclicName>
+								<cyclicName type="11">Dog</cyclicName>
+								<cyclicName type="12">Pig</cyclicName>
+							</cyclicNameWidth>
+						</cyclicNameContext>
+					</cyclicNameSet>
+				</cyclicNameSets>
+			</calendar>
+			<calendar type="generic">
+			</calendar>
+			<calendar type="gregorian">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="wide">
+							<month type="1">enWideM1</month>
+							<month type="2">enWideM2</month>
+							<month type="3">enWideM3</month>
+							<month type="4">enWideM4</month>
+							<month type="5">enWideM5</month>
+							<month type="6">enWideM6</month>
+							<month type="7">enWideM7</month>
+							<month type="8">enWideM8</month>
+							<month type="9">enWideM9</month>
+							<month type="10">enWideM10</month>
+							<month type="11">enWideM11</month>
+							<month type="12">enWideM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="narrow">
+							<month type="1">enNarrowM1</month>
+							<month type="2">enNarrowM2</month>
+							<month type="3">enNarrowM3</month>
+							<month type="4">enNarrowM4</month>
+							<month type="5">enNarrowM5</month>
+							<month type="6">enNarrowM6</month>
+							<!-- missing -->
+							<month type="8">enNarrowM8</month>
+							<month type="9">enNarrowM9</month>
+							<month type="10">enNarrowM10</month>
+							<month type="11">enNarrowM11</month>
+							<month type="12">enNarrowM12</month>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<era type="0">Before Christ</era>
+						<era type="0" alt="variant">Before Common Era</era>
+						<era type="1">Anno Domini</era>
+						<era type="1" alt="variant">Common Era</era>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">BC</era>
+						<era type="0" alt="variant">BCE</era>
+						<era type="1">AD</era>
+						<era type="1" alt="variant">CE</era>
+					</eraAbbr>
+					<!-- nothing for eraNarrow -->
+				</eras>
+			</calendar>
+			<calendar type="hebrew">
+				<eras>
+					<eraAbbr>
+						<era type="0">AM</era>
+					</eraAbbr>
+				</eras>
+			</calendar>
+			<calendar type="islamic">
+				<eras>
+					<eraAbbr>
+						<era type="0">AH</era>
+					</eraAbbr>
+				</eras>
+			</calendar>
+		</calendars>
+		<fields>
+			<field type="era">
+				<displayName>era</displayName>
+			</field>
+			<field type="month">
+				<displayName>month</displayName>
+				<relative type="-1">last month</relative>
+				<relative type="0">this month</relative>
+				<relative type="1">next month</relative>
+				<relativeTime type="future">
+					<relativeTimePattern count="one">enFutMOne</relativeTimePattern>
+					<relativeTimePattern count="other">enFutMOther</relativeTimePattern>
+				</relativeTime>
+				<relativeTime type="past">
+					<relativeTimePattern count="one">enPastMOne</relativeTimePattern>
+					<relativeTimePattern count="other">enPastMOther</relativeTimePattern>
+				</relativeTime>
+			</field>
+			<field type="month-short">
+				<displayName>mo.</displayName>
+				<relative type="-1">last mo.</relative>
+				<relative type="0">this mo.</relative>
+				<relative type="1">next mo.</relative>
+				<relativeTime type="future">
+					<relativeTimePattern count="one">enShortFutMOne</relativeTimePattern>
+					<relativeTimePattern count="other">enShortFutMOther</relativeTimePattern>
+				</relativeTime>
+				<relativeTime type="past">
+					<relativeTimePattern count="one">enShortPastMOne</relativeTimePattern>
+					<relativeTimePattern count="other">enShortPastMOther</relativeTimePattern>
+				</relativeTime>
+			</field>
+		</fields>
+	</dates>
+</ldml>

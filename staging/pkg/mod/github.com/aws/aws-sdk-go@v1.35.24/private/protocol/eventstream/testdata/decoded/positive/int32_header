@@ -1,0 +1,13 @@
+{
+  "total_length": 45,
+  "headers_length": 16,
+  "prelude_crc": 1103373496,
+  "headers": [    {
+      "name": "event-type",
+      "type": 4,
+      "value": 40972
+    }
+  ],
+  "payload": "eydmb28nOidiYXInfQ==",
+  "message_crc": 921993376
+}

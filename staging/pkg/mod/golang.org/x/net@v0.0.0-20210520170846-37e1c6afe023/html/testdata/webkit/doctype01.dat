@@ -1,0 +1,470 @@
+#data
+<!DOCTYPE html>Hello
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!dOctYpE HtMl>Hello
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPEhtml>Hello
+#errors
+(1,9): need-space-after-doctype
+#new-errors
+(1:10) missing-whitespace-before-doctype-name
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE>Hello
+#errors
+(1,9): need-space-after-doctype
+(1,10): expected-doctype-name-but-got-right-bracket
+(1,10): unknown-doctype
+#new-errors
+(1:10) missing-doctype-name
+#document
+| <!DOCTYPE >
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE >Hello
+#errors
+(1,11): expected-doctype-name-but-got-right-bracket
+(1,11): unknown-doctype
+#new-errors
+(1:11) missing-doctype-name
+#document
+| <!DOCTYPE >
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato>Hello
+#errors
+(1,17): unknown-doctype
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato >Hello
+#errors
+(1,18): unknown-doctype
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato taco>Hello
+#errors
+(1,17): expected-space-or-right-bracket-in-doctype
+(1,22): unknown-doctype
+#new-errors
+(1:18) invalid-character-sequence-after-doctype-name
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato taco "ddd>Hello
+#errors
+(1,17): expected-space-or-right-bracket-in-doctype
+(1,27): unknown-doctype
+#new-errors
+(1:18) invalid-character-sequence-after-doctype-name
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato sYstEM>Hello
+#errors
+(1,24): unexpected-char-in-doctype
+(1,24): unknown-doctype
+#new-errors
+(1:24) missing-doctype-system-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato sYstEM    >Hello
+#errors
+(1,28): unexpected-char-in-doctype
+(1,28): unknown-doctype
+#new-errors
+(1:28) missing-doctype-system-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE   potato       sYstEM  ggg>Hello
+#errors
+(1,34): unexpected-char-in-doctype
+(1,37): unknown-doctype
+#new-errors
+(1:34) missing-quote-before-doctype-system-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato SYSTEM taco  >Hello
+#errors
+(1,25): unexpected-char-in-doctype
+(1,31): unknown-doctype
+#new-errors
+(1:25) missing-quote-before-doctype-system-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato SYSTEM 'taco"'>Hello
+#errors
+(1,32): unknown-doctype
+#document
+| <!DOCTYPE potato "" "taco"">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato SYSTEM "taco">Hello
+#errors
+(1,31): unknown-doctype
+#document
+| <!DOCTYPE potato "" "taco">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato SYSTEM "tai'co">Hello
+#errors
+(1,33): unknown-doctype
+#document
+| <!DOCTYPE potato "" "tai'co">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato SYSTEMtaco "ddd">Hello
+#errors
+(1,24): unexpected-char-in-doctype
+(1,34): unknown-doctype
+#new-errors
+(1:24) missing-quote-before-doctype-system-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato grass SYSTEM taco>Hello
+#errors
+(1,17): expected-space-or-right-bracket-in-doctype
+(1,35): unknown-doctype
+#new-errors
+(1:18) invalid-character-sequence-after-doctype-name
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato pUbLIc>Hello
+#errors
+(1,24): unexpected-end-of-doctype
+(1,24): unknown-doctype
+#new-errors
+(1:24) missing-doctype-public-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato pUbLIc >Hello
+#errors
+(1,25): unexpected-end-of-doctype
+(1,25): unknown-doctype
+#new-errors
+(1:25) missing-doctype-public-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato pUbLIcgoof>Hello
+#errors
+(1,24): unexpected-char-in-doctype
+(1,28): unknown-doctype
+#new-errors
+(1:24) missing-quote-before-doctype-public-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato PUBLIC goof>Hello
+#errors
+(1,25): unexpected-char-in-doctype
+(1,29): unknown-doctype
+#new-errors
+(1:25) missing-quote-before-doctype-public-identifier
+#document
+| <!DOCTYPE potato>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato PUBLIC "go'of">Hello
+#errors
+(1,32): unknown-doctype
+#document
+| <!DOCTYPE potato "go'of" "">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato PUBLIC 'go'of'>Hello
+#errors
+(1,29): unexpected-char-in-doctype
+(1,32): unknown-doctype
+#new-errors
+(1:29) missing-quote-before-doctype-system-identifier
+#document
+| <!DOCTYPE potato "go" "">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato PUBLIC 'go:hh   of' >Hello
+#errors
+(1,38): unknown-doctype
+#document
+| <!DOCTYPE potato "go:hh   of" "">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE potato PUBLIC "W3C-//dfdf" SYSTEM ggg>Hello
+#errors
+(1,38): unexpected-char-in-doctype
+(1,48): unknown-doctype
+#new-errors
+(1:38) missing-quote-before-doctype-system-identifier
+#document
+| <!DOCTYPE potato "W3C-//dfdf" "">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">Hello
+#errors
+#document
+| <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE ...>Hello
+#errors
+(1,14): unknown-doctype
+#document
+| <!DOCTYPE ...>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+
+#data
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+#errors
+(2,58): unknown-doctype
+#document
+| <!DOCTYPE html "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
+#errors
+(2,54): unknown-doctype
+#document
+| <!DOCTYPE html "-//W3C//DTD XHTML 1.0 Frameset//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE root-element [SYSTEM OR PUBLIC FPI] "uri" [ 
+<!-- internal declarations -->
+]>
+#errors
+(1,23): expected-space-or-right-bracket-in-doctype
+(2,30): unknown-doctype
+#new-errors
+(1:24) invalid-character-sequence-after-doctype-name
+#document
+| <!DOCTYPE root-element>
+| <html>
+|   <head>
+|   <body>
+|     "]>"
+
+#data
+<!DOCTYPE html PUBLIC
+  "-//WAPFORUM//DTD XHTML Mobile 1.0//EN"
+    "http://www.wapforum.org/DTD/xhtml-mobile10.dtd">
+#errors
+(3,53): unknown-doctype
+#document
+| <!DOCTYPE html "-//WAPFORUM//DTD XHTML Mobile 1.0//EN" "http://www.wapforum.org/DTD/xhtml-mobile10.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE HTML SYSTEM "http://www.w3.org/DTD/HTML4-strict.dtd"><body><b>Mine!</b></body>
+#errors
+(1,63): unknown-doctype
+#document
+| <!DOCTYPE html "" "http://www.w3.org/DTD/HTML4-strict.dtd">
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       "Mine!"
+
+#data
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN""http://www.w3.org/TR/html4/strict.dtd">
+#errors
+(1,50): unexpected-char-in-doctype
+#new-errors
+(1:50) missing-whitespace-between-doctype-public-and-system-identifiers
+#document
+| <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"'http://www.w3.org/TR/html4/strict.dtd'>
+#errors
+(1,50): unexpected-char-in-doctype
+#new-errors
+(1:50) missing-whitespace-between-doctype-public-and-system-identifiers
+#document
+| <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE HTML PUBLIC"-//W3C//DTD HTML 4.01//EN"'http://www.w3.org/TR/html4/strict.dtd'>
+#errors
+(1,21): unexpected-char-in-doctype
+(1,49): unexpected-char-in-doctype
+#new-errors
+(1:22) missing-whitespace-after-doctype-public-keyword
+(1:49) missing-whitespace-between-doctype-public-and-system-identifiers
+#document
+| <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE HTML PUBLIC'-//W3C//DTD HTML 4.01//EN''http://www.w3.org/TR/html4/strict.dtd'>
+#errors
+(1,21): unexpected-char-in-doctype
+(1,49): unexpected-char-in-doctype
+#new-errors
+(1:22) missing-whitespace-after-doctype-public-keyword
+(1:49) missing-whitespace-between-doctype-public-and-system-identifiers
+#document
+| <!DOCTYPE html "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+| <html>
+|   <head>
+|   <body>

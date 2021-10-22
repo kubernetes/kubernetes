@@ -1,0 +1,1706 @@
+<<< TestDiff/Comparer/StructInequal
+  struct{ A int; B int; C int }{
+  	A: 1,
+  	B: 2,
+- 	C: 3,
++ 	C: 4,
+  }
+>>> TestDiff/Comparer/StructInequal
+<<< TestDiff/Comparer/PointerStructInequal
+  &struct{ A *int }{
+- 	A: &4,
++ 	A: &5,
+  }
+>>> TestDiff/Comparer/PointerStructInequal
+<<< TestDiff/Comparer/StructNestedPointerInequal
+  &struct{ R *bytes.Buffer }{
+- 	R: s"",
++ 	R: nil,
+  }
+>>> TestDiff/Comparer/StructNestedPointerInequal
+<<< TestDiff/Comparer/RegexpInequal
+  []*regexp.Regexp{
+  	nil,
+- 	s"a*b*c*",
++ 	s"a*b*d*",
+  }
+>>> TestDiff/Comparer/RegexpInequal
+<<< TestDiff/Comparer/TriplePointerInequal
+  &&&int(
+- 	0,
++ 	1,
+  )
+>>> TestDiff/Comparer/TriplePointerInequal
+<<< TestDiff/Comparer/StringerInequal
+  struct{ fmt.Stringer }(
+- 	s"hello",
++ 	s"hello2",
+  )
+>>> TestDiff/Comparer/StringerInequal
+<<< TestDiff/Comparer/DifferingHash
+  [16]uint8{
+- 	0x0c, 0xc1, 0x75, 0xb9, 0xc0, 0xf1, 0xb6, 0xa8, 0x31, 0xc3, 0x99, 0xe2, 0x69, 0x77, 0x26, 0x61,
++ 	0x92, 0xeb, 0x5f, 0xfe, 0xe6, 0xae, 0x2f, 0xec, 0x3a, 0xd7, 0x1c, 0x77, 0x75, 0x31, 0x57, 0x8f,
+  }
+>>> TestDiff/Comparer/DifferingHash
+<<< TestDiff/Comparer/NilStringer
+  interface{}(
+- 	&fmt.Stringer(nil),
+  )
+>>> TestDiff/Comparer/NilStringer
+<<< TestDiff/Comparer/TarHeaders
+  []cmp_test.tarHeader{
+  	{
+  		... // 4 identical fields
+  		Size:     1,
+  		ModTime:  s"2009-11-10 23:00:00 +0000 UTC",
+- 		Typeflag: 48,
++ 		Typeflag: 0,
+  		Linkname: "",
+  		Uname:    "user",
+  		... // 6 identical fields
+  	},
+  	{
+  		... // 4 identical fields
+  		Size:     2,
+  		ModTime:  s"2009-11-11 00:00:00 +0000 UTC",
+- 		Typeflag: 48,
++ 		Typeflag: 0,
+  		Linkname: "",
+  		Uname:    "user",
+  		... // 6 identical fields
+  	},
+  	{
+  		... // 4 identical fields
+  		Size:     4,
+  		ModTime:  s"2009-11-11 01:00:00 +0000 UTC",
+- 		Typeflag: 48,
++ 		Typeflag: 0,
+  		Linkname: "",
+  		Uname:    "user",
+  		... // 6 identical fields
+  	},
+  	{
+  		... // 4 identical fields
+  		Size:     8,
+  		ModTime:  s"2009-11-11 02:00:00 +0000 UTC",
+- 		Typeflag: 48,
++ 		Typeflag: 0,
+  		Linkname: "",
+  		Uname:    "user",
+  		... // 6 identical fields
+  	},
+  	{
+  		... // 4 identical fields
+  		Size:     16,
+  		ModTime:  s"2009-11-11 03:00:00 +0000 UTC",
+- 		Typeflag: 48,
++ 		Typeflag: 0,
+  		Linkname: "",
+  		Uname:    "user",
+  		... // 6 identical fields
+  	},
+  }
+>>> TestDiff/Comparer/TarHeaders
+<<< TestDiff/Comparer/IrreflexiveComparison
+  []int{
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+- 	Inverse(λ, float64(NaN)),
++ 	Inverse(λ, float64(NaN)),
+  }
+>>> TestDiff/Comparer/IrreflexiveComparison
+<<< TestDiff/Comparer/StringerMapKey
+  map[*testprotos.Stringer]*testprotos.Stringer(
+- 	{s"hello": s"world"},
++ 	nil,
+  )
+>>> TestDiff/Comparer/StringerMapKey
+<<< TestDiff/Comparer/StringerBacktick
+  interface{}(
+- 	[]*testprotos.Stringer{s`multi\nline\nline\nline`},
+  )
+>>> TestDiff/Comparer/StringerBacktick
+<<< TestDiff/Comparer/DynamicMap
+  []interface{}{
+  	map[string]interface{}{
+  		"avg":  float64(0.278),
+- 		"hr":   int(65),
++ 		"hr":   float64(65),
+  		"name": string("Mark McGwire"),
+  	},
+  	map[string]interface{}{
+  		"avg":  float64(0.288),
+- 		"hr":   int(63),
++ 		"hr":   float64(63),
+  		"name": string("Sammy Sosa"),
+  	},
+  }
+>>> TestDiff/Comparer/DynamicMap
+<<< TestDiff/Comparer/MapKeyPointer
+  map[*int]string{
+- 	&⟪0xdeadf00f⟫0: "hello",
++ 	&⟪0xdeadf00f⟫0: "world",
+  }
+>>> TestDiff/Comparer/MapKeyPointer
+<<< TestDiff/Comparer/IgnoreSliceElements
+  [2][]int{
+  	{..., 1, 2, 3, ...},
+  	{
+  		... // 6 ignored and 1 identical elements
+- 		20,
++ 		2,
+  		... // 3 ignored elements
+  	},
+  }
+>>> TestDiff/Comparer/IgnoreSliceElements
+<<< TestDiff/Comparer/IgnoreMapEntries
+  [2]map[string]int{
+  	{"KEEP3": 3, "keep1": 1, "keep2": 2, ...},
+  	{
+  		... // 2 ignored entries
+  		"keep1": 1,
++ 		"keep2": 2,
+  	},
+  }
+>>> TestDiff/Comparer/IgnoreMapEntries
+<<< TestDiff/Transformer/Uints
+  uint8(Inverse(λ, uint16(Inverse(λ, uint32(Inverse(λ, uint64(
+- 	0,
++ 	1,
+  )))))))
+>>> TestDiff/Transformer/Uints
+<<< TestDiff/Transformer/Filtered
+  []int{
+  	Inverse(λ, int64(0)),
+- 	Inverse(λ, int64(-5)),
++ 	Inverse(λ, int64(3)),
+  	Inverse(λ, int64(0)),
+- 	Inverse(λ, int64(-1)),
++ 	Inverse(λ, int64(-5)),
+  }
+>>> TestDiff/Transformer/Filtered
+<<< TestDiff/Transformer/DisjointOutput
+  int(Inverse(λ, interface{}(
+- 	string("zero"),
++ 	float64(1),
+  )))
+>>> TestDiff/Transformer/DisjointOutput
+<<< TestDiff/Transformer/JSON
+  string(Inverse(ParseJSON, map[string]interface{}{
+  	"address": map[string]interface{}{
+- 		"city":          string("Los Angeles"),
++ 		"city":          string("New York"),
+  		"postalCode":    string("10021-3100"),
+- 		"state":         string("CA"),
++ 		"state":         string("NY"),
+  		"streetAddress": string("21 2nd Street"),
+  	},
+  	"age":       float64(25),
+  	"children":  []interface{}{},
+  	"firstName": string("John"),
+  	"isAlive":   bool(true),
+  	"lastName":  string("Smith"),
+  	"phoneNumbers": []interface{}{
+  		map[string]interface{}{
+- 			"number": string("212 555-4321"),
++ 			"number": string("212 555-1234"),
+  			"type":   string("home"),
+  		},
+  		map[string]interface{}{"number": string("646 555-4567"), "type": string("office")},
+  		map[string]interface{}{"number": string("123 456-7890"), "type": string("mobile")},
+  	},
++ 	"spouse": nil,
+  }))
+>>> TestDiff/Transformer/JSON
+<<< TestDiff/Transformer/AcyclicString
+  cmp_test.StringBytes{
+  	String: Inverse(SplitString, []string{
+  		"some",
+  		"multi",
+- 		"Line",
++ 		"line",
+  		"string",
+  	}),
+  	Bytes: []uint8(Inverse(SplitBytes, [][]uint8{
+  		{0x73, 0x6f, 0x6d, 0x65},
+  		{0x6d, 0x75, 0x6c, 0x74, ...},
+  		{0x6c, 0x69, 0x6e, 0x65},
+  		{
+- 			0x62,
++ 			0x42,
+  			0x79,
+  			0x74,
+  			... // 2 identical elements
+  		},
+  	})),
+  }
+>>> TestDiff/Transformer/AcyclicString
+<<< TestDiff/Reporter/PanicStringer
+  struct{ X fmt.Stringer }{
+- 	X: struct{ fmt.Stringer }{},
++ 	X: s"",
+  }
+>>> TestDiff/Reporter/PanicStringer
+<<< TestDiff/Reporter/PanicError
+  struct{ X error }{
+- 	X: struct{ error }{},
++ 	X: e"",
+  }
+>>> TestDiff/Reporter/PanicError
+<<< TestDiff/Reporter/AmbiguousType
+  interface{}(
+- 	"github.com/google/go-cmp/cmp/internal/teststructs/foo1".Bar{},
++ 	"github.com/google/go-cmp/cmp/internal/teststructs/foo2".Bar{},
+  )
+>>> TestDiff/Reporter/AmbiguousType
+<<< TestDiff/Reporter/AmbiguousPointer
+  (*int)(
+- 	&⟪0xdeadf00f⟫0,
++ 	&⟪0xdeadf00f⟫0,
+  )
+>>> TestDiff/Reporter/AmbiguousPointer
+<<< TestDiff/Reporter/AmbiguousPointerStruct
+  struct{ I *int }{
+- 	I: &⟪0xdeadf00f⟫0,
++ 	I: &⟪0xdeadf00f⟫0,
+  }
+>>> TestDiff/Reporter/AmbiguousPointerStruct
+<<< TestDiff/Reporter/AmbiguousPointerSlice
+  []*int{
+- 	&⟪0xdeadf00f⟫0,
++ 	&⟪0xdeadf00f⟫0,
+  }
+>>> TestDiff/Reporter/AmbiguousPointerSlice
+<<< TestDiff/Reporter/AmbiguousPointerMap
+  map[string]*int{
+- 	"zero": &⟪0xdeadf00f⟫0,
++ 	"zero": &⟪0xdeadf00f⟫0,
+  }
+>>> TestDiff/Reporter/AmbiguousPointerMap
+<<< TestDiff/Reporter/AmbiguousStringer
+  interface{}(
+- 	cmp_test.Stringer("hello"),
++ 	&cmp_test.Stringer("hello"),
+  )
+>>> TestDiff/Reporter/AmbiguousStringer
+<<< TestDiff/Reporter/AmbiguousStringerStruct
+  struct{ S fmt.Stringer }{
+- 	S: cmp_test.Stringer("hello"),
++ 	S: &cmp_test.Stringer("hello"),
+  }
+>>> TestDiff/Reporter/AmbiguousStringerStruct
+<<< TestDiff/Reporter/AmbiguousStringerSlice
+  []fmt.Stringer{
+- 	cmp_test.Stringer("hello"),
++ 	&cmp_test.Stringer("hello"),
+  }
+>>> TestDiff/Reporter/AmbiguousStringerSlice
+<<< TestDiff/Reporter/AmbiguousStringerMap
+  map[string]fmt.Stringer{
+- 	"zero": cmp_test.Stringer("hello"),
++ 	"zero": &cmp_test.Stringer("hello"),
+  }
+>>> TestDiff/Reporter/AmbiguousStringerMap
+<<< TestDiff/Reporter/AmbiguousSliceHeader
+  []int(
+- 	⟪ptr:0xdeadf00f, len:0, cap:5⟫{},
++ 	⟪ptr:0xdeadf00f, len:0, cap:1000⟫{},
+  )
+>>> TestDiff/Reporter/AmbiguousSliceHeader
+<<< TestDiff/Reporter/AmbiguousStringerMapKey
+  map[interface{}]string{
+- 	nil:                                                                     "nil",
++ 	&⟪0xdeadf00f⟫"github.com/google/go-cmp/cmp_test".Stringer("hello"):      "goodbye",
+- 	"github.com/google/go-cmp/cmp_test".Stringer("hello"):                   "goodbye",
+- 	"github.com/google/go-cmp/cmp/internal/teststructs/foo1".Bar{S: "fizz"}: "buzz",
++ 	"github.com/google/go-cmp/cmp/internal/teststructs/foo2".Bar{S: "fizz"}: "buzz",
+  }
+>>> TestDiff/Reporter/AmbiguousStringerMapKey
+<<< TestDiff/Reporter/NonAmbiguousStringerMapKey
+  map[interface{}]string{
++ 	s"fizz":  "buzz",
+- 	s"hello": "goodbye",
+  }
+>>> TestDiff/Reporter/NonAmbiguousStringerMapKey
+<<< TestDiff/Reporter/InvalidUTF8
+  interface{}(
+- 	cmp_test.MyString("\xed\xa0\x80"),
+  )
+>>> TestDiff/Reporter/InvalidUTF8
+<<< TestDiff/Reporter/UnbatchedSlice
+  cmp_test.MyComposite{
+  	... // 3 identical fields
+  	BytesB: nil,
+  	BytesC: nil,
+  	IntsA: []int8{
++ 		10,
+  		11,
+- 		12,
++ 		21,
+  		13,
+  		14,
+  		... // 15 identical elements
+  	},
+  	IntsB: nil,
+  	IntsC: nil,
+  	... // 6 identical fields
+  }
+>>> TestDiff/Reporter/UnbatchedSlice
+<<< TestDiff/Reporter/BatchedSlice
+  cmp_test.MyComposite{
+  	... // 3 identical fields
+  	BytesB: nil,
+  	BytesC: nil,
+  	IntsA: []int8{
+- 		10, 11, 12, 13, 14, 15, 16,
++ 		12, 29, 13, 27, 22, 23,
+  		17, 18, 19, 20, 21,
+- 		22, 23, 24, 25, 26, 27, 28, 29,
++ 		10, 26, 16, 25, 28, 11, 15, 24, 14,
+  	},
+  	IntsB: nil,
+  	IntsC: nil,
+  	... // 6 identical fields
+  }
+>>> TestDiff/Reporter/BatchedSlice
+<<< TestDiff/Reporter/BatchedWithComparer
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+  	BytesA: []uint8{
+- 		0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,             // -|.......|
++ 		0x0c, 0x1d, 0x0d, 0x1b, 0x16, 0x17,                   // +|......|
+  		0x11, 0x12, 0x13, 0x14, 0x15,                         //  |.....|
+- 		0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,       // -|........|
++ 		0x0a, 0x1a, 0x10, 0x19, 0x1c, 0x0b, 0x0f, 0x18, 0x0e, // +|.........|
+  	},
+  	BytesB: nil,
+  	BytesC: nil,
+  	... // 9 identical fields
+  }
+>>> TestDiff/Reporter/BatchedWithComparer
+<<< TestDiff/Reporter/BatchedLong
+  interface{}(
+- 	cmp_test.MyComposite{IntsA: []int8{0, 1, 2, 3, 4, 5, 6, 7, ...}},
+  )
+>>> TestDiff/Reporter/BatchedLong
+<<< TestDiff/Reporter/BatchedNamedAndUnnamed
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+  	BytesA: []uint8{
+- 		0x01, 0x02, 0x03, // -|...|
++ 		0x03, 0x02, 0x01, // +|...|
+  	},
+  	BytesB: []cmp_test.MyByte{
+- 		0x04, 0x05, 0x06,
++ 		0x06, 0x05, 0x04,
+  	},
+  	BytesC: cmp_test.MyBytes{
+- 		0x07, 0x08, 0x09, // -|...|
++ 		0x09, 0x08, 0x07, // +|...|
+  	},
+  	IntsA: []int8{
+- 		-1, -2, -3,
++ 		-3, -2, -1,
+  	},
+  	IntsB: []cmp_test.MyInt{
+- 		-4, -5, -6,
++ 		-6, -5, -4,
+  	},
+  	IntsC: cmp_test.MyInts{
+- 		-7, -8, -9,
++ 		-9, -8, -7,
+  	},
+  	UintsA: []uint16{
+- 		1000, 2000, 3000,
++ 		3000, 2000, 1000,
+  	},
+  	UintsB: []cmp_test.MyUint{
+- 		4000, 5000, 6000,
++ 		6000, 5000, 4000,
+  	},
+  	UintsC: cmp_test.MyUints{
+- 		7000, 8000, 9000,
++ 		9000, 8000, 7000,
+  	},
+  	FloatsA: []float32{
+- 		1.5, 2.5, 3.5,
++ 		3.5, 2.5, 1.5,
+  	},
+  	FloatsB: []cmp_test.MyFloat{
+- 		4.5, 5.5, 6.5,
++ 		6.5, 5.5, 4.5,
+  	},
+  	FloatsC: cmp_test.MyFloats{
+- 		7.5, 8.5, 9.5,
++ 		9.5, 8.5, 7.5,
+  	},
+  }
+>>> TestDiff/Reporter/BatchedNamedAndUnnamed
+<<< TestDiff/Reporter/BinaryHexdump
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+  	BytesA: []uint8{
+  		0xf3, 0x0f, 0x8a, 0xa4, 0xd3, 0x12, 0x52, 0x09, 0x24, 0xbe,                                     //  |......R.$.|
+- 		0x58, 0x95, 0x41, 0xfd, 0x24, 0x66, 0x58, 0x8b, 0x79,                                           // -|X.A.$fX.y|
+  		0x54, 0xac, 0x0d, 0xd8, 0x71, 0x77, 0x70, 0x20, 0x6a, 0x5c, 0x73, 0x7f, 0x8c, 0x17, 0x55, 0xc0, //  |T...qwp j\s...U.|
+  		0x34, 0xce, 0x6e, 0xf7, 0xaa, 0x47, 0xee, 0x32, 0x9d, 0xc5, 0xca, 0x1e, 0x58, 0xaf, 0x8f, 0x27, //  |4.n..G.2....X..'|
+  		0xf3, 0x02, 0x4a, 0x90, 0xed, 0x69, 0x2e, 0x70, 0x32, 0xb4, 0xab, 0x30, 0x20, 0xb6, 0xbd, 0x5c, //  |..J..i.p2..0 ..\|
+  		0x62, 0x34, 0x17, 0xb0, 0x00, 0xbb, 0x4f, 0x7e, 0x27, 0x47, 0x06, 0xf4, 0x2e, 0x66, 0xfd, 0x63, //  |b4....O~'G...f.c|
+  		0xd7, 0x04, 0xdd, 0xb7, 0x30, 0xb7, 0xd1,                                                       //  |....0..|
+- 		0x55, 0x7e, 0x7b, 0xf6, 0xb3, 0x7e, 0x1d, 0x57, 0x69,                                           // -|U~{..~.Wi|
++ 		0x75, 0x2d, 0x5b, 0x5d, 0x5d, 0xf6, 0xb3, 0x68, 0x61, 0x68, 0x61, 0x7e, 0x1d, 0x57, 0x49,       // +|u-[]]..haha~.WI|
+  		0x20, 0x9e, 0xbc, 0xdf, 0xe1, 0x4d, 0xa9, 0xef, 0xa2, 0xd2, 0xed, 0xb4, 0x47, 0x78, 0xc9, 0xc9, //  | ....M......Gx..|
+  		0x27, 0xa4, 0xc6, 0xce, 0xec, 0x44, 0x70, 0x5d,                                                 //  |'....Dp]|
+  	},
+  	BytesB: nil,
+  	BytesC: nil,
+  	... // 9 identical fields
+  }
+>>> TestDiff/Reporter/BinaryHexdump
+<<< TestDiff/Reporter/StringHexdump
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: cmp_test.MyString{
+- 		0x72, 0x65, 0x61, 0x64, 0x6d, 0x65,                                                             // -|readme|
++ 		0x67, 0x6f, 0x70, 0x68, 0x65, 0x72,                                                             // +|gopher|
+  		0x2e, 0x74, 0x78, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  |.txt............|
+  		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  |................|
+  		... // 64 identical bytes
+  		0x30, 0x30, 0x36, 0x30, 0x30, 0x00, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x30, 0x30, //  |00600.0000000.00|
+  		0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x34, //  |00000.0000000004|
+- 		0x36,                                                                                           // -|6|
++ 		0x33,                                                                                           // +|3|
+  		0x00, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x30, 0x31, 0x31, //  |.00000000000.011|
+- 		0x31, 0x37, 0x33,                                                                               // -|173|
++ 		0x32, 0x31, 0x37,                                                                               // +|217|
+  		0x00, 0x20, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  |. 0.............|
+  		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  |................|
+  		... // 326 identical bytes
+  	},
+  	BytesA: nil,
+  	BytesB: nil,
+  	... // 10 identical fields
+  }
+>>> TestDiff/Reporter/StringHexdump
+<<< TestDiff/Reporter/BinaryString
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+  	BytesA: bytes.Join({
+  		`{"firstName":"John","lastName":"Smith","isAlive":true,"age":27,"`,
+  		`address":{"streetAddress":"`,
+- 		"314 54th Avenue",
++ 		"21 2nd Street",
+  		`","city":"New York","state":"NY","postalCode":"10021-3100"},"pho`,
+  		`neNumbers":[{"type":"home","number":"212 555-1234"},{"type":"off`,
+  		... // 101 identical bytes
+  	}, ""),
+  	BytesB: nil,
+  	BytesC: nil,
+  	... // 9 identical fields
+  }
+>>> TestDiff/Reporter/BinaryString
+<<< TestDiff/Reporter/TripleQuote
+  cmp_test.MyComposite{
+  	StringA: (
+  		"""
+  		aaa
+  		bbb
+- 		ccc
++ 		CCC
+  		ddd
+  		eee
+  		... // 10 identical lines
+  		ppp
+  		qqq
+- 		RRR
+- 		sss
++ 		rrr
++ 		SSS
+  		ttt
+  		uuu
+  		... // 6 identical lines
+  		"""
+  	),
+  	StringB: "",
+  	BytesA:  nil,
+  	... // 11 identical fields
+  }
+>>> TestDiff/Reporter/TripleQuote
+<<< TestDiff/Reporter/TripleQuoteSlice
+  []string{
+  	(
+  		"""
+  		... // 23 identical lines
+  		xxx
+  		yyy
+- 		zzz
+  		"""
+  	),
+  	"aaa\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nooo\nppp\n"...,
+  }
+>>> TestDiff/Reporter/TripleQuoteSlice
+<<< TestDiff/Reporter/TripleQuoteNamedTypes
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: (
+  		"""
+  		aaa
+  		bbb
+- 		ccc
++ 		CCC
+  		ddd
+  		eee
+  		... // 10 identical lines
+  		ppp
+  		qqq
+- 		RRR
+- 		sss
++ 		rrr
++ 		SSS
+  		ttt
+  		uuu
+  		... // 5 identical lines
+  		"""
+  	),
+  	BytesA: nil,
+  	BytesB: nil,
+  	BytesC: cmp_test.MyBytes(
+  		"""
+  		aaa
+  		bbb
+- 		ccc
++ 		CCC
+  		ddd
+  		eee
+  		... // 10 identical lines
+  		ppp
+  		qqq
+- 		RRR
+- 		sss
++ 		rrr
++ 		SSS
+  		ttt
+  		uuu
+  		... // 5 identical lines
+  		"""
+  	),
+  	IntsA: nil,
+  	IntsB: nil,
+  	... // 7 identical fields
+  }
+>>> TestDiff/Reporter/TripleQuoteNamedTypes
+<<< TestDiff/Reporter/TripleQuoteSliceNamedTypes
+  []cmp_test.MyString{
+  	(
+  		"""
+  		... // 23 identical lines
+  		xxx
+  		yyy
+- 		zzz
+  		"""
+  	),
+  	"aaa\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nooo\nppp\n"...,
+  }
+>>> TestDiff/Reporter/TripleQuoteSliceNamedTypes
+<<< TestDiff/Reporter/TripleQuoteEndlines
+  (
+  	"""
+  	aaa
+  	bbb
+- 	ccc
++ 	CCC
+  	ddd
+  	eee
+  	... // 10 identical lines
+  	ppp
+  	qqq
+- 	RRR
++ 	rrr
+  	sss
+  	ttt
+  	... // 4 identical lines
+  	yyy
+  	zzz
+- 	
+  	"""
+  )
+>>> TestDiff/Reporter/TripleQuoteEndlines
+<<< TestDiff/Reporter/AvoidTripleQuoteAmbiguousQuotes
+  strings.Join({
+  	"aaa",
+  	"bbb",
+- 	"ccc",
++ 	"CCC",
+  	"ddd",
+  	"eee",
+- 	"fff",
++ 	`"""`,
+  	"ggg",
+  	"hhh",
+  	... // 7 identical lines
+  	"ppp",
+  	"qqq",
+- 	"RRR",
++ 	"rrr",
+  	"sss",
+  	"ttt",
+  	... // 7 identical lines
+  }, "\n")
+>>> TestDiff/Reporter/AvoidTripleQuoteAmbiguousQuotes
+<<< TestDiff/Reporter/AvoidTripleQuoteAmbiguousEllipsis
+  strings.Join({
+  	"aaa",
+  	"bbb",
+- 	"ccc",
+- 	"...",
++ 	"CCC",
++ 	"ddd",
+  	"eee",
+  	"fff",
+  	... // 9 identical lines
+  	"ppp",
+  	"qqq",
+- 	"RRR",
++ 	"rrr",
+  	"sss",
+  	"ttt",
+  	... // 7 identical lines
+  }, "\n")
+>>> TestDiff/Reporter/AvoidTripleQuoteAmbiguousEllipsis
+<<< TestDiff/Reporter/AvoidTripleQuoteNonPrintable
+  strings.Join({
+  	"aaa",
+  	"bbb",
+- 	"ccc",
++ 	"CCC",
+  	"ddd",
+  	"eee",
+  	... // 7 identical lines
+  	"mmm",
+  	"nnn",
+- 	"ooo",
++ 	"o\roo",
+  	"ppp",
+  	"qqq",
+- 	"RRR",
++ 	"rrr",
+  	"sss",
+  	"ttt",
+  	... // 7 identical lines
+  }, "\n")
+>>> TestDiff/Reporter/AvoidTripleQuoteNonPrintable
+<<< TestDiff/Reporter/AvoidTripleQuoteIdenticalWhitespace
+  strings.Join({
+  	"aaa",
+  	"bbb",
+- 	"ccc",
+- 	" ddd",
++ 	"ccc ",
++ 	"ddd",
+  	"eee",
+  	"fff",
+  	... // 9 identical lines
+  	"ppp",
+  	"qqq",
+- 	"RRR",
++ 	"rrr",
+  	"sss",
+  	"ttt",
+  	... // 7 identical lines
+  }, "\n")
+>>> TestDiff/Reporter/AvoidTripleQuoteIdenticalWhitespace
+<<< TestDiff/Reporter/TripleQuoteStringer
+  []fmt.Stringer{
+  	s"package main\n\nimport (\n\t\"fmt\"\n)\n\nfunc main() {\n\tfmt.Println(\"Hel"...,
+- 	(
+- 		s"""
+- 		package main
+- 		
+- 		import (
+- 			"fmt"
+- 			"math/rand"
+- 		)
+- 		
+- 		func main() {
+- 			fmt.Println("My favorite number is", rand.Intn(10))
+- 		}
+- 		s"""
+- 	),
++ 	(
++ 		s"""
++ 		package main
++ 		
++ 		import (
++ 			"fmt"
++ 			"math"
++ 		)
++ 		
++ 		func main() {
++ 			fmt.Printf("Now you have %g problems.\n", math.Sqrt(7))
++ 		}
++ 		s"""
++ 	),
+  }
+>>> TestDiff/Reporter/TripleQuoteStringer
+<<< TestDiff/Reporter/LimitMaximumBytesDiffs
+  []uint8{
+- 	0xcd, 0x3d, 0x3d, 0x3d, 0x3d, 0x06, 0x1f, 0xc2, 0xcc, 0xc2, 0x2d, 0x53,                         // -|.====.....-S|
++ 	0x5c, 0x3d, 0x3d, 0x3d, 0x3d, 0x7c, 0x96, 0xe7, 0x53, 0x42, 0xa0, 0xab,                         // +|\====|..SB..|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                                   //  |=====|
+- 	0x1d, 0xdf, 0x61, 0xae, 0x98, 0x9f, 0x48,                                                       // -|..a...H|
++ 	0xf0, 0xbd, 0xa5, 0x71, 0xab, 0x17, 0x3b,                                                       // +|...q..;|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                             //  |======|
+- 	0xc7, 0xb0, 0xb7,                                                                               // -|...|
++ 	0xab, 0x50, 0x00,                                                                               // +|.P.|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                       //  |=======|
+- 	0xef, 0x3d, 0x3d, 0x3d, 0x3d, 0x3a, 0x5c, 0x94, 0xe6, 0x4a, 0xc7,                               // -|.====:\..J.|
++ 	0xeb, 0x3d, 0x3d, 0x3d, 0x3d, 0xa5, 0x14, 0xe6, 0x4f, 0x28, 0xe4,                               // +|.====...O(.|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                                   //  |=====|
+- 	0xb4,                                                                                           // -|.|
++ 	0x28,                                                                                           // +|(|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                             //  |======|
+- 	0x0a, 0x0a, 0xf7, 0x94,                                                                         // -|....|
++ 	0x2f, 0x63, 0x40, 0x3f,                                                                         // +|/c@?|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                               //  |===========|
+- 	0xf2, 0x9c, 0xc0, 0x66,                                                                         // -|...f|
++ 	0xd9, 0x78, 0xed, 0x13,                                                                         // +|.x..|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                                   //  |=====|
+- 	0x34, 0xf6, 0xf1, 0xc3, 0x17, 0x82,                                                             // -|4.....|
++ 	0x4a, 0xfc, 0x91, 0x38, 0x42, 0x8d,                                                             // +|J..8B.|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                             //  |======|
+- 	0x6e, 0x16, 0x60, 0x91, 0x44, 0xc6, 0x06,                                                       // -|n.`.D..|
++ 	0x61, 0x38, 0x41, 0xeb, 0x73, 0x04, 0xae,                                                       // +|a8A.s..|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                       //  |=======|
+- 	0x1c, 0x45, 0x3d, 0x3d, 0x3d, 0x3d, 0x2e,                                                       // -|.E====.|
++ 	0x07, 0x43, 0x3d, 0x3d, 0x3d, 0x3d, 0x1c,                                                       // +|.C====.|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                               //  |===========|
+- 	0xc4, 0x18,                                                                                     // -|..|
++ 	0x91, 0x22,                                                                                     // +|."|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                       //  |=======|
+- 	0x8a, 0x8d, 0x0e, 0x3d, 0x3d, 0x3d, 0x3d, 0x87, 0xb1, 0xa5, 0x8e, 0xc3, 0x3d, 0x3d, 0x3d, 0x3d, // -|...====.....====|
+- 	0x3d, 0x7a, 0x0f, 0x31, 0xae, 0x55, 0x3d,                                                       // -|=z.1.U=|
++ 	0x75, 0xd8, 0xbe, 0x3d, 0x3d, 0x3d, 0x3d, 0x73, 0xec, 0x84, 0x35, 0x07, 0x3d, 0x3d, 0x3d, 0x3d, // +|u..====s..5.====|
++ 	0x3d, 0x3b, 0xab, 0x53, 0x39, 0x74,                                                             // +|=;.S9t|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                                   //  |=====|
+- 	0x47, 0x2c, 0x3d,                                                                               // -|G,=|
++ 	0x3d, 0x1f, 0x1b,                                                                               // +|=..|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                                             //  |======|
+- 	0x35, 0xe7, 0x35, 0xee, 0x82, 0xf4, 0xce, 0x3d, 0x3d, 0x3d, 0x3d, 0x11, 0x72, 0x3d,             // -|5.5....====.r=|
++ 	0x3d, 0x80, 0xab, 0x2f, 0xed, 0x2b, 0x3a, 0x3b, 0x3d, 0x3d, 0x3d, 0x3d, 0xea, 0x49,             // +|=../.+:;====.I|
+  	0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d, 0x3d,                                     //  |==========|
+- 	0xaf, 0x5d, 0x3d,                                                                               // -|.]=|
++ 	0x3d, 0xab, 0x6c,                                                                               // +|=.l|
+  	... // 51 identical, 34 removed, and 35 inserted bytes
+  }
+>>> TestDiff/Reporter/LimitMaximumBytesDiffs
+<<< TestDiff/Reporter/LimitMaximumStringDiffs
+  (
+  	"""
+- 	a
++ 	aa
+  	b
+- 	c
++ 	cc
+  	d
+- 	e
++ 	ee
+  	f
+- 	g
++ 	gg
+  	h
+- 	i
++ 	ii
+  	j
+- 	k
++ 	kk
+  	l
+- 	m
++ 	mm
+  	n
+- 	o
++ 	oo
+  	p
+- 	q
++ 	qq
+  	r
+- 	s
++ 	ss
+  	t
+- 	u
++ 	uu
+  	v
+- 	w
++ 	ww
+  	x
+- 	y
++ 	yy
+  	z
+- 	A
++ 	AA
+  	B
+- 	C
++ 	CC
+  	D
+- 	E
++ 	EE
+  	... // 12 identical, 10 removed, and 10 inserted lines
+  	"""
+  )
+>>> TestDiff/Reporter/LimitMaximumStringDiffs
+<<< TestDiff/Reporter/LimitMaximumSliceDiffs
+  []struct{ S string }{
+- 	{S: "a"},
++ 	{S: "aa"},
+  	{S: "b"},
+- 	{S: "c"},
++ 	{S: "cc"},
+  	{S: "d"},
+- 	{S: "e"},
++ 	{S: "ee"},
+  	{S: "f"},
+- 	{S: "g"},
++ 	{S: "gg"},
+  	{S: "h"},
+- 	{S: "i"},
++ 	{S: "ii"},
+  	{S: "j"},
+- 	{S: "k"},
++ 	{S: "kk"},
+  	{S: "l"},
+- 	{S: "m"},
++ 	{S: "mm"},
+  	{S: "n"},
+- 	{S: "o"},
++ 	{S: "oo"},
+  	{S: "p"},
+- 	{S: "q"},
++ 	{S: "qq"},
+  	{S: "r"},
+- 	{S: "s"},
++ 	{S: "ss"},
+  	{S: "t"},
+- 	{S: "u"},
++ 	{S: "uu"},
+  	{S: "v"},
+- 	{S: "w"},
++ 	{S: "ww"},
+  	{S: "x"},
+- 	{S: "y"},
++ 	{S: "yy"},
+  	{S: "z"},
+- 	{S: "A"},
++ 	{S: "AA"},
+  	{S: "B"},
+- 	{S: "C"},
++ 	{S: "CC"},
+  	{S: "D"},
+- 	{S: "E"},
++ 	{S: "EE"},
+  	... // 12 identical and 10 modified elements
+  }
+>>> TestDiff/Reporter/LimitMaximumSliceDiffs
+<<< TestDiff/Reporter/MultilineString
+  cmp_test.MyComposite{
+  	StringA: (
+  		"""
+- 		Package cmp determines equality of values.
++ 		Package cmp determines equality of value.
+  		
+  		This package is intended to be a more powerful and safer alternative to
+  		... // 6 identical lines
+  		For example, an equality function may report floats as equal so long as they
+  		are within some tolerance of each other.
+- 		
+- 		• Types that have an Equal method may use that method to determine equality.
+- 		This allows package authors to determine the equality operation for the types
+- 		that they define.
+  		
+  		• If no custom equality functions are used and no Equal method is defined,
+  		... // 3 identical lines
+  		by using an Ignore option (see cmpopts.IgnoreUnexported) or explicitly compared
+  		using the AllowUnexported option.
+- 		
+  		"""
+  	),
+  	StringB: "",
+  	BytesA:  nil,
+  	... // 11 identical fields
+  }
+>>> TestDiff/Reporter/MultilineString
+<<< TestDiff/Reporter/Slices
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+- 	BytesA:  []uint8{0x01, 0x02, 0x03},
++ 	BytesA:  nil,
+- 	BytesB:  []cmp_test.MyByte{0x04, 0x05, 0x06},
++ 	BytesB:  nil,
+- 	BytesC:  cmp_test.MyBytes{0x07, 0x08, 0x09},
++ 	BytesC:  nil,
+- 	IntsA:   []int8{-1, -2, -3},
++ 	IntsA:   nil,
+- 	IntsB:   []cmp_test.MyInt{-4, -5, -6},
++ 	IntsB:   nil,
+- 	IntsC:   cmp_test.MyInts{-7, -8, -9},
++ 	IntsC:   nil,
+- 	UintsA:  []uint16{1000, 2000, 3000},
++ 	UintsA:  nil,
+- 	UintsB:  []cmp_test.MyUint{4000, 5000, 6000},
++ 	UintsB:  nil,
+- 	UintsC:  cmp_test.MyUints{7000, 8000, 9000},
++ 	UintsC:  nil,
+- 	FloatsA: []float32{1.5, 2.5, 3.5},
++ 	FloatsA: nil,
+- 	FloatsB: []cmp_test.MyFloat{4.5, 5.5, 6.5},
++ 	FloatsB: nil,
+- 	FloatsC: cmp_test.MyFloats{7.5, 8.5, 9.5},
++ 	FloatsC: nil,
+  }
+>>> TestDiff/Reporter/Slices
+<<< TestDiff/Reporter/EmptySlices
+  cmp_test.MyComposite{
+  	StringA: "",
+  	StringB: "",
+- 	BytesA:  []uint8{},
++ 	BytesA:  nil,
+- 	BytesB:  []cmp_test.MyByte{},
++ 	BytesB:  nil,
+- 	BytesC:  cmp_test.MyBytes{},
++ 	BytesC:  nil,
+- 	IntsA:   []int8{},
++ 	IntsA:   nil,
+- 	IntsB:   []cmp_test.MyInt{},
++ 	IntsB:   nil,
+- 	IntsC:   cmp_test.MyInts{},
++ 	IntsC:   nil,
+- 	UintsA:  []uint16{},
++ 	UintsA:  nil,
+- 	UintsB:  []cmp_test.MyUint{},
++ 	UintsB:  nil,
+- 	UintsC:  cmp_test.MyUints{},
++ 	UintsC:  nil,
+- 	FloatsA: []float32{},
++ 	FloatsA: nil,
+- 	FloatsB: []cmp_test.MyFloat{},
++ 	FloatsB: nil,
+- 	FloatsC: cmp_test.MyFloats{},
++ 	FloatsC: nil,
+  }
+>>> TestDiff/Reporter/EmptySlices
+<<< TestDiff/Reporter/LargeMapKey
+  map[*[]uint8]int{
+- 	&⟪0xdeadf00f⟫⟪ptr:0xdeadf00f, len:1048576, cap:1048576⟫{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ...}: 0,
++ 	&⟪0xdeadf00f⟫⟪ptr:0xdeadf00f, len:1048576, cap:1048576⟫{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ...}: 0,
+  }
+>>> TestDiff/Reporter/LargeMapKey
+<<< TestDiff/Reporter/LargeStringInInterface
+  struct{ X interface{} }{
+  	X: strings.Join({
+  		... // 485 identical bytes
+  		"s mus. Pellentesque mi lorem, consectetur id porttitor id, solli",
+  		"citudin sit amet enim. Duis eu dolor magna. Nunc ut augue turpis",
+- 		".",
++ 		",",
+  	}, ""),
+  }
+>>> TestDiff/Reporter/LargeStringInInterface
+<<< TestDiff/Reporter/LargeBytesInInterface
+  struct{ X interface{} }{
+  	X: bytes.Join({
+  		... // 485 identical bytes
+  		"s mus. Pellentesque mi lorem, consectetur id porttitor id, solli",
+  		"citudin sit amet enim. Duis eu dolor magna. Nunc ut augue turpis",
+- 		".",
++ 		",",
+  	}, ""),
+  }
+>>> TestDiff/Reporter/LargeBytesInInterface
+<<< TestDiff/Reporter/LargeStandaloneString
+  struct{ X interface{} }{
+- 	X: [1]string{
+- 		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam sit amet pretium ligula, at gravida quam. Integer iaculis, velit at sagittis ultricies, lacus metus scelerisque turpis, ornare feugiat nulla nisl ac erat. Maecenas elementum ultricies libero, sed efficitur lacus molestie non. Nulla ac pretium dolor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Pellentesque mi lorem, consectetur id porttitor id, sollicitudin sit amet enim. Duis eu dolor magna. Nunc ut augue turpis.",
+- 	},
++ 	X: [1]string{
++ 		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam sit amet pretium ligula, at gravida quam. Integer iaculis, velit at sagittis ultricies, lacus metus scelerisque turpis, ornare feugiat nulla nisl ac erat. Maecenas elementum ultricies libero, sed efficitur lacus molestie non. Nulla ac pretium dolor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Pellentesque mi lorem, consectetur id porttitor id, sollicitudin sit amet enim. Duis eu dolor magna. Nunc ut augue turpis,",
++ 	},
+  }
+>>> TestDiff/Reporter/LargeStandaloneString
+<<< TestDiff/EmbeddedStruct/ParentStructA/Inequal
+  teststructs.ParentStructA{
+  	privateStruct: teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructA/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructB/Inequal
+  teststructs.ParentStructB{
+  	PublicStruct: teststructs.PublicStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructB/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructC/Inequal
+  teststructs.ParentStructC{
+  	privateStruct: teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+- 	Public:  3,
++ 	Public:  4,
+- 	private: 4,
++ 	private: 5,
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructC/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructD/Inequal
+  teststructs.ParentStructD{
+  	PublicStruct: teststructs.PublicStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+- 	Public:  3,
++ 	Public:  4,
+- 	private: 4,
++ 	private: 5,
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructD/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructE/Inequal
+  teststructs.ParentStructE{
+  	privateStruct: teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  	PublicStruct: teststructs.PublicStruct{
+- 		Public:  3,
++ 		Public:  4,
+- 		private: 4,
++ 		private: 5,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructE/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructF/Inequal
+  teststructs.ParentStructF{
+  	privateStruct: teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  	PublicStruct: teststructs.PublicStruct{
+- 		Public:  3,
++ 		Public:  4,
+- 		private: 4,
++ 		private: 5,
+  	},
+- 	Public:  5,
++ 	Public:  6,
+- 	private: 6,
++ 	private: 7,
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructF/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructG/Inequal
+  &teststructs.ParentStructG{
+  	privateStruct: &teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructG/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructH/Inequal
+  &teststructs.ParentStructH{
+  	PublicStruct: &teststructs.PublicStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructH/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructI/Inequal
+  &teststructs.ParentStructI{
+  	privateStruct: &teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  	PublicStruct: &teststructs.PublicStruct{
+- 		Public:  3,
++ 		Public:  4,
+- 		private: 4,
++ 		private: 5,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructI/Inequal
+<<< TestDiff/EmbeddedStruct/ParentStructJ/Inequal
+  &teststructs.ParentStructJ{
+  	privateStruct: &teststructs.privateStruct{
+- 		Public:  1,
++ 		Public:  2,
+- 		private: 2,
++ 		private: 3,
+  	},
+  	PublicStruct: &teststructs.PublicStruct{
+- 		Public:  3,
++ 		Public:  4,
+- 		private: 4,
++ 		private: 5,
+  	},
+  	Public: teststructs.PublicStruct{
+- 		Public:  7,
++ 		Public:  8,
+- 		private: 8,
++ 		private: 9,
+  	},
+  	private: teststructs.privateStruct{
+- 		Public:  5,
++ 		Public:  6,
+- 		private: 6,
++ 		private: 7,
+  	},
+  }
+>>> TestDiff/EmbeddedStruct/ParentStructJ/Inequal
+<<< TestDiff/EqualMethod/StructB/ValueInequal
+  teststructs.StructB{
+- 	X: "NotEqual",
++ 	X: "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructB/ValueInequal
+<<< TestDiff/EqualMethod/StructD/ValueInequal
+  teststructs.StructD{
+- 	X: "NotEqual",
++ 	X: "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructD/ValueInequal
+<<< TestDiff/EqualMethod/StructE/ValueInequal
+  teststructs.StructE{
+- 	X: "NotEqual",
++ 	X: "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructE/ValueInequal
+<<< TestDiff/EqualMethod/StructF/ValueInequal
+  teststructs.StructF{
+- 	X: "NotEqual",
++ 	X: "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructF/ValueInequal
+<<< TestDiff/EqualMethod/StructA1/ValueInequal
+  teststructs.StructA1{
+  	StructA: {X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructA1/ValueInequal
+<<< TestDiff/EqualMethod/StructA1/PointerInequal
+  &teststructs.StructA1{
+  	StructA: {X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructA1/PointerInequal
+<<< TestDiff/EqualMethod/StructB1/ValueInequal
+  teststructs.StructB1{
+  	StructB: Inverse(Addr, &teststructs.StructB{X: "NotEqual"}),
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructB1/ValueInequal
+<<< TestDiff/EqualMethod/StructB1/PointerInequal
+  &teststructs.StructB1{
+  	StructB: Inverse(Addr, &teststructs.StructB{X: "NotEqual"}),
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructB1/PointerInequal
+<<< TestDiff/EqualMethod/StructD1/ValueInequal
+  teststructs.StructD1{
+- 	StructD: teststructs.StructD{X: "NotEqual"},
++ 	StructD: teststructs.StructD{X: "not_equal"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructD1/ValueInequal
+<<< TestDiff/EqualMethod/StructE1/ValueInequal
+  teststructs.StructE1{
+- 	StructE: teststructs.StructE{X: "NotEqual"},
++ 	StructE: teststructs.StructE{X: "not_equal"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructE1/ValueInequal
+<<< TestDiff/EqualMethod/StructF1/ValueInequal
+  teststructs.StructF1{
+- 	StructF: teststructs.StructF{X: "NotEqual"},
++ 	StructF: teststructs.StructF{X: "not_equal"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructF1/ValueInequal
+<<< TestDiff/EqualMethod/StructA2/ValueInequal
+  teststructs.StructA2{
+  	StructA: &{X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructA2/ValueInequal
+<<< TestDiff/EqualMethod/StructA2/PointerInequal
+  &teststructs.StructA2{
+  	StructA: &{X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructA2/PointerInequal
+<<< TestDiff/EqualMethod/StructB2/ValueInequal
+  teststructs.StructB2{
+  	StructB: &{X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructB2/ValueInequal
+<<< TestDiff/EqualMethod/StructB2/PointerInequal
+  &teststructs.StructB2{
+  	StructB: &{X: "NotEqual"},
+- 	X:       "NotEqual",
++ 	X:       "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructB2/PointerInequal
+<<< TestDiff/EqualMethod/StructNo/Inequal
+  teststructs.StructNo{
+- 	X: "NotEqual",
++ 	X: "not_equal",
+  }
+>>> TestDiff/EqualMethod/StructNo/Inequal
+<<< TestDiff/Cycle/PointersInequal
+  &&⟪ref#0⟫cmp_test.P(
+- 	&⟪ref#0⟫(...),
++ 	&&⟪ref#0⟫(...),
+  )
+>>> TestDiff/Cycle/PointersInequal
+<<< TestDiff/Cycle/SlicesInequal
+  cmp_test.S{
+- 	⟪ref#0⟫{⟪ref#0⟫(...)},
++ 	⟪ref#1⟫{{⟪ref#1⟫(...)}},
+  }
+>>> TestDiff/Cycle/SlicesInequal
+<<< TestDiff/Cycle/MapsInequal
+  cmp_test.M⟪ref#0⟫{
+- 	0: ⟪ref#0⟫(...),
++ 	0: {0: ⟪ref#0⟫(...)},
+  }
+>>> TestDiff/Cycle/MapsInequal
+<<< TestDiff/Cycle/GraphInequalZeroed
+  map[string]*cmp_test.CycleAlpha{
+  	"Bar": &⟪ref#0⟫{
+  		Name: "Bar",
+  		Bravos: map[string]*cmp_test.CycleBravo{
+  			"BarBuzzBravo": &⟪ref#1⟫{
+- 				ID:   102,
++ 				ID:   0,
+  				Name: "BarBuzzBravo",
+  				Mods: 2,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫(...),
+  					"Buzz": &⟪ref#2⟫{
+  						Name: "Buzz",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫(...),
+  							"BuzzBarBravo": &⟪ref#3⟫{
+- 								ID:     103,
++ 								ID:     0,
+  								Name:   "BuzzBarBravo",
+  								Mods:   0,
+  								Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)},
+  							},
+  						},
+  					},
+  				},
+  			},
+  			"BuzzBarBravo": &⟪ref#3⟫{
+- 				ID:   103,
++ 				ID:   0,
+  				Name: "BuzzBarBravo",
+  				Mods: 0,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫(...),
+  					"Buzz": &⟪ref#2⟫{
+  						Name: "Buzz",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫{
+- 								ID:     102,
++ 								ID:     0,
+  								Name:   "BarBuzzBravo",
+  								Mods:   2,
+  								Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)},
+  							},
+  							"BuzzBarBravo": &⟪ref#3⟫(...),
+  						},
+  					},
+  				},
+  			},
+  		},
+  	},
+  	"Buzz": &⟪ref#2⟫{
+  		Name: "Buzz",
+  		Bravos: map[string]*cmp_test.CycleBravo{
+  			"BarBuzzBravo": &⟪ref#1⟫{
+- 				ID:   102,
++ 				ID:   0,
+  				Name: "BarBuzzBravo",
+  				Mods: 2,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫{
+  						Name: "Bar",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫(...),
+  							"BuzzBarBravo": &⟪ref#3⟫{
+- 								ID:     103,
++ 								ID:     0,
+  								Name:   "BuzzBarBravo",
+  								Mods:   0,
+  								Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)},
+  							},
+  						},
+  					},
+  					"Buzz": &⟪ref#2⟫(...),
+  				},
+  			},
+  			"BuzzBarBravo": &⟪ref#3⟫{
+- 				ID:   103,
++ 				ID:   0,
+  				Name: "BuzzBarBravo",
+  				Mods: 0,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫{
+  						Name: "Bar",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫{
+- 								ID:     102,
++ 								ID:     0,
+  								Name:   "BarBuzzBravo",
+  								Mods:   2,
+  								Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)},
+  							},
+  							"BuzzBarBravo": &⟪ref#3⟫(...),
+  						},
+  					},
+  					"Buzz": &⟪ref#2⟫(...),
+  				},
+  			},
+  		},
+  	},
+  	"Foo": &⟪ref#4⟫{
+  		Name: "Foo",
+  		Bravos: map[string]*cmp_test.CycleBravo{
+  			"FooBravo": &{
+- 				ID:     101,
++ 				ID:     0,
+  				Name:   "FooBravo",
+  				Mods:   100,
+  				Alphas: {"Foo": &⟪ref#4⟫(...)},
+  			},
+  		},
+  	},
+  }
+>>> TestDiff/Cycle/GraphInequalZeroed
+<<< TestDiff/Cycle/GraphInequalStruct
+  map[string]*cmp_test.CycleAlpha{
+  	"Bar": &⟪ref#0⟫{
+  		Name: "Bar",
+  		Bravos: map[string]*cmp_test.CycleBravo{
+  			"BarBuzzBravo": &⟪ref#1⟫{
+  				ID:   102,
+  				Name: "BarBuzzBravo",
+  				Mods: 2,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫(...),
+  					"Buzz": &⟪ref#2⟫{
+  						Name: "Buzz",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫(...),
+  							"BuzzBarBravo": &⟪ref#3⟫{
+  								ID:     103,
+  								Name:   "BuzzBarBravo",
+  								Mods:   0,
+- 								Alphas: nil,
++ 								Alphas: map[string]*cmp_test.CycleAlpha{"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)},
+  							},
+  						},
+  					},
+  				},
+  			},
+  			"BuzzBarBravo": &⟪ref#3⟫{
+  				ID:   103,
+  				Name: "BuzzBarBravo",
+  				Mods: 0,
+  				Alphas: map[string]*cmp_test.CycleAlpha{
+  					"Bar": &⟪ref#0⟫(...),
+  					"Buzz": &⟪ref#2⟫{
+  						Name: "Buzz",
+  						Bravos: map[string]*cmp_test.CycleBravo{
+  							"BarBuzzBravo": &⟪ref#1⟫{ID: 102, Name: "BarBuzzBravo", Mods: 2, Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)}},
+- 							"BuzzBarBravo": &{ID: 103, Name: "BuzzBarBravo"},
++ 							"BuzzBarBravo": &⟪ref#3⟫(...),
+  						},
+  					},
+  				},
+  			},
+  		},
+  	},
+  	"Buzz": &⟪ref#2⟫{
+  		Name: "Buzz",
+  		Bravos: map[string]*cmp_test.CycleBravo{
+  			"BarBuzzBravo": &⟪ref#1⟫{ID: 102, Name: "BarBuzzBravo", Mods: 2, Alphas: {"Bar": &⟪ref#0⟫{Name: "Bar", Bravos: {"BarBuzzBravo": &⟪ref#1⟫(...), "BuzzBarBravo": &⟪ref#3⟫{ID: 103, Name: "BuzzBarBravo", Alphas: {"Bar": &⟪ref#0⟫(...), "Buzz": &⟪ref#2⟫(...)}}}}, "Buzz": &⟪ref#2⟫(...)}},
+  			"BuzzBarBravo": &⟪ref#3⟫{
+  				ID:     103,
+  				Name:   "BuzzBarBravo",
+  				Mods:   0,
+- 				Alphas: nil,
++ 				Alphas: map[string]*cmp_test.CycleAlpha{
++ 					"Bar": &⟪ref#0⟫{
++ 						Name:   "Bar",
++ 						Bravos: map[string]*cmp_test.CycleBravo{"BarBuzzBravo": &⟪ref#1⟫{...}, "BuzzBarBravo": &⟪ref#3⟫(...)},
++ 					},
++ 					"Buzz": &⟪ref#2⟫(...),
++ 				},
+  			},
+  		},
+  	},
+  	"Foo": &⟪ref#4⟫{Name: "Foo", Bravos: {"FooBravo": &{ID: 101, Name: "FooBravo", Mods: 100, Alphas: {"Foo": &⟪ref#4⟫(...)}}}},
+  }
+>>> TestDiff/Cycle/GraphInequalStruct
+<<< TestDiff/Project1/ProtoInequal
+  teststructs.Eagle{
+  	... // 4 identical fields
+  	Dreamers: nil,
+  	Prong:    0,
+  	Slaps: []teststructs.Slap{
+  		... // 2 identical elements
+  		{},
+  		{},
+  		{
+  			Name:     "",
+  			Desc:     "",
+  			DescLong: "",
+- 			Args:     s"metadata",
++ 			Args:     s"metadata2",
+  			Tense:    0,
+  			Interval: 0,
+  			... // 3 identical fields
+  		},
+  	},
+  	StateGoverner: "",
+  	PrankRating:   "",
+  	... // 2 identical fields
+  }
+>>> TestDiff/Project1/ProtoInequal
+<<< TestDiff/Project1/Inequal
+  teststructs.Eagle{
+  	... // 2 identical fields
+  	Desc:     "some description",
+  	DescLong: "",
+  	Dreamers: []teststructs.Dreamer{
+  		{},
+  		{
+  			... // 4 identical fields
+  			ContSlaps:         nil,
+  			ContSlapsInterval: 0,
+  			Animal: []interface{}{
+  				teststructs.Goat{
+  					Target:     "corporation",
+  					Slaps:      nil,
+  					FunnyPrank: "",
+  					Immutable: &teststructs.GoatImmutable{
+- 						ID:      "southbay2",
++ 						ID:      "southbay",
+- 						State:   &6,
++ 						State:   &5,
+  						Started: s"2009-11-10 23:00:00 +0000 UTC",
+  						Stopped: s"0001-01-01 00:00:00 +0000 UTC",
+  						... // 1 ignored and 1 identical fields
+  					},
+  				},
+  				teststructs.Donkey{},
+  			},
+  			Ornamental: false,
+  			Amoeba:     53,
+  			... // 5 identical fields
+  		},
+  	},
+  	Prong: 0,
+  	Slaps: []teststructs.Slap{
+  		{
+  			... // 6 identical fields
+  			Homeland:   0,
+  			FunnyPrank: "",
+  			Immutable: &teststructs.SlapImmutable{
+  				ID:          "immutableSlap",
+  				Out:         nil,
+- 				MildSlap:    false,
++ 				MildSlap:    true,
+  				PrettyPrint: "",
+  				State:       nil,
+  				Started:     s"2009-11-10 23:00:00 +0000 UTC",
+  				Stopped:     s"0001-01-01 00:00:00 +0000 UTC",
+  				LastUpdate:  s"0001-01-01 00:00:00 +0000 UTC",
+  				LoveRadius: &teststructs.LoveRadius{
+  					Summer: &teststructs.SummerLove{
+  						Summary: &teststructs.SummerLoveSummary{
+  							Devices: []string{
+  								"foo",
+- 								"bar",
+- 								"baz",
+  							},
+  							ChangeType: {1, 2, 3},
+  							... // 1 ignored field
+  						},
+  						... // 1 ignored field
+  					},
+  					... // 1 ignored field
+  				},
+  				... // 1 ignored field
+  			},
+  		},
+  	},
+  	StateGoverner: "",
+  	PrankRating:   "",
+  	... // 2 identical fields
+  }
+>>> TestDiff/Project1/Inequal
+<<< TestDiff/Project2/InequalOrder
+  teststructs.GermBatch{
+  	DirtyGerms: map[int32][]*testprotos.Germ{
+  		17: {s"germ1"},
+  		18: {
+- 			s"germ2",
+  			s"germ3",
+  			s"germ4",
++ 			s"germ2",
+  		},
+  	},
+  	CleanGerms: nil,
+  	GermMap:    {13: s"germ13", 21: s"germ21"},
+  	... // 7 identical fields
+  }
+>>> TestDiff/Project2/InequalOrder
+<<< TestDiff/Project2/Inequal
+  teststructs.GermBatch{
+  	DirtyGerms: map[int32][]*testprotos.Germ{
++ 		17: {s"germ1"},
+  		18: Inverse(Sort, []*testprotos.Germ{
+  			s"germ2",
+  			s"germ3",
+- 			s"germ4",
+  		}),
+  	},
+  	CleanGerms: nil,
+  	GermMap:    {13: s"germ13", 21: s"germ21"},
+  	DishMap: map[int32]*teststructs.Dish{
+  		0: &{err: e"EOF"},
+- 		1: nil,
++ 		1: &{err: e"unexpected EOF"},
+  		2: &{pb: s"dish"},
+  	},
+  	HasPreviousResult: true,
+  	DirtyID:           10,
+  	CleanID:           0,
+- 	GermStrain:        421,
++ 	GermStrain:        22,
+  	TotalDirtyGerms:   0,
+  	InfectedAt:        s"2009-11-10 23:00:00 +0000 UTC",
+  }
+>>> TestDiff/Project2/Inequal
+<<< TestDiff/Project3/Inequal
+  teststructs.Dirt{
+- 	table:   &teststructs.MockTable{state: []string{"a", "c"}},
++ 	table:   &teststructs.MockTable{state: []string{"a", "b", "c"}},
+  	ts:      12345,
+- 	Discord: 554,
++ 	Discord: 500,
+- 	Proto:   testprotos.Dirt(Inverse(λ, s"blah")),
++ 	Proto:   testprotos.Dirt(Inverse(λ, s"proto")),
+  	wizard: map[string]*testprotos.Wizard{
+- 		"albus": s"dumbledore",
+- 		"harry": s"potter",
++ 		"harry": s"otter",
+  	},
+  	sadistic: nil,
+  	lastTime: 54321,
+  	... // 1 ignored field
+  }
+>>> TestDiff/Project3/Inequal
+<<< TestDiff/Project4/Inequal
+  teststructs.Cartel{
+  	Headquarter: teststructs.Headquarter{
+  		id:       5,
+  		location: "moon",
+  		subDivisions: []string{
+- 			"alpha",
+  			"bravo",
+  			"charlie",
+  		},
+  		incorporatedDate: s"0001-01-01 00:00:00 +0000 UTC",
+  		metaData:         s"metadata",
+  		privateMessage:   nil,
+  		publicMessage: []uint8{
+  			0x01,
+  			0x02,
+- 			0x03,
++ 			0x04,
+- 			0x04,
++ 			0x03,
+  			0x05,
+  		},
+  		horseBack: "abcdef",
+  		rattle:    "",
+  		... // 5 identical fields
+  	},
+  	source:        "mars",
+  	creationDate:  s"0001-01-01 00:00:00 +0000 UTC",
+  	boss:          "al capone",
+  	lastCrimeDate: s"0001-01-01 00:00:00 +0000 UTC",
+  	poisons: []*teststructs.Poison{
+  		&{
+- 			poisonType:   1,
++ 			poisonType:   5,
+  			expiration:   s"2009-11-10 23:00:00 +0000 UTC",
+  			manufacturer: "acme",
+  			potency:      0,
+  		},
+- 		&{poisonType: 2, manufacturer: "acme2"},
+  	},
+  }
+>>> TestDiff/Project4/Inequal

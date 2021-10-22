@@ -1,0 +1,1333 @@
+{
+  "version": "2.0",
+  "service": "<p> AWS S3 Control provides access to Amazon S3 control plane operations. </p>",
+  "operations": {
+    "CreateAccessPoint": "<p>Creates an access point and associates it with the specified bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-points.html\">Managing Data Access with Amazon S3 Access Points</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p> <b>Using this action with Amazon S3 on Outposts</b> </p> <p>This action: </p> <ul> <li> <p>Requires a virtual private cloud (VPC) configuration as S3 on Outposts only supports VPC style access points.</p> </li> <li> <p>Does not support ACL on S3 on Outposts buckets.</p> </li> <li> <p>Does not support Public Access on S3 on Outposts buckets.</p> </li> <li> <p>Does not support object lock for S3 on Outposts buckets.</p> </li> </ul> <p>For more information, see <a href=\"AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide </i>.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_CreateAccessPoint.html#API_control_CreateAccessPoint_Examples\"> Example</a> section below.</p> <p/> <p>The following actions are related to <code>CreateAccessPoint</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetAccessPoint.html\">GetAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteAccessPoint.html\">DeleteAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_ListAccessPoints.html\">ListAccessPoints</a> </p> </li> </ul>",
+    "CreateBucket": "<note> <p>This API operation creates an Amazon S3 on Outposts bucket. To create an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html\">Create Bucket</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Creates a new Outposts bucket. By creating the bucket, you become the bucket owner. To create an Outposts bucket, you must have S3 on Outposts. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>Not every string is an acceptable bucket name. For information on bucket naming restrictions, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html#bucketnamingrules\">Working with Amazon S3 Buckets</a>.</p> <p>S3 on Outposts buckets do not support </p> <ul> <li> <p>ACLs. Instead, configure access point policies to manage access to buckets.</p> </li> <li> <p>Public access. </p> </li> <li> <p>Object Lock</p> </li> <li> <p>Bucket Location constraint</p> </li> </ul> <p>For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and outpost-id in your API request, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_CreateBucket.html#API_control_CreateBucket_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>CreateBucket</code> for Amazon S3 on Outposts:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html\">PutObject</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetBucket.html\">GetBucket</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucket.html\">DeleteBucket</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_CreateAccessPoint.html\">CreateAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutAccessPointPolicy.html\">PutAccessPointPolicy</a> </p> </li> </ul>",
+    "CreateJob": "<p>S3 Batch Operations performs large-scale Batch Operations on Amazon S3 objects. Batch Operations can run a single operation or action on lists of Amazon S3 objects that you specify. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html\">S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>This operation creates a S3 Batch Operations job.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DescribeJob.html\">DescribeJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListJobs.html\">ListJobs</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobPriority.html\">UpdateJobPriority</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobStatus.html\">UpdateJobStatus</a> </p> </li> </ul>",
+    "DeleteAccessPoint": "<p>Deletes the specified access point.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteAccessPoint.html#API_control_DeleteAccessPoint_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>DeleteAccessPoint</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateAccessPoint.html\">CreateAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetAccessPoint.html\">GetAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListAccessPoints.html\">ListAccessPoints</a> </p> </li> </ul>",
+    "DeleteAccessPointPolicy": "<p>Deletes the access point policy for the specified access point.</p> <p/> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteAccessPointPolicy.html#API_control_DeleteAccessPointPolicy_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>DeleteAccessPointPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutAccessPointPolicy.html\">PutAccessPointPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetAccessPointPolicy.html\">GetAccessPointPolicy</a> </p> </li> </ul>",
+    "DeleteBucket": "<note> <p>This API operation deletes an Amazon S3 on Outposts bucket. To delete an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucket.html\">DeleteBucket</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Deletes the Amazon S3 on Outposts bucket. All objects (including all object versions and delete markers) in the bucket must be deleted before the bucket itself can be deleted. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucket.html#API_control_DeleteBucket_Examples\"> Example</a> section below.</p> <p class=\"title\"> <b>Related Resources</b> </p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateBucket.html\">CreateBucket</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetBucket.html\">GetBucket</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html\">DeleteObject</a> </p> </li> </ul>",
+    "DeleteBucketLifecycleConfiguration": "<note> <p>This API action deletes an Amazon S3 on Outposts bucket's lifecycle configuration. To delete an S3 bucket's lifecycle configuration, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketLifecycle.html\">DeleteBucketLifecycle</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Deletes the lifecycle configuration from the specified Outposts bucket. Amazon S3 on Outposts removes all the lifecycle configuration rules in the lifecycle subresource associated with the bucket. Your objects never expire, and Amazon S3 on Outposts no longer automatically deletes any objects on the basis of rules contained in the deleted lifecycle configuration. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>To use this operation, you must have permission to perform the <code>s3outposts:DeleteLifecycleConfiguration</code> action. By default, the bucket owner has this permission and the Outposts bucket owner can grant this permission to others.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucketLifecycleConfiguration.html#API_control_DeleteBucketLifecycleConfiguration_Examples\"> Example</a> section below.</p> <p>For more information about object expiration, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/intro-lifecycle-rules.html#intro-lifecycle-rules-actions\"> Elements to Describe Lifecycle Actions</a>.</p> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutBucketLifecycleConfiguration.html\">PutBucketLifecycleConfiguration</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketLifecycleConfiguration.html\">GetBucketLifecycleConfiguration</a> </p> </li> </ul>",
+    "DeleteBucketPolicy": "<note> <p>This API operation deletes an Amazon S3 on Outposts bucket policy. To delete an S3 bucket policy, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketPolicy.html\">DeleteBucketPolicy</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>This implementation of the DELETE operation uses the policy subresource to delete the policy of a specified Amazon S3 on Outposts bucket. If you are using an identity other than the root user of the AWS account that owns the bucket, the calling identity must have the <code>s3outposts:DeleteBucketPolicy</code> permissions on the specified Outposts bucket and belong to the bucket owner's account to use this operation. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>If you don't have <code>DeleteBucketPolicy</code> permissions, Amazon S3 returns a <code>403 Access Denied</code> error. If you have the correct permissions, but you're not using an identity that belongs to the bucket owner's account, Amazon S3 returns a <code>405 Method Not Allowed</code> error. </p> <important> <p>As a security precaution, the root user of the AWS account that owns a bucket can always use this operation, even if the policy explicitly denies the root user the ability to perform this action.</p> </important> <p>For more information about bucket policies, see <a href=\" https://docs.aws.amazon.com/AmazonS3/latest/dev/using-iam-policies.html\">Using Bucket Policies and User Policies</a>. </p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucketPolicy.html#API_control_DeleteBucketPolicy_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>DeleteBucketPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketPolicy.html\">GetBucketPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutBucketPolicy.html\">PutBucketPolicy</a> </p> </li> </ul>",
+    "DeleteBucketTagging": "<note> <p>This API operation deletes an Amazon S3 on Outposts bucket's tags. To delete an S3 bucket tags, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketTagging.html\">DeleteBucketTagging</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Deletes the tags from the Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>To use this operation, you must have permission to perform the <code>PutBucketTagging</code> action. By default, the bucket owner has this permission and can grant this permission to others. </p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucketTagging.html#API_control_DeleteBucketTagging_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>DeleteBucketTagging</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketTagging.html\">GetBucketTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutBucketTagging.html\">PutBucketTagging</a> </p> </li> </ul>",
+    "DeleteJobTagging": "<p>Removes the entire tag set from the specified S3 Batch Operations job. To use this operation, you must have permission to perform the <code>s3:DeleteJobTagging</code> action. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-managing-jobs.html#batch-ops-job-tags\">Controlling access and labeling jobs using tags</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetJobTagging.html\">GetJobTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutJobTagging.html\">PutJobTagging</a> </p> </li> </ul>",
+    "DeletePublicAccessBlock": "<p>Removes the <code>PublicAccessBlock</code> configuration for an AWS account. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html\"> Using Amazon S3 block public access</a>.</p> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetPublicAccessBlock.html\">GetPublicAccessBlock</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutPublicAccessBlock.html\">PutPublicAccessBlock</a> </p> </li> </ul>",
+    "DescribeJob": "<p>Retrieves the configuration parameters and status for a Batch Operations job. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html\">S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListJobs.html\">ListJobs</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobPriority.html\">UpdateJobPriority</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobStatus.html\">UpdateJobStatus</a> </p> </li> </ul>",
+    "GetAccessPoint": "<p>Returns configuration information about the specified access point.</p> <p/> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetAccessPoint.html#API_control_GetAccessPoint_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>GetAccessPoint</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateAccessPoint.html\">CreateAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteAccessPoint.html\">DeleteAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListAccessPoints.html\">ListAccessPoints</a> </p> </li> </ul>",
+    "GetAccessPointPolicy": "<p>Returns the access point policy associated with the specified access point.</p> <p>The following actions are related to <code>GetAccessPointPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutAccessPointPolicy.html\">PutAccessPointPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteAccessPointPolicy.html\">DeleteAccessPointPolicy</a> </p> </li> </ul>",
+    "GetAccessPointPolicyStatus": "<p>Indicates whether the specified access point currently has a policy that allows public access. For more information about public access through access points, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-points.html\">Managing Data Access with Amazon S3 Access Points</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+    "GetBucket": "<p>Gets an Amazon S3 on Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\"> Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>The following actions are related to <code>GetBucket</code> for Amazon S3 on Outposts:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html\">PutObject</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_CreateBucket.html\">CreateBucket</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_DeleteBucket.html\">DeleteBucket</a> </p> </li> </ul>",
+    "GetBucketLifecycleConfiguration": "<note> <p>This API operation gets an Amazon S3 on Outposts bucket's lifecycle configuration. To get an S3 bucket's lifecycle configuration, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html\">GetBucketLifecycleConfiguration</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Returns the lifecycle configuration information set on the Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> and for information about lifecycle configuration, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lifecycle-mgmt.html\"> Object Lifecycle Management</a> in <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>To use this operation, you must have permission to perform the <code>s3outposts:GetLifecycleConfiguration</code> action. The Outposts bucket owner has this permission, by default. The bucket owner can grant this permission to others. For more information about permissions, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/using-with-s3-actions.html#using-with-s3-actions-related-to-bucket-subresources\">Permissions Related to Bucket Subresource Operations</a> and <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-access-control.html\">Managing Access Permissions to Your Amazon S3 Resources</a>.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetBucketLifecycleConfiguration.html#API_control_GetBucketLifecycleConfiguration_Examples\"> Example</a> section below.</p> <p> <code>GetBucketLifecycleConfiguration</code> has the following special error:</p> <ul> <li> <p>Error code: <code>NoSuchLifecycleConfiguration</code> </p> <ul> <li> <p>Description: The lifecycle configuration does not exist.</p> </li> <li> <p>HTTP Status Code: 404 Not Found</p> </li> <li> <p>SOAP Fault Code Prefix: Client</p> </li> </ul> </li> </ul> <p>The following actions are related to <code>GetBucketLifecycleConfiguration</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutBucketLifecycleConfiguration.html\">PutBucketLifecycleConfiguration</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketLifecycleConfiguration.html\">DeleteBucketLifecycleConfiguration</a> </p> </li> </ul>",
+    "GetBucketPolicy": "<note> <p>This API action gets a bucket policy for an Amazon S3 on Outposts bucket. To get a policy for an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketPolicy.html\">GetBucketPolicy</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Returns the policy of a specified Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>If you are using an identity other than the root user of the AWS account that owns the bucket, the calling identity must have the <code>GetBucketPolicy</code> permissions on the specified bucket and belong to the bucket owner's account in order to use this operation.</p> <p>If you don't have <code>s3outposts:GetBucketPolicy</code> permissions, Amazon S3 returns a <code>403 Access Denied</code> error. If you have the correct permissions, but you're not using an identity that belongs to the bucket owner's account, Amazon S3 returns a <code>405 Method Not Allowed</code> error.</p> <important> <p>As a security precaution, the root user of the AWS account that owns a bucket can always use this operation, even if the policy explicitly denies the root user the ability to perform this action.</p> </important> <p>For more information about bucket policies, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/using-iam-policies.html\">Using Bucket Policies and User Policies</a>.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetBucketPolicy.html#API_control_GetBucketPolicy_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>GetBucketPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html\">GetObject</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutBucketPolicy.html\">PutBucketPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketPolicy.html\">DeleteBucketPolicy</a> </p> </li> </ul>",
+    "GetBucketTagging": "<note> <p>This API operation gets an Amazon S3 on Outposts bucket's tags. To get an S3 bucket tags, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketTagging.html\">GetBucketTagging</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Returns the tag set associated with the Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>To use this operation, you must have permission to perform the <code>GetBucketTagging</code> action. By default, the bucket owner has this permission and can grant this permission to others.</p> <p> <code>GetBucketTagging</code> has the following special error:</p> <ul> <li> <p>Error code: <code>NoSuchTagSetError</code> </p> <ul> <li> <p>Description: There is no tag set associated with the bucket.</p> </li> </ul> </li> </ul> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetBucketTagging.html#API_control_GetBucketTagging_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>GetBucketTagging</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutBucketTagging.html\">PutBucketTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketTagging.html\">DeleteBucketTagging</a> </p> </li> </ul>",
+    "GetJobTagging": "<p>Returns the tags on an S3 Batch Operations job. To use this operation, you must have permission to perform the <code>s3:GetJobTagging</code> action. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-managing-jobs.html#batch-ops-job-tags\">Controlling access and labeling jobs using tags</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutJobTagging.html\">PutJobTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteJobTagging.html\">DeleteJobTagging</a> </p> </li> </ul>",
+    "GetPublicAccessBlock": "<p>Retrieves the <code>PublicAccessBlock</code> configuration for an AWS account. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html\"> Using Amazon S3 block public access</a>.</p> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeletePublicAccessBlock.html\">DeletePublicAccessBlock</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_PutPublicAccessBlock.html\">PutPublicAccessBlock</a> </p> </li> </ul>",
+    "ListAccessPoints": "<p>Returns a list of the access points currently associated with the specified bucket. You can retrieve up to 1000 access points per call. If the specified bucket has more than 1,000 access points (or the number specified in <code>maxResults</code>, whichever is less), the response will include a continuation token that you can use to list the additional access points.</p> <p/> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_GetAccessPoint.html#API_control_GetAccessPoint_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>ListAccessPoints</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateAccessPoint.html\">CreateAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteAccessPoint.html\">DeleteAccessPoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetAccessPoint.html\">GetAccessPoint</a> </p> </li> </ul>",
+    "ListJobs": "<p>Lists current S3 Batch Operations jobs and jobs that have ended within the last 30 days for the AWS account making the request. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html\">S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>Related actions include:</p> <p/> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DescribeJob.html\">DescribeJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobPriority.html\">UpdateJobPriority</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobStatus.html\">UpdateJobStatus</a> </p> </li> </ul>",
+    "ListRegionalBuckets": "<p>Returns a list of all Outposts buckets in an Outposts that are owned by the authenticated sender of the request. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and outpost-id in your API request, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_ListRegionalBuckets.html#API_control_ListRegionalBuckets_Examples\"> Example</a> section below.</p>",
+    "PutAccessPointPolicy": "<p>Associates an access policy with the specified access point. Each access point can have only one policy, so a request made to this API replaces any existing policy associated with the specified access point.</p> <p/> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutAccessPointPolicy.html#API_control_PutAccessPointPolicy_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>PutAccessPointPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetAccessPointPolicy.html\">GetAccessPointPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteAccessPointPolicy.html\">DeleteAccessPointPolicy</a> </p> </li> </ul>",
+    "PutBucketLifecycleConfiguration": "<note> <p>This API action puts a lifecycle configuration to an Amazon S3 on Outposts bucket. To put a lifecycle configuration to an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycleConfiguration.html\">PutBucketLifecycleConfiguration</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Creates a new lifecycle configuration for the Outposts bucket or replaces an existing lifecycle configuration. Outposts buckets can only support a lifecycle that deletes objects after a certain period of time. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Managing Lifecycle Permissions for Amazon S3 on Outposts</a>.</p> <p/> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutBucketLifecycleConfiguration.html#API_control_PutBucketLifecycleConfiguration_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>PutBucketLifecycleConfiguration</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketLifecycleConfiguration.html\">GetBucketLifecycleConfiguration</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketLifecycleConfiguration.html\">DeleteBucketLifecycleConfiguration</a> </p> </li> </ul>",
+    "PutBucketPolicy": "<note> <p>This API action puts a bucket policy to an Amazon S3 on Outposts bucket. To put a policy on an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketPolicy.html\">PutBucketPolicy</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Applies an Amazon S3 bucket policy to an Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>If you are using an identity other than the root user of the AWS account that owns the Outposts bucket, the calling identity must have the <code>PutBucketPolicy</code> permissions on the specified Outposts bucket and belong to the bucket owner's account in order to use this operation.</p> <p>If you don't have <code>PutBucketPolicy</code> permissions, Amazon S3 returns a <code>403 Access Denied</code> error. If you have the correct permissions, but you're not using an identity that belongs to the bucket owner's account, Amazon S3 returns a <code>405 Method Not Allowed</code> error.</p> <important> <p> As a security precaution, the root user of the AWS account that owns a bucket can always use this operation, even if the policy explicitly denies the root user the ability to perform this action. </p> </important> <p>For more information about bucket policies, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/using-iam-policies.html\">Using Bucket Policies and User Policies</a>.</p> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutBucketPolicy.html#API_control_PutBucketPolicy_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>PutBucketPolicy</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketPolicy.html\">GetBucketPolicy</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketPolicy.html\">DeleteBucketPolicy</a> </p> </li> </ul>",
+    "PutBucketTagging": "<note> <p>This API action puts tags on an Amazon S3 on Outposts bucket. To put tags on an S3 bucket, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html\">PutBucketTagging</a> in the <i>Amazon Simple Storage Service API</i>. </p> </note> <p>Sets the tags for an Outposts bucket. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/S3onOutposts.html\">Using Amazon S3 on Outposts</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>Use tags to organize your AWS bill to reflect your own cost structure. To do this, sign up to get your AWS account bill with tag key values included. Then, to see the cost of combined resources, organize your billing information according to resources with the same tag key values. For example, you can tag several resources with a specific application name, and then organize your billing information to see the total cost of that application across several services. For more information, see <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html\">Cost Allocation and Tagging</a>.</p> <note> <p>Within a bucket, if you add a tag that has the same key as an existing tag, the new value overwrites the old value. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/CostAllocTagging.html\">Using Cost Allocation in Amazon S3 Bucket Tags</a>.</p> </note> <p>To use this operation, you must have permissions to perform the <code>s3outposts:PutBucketTagging</code> action. The Outposts bucket owner has this permission by default and can grant this permission to others. For more information about permissions, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/using-with-s3-actions.html#using-with-s3-actions-related-to-bucket-subresources\"> Permissions Related to Bucket Subresource Operations</a> and <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-access-control.html\">Managing Access Permissions to Your Amazon S3 Resources</a>.</p> <p> <code>PutBucketTagging</code> has the following special errors:</p> <ul> <li> <p>Error code: <code>InvalidTagError</code> </p> <ul> <li> <p>Description: The tag provided was not a valid tag. This error can occur if the tag did not pass input validation. For information about tag restrictions, see <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/allocation-tag-restrictions.html\"> User-Defined Tag Restrictions</a> and <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/aws-tag-restrictions.html\"> AWS-Generated Cost Allocation Tag Restrictions</a>.</p> </li> </ul> </li> <li> <p>Error code: <code>MalformedXMLError</code> </p> <ul> <li> <p>Description: The XML provided does not match the schema.</p> </li> </ul> </li> <li> <p>Error code: <code>OperationAbortedError </code> </p> <ul> <li> <p>Description: A conflicting conditional operation is currently in progress against this resource. Try again.</p> </li> </ul> </li> <li> <p>Error code: <code>InternalError</code> </p> <ul> <li> <p>Description: The service was unable to apply the provided tag to the bucket.</p> </li> </ul> </li> </ul> <p>All Amazon S3 on Outposts REST API requests for this action require an additional parameter of outpost-id to be passed with the request and an S3 on Outposts endpoint hostname prefix instead of s3-control. For an example of the request syntax for Amazon S3 on Outposts that uses the S3 on Outposts endpoint hostname prefix and the outpost-id derived using the access point ARN, see the <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API__control_PutBucketTagging.html#API_control_PutBucketTagging_Examples\"> Example</a> section below.</p> <p>The following actions are related to <code>PutBucketTagging</code>:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetBucketTagging.html\">GetBucketTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteBucketTagging.html\">DeleteBucketTagging</a> </p> </li> </ul>",
+    "PutJobTagging": "<p>Sets the supplied tag-set on an S3 Batch Operations job.</p> <p>A tag is a key-value pair. You can associate S3 Batch Operations tags with any job by sending a PUT request against the tagging subresource that is associated with the job. To modify the existing tag set, you can either replace the existing tag set entirely, or make changes within the existing tag set by retrieving the existing tag set using <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetJobTagging.html\">GetJobTagging</a>, modify that tag set, and use this API action to replace the tag set with the one you modified. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-managing-jobs.html#batch-ops-job-tags\">Controlling access and labeling jobs using tags</a> in the <i>Amazon Simple Storage Service Developer Guide</i>. </p> <p/> <note> <ul> <li> <p>If you send this request with an empty tag set, Amazon S3 deletes the existing tag set on the Batch Operations job. If you use this method, you are charged for a Tier 1 Request (PUT). For more information, see <a href=\"http://aws.amazon.com/s3/pricing/\">Amazon S3 pricing</a>.</p> </li> <li> <p>For deleting existing tags for your Batch Operations job, a <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteJobTagging.html\">DeleteJobTagging</a> request is preferred because it achieves the same result without incurring charges.</p> </li> <li> <p>A few things to consider about using tags:</p> <ul> <li> <p>Amazon S3 limits the maximum number of tags to 50 tags per job.</p> </li> <li> <p>You can associate up to 50 tags with a job as long as they have unique tag keys.</p> </li> <li> <p>A tag key can be up to 128 Unicode characters in length, and tag values can be up to 256 Unicode characters in length.</p> </li> <li> <p>The key and values are case sensitive.</p> </li> <li> <p>For tagging-related restrictions related to characters and encodings, see <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/allocation-tag-restrictions.html\">User-Defined Tag Restrictions</a> in the <i>AWS Billing and Cost Management User Guide</i>.</p> </li> </ul> </li> </ul> </note> <p/> <p>To use this operation, you must have permission to perform the <code>s3:PutJobTagging</code> action.</p> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreatJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetJobTagging.html\">GetJobTagging</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeleteJobTagging.html\">DeleteJobTagging</a> </p> </li> </ul>",
+    "PutPublicAccessBlock": "<p>Creates or modifies the <code>PublicAccessBlock</code> configuration for an AWS account. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html\"> Using Amazon S3 block public access</a>.</p> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_GetPublicAccessBlock.html\">GetPublicAccessBlock</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DeletePublicAccessBlock.html\">DeletePublicAccessBlock</a> </p> </li> </ul>",
+    "UpdateJobPriority": "<p>Updates an existing S3 Batch Operations job's priority. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html\">S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListJobs.html\">ListJobs</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DescribeJob.html\">DescribeJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobStatus.html\">UpdateJobStatus</a> </p> </li> </ul>",
+    "UpdateJobStatus": "<p>Updates the status for the specified job. Use this operation to confirm that you want to run a job or to cancel an existing job. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html\">S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p/> <p>Related actions include:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateJob.html\">CreateJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_ListJobs.html\">ListJobs</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_DescribeJob.html\">DescribeJob</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_UpdateJobStatus.html\">UpdateJobStatus</a> </p> </li> </ul>"
+  },
+  "shapes": {
+    "AbortIncompleteMultipartUpload": {
+      "base": "<p>The container for abort incomplete multipart upload</p>",
+      "refs": {
+        "LifecycleRule$AbortIncompleteMultipartUpload": "<p>Specifies the days since the initiation of an incomplete multipart upload that Amazon S3 waits before permanently removing all parts of the upload. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html#mpu-abort-incomplete-mpu-lifecycle-config\"> Aborting Incomplete Multipart Uploads Using a Bucket Lifecycle Policy</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>"
+      }
+    },
+    "AccessPoint": {
+      "base": "<p>An access point used to access a bucket.</p>",
+      "refs": {
+        "AccessPointList$member": null
+      }
+    },
+    "AccessPointList": {
+      "base": null,
+      "refs": {
+        "ListAccessPointsResult$AccessPointList": "<p>Contains identification and configuration information for one or more access points associated with the specified bucket.</p>"
+      }
+    },
+    "AccessPointName": {
+      "base": null,
+      "refs": {
+        "AccessPoint$Name": "<p>The name of this access point.</p>",
+        "CreateAccessPointRequest$Name": "<p>The name you want to assign to this access point.</p>",
+        "DeleteAccessPointPolicyRequest$Name": "<p>The name of the access point whose policy you want to delete.</p> <p>For Amazon S3 on Outposts specify the ARN of the access point accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/accesspoint/&lt;my-accesspoint-name&gt;</code>. For example, to access the access point <code>reports-ap</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/accesspoint/reports-ap</code>. The value must be URL encoded. </p>",
+        "DeleteAccessPointRequest$Name": "<p>The name of the access point you want to delete.</p> <p>For Amazon S3 on Outposts specify the ARN of the access point accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/accesspoint/&lt;my-accesspoint-name&gt;</code>. For example, to access the access point <code>reports-ap</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/accesspoint/reports-ap</code>. The value must be URL encoded. </p>",
+        "GetAccessPointPolicyRequest$Name": "<p>The name of the access point whose policy you want to retrieve.</p> <p>For Amazon S3 on Outposts specify the ARN of the access point accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/accesspoint/&lt;my-accesspoint-name&gt;</code>. For example, to access the access point <code>reports-ap</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/accesspoint/reports-ap</code>. The value must be URL encoded. </p>",
+        "GetAccessPointPolicyStatusRequest$Name": "<p>The name of the access point whose policy status you want to retrieve.</p>",
+        "GetAccessPointRequest$Name": "<p>The name of the access point whose configuration information you want to retrieve.</p> <p>For Amazon S3 on Outposts specify the ARN of the access point accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/accesspoint/&lt;my-accesspoint-name&gt;</code>. For example, to access the access point <code>reports-ap</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/accesspoint/reports-ap</code>. The value must be URL encoded. </p>",
+        "GetAccessPointResult$Name": "<p>The name of the specified access point.</p>",
+        "PutAccessPointPolicyRequest$Name": "<p>The name of the access point that you want to associate with the specified policy.</p> <p>For Amazon S3 on Outposts specify the ARN of the access point accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/accesspoint/&lt;my-accesspoint-name&gt;</code>. For example, to access the access point <code>reports-ap</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/accesspoint/reports-ap</code>. The value must be URL encoded. </p>"
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "CreateAccessPointRequest$AccountId": "<p>The AWS account ID for the owner of the bucket for which you want to create an access point.</p>",
+        "CreateJobRequest$AccountId": "<p>The AWS account ID that creates the job.</p>",
+        "DeleteAccessPointPolicyRequest$AccountId": "<p>The account ID for the account that owns the specified access point.</p>",
+        "DeleteAccessPointRequest$AccountId": "<p>The account ID for the account that owns the specified access point.</p>",
+        "DeleteBucketLifecycleConfigurationRequest$AccountId": "<p>The account ID of the lifecycle configuration to delete.</p>",
+        "DeleteBucketPolicyRequest$AccountId": "<p>The account ID of the Outposts bucket.</p>",
+        "DeleteBucketRequest$AccountId": "<p>The account ID that owns the Outposts bucket.</p>",
+        "DeleteBucketTaggingRequest$AccountId": "<p>The AWS account ID of the Outposts bucket tag set to be removed.</p>",
+        "DeleteJobTaggingRequest$AccountId": "<p>The AWS account ID associated with the S3 Batch Operations job.</p>",
+        "DeletePublicAccessBlockRequest$AccountId": "<p>The account ID for the AWS account whose <code>PublicAccessBlock</code> configuration you want to remove.</p>",
+        "DescribeJobRequest$AccountId": "<p/>",
+        "GetAccessPointPolicyRequest$AccountId": "<p>The account ID for the account that owns the specified access point.</p>",
+        "GetAccessPointPolicyStatusRequest$AccountId": "<p>The account ID for the account that owns the specified access point.</p>",
+        "GetAccessPointRequest$AccountId": "<p>The account ID for the account that owns the specified access point.</p>",
+        "GetBucketLifecycleConfigurationRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "GetBucketPolicyRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "GetBucketRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "GetBucketTaggingRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "GetJobTaggingRequest$AccountId": "<p>The AWS account ID associated with the S3 Batch Operations job.</p>",
+        "GetPublicAccessBlockRequest$AccountId": "<p>The account ID for the AWS account whose <code>PublicAccessBlock</code> configuration you want to retrieve.</p>",
+        "ListAccessPointsRequest$AccountId": "<p>The AWS account ID for owner of the bucket whose access points you want to list.</p>",
+        "ListJobsRequest$AccountId": "<p/>",
+        "ListRegionalBucketsRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "PutAccessPointPolicyRequest$AccountId": "<p>The AWS account ID for owner of the bucket associated with the specified access point.</p>",
+        "PutBucketLifecycleConfigurationRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "PutBucketPolicyRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "PutBucketTaggingRequest$AccountId": "<p>The AWS account ID of the Outposts bucket.</p>",
+        "PutJobTaggingRequest$AccountId": "<p>The AWS account ID associated with the S3 Batch Operations job.</p>",
+        "PutPublicAccessBlockRequest$AccountId": "<p>The account ID for the AWS account whose <code>PublicAccessBlock</code> configuration you want to set.</p>",
+        "UpdateJobPriorityRequest$AccountId": "<p/>",
+        "UpdateJobStatusRequest$AccountId": "<p/>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "JobReport$Enabled": "<p>Indicates whether the specified job will generate a job-completion report.</p>",
+        "S3CopyObjectOperation$RequesterPays": "<p/>",
+        "S3ObjectMetadata$RequesterCharged": "<p/>",
+        "S3SetObjectRetentionOperation$BypassGovernanceRetention": "<p>Indicates if the action should be applied to objects in the Batch Operations job even if they have Object Lock <code> GOVERNANCE</code> type in place.</p>"
+      }
+    },
+    "BucketAlreadyExists": {
+      "base": "<p>The requested Outposts bucket name is not available. The bucket namespace is shared by all users of the AWS Outposts in this Region. Select a different name and try again.</p>",
+      "refs": {
+      }
+    },
+    "BucketAlreadyOwnedByYou": {
+      "base": "<p>The Outposts bucket you tried to create already exists, and you own it. </p>",
+      "refs": {
+      }
+    },
+    "BucketCannedACL": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$ACL": "<p>The canned ACL to apply to the bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "BucketLocationConstraint": {
+      "base": null,
+      "refs": {
+        "CreateBucketConfiguration$LocationConstraint": "<p>Specifies the Region where the bucket will be created. If you are creating a bucket on the US East (N. Virginia) Region (us-east-1), you do not need to specify the location. </p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "BucketName": {
+      "base": null,
+      "refs": {
+        "AccessPoint$Bucket": "<p>The name of the bucket associated with this access point.</p>",
+        "CreateAccessPointRequest$Bucket": "<p>The name of the bucket that you want to associate this access point with.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "CreateBucketRequest$Bucket": "<p>The name of the bucket.</p>",
+        "DeleteBucketLifecycleConfigurationRequest$Bucket": "<p>The bucket ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "DeleteBucketPolicyRequest$Bucket": "<p>The ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "DeleteBucketRequest$Bucket": "<p>Specifies the bucket being deleted.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "DeleteBucketTaggingRequest$Bucket": "<p>The bucket ARN that has the tag set to be removed.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "GetAccessPointResult$Bucket": "<p>The name of the bucket associated with the specified access point.</p>",
+        "GetBucketLifecycleConfigurationRequest$Bucket": "<p>The Amazon Resource Name (ARN) of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "GetBucketPolicyRequest$Bucket": "<p>The ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "GetBucketRequest$Bucket": "<p>The ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "GetBucketResult$Bucket": "<p>The Outposts bucket requested.</p>",
+        "GetBucketTaggingRequest$Bucket": "<p>The ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "ListAccessPointsRequest$Bucket": "<p>The name of the bucket whose associated access points you want to list.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "PutBucketLifecycleConfigurationRequest$Bucket": "<p>The name of the bucket for which to set the configuration.</p>",
+        "PutBucketPolicyRequest$Bucket": "<p>The ARN of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "PutBucketTaggingRequest$Bucket": "<p>The Amazon Resource Name (ARN) of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "RegionalBucket$Bucket": "<p/>"
+      }
+    },
+    "ConfirmRemoveSelfBucketAccess": {
+      "base": null,
+      "refs": {
+        "PutBucketPolicyRequest$ConfirmRemoveSelfBucketAccess": "<p>Set this parameter to true to confirm that you want to remove your permissions to change this bucket policy in the future.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "ConfirmationRequired": {
+      "base": null,
+      "refs": {
+        "CreateJobRequest$ConfirmationRequired": "<p>Indicates whether confirmation is required before Amazon S3 runs the job. Confirmation is only required for jobs created through the Amazon S3 console.</p>",
+        "JobDescriptor$ConfirmationRequired": "<p>Indicates whether confirmation is required before Amazon S3 begins running the specified job. Confirmation is required only for jobs created through the Amazon S3 console.</p>"
+      }
+    },
+    "CreateAccessPointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAccessPointResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateBucketConfiguration": {
+      "base": "<p>The container for the bucket configuration.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>",
+      "refs": {
+        "CreateBucketRequest$CreateBucketConfiguration": "<p>The configuration information for the bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "CreateBucketRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateBucketResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateJobResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreationDate": {
+      "base": null,
+      "refs": {
+        "GetAccessPointResult$CreationDate": "<p>The date and time when the specified access point was created.</p>",
+        "GetBucketResult$CreationDate": "<p>The creation date of the Outposts bucket.</p>",
+        "RegionalBucket$CreationDate": "<p>The creation date of the regional bucket</p>"
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "LifecycleExpiration$Date": "<p>Indicates at what date the object is to be deleted. Should be in GMT ISO 8601 format.</p>",
+        "Transition$Date": "<p>Indicates when objects are transitioned to the specified storage class. The date value must be in ISO 8601 format. The time is always midnight UTC.</p>"
+      }
+    },
+    "Days": {
+      "base": null,
+      "refs": {
+        "LifecycleExpiration$Days": "<p>Indicates the lifetime, in days, of the objects that are subject to the rule. The value must be a non-zero positive integer.</p>",
+        "NoncurrentVersionExpiration$NoncurrentDays": "<p>Specifies the number of days an object is noncurrent before Amazon S3 can perform the associated action. For information about the noncurrent days calculations, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/intro-lifecycle-rules.html#non-current-days-calculations\">How Amazon S3 Calculates When an Object Became Noncurrent</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+        "NoncurrentVersionTransition$NoncurrentDays": "<p>Specifies the number of days an object is noncurrent before Amazon S3 can perform the associated action. For information about the noncurrent days calculations, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/intro-lifecycle-rules.html#non-current-days-calculations\"> How Amazon S3 Calculates How Long an Object Has Been Noncurrent</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+        "Transition$Days": "<p>Indicates the number of days after creation when objects are transitioned to the specified storage class. The value must be a positive integer.</p>"
+      }
+    },
+    "DaysAfterInitiation": {
+      "base": null,
+      "refs": {
+        "AbortIncompleteMultipartUpload$DaysAfterInitiation": "<p>Specifies the number of days after which Amazon S3 aborts an incomplete multipart upload to the Outposts bucket.</p>"
+      }
+    },
+    "DeleteAccessPointPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAccessPointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBucketLifecycleConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBucketPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBucketRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBucketTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteJobTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteJobTaggingResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePublicAccessBlockRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeJobResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "BadRequestException$Message": null,
+        "IdempotencyException$Message": null,
+        "InternalServiceException$Message": null,
+        "InvalidNextTokenException$Message": null,
+        "InvalidRequestException$Message": null,
+        "JobStatusException$Message": null,
+        "NotFoundException$Message": null,
+        "TooManyRequestsException$Message": null,
+        "TooManyTagsException$Message": null
+      }
+    },
+    "ExpirationStatus": {
+      "base": null,
+      "refs": {
+        "LifecycleRule$Status": "<p>If 'Enabled', the rule is currently being applied. If 'Disabled', the rule is not currently being applied.</p>"
+      }
+    },
+    "ExpiredObjectDeleteMarker": {
+      "base": null,
+      "refs": {
+        "LifecycleExpiration$ExpiredObjectDeleteMarker": "<p>Indicates whether Amazon S3 will remove a delete marker with no noncurrent versions. If set to true, the delete marker will be expired. If set to false, the policy takes no action. This cannot be specified with Days or Date in a Lifecycle Expiration Policy.</p>"
+      }
+    },
+    "FunctionArnString": {
+      "base": null,
+      "refs": {
+        "LambdaInvokeOperation$FunctionArn": "<p>The Amazon Resource Name (ARN) for the AWS Lambda function that the specified job will invoke for each object in the manifest.</p>"
+      }
+    },
+    "GetAccessPointPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessPointPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessPointPolicyStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessPointPolicyStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessPointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessPointResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketLifecycleConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketLifecycleConfigurationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetBucketTaggingResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetJobTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetJobTaggingResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPublicAccessBlockOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPublicAccessBlockRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GrantFullControl": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$GrantFullControl": "<p>Allows grantee the read, write, read ACP, and write ACP permissions on the bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "GrantRead": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$GrantRead": "<p>Allows grantee to list the objects in the bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "GrantReadACP": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$GrantReadACP": "<p>Allows grantee to read the bucket ACL.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "GrantWrite": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$GrantWrite": "<p>Allows grantee to create, overwrite, and delete any object in the bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "GrantWriteACP": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$GrantWriteACP": "<p>Allows grantee to write the ACL for the applicable bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "IAMRoleArn": {
+      "base": null,
+      "refs": {
+        "CreateJobRequest$RoleArn": "<p>The Amazon Resource Name (ARN) for the AWS Identity and Access Management (IAM) role that Batch Operations will use to run this job's operation on each object in the manifest.</p>",
+        "JobDescriptor$RoleArn": "<p>The Amazon Resource Name (ARN) for the AWS Identity and Access Management (IAM) role assigned to run the tasks for this job.</p>"
+      }
+    },
+    "ID": {
+      "base": null,
+      "refs": {
+        "LifecycleRule$ID": "<p>Unique identifier for the rule. The value cannot be longer than 255 characters.</p>"
+      }
+    },
+    "IdempotencyException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InternalServiceException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "IsPublic": {
+      "base": null,
+      "refs": {
+        "PolicyStatus$IsPublic": "<p/>"
+      }
+    },
+    "JobArn": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$JobArn": "<p>The Amazon Resource Name (ARN) for this job.</p>"
+      }
+    },
+    "JobCreationTime": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$CreationTime": "<p>A timestamp indicating when this job was created.</p>",
+        "JobListDescriptor$CreationTime": "<p>A timestamp indicating when the specified job was created.</p>"
+      }
+    },
+    "JobDescriptor": {
+      "base": "<p>A container element for the job configuration and status information returned by a <code>Describe Job</code> request.</p>",
+      "refs": {
+        "DescribeJobResult$Job": "<p>Contains the configuration parameters and status for the job specified in the <code>Describe Job</code> request.</p>"
+      }
+    },
+    "JobFailure": {
+      "base": "<p>If this job failed, this element indicates why the job failed.</p>",
+      "refs": {
+        "JobFailureList$member": null
+      }
+    },
+    "JobFailureCode": {
+      "base": null,
+      "refs": {
+        "JobFailure$FailureCode": "<p>The failure code, if any, for the specified job.</p>"
+      }
+    },
+    "JobFailureList": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$FailureReasons": "<p>If the specified job failed, this field contains information describing the failure.</p>"
+      }
+    },
+    "JobFailureReason": {
+      "base": null,
+      "refs": {
+        "JobFailure$FailureReason": "<p>The failure reason, if any, for the specified job.</p>"
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "CreateJobResult$JobId": "<p>The ID for this job. Amazon S3 generates this ID automatically and returns it after a successful <code>Create Job</code> request.</p>",
+        "DeleteJobTaggingRequest$JobId": "<p>The ID for the S3 Batch Operations job whose tags you want to delete.</p>",
+        "DescribeJobRequest$JobId": "<p>The ID for the job whose information you want to retrieve.</p>",
+        "GetJobTaggingRequest$JobId": "<p>The ID for the S3 Batch Operations job whose tags you want to retrieve.</p>",
+        "JobDescriptor$JobId": "<p>The ID for the specified job.</p>",
+        "JobListDescriptor$JobId": "<p>The ID for the specified job.</p>",
+        "PutJobTaggingRequest$JobId": "<p>The ID for the S3 Batch Operations job whose tags you want to replace.</p>",
+        "UpdateJobPriorityRequest$JobId": "<p>The ID for the job whose priority you want to update.</p>",
+        "UpdateJobPriorityResult$JobId": "<p>The ID for the job whose priority Amazon S3 updated.</p>",
+        "UpdateJobStatusRequest$JobId": "<p>The ID of the job whose status you want to update.</p>",
+        "UpdateJobStatusResult$JobId": "<p>The ID for the job whose status was updated.</p>"
+      }
+    },
+    "JobListDescriptor": {
+      "base": "<p>Contains the configuration and status information for a single job retrieved as part of a job list.</p>",
+      "refs": {
+        "JobListDescriptorList$member": null
+      }
+    },
+    "JobListDescriptorList": {
+      "base": null,
+      "refs": {
+        "ListJobsResult$Jobs": "<p>The list of current jobs and jobs that have ended within the last 30 days.</p>"
+      }
+    },
+    "JobManifest": {
+      "base": "<p>Contains the configuration information for a job's manifest.</p>",
+      "refs": {
+        "CreateJobRequest$Manifest": "<p>Configuration parameters for the manifest.</p>",
+        "JobDescriptor$Manifest": "<p>The configuration information for the specified job's manifest object.</p>"
+      }
+    },
+    "JobManifestFieldList": {
+      "base": null,
+      "refs": {
+        "JobManifestSpec$Fields": "<p>If the specified manifest object is in the <code>S3BatchOperations_CSV_20180820</code> format, this element describes which columns contain the required data.</p>"
+      }
+    },
+    "JobManifestFieldName": {
+      "base": null,
+      "refs": {
+        "JobManifestFieldList$member": null
+      }
+    },
+    "JobManifestFormat": {
+      "base": null,
+      "refs": {
+        "JobManifestSpec$Format": "<p>Indicates which of the available formats the specified manifest uses.</p>"
+      }
+    },
+    "JobManifestLocation": {
+      "base": "<p>Contains the information required to locate a manifest object.</p>",
+      "refs": {
+        "JobManifest$Location": "<p>Contains the information required to locate the specified job's manifest.</p>"
+      }
+    },
+    "JobManifestSpec": {
+      "base": "<p>Describes the format of a manifest. If the manifest is in CSV format, also describes the columns contained within the manifest.</p>",
+      "refs": {
+        "JobManifest$Spec": "<p>Describes the format of the specified job's manifest. If the manifest is in CSV format, also describes the columns contained within the manifest.</p>"
+      }
+    },
+    "JobNumberOfTasksFailed": {
+      "base": null,
+      "refs": {
+        "JobProgressSummary$NumberOfTasksFailed": "<p/>"
+      }
+    },
+    "JobNumberOfTasksSucceeded": {
+      "base": null,
+      "refs": {
+        "JobProgressSummary$NumberOfTasksSucceeded": "<p/>"
+      }
+    },
+    "JobOperation": {
+      "base": "<p>The operation that you want this job to perform on each object listed in the manifest. For more information about the available operations, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-operations.html\">Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+      "refs": {
+        "CreateJobRequest$Operation": "<p>The operation that you want this job to perform on each object listed in the manifest. For more information about the available operations, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-operations.html\">Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+        "JobDescriptor$Operation": "<p>The operation that the specified job is configured to run on the objects listed in the manifest.</p>"
+      }
+    },
+    "JobPriority": {
+      "base": null,
+      "refs": {
+        "CreateJobRequest$Priority": "<p>The numerical priority for this job. Higher numbers indicate higher priority.</p>",
+        "JobDescriptor$Priority": "<p>The priority of the specified job.</p>",
+        "JobListDescriptor$Priority": "<p>The current priority for the specified job.</p>",
+        "UpdateJobPriorityRequest$Priority": "<p>The priority you want to assign to this job.</p>",
+        "UpdateJobPriorityResult$Priority": "<p>The new priority assigned to the specified job.</p>"
+      }
+    },
+    "JobProgressSummary": {
+      "base": "<p>Describes the total number of tasks that the specified job has started, the number of tasks that succeeded, and the number of tasks that failed.</p>",
+      "refs": {
+        "JobDescriptor$ProgressSummary": "<p>Describes the total number of tasks that the specified job has run, the number of tasks that succeeded, and the number of tasks that failed.</p>",
+        "JobListDescriptor$ProgressSummary": "<p>Describes the total number of tasks that the specified job has run, the number of tasks that succeeded, and the number of tasks that failed.</p>"
+      }
+    },
+    "JobReport": {
+      "base": "<p>Contains the configuration parameters for a job-completion report.</p>",
+      "refs": {
+        "CreateJobRequest$Report": "<p>Configuration parameters for the optional job-completion report.</p>",
+        "JobDescriptor$Report": "<p>Contains the configuration information for the job-completion report if you requested one in the <code>Create Job</code> request.</p>"
+      }
+    },
+    "JobReportFormat": {
+      "base": null,
+      "refs": {
+        "JobReport$Format": "<p>The format of the specified job-completion report.</p>"
+      }
+    },
+    "JobReportScope": {
+      "base": null,
+      "refs": {
+        "JobReport$ReportScope": "<p>Indicates whether the job-completion report will include details of all tasks or only failed tasks.</p>"
+      }
+    },
+    "JobStatus": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$Status": "<p>The current status of the specified job.</p>",
+        "JobListDescriptor$Status": "<p>The specified job's current status.</p>",
+        "JobStatusList$member": null,
+        "UpdateJobStatusResult$Status": "<p>The current status for the specified job.</p>"
+      }
+    },
+    "JobStatusException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "JobStatusList": {
+      "base": null,
+      "refs": {
+        "ListJobsRequest$JobStatuses": "<p>The <code>List Jobs</code> request returns jobs that match the statuses listed in this element.</p>"
+      }
+    },
+    "JobStatusUpdateReason": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$StatusUpdateReason": "<p>The reason for updating the job.</p>",
+        "UpdateJobStatusRequest$StatusUpdateReason": "<p>A description of the reason why you want to change the specified job's status. This field can be any string up to the maximum length.</p>",
+        "UpdateJobStatusResult$StatusUpdateReason": "<p>The reason that the specified job's status was updated.</p>"
+      }
+    },
+    "JobTerminationDate": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$TerminationDate": "<p>A timestamp indicating when this job terminated. A job's termination date is the date and time when it succeeded, failed, or was canceled.</p>",
+        "JobListDescriptor$TerminationDate": "<p>A timestamp indicating when the specified job terminated. A job's termination date is the date and time when it succeeded, failed, or was canceled.</p>"
+      }
+    },
+    "JobTotalNumberOfTasks": {
+      "base": null,
+      "refs": {
+        "JobProgressSummary$TotalNumberOfTasks": "<p/>"
+      }
+    },
+    "KmsKeyArnString": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$SSEAwsKmsKeyId": "<p/>"
+      }
+    },
+    "LambdaInvokeOperation": {
+      "base": "<p>Contains the configuration parameters for a <code>Lambda Invoke</code> operation.</p>",
+      "refs": {
+        "JobOperation$LambdaInvoke": "<p>Directs the specified job to invoke an AWS Lambda function on each object in the manifest.</p>"
+      }
+    },
+    "LifecycleConfiguration": {
+      "base": "<p>The container for the Outposts bucket lifecycle configuration.</p>",
+      "refs": {
+        "PutBucketLifecycleConfigurationRequest$LifecycleConfiguration": "<p>Container for lifecycle rules. You can add as many as 1,000 rules.</p>"
+      }
+    },
+    "LifecycleExpiration": {
+      "base": "<p>The container of the Outposts bucket lifecycle expiration.</p>",
+      "refs": {
+        "LifecycleRule$Expiration": "<p>Specifies the expiration for the lifecycle of the object in the form of date, days and, whether the object has a delete marker.</p>"
+      }
+    },
+    "LifecycleRule": {
+      "base": "<p>The container for the Outposts bucket lifecycle rule.</p>",
+      "refs": {
+        "LifecycleRules$member": null
+      }
+    },
+    "LifecycleRuleAndOperator": {
+      "base": "<p>The container for the Outposts bucket lifecycle rule and operator.</p>",
+      "refs": {
+        "LifecycleRuleFilter$And": "<p>The container for the <code>AND</code> condition for the lifecycle rule.</p>"
+      }
+    },
+    "LifecycleRuleFilter": {
+      "base": "<p>The container for the filter of the lifecycle rule.</p>",
+      "refs": {
+        "LifecycleRule$Filter": "<p>The container for the filter of lifecycle rule.</p>"
+      }
+    },
+    "LifecycleRules": {
+      "base": null,
+      "refs": {
+        "GetBucketLifecycleConfigurationResult$Rules": "<p>Container for the lifecycle rule of the Outposts bucket.</p>",
+        "LifecycleConfiguration$Rules": "<p>A lifecycle rule for individual objects in an Outposts bucket. </p>"
+      }
+    },
+    "ListAccessPointsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccessPointsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListJobsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRegionalBucketsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRegionalBucketsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Location": {
+      "base": null,
+      "refs": {
+        "CreateBucketResult$Location": "<p>The location of the bucket.</p>"
+      }
+    },
+    "MaxLength1024String": {
+      "base": null,
+      "refs": {
+        "S3UserMetadata$value": null
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAccessPointsRequest$MaxResults": "<p>The maximum number of access points that you want to include in the list. If the specified bucket has more than this number of access points, then the response will include a continuation token in the <code>NextToken</code> field that you can use to retrieve the next page of access points.</p>",
+        "ListJobsRequest$MaxResults": "<p>The maximum number of jobs that Amazon S3 will include in the <code>List Jobs</code> response. If there are more jobs than this number, the response will include a pagination token in the <code>NextToken</code> field to enable you to retrieve the next page of results.</p>",
+        "ListRegionalBucketsRequest$MaxResults": "<p/>"
+      }
+    },
+    "NetworkOrigin": {
+      "base": null,
+      "refs": {
+        "AccessPoint$NetworkOrigin": "<p>Indicates whether this access point allows access from the public internet. If <code>VpcConfiguration</code> is specified for this access point, then <code>NetworkOrigin</code> is <code>VPC</code>, and the access point doesn't allow access from the public internet. Otherwise, <code>NetworkOrigin</code> is <code>Internet</code>, and the access point allows access from the public internet, subject to the access point and bucket access policies.</p>",
+        "GetAccessPointResult$NetworkOrigin": "<p>Indicates whether this access point allows access from the public internet. If <code>VpcConfiguration</code> is specified for this access point, then <code>NetworkOrigin</code> is <code>VPC</code>, and the access point doesn't allow access from the public internet. Otherwise, <code>NetworkOrigin</code> is <code>Internet</code>, and the access point allows access from the public internet, subject to the access point and bucket access policies.</p> <p>This will always be true for an Amazon S3 on Outposts access point</p>"
+      }
+    },
+    "NoSuchPublicAccessBlockConfiguration": {
+      "base": "<p>Amazon S3 throws this exception if you make a <code>GetPublicAccessBlock</code> request against an account that doesn't have a <code>PublicAccessBlockConfiguration</code> set.</p>",
+      "refs": {
+      }
+    },
+    "NoSuchPublicAccessBlockConfigurationMessage": {
+      "base": null,
+      "refs": {
+        "NoSuchPublicAccessBlockConfiguration$Message": null
+      }
+    },
+    "NonEmptyMaxLength1024String": {
+      "base": null,
+      "refs": {
+        "JobManifestLocation$ETag": "<p>The ETag for the specified manifest object.</p>",
+        "ListAccessPointsRequest$NextToken": "<p>A continuation token. If a previous call to <code>ListAccessPoints</code> returned a continuation token in the <code>NextToken</code> field, then providing that value here causes Amazon S3 to retrieve the next page of results.</p>",
+        "ListAccessPointsResult$NextToken": "<p>If the specified bucket has more access points than can be returned in one call to this API, this field contains a continuation token that you can provide in subsequent calls to this API to retrieve additional access points.</p>",
+        "ListRegionalBucketsRequest$NextToken": "<p/>",
+        "ListRegionalBucketsResult$NextToken": "<p> <code>NextToken</code> is sent when <code>isTruncated</code> is true, which means there are more buckets that can be listed. The next list requests to Amazon S3 can be continued with this <code>NextToken</code>. <code>NextToken</code> is obfuscated and is not a real key.</p>",
+        "S3CopyObjectOperation$TargetKeyPrefix": "<p/>",
+        "S3Grantee$Identifier": "<p/>",
+        "S3Grantee$DisplayName": "<p/>",
+        "S3ObjectMetadata$CacheControl": "<p/>",
+        "S3ObjectMetadata$ContentDisposition": "<p/>",
+        "S3ObjectMetadata$ContentEncoding": "<p/>",
+        "S3ObjectMetadata$ContentLanguage": "<p/>",
+        "S3ObjectMetadata$ContentMD5": "<p/>",
+        "S3ObjectMetadata$ContentType": "<p/>",
+        "S3ObjectOwner$ID": "<p/>",
+        "S3ObjectOwner$DisplayName": "<p/>",
+        "S3UserMetadata$key": null
+      }
+    },
+    "NonEmptyMaxLength2048String": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$RedirectLocation": "<p/>"
+      }
+    },
+    "NonEmptyMaxLength256String": {
+      "base": null,
+      "refs": {
+        "CreateJobRequest$Description": "<p>A description for this job. You can use any string within the permitted length. Descriptions don't need to be unique and can be used for multiple jobs.</p>",
+        "JobDescriptor$Description": "<p>The description for this job, if one was provided in this job's <code>Create Job</code> request.</p>",
+        "JobListDescriptor$Description": "<p>The user-specified description that was included in the specified job's <code>Create Job</code> request.</p>"
+      }
+    },
+    "NonEmptyMaxLength64String": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$OutpostId": "<p>The ID of the Outposts where the bucket is being created.</p> <note> <p>This is required by Amazon S3 on Outposts buckets.</p> </note>",
+        "CreateJobRequest$ClientRequestToken": "<p>An idempotency token to ensure that you don't accidentally submit the same request twice. You can use any string up to the maximum length.</p>",
+        "ListRegionalBucketsRequest$OutpostId": "<p>The ID of the AWS Outposts.</p> <note> <p>This is required by Amazon S3 on Outposts buckets.</p> </note>",
+        "RegionalBucket$OutpostId": "<p>The AWS Outposts ID of the regional bucket.</p>"
+      }
+    },
+    "NoncurrentVersionExpiration": {
+      "base": "<p>The container of the noncurrent version expiration.</p>",
+      "refs": {
+        "LifecycleRule$NoncurrentVersionExpiration": "<p>The noncurrent version expiration of the lifecycle rule.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "NoncurrentVersionTransition": {
+      "base": "<p>The container for the noncurrent version transition.</p>",
+      "refs": {
+        "NoncurrentVersionTransitionList$member": null
+      }
+    },
+    "NoncurrentVersionTransitionList": {
+      "base": null,
+      "refs": {
+        "LifecycleRule$NoncurrentVersionTransitions": "<p> Specifies the transition rule for the lifecycle rule that describes when noncurrent objects transition to a specific storage class. If your bucket is versioning-enabled (or versioning is suspended), you can set this action to request that Amazon S3 transition noncurrent object versions to a specific storage class at a set period in the object's lifetime. </p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ObjectLockEnabledForBucket": {
+      "base": null,
+      "refs": {
+        "CreateBucketRequest$ObjectLockEnabledForBucket": "<p>Specifies whether you want S3 Object Lock to be enabled for the new bucket.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "OperationName": {
+      "base": null,
+      "refs": {
+        "JobListDescriptor$Operation": "<p>The operation that the specified job is configured to run on each object listed in the manifest.</p>"
+      }
+    },
+    "Policy": {
+      "base": null,
+      "refs": {
+        "GetAccessPointPolicyResult$Policy": "<p>The access point policy associated with the specified access point.</p>",
+        "GetBucketPolicyResult$Policy": "<p>The policy of the Outposts bucket.</p>",
+        "PutAccessPointPolicyRequest$Policy": "<p>The policy that you want to apply to the specified access point. For more information about access point policies, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-points.html\">Managing Data Access with Amazon S3 Access Points</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+        "PutBucketPolicyRequest$Policy": "<p>The bucket policy as a JSON document.</p>"
+      }
+    },
+    "PolicyStatus": {
+      "base": "<p>Indicates whether this access point policy is public. For more information about how Amazon S3 evaluates policies to determine whether they are public, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html#access-control-block-public-access-policy-status\">The Meaning of \"Public\"</a> in the <i>Amazon Simple Storage Service Developer Guide</i>. </p>",
+      "refs": {
+        "GetAccessPointPolicyStatusResult$PolicyStatus": "<p>Indicates the current policy status of the specified access point.</p>"
+      }
+    },
+    "Prefix": {
+      "base": null,
+      "refs": {
+        "LifecycleRuleAndOperator$Prefix": "<p>Prefix identifying one or more objects to which the rule applies.</p>",
+        "LifecycleRuleFilter$Prefix": "<p>Prefix identifying one or more objects to which the rule applies.</p>"
+      }
+    },
+    "PublicAccessBlockConfiguration": {
+      "base": "<p>The <code>PublicAccessBlock</code> configuration that you want to apply to this Amazon S3 bucket. You can enable the configuration options in any combination. For more information about when Amazon S3 considers a bucket or object public, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html#access-control-block-public-access-policy-status\">The Meaning of \"Public\"</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p> <p>This is not supported for Amazon S3 on Outposts.</p>",
+      "refs": {
+        "CreateAccessPointRequest$PublicAccessBlockConfiguration": null,
+        "GetAccessPointResult$PublicAccessBlockConfiguration": null,
+        "GetPublicAccessBlockOutput$PublicAccessBlockConfiguration": "<p>The <code>PublicAccessBlock</code> configuration currently in effect for this AWS account.</p>",
+        "PutPublicAccessBlockRequest$PublicAccessBlockConfiguration": "<p>The <code>PublicAccessBlock</code> configuration that you want to apply to the specified AWS account.</p>"
+      }
+    },
+    "PublicAccessBlockEnabled": {
+      "base": null,
+      "refs": {
+        "GetBucketResult$PublicAccessBlockEnabled": "<p/>",
+        "RegionalBucket$PublicAccessBlockEnabled": "<p/>"
+      }
+    },
+    "PutAccessPointPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutBucketLifecycleConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutBucketPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutBucketTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutJobTaggingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutJobTaggingResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutPublicAccessBlockRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegionalBucket": {
+      "base": "<p>The container for the regional bucket.</p>",
+      "refs": {
+        "RegionalBucketList$member": null
+      }
+    },
+    "RegionalBucketList": {
+      "base": null,
+      "refs": {
+        "ListRegionalBucketsResult$RegionalBucketList": "<p/>"
+      }
+    },
+    "ReportPrefixString": {
+      "base": null,
+      "refs": {
+        "JobReport$Prefix": "<p>An optional prefix to describe where in the specified bucket the job-completion report will be stored. Amazon S3 stores the job-completion report at <code>&lt;prefix&gt;/job-&lt;job-id&gt;/report.json</code>.</p>"
+      }
+    },
+    "RequestedJobStatus": {
+      "base": null,
+      "refs": {
+        "UpdateJobStatusRequest$RequestedJobStatus": "<p>The status that you want to move the specified job to.</p>"
+      }
+    },
+    "S3AccessControlList": {
+      "base": "<p/>",
+      "refs": {
+        "S3AccessControlPolicy$AccessControlList": "<p/>"
+      }
+    },
+    "S3AccessControlPolicy": {
+      "base": "<p/>",
+      "refs": {
+        "S3SetObjectAclOperation$AccessControlPolicy": "<p/>"
+      }
+    },
+    "S3AccessPointArn": {
+      "base": null,
+      "refs": {
+        "AccessPoint$AccessPointArn": "<p>The ARN for the access point.</p>",
+        "CreateAccessPointResult$AccessPointArn": "<p>The ARN of the access point.</p>"
+      }
+    },
+    "S3BucketArnString": {
+      "base": null,
+      "refs": {
+        "JobReport$Bucket": "<p>The Amazon Resource Name (ARN) for the bucket where specified job-completion report will be stored.</p>",
+        "S3CopyObjectOperation$TargetResource": "<p/>"
+      }
+    },
+    "S3CannedAccessControlList": {
+      "base": null,
+      "refs": {
+        "S3AccessControlPolicy$CannedAccessControlList": "<p/>",
+        "S3CopyObjectOperation$CannedAccessControlList": "<p/>"
+      }
+    },
+    "S3ContentLength": {
+      "base": null,
+      "refs": {
+        "S3ObjectMetadata$ContentLength": "<p/>"
+      }
+    },
+    "S3CopyObjectOperation": {
+      "base": "<p>Contains the configuration parameters for a PUT Copy object operation. S3 Batch Operations passes each value through to the underlying PUT Copy object API. For more information about the parameters for this operation, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectCOPY.html\">PUT Object - Copy</a>.</p>",
+      "refs": {
+        "JobOperation$S3PutObjectCopy": "<p>Directs the specified job to run a PUT Copy object call on each object in the manifest.</p>"
+      }
+    },
+    "S3ExpirationInDays": {
+      "base": null,
+      "refs": {
+        "S3InitiateRestoreObjectOperation$ExpirationInDays": "<p/>"
+      }
+    },
+    "S3GlacierJobTier": {
+      "base": null,
+      "refs": {
+        "S3InitiateRestoreObjectOperation$GlacierJobTier": "<p/>"
+      }
+    },
+    "S3Grant": {
+      "base": "<p/>",
+      "refs": {
+        "S3GrantList$member": null
+      }
+    },
+    "S3GrantList": {
+      "base": null,
+      "refs": {
+        "S3AccessControlList$Grants": "<p/>",
+        "S3CopyObjectOperation$AccessControlGrants": "<p/>"
+      }
+    },
+    "S3Grantee": {
+      "base": "<p/>",
+      "refs": {
+        "S3Grant$Grantee": "<p/>"
+      }
+    },
+    "S3GranteeTypeIdentifier": {
+      "base": null,
+      "refs": {
+        "S3Grantee$TypeIdentifier": "<p/>"
+      }
+    },
+    "S3InitiateRestoreObjectOperation": {
+      "base": "<p>Contains the configuration parameters for an Initiate Glacier Restore job. S3 Batch Operations passes each value through to the underlying POST Object restore API. For more information about the parameters for this operation, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPOSTrestore.html#RESTObjectPOSTrestore-restore-request\">RestoreObject</a>.</p>",
+      "refs": {
+        "JobOperation$S3InitiateRestoreObject": "<p>Directs the specified job to run an Initiate Glacier Restore call on each object in the manifest.</p>"
+      }
+    },
+    "S3KeyArnString": {
+      "base": null,
+      "refs": {
+        "JobManifestLocation$ObjectArn": "<p>The Amazon Resource Name (ARN) for a manifest object.</p>"
+      }
+    },
+    "S3MetadataDirective": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$MetadataDirective": "<p/>"
+      }
+    },
+    "S3ObjectLockLegalHold": {
+      "base": "<p>Whether S3 Object Lock legal hold will be applied to objects in an S3 Batch Operations job.</p>",
+      "refs": {
+        "S3SetObjectLegalHoldOperation$LegalHold": "<p>Contains the Object Lock legal hold status to be applied to all objects in the Batch Operations job.</p>"
+      }
+    },
+    "S3ObjectLockLegalHoldStatus": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$ObjectLockLegalHoldStatus": "<p>The legal hold status to be applied to all objects in the Batch Operations job.</p>",
+        "S3ObjectLockLegalHold$Status": "<p>The Object Lock legal hold status to be applied to all objects in the Batch Operations job.</p>"
+      }
+    },
+    "S3ObjectLockMode": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$ObjectLockMode": "<p>The retention mode to be applied to all objects in the Batch Operations job.</p>"
+      }
+    },
+    "S3ObjectLockRetentionMode": {
+      "base": null,
+      "refs": {
+        "S3Retention$Mode": "<p>The Object Lock retention mode to be applied to all objects in the Batch Operations job.</p>"
+      }
+    },
+    "S3ObjectMetadata": {
+      "base": "<p/>",
+      "refs": {
+        "S3CopyObjectOperation$NewObjectMetadata": "<p/>"
+      }
+    },
+    "S3ObjectOwner": {
+      "base": "<p/>",
+      "refs": {
+        "S3AccessControlList$Owner": "<p/>"
+      }
+    },
+    "S3ObjectVersionId": {
+      "base": null,
+      "refs": {
+        "JobManifestLocation$ObjectVersionId": "<p>The optional version ID to identify a specific version of the manifest object.</p>"
+      }
+    },
+    "S3Permission": {
+      "base": null,
+      "refs": {
+        "S3Grant$Permission": "<p/>"
+      }
+    },
+    "S3RegionalBucketArn": {
+      "base": null,
+      "refs": {
+        "CreateBucketResult$BucketArn": "<p>The Amazon Resource Name (ARN) of the bucket.</p> <p>For Amazon S3 on Outposts specify the ARN of the bucket accessed in the format <code>arn:aws:s3-outposts:&lt;Region&gt;:&lt;account-id&gt;:outpost/&lt;outpost-id&gt;/bucket/&lt;my-bucket-name&gt;</code>. For example, to access the bucket <code>reports</code> through outpost <code>my-outpost</code> owned by account <code>123456789012</code> in Region <code>us-west-2</code>, use the URL encoding of <code>arn:aws:s3-outposts:us-west-2:123456789012:outpost/my-outpost/bucket/reports</code>. The value must be URL encoded. </p>",
+        "RegionalBucket$BucketArn": "<p>The Amazon Resource Name (ARN) for the regional bucket.</p>"
+      }
+    },
+    "S3Retention": {
+      "base": "<p>Contains the S3 Object Lock retention mode to be applied to all objects in the S3 Batch Operations job. If you don't provide <code>Mode</code> and <code>RetainUntilDate</code> data types in your operation, you will remove the retention from your objects. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-retention-date.html\">Using S3 Object Lock retention with S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+      "refs": {
+        "S3SetObjectRetentionOperation$Retention": "<p>Contains the Object Lock retention mode to be applied to all objects in the Batch Operations job. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-retention-date.html\">Using S3 Object Lock retention with S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>"
+      }
+    },
+    "S3SSEAlgorithm": {
+      "base": null,
+      "refs": {
+        "S3ObjectMetadata$SSEAlgorithm": "<p/>"
+      }
+    },
+    "S3SetObjectAclOperation": {
+      "base": "<p>Contains the configuration parameters for a Set Object ACL operation. S3 Batch Operations passes each value through to the underlying PUT Object acl API. For more information about the parameters for this operation, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUTacl.html\">PUT Object acl</a>.</p>",
+      "refs": {
+        "JobOperation$S3PutObjectAcl": "<p>Directs the specified job to run a PUT Object acl call on each object in the manifest.</p>"
+      }
+    },
+    "S3SetObjectLegalHoldOperation": {
+      "base": "<p>Contains the configuration for an S3 Object Lock legal hold operation that an S3 Batch Operations job passes each object through to the underlying <code>PutObjectLegalHold</code> API. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-legal-hold.html\">Using S3 Object Lock legal hold with S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+      "refs": {
+        "JobOperation$S3PutObjectLegalHold": null
+      }
+    },
+    "S3SetObjectRetentionOperation": {
+      "base": "<p>Contains the configuration parameters for the Object Lock retention action for an S3 Batch Operations job. Batch Operations passes each value through to the underlying <code>PutObjectRetention</code> API. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-retention-date.html\">Using S3 Object Lock retention with S3 Batch Operations</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+      "refs": {
+        "JobOperation$S3PutObjectRetention": null
+      }
+    },
+    "S3SetObjectTaggingOperation": {
+      "base": "<p>Contains the configuration parameters for a Set Object Tagging operation. S3 Batch Operations passes each value through to the underlying PUT Object tagging API. For more information about the parameters for this operation, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUTtagging.html\">PUT Object tagging</a>.</p>",
+      "refs": {
+        "JobOperation$S3PutObjectTagging": "<p>Directs the specified job to run a PUT Object tagging call on each object in the manifest.</p>"
+      }
+    },
+    "S3StorageClass": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$StorageClass": "<p/>"
+      }
+    },
+    "S3Tag": {
+      "base": "<p/>",
+      "refs": {
+        "LifecycleRuleFilter$Tag": null,
+        "S3TagSet$member": null
+      }
+    },
+    "S3TagSet": {
+      "base": null,
+      "refs": {
+        "CreateJobRequest$Tags": "<p>A set of tags to associate with the S3 Batch Operations job. This is an optional parameter. </p>",
+        "GetBucketTaggingResult$TagSet": "<p>The tags set of the Outposts bucket.</p>",
+        "GetJobTaggingResult$Tags": "<p>The set of tags associated with the S3 Batch Operations job.</p>",
+        "LifecycleRuleAndOperator$Tags": "<p>All of these tags must exist in the object's tag set in order for the rule to apply.</p>",
+        "PutJobTaggingRequest$Tags": "<p>The set of tags to associate with the S3 Batch Operations job.</p>",
+        "S3CopyObjectOperation$NewObjectTagging": "<p/>",
+        "S3SetObjectTaggingOperation$TagSet": "<p/>",
+        "Tagging$TagSet": "<p>A collection for a set of tags.</p>"
+      }
+    },
+    "S3UserMetadata": {
+      "base": null,
+      "refs": {
+        "S3ObjectMetadata$UserMetadata": "<p/>"
+      }
+    },
+    "Setting": {
+      "base": null,
+      "refs": {
+        "PublicAccessBlockConfiguration$BlockPublicAcls": "<p>Specifies whether Amazon S3 should block public access control lists (ACLs) for buckets in this account. Setting this element to <code>TRUE</code> causes the following behavior:</p> <ul> <li> <p>PUT Bucket acl and PUT Object acl calls fail if the specified ACL is public.</p> </li> <li> <p>PUT Object calls fail if the request includes a public ACL.</p> </li> <li> <p>PUT Bucket calls fail if the request includes a public ACL.</p> </li> </ul> <p>Enabling this setting doesn't affect existing policies or ACLs.</p> <p>This is not supported for Amazon S3 on Outposts.</p>",
+        "PublicAccessBlockConfiguration$IgnorePublicAcls": "<p>Specifies whether Amazon S3 should ignore public ACLs for buckets in this account. Setting this element to <code>TRUE</code> causes Amazon S3 to ignore all public ACLs on buckets in this account and any objects that they contain. </p> <p>Enabling this setting doesn't affect the persistence of any existing ACLs and doesn't prevent new public ACLs from being set.</p> <p>This is not supported for Amazon S3 on Outposts.</p>",
+        "PublicAccessBlockConfiguration$BlockPublicPolicy": "<p>Specifies whether Amazon S3 should block public bucket policies for buckets in this account. Setting this element to <code>TRUE</code> causes Amazon S3 to reject calls to PUT Bucket policy if the specified bucket policy allows public access. </p> <p>Enabling this setting doesn't affect existing bucket policies.</p> <p>This is not supported for Amazon S3 on Outposts.</p>",
+        "PublicAccessBlockConfiguration$RestrictPublicBuckets": "<p>Specifies whether Amazon S3 should restrict public bucket policies for buckets in this account. Setting this element to <code>TRUE</code> restricts access to buckets with public policies to only AWS services and authorized users within this account.</p> <p>Enabling this setting doesn't affect previously stored bucket policies, except that public and cross-account access within any public bucket policy, including non-public delegation to specific accounts, is blocked.</p> <p>This is not supported for Amazon S3 on Outposts.</p>"
+      }
+    },
+    "StringForNextToken": {
+      "base": null,
+      "refs": {
+        "ListJobsRequest$NextToken": "<p>A pagination token to request the next page of results. Use the token that Amazon S3 returned in the <code>NextToken</code> element of the <code>ListJobsResult</code> from the previous <code>List Jobs</code> request.</p>",
+        "ListJobsResult$NextToken": "<p>If the <code>List Jobs</code> request produced more than the maximum number of results, you can pass this value into a subsequent <code>List Jobs</code> request in order to retrieve the next page of results.</p>"
+      }
+    },
+    "SuspendedCause": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$SuspendedCause": "<p>The reason why the specified job was suspended. A job is only suspended if you create it through the Amazon S3 console. When you create the job, it enters the <code>Suspended</code> state to await confirmation before running. After you confirm the job, it automatically exits the <code>Suspended</code> state.</p>"
+      }
+    },
+    "SuspendedDate": {
+      "base": null,
+      "refs": {
+        "JobDescriptor$SuspendedDate": "<p>The timestamp when this job was suspended, if it has been suspended.</p>"
+      }
+    },
+    "TagKeyString": {
+      "base": null,
+      "refs": {
+        "S3Tag$Key": "<p/>"
+      }
+    },
+    "TagValueString": {
+      "base": null,
+      "refs": {
+        "S3Tag$Value": "<p/>"
+      }
+    },
+    "Tagging": {
+      "base": "<p/>",
+      "refs": {
+        "PutBucketTaggingRequest$Tagging": "<p/>"
+      }
+    },
+    "TimeStamp": {
+      "base": null,
+      "refs": {
+        "S3CopyObjectOperation$ModifiedSinceConstraint": "<p/>",
+        "S3CopyObjectOperation$UnModifiedSinceConstraint": "<p/>",
+        "S3CopyObjectOperation$ObjectLockRetainUntilDate": "<p>The date when the applied object retention configuration expires on all objects in the Batch Operations job.</p>",
+        "S3ObjectMetadata$HttpExpiresDate": "<p/>",
+        "S3Retention$RetainUntilDate": "<p>The date when the applied Object Lock retention will expire on all objects set by the Batch Operations job.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>Amazon S3 throws this exception if you have too many tags in your tag set.</p>",
+      "refs": {
+      }
+    },
+    "Transition": {
+      "base": "<p>Specifies when an object transitions to a specified storage class. For more information about Amazon S3 Lifecycle configuration rules, see <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/lifecycle-transition-general-considerations.html\"> Transitioning Objects Using Amazon S3 Lifecycle</a> in the <i>Amazon Simple Storage Service Developer Guide</i>.</p>",
+      "refs": {
+        "TransitionList$member": null
+      }
+    },
+    "TransitionList": {
+      "base": null,
+      "refs": {
+        "LifecycleRule$Transitions": "<p>Specifies when an Amazon S3 object transitions to a specified storage class.</p> <note> <p>This is not supported by Amazon S3 on Outposts buckets.</p> </note>"
+      }
+    },
+    "TransitionStorageClass": {
+      "base": null,
+      "refs": {
+        "NoncurrentVersionTransition$StorageClass": "<p>The class of storage used to store the object.</p>",
+        "Transition$StorageClass": "<p>The storage class to which you want the object to transition.</p>"
+      }
+    },
+    "UpdateJobPriorityRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateJobPriorityResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateJobStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateJobStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VpcConfiguration": {
+      "base": "<p>The virtual private cloud (VPC) configuration for an access point.</p>",
+      "refs": {
+        "AccessPoint$VpcConfiguration": "<p>The virtual private cloud (VPC) configuration for this access point, if one exists.</p>",
+        "CreateAccessPointRequest$VpcConfiguration": "<p>If you include this field, Amazon S3 restricts access to this access point to requests from the specified virtual private cloud (VPC).</p> <note> <p>This is required for creating an access point for Amazon S3 on Outposts buckets.</p> </note>",
+        "GetAccessPointResult$VpcConfiguration": "<p>Contains the virtual private cloud (VPC) configuration for the specified access point.</p>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "VpcConfiguration$VpcId": "<p>If this field is specified, this access point will only allow connections from the specified VPC ID.</p>"
+      }
+    }
+  }
+}

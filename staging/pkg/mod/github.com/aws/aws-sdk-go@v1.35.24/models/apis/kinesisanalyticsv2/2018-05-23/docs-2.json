@@ -1,0 +1,1695 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Kinesis Data Analytics is a fully managed service that you can use to process and analyze streaming data using Java, SQL, or Scala. The service enables you to quickly author and run Java, SQL, or Scala code against streaming sources to perform time series analytics, feed real-time dashboards, and create real-time metrics.</p>",
+  "operations": {
+    "AddApplicationCloudWatchLoggingOption": "<p>Adds an Amazon CloudWatch log stream to monitor application configuration errors.</p>",
+    "AddApplicationInput": "<p> Adds a streaming source to your SQL-based Kinesis Data Analytics application. </p> <p>You can add a streaming source when you create an application, or you can use this operation to add a streaming source after you create an application. For more information, see <a>CreateApplication</a>.</p> <p>Any configuration update, including adding a streaming source using this operation, results in a new version of the application. You can use the <a>DescribeApplication</a> operation to find the current application version. </p>",
+    "AddApplicationInputProcessingConfiguration": "<p>Adds an <a>InputProcessingConfiguration</a> to a SQL-based Kinesis Data Analytics application. An input processor pre-processes records on the input stream before the application's SQL code executes. Currently, the only input processor available is <a href=\"https://docs.aws.amazon.com/lambda/\">AWS Lambda</a>.</p>",
+    "AddApplicationOutput": "<p>Adds an external destination to your SQL-based Kinesis Data Analytics application.</p> <p>If you want Kinesis Data Analytics to deliver data from an in-application stream within your application to an external destination (such as an Kinesis data stream, a Kinesis Data Firehose delivery stream, or an AWS Lambda function), you add the relevant configuration to your application using this operation. You can configure one or more outputs for your application. Each output configuration maps an in-application stream and an external destination.</p> <p> You can use one of the output configurations to deliver data from your in-application error stream to an external destination so that you can analyze the errors. </p> <p> Any configuration update, including adding a streaming source using this operation, results in a new version of the application. You can use the <a>DescribeApplication</a> operation to find the current application version.</p>",
+    "AddApplicationReferenceDataSource": "<p>Adds a reference data source to an existing SQL-based Kinesis Data Analytics application.</p> <p>Kinesis Data Analytics reads reference data (that is, an Amazon S3 object) and creates an in-application table within your application. In the request, you provide the source (S3 bucket name and object key name), name of the in-application table to create, and the necessary mapping information that describes how data in an Amazon S3 object maps to columns in the resulting in-application table.</p>",
+    "AddApplicationVpcConfiguration": "<p>Adds a Virtual Private Cloud (VPC) configuration to the application. Applications can use VPCs to store and access resources securely.</p> <p>Note the following about VPC configurations for Kinesis Data Analytics applications:</p> <ul> <li> <p>VPC configurations are not supported for SQL applications.</p> </li> <li> <p>When a VPC is added to a Kinesis Data Analytics application, the application can no longer be accessed from the Internet directly. To enable Internet access to the application, add an Internet gateway to your VPC.</p> </li> </ul>",
+    "CreateApplication": "<p>Creates a Kinesis Data Analytics application. For information about creating a Kinesis Data Analytics application, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/getting-started.html\">Creating an Application</a>.</p>",
+    "CreateApplicationSnapshot": "<p>Creates a snapshot of the application's state data.</p>",
+    "DeleteApplication": "<p>Deletes the specified application. Kinesis Data Analytics halts application execution and deletes the application.</p>",
+    "DeleteApplicationCloudWatchLoggingOption": "<p>Deletes an Amazon CloudWatch log stream from an Kinesis Data Analytics application. </p>",
+    "DeleteApplicationInputProcessingConfiguration": "<p>Deletes an <a>InputProcessingConfiguration</a> from an input.</p>",
+    "DeleteApplicationOutput": "<p>Deletes the output destination configuration from your SQL-based Kinesis Data Analytics application's configuration. Kinesis Data Analytics will no longer write data from the corresponding in-application stream to the external output destination.</p>",
+    "DeleteApplicationReferenceDataSource": "<p>Deletes a reference data source configuration from the specified SQL-based Kinesis Data Analytics application's configuration.</p> <p>If the application is running, Kinesis Data Analytics immediately removes the in-application table that you created using the <a>AddApplicationReferenceDataSource</a> operation. </p>",
+    "DeleteApplicationSnapshot": "<p>Deletes a snapshot of application state.</p>",
+    "DeleteApplicationVpcConfiguration": "<p>Removes a VPC configuration from a Kinesis Data Analytics application.</p>",
+    "DescribeApplication": "<p>Returns information about a specific Kinesis Data Analytics application.</p> <p>If you want to retrieve a list of all applications in your account, use the <a>ListApplications</a> operation.</p>",
+    "DescribeApplicationSnapshot": "<p>Returns information about a snapshot of application state data.</p>",
+    "DiscoverInputSchema": "<p>Infers a schema for a SQL-based Kinesis Data Analytics application by evaluating sample records on the specified streaming source (Kinesis data stream or Kinesis Data Firehose delivery stream) or Amazon S3 object. In the response, the operation returns the inferred schema and also the sample records that the operation used to infer the schema.</p> <p> You can use the inferred schema when configuring a streaming source for your application. When you create an application using the Kinesis Data Analytics console, the console uses this operation to infer a schema and show it in the console user interface. </p>",
+    "ListApplicationSnapshots": "<p>Lists information about the current application snapshots.</p>",
+    "ListApplications": "<p>Returns a list of Kinesis Data Analytics applications in your account. For each application, the response includes the application name, Amazon Resource Name (ARN), and status. </p> <p>If you want detailed information about a specific application, use <a>DescribeApplication</a>.</p>",
+    "ListTagsForResource": "<p>Retrieves the list of key-value tags assigned to the application. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-tagging.html\">Using Tagging</a>.</p>",
+    "StartApplication": "<p>Starts the specified Kinesis Data Analytics application. After creating an application, you must exclusively call this operation to start your application.</p>",
+    "StopApplication": "<p>Stops the application from processing data. You can stop an application only if it is in the running state. You can use the <a>DescribeApplication</a> operation to find the application state. </p>",
+    "TagResource": "<p>Adds one or more key-value tags to a Kinesis Data Analytics application. Note that the maximum number of application tags includes system tags. The maximum number of user-defined application tags is 50. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-tagging.html\">Using Tagging</a>.</p>",
+    "UntagResource": "<p>Removes one or more tags from a Kinesis Data Analytics application. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-tagging.html\">Using Tagging</a>.</p>",
+    "UpdateApplication": "<p>Updates an existing Kinesis Data Analytics application. Using this operation, you can update application code, input configuration, and output configuration. </p> <p>Kinesis Data Analytics updates the <code>ApplicationVersionId</code> each time you update your application. </p> <note> <p>You cannot update the <code>RuntimeEnvironment</code> of an existing application. If you need to update an application's <code>RuntimeEnvironment</code>, you must delete the application and create it again.</p> </note>"
+  },
+  "shapes": {
+    "AddApplicationCloudWatchLoggingOptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationCloudWatchLoggingOptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationInputProcessingConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationInputProcessingConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationInputRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationInputResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationOutputRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationOutputResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationReferenceDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationReferenceDataSourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationVpcConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddApplicationVpcConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ApplicationCodeConfiguration": {
+      "base": "<p>Describes code configuration for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfiguration$ApplicationCodeConfiguration": "<p>The code location and type parameters for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ApplicationCodeConfigurationDescription": {
+      "base": "<p>Describes code configuration for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$ApplicationCodeConfigurationDescription": "<p>The details about the application code for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ApplicationCodeConfigurationUpdate": {
+      "base": "<p>Describes code configuration updates to a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationUpdate$ApplicationCodeConfigurationUpdate": "<p>Describes updates to a Flink-based Kinesis Data Analytics application's code configuration.</p>"
+      }
+    },
+    "ApplicationConfiguration": {
+      "base": "<p>Specifies the creation parameters for a Kinesis Data Analytics application.</p>",
+      "refs": {
+        "CreateApplicationRequest$ApplicationConfiguration": "<p>Use this parameter to configure the application.</p>"
+      }
+    },
+    "ApplicationConfigurationDescription": {
+      "base": "<p>Describes details about the application code and starting parameters for a Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationDetail$ApplicationConfigurationDescription": "<p>Provides details about the application's Java, SQL, or Scala code and starting parameters.</p>"
+      }
+    },
+    "ApplicationConfigurationUpdate": {
+      "base": "<p>Describes updates to an application's configuration.</p>",
+      "refs": {
+        "UpdateApplicationRequest$ApplicationConfigurationUpdate": "<p>Describes application configuration updates.</p>"
+      }
+    },
+    "ApplicationDescription": {
+      "base": null,
+      "refs": {
+        "ApplicationDetail$ApplicationDescription": "<p>The description of the application.</p>",
+        "CreateApplicationRequest$ApplicationDescription": "<p>A summary description of the application.</p>"
+      }
+    },
+    "ApplicationDetail": {
+      "base": "<p>Describes the application, including the application Amazon Resource Name (ARN), status, latest version, and input and output configurations.</p>",
+      "refs": {
+        "CreateApplicationResponse$ApplicationDetail": "<p>In response to your <code>CreateApplication</code> request, Kinesis Data Analytics returns a response with details of the application it created.</p>",
+        "DescribeApplicationResponse$ApplicationDetail": "<p>Provides a description of the application, such as the application's Amazon Resource Name (ARN), status, and latest version.</p>",
+        "UpdateApplicationResponse$ApplicationDetail": "<p>Describes application updates.</p>"
+      }
+    },
+    "ApplicationName": {
+      "base": null,
+      "refs": {
+        "AddApplicationCloudWatchLoggingOptionRequest$ApplicationName": "<p>The Kinesis Data Analytics application name.</p>",
+        "AddApplicationInputProcessingConfigurationRequest$ApplicationName": "<p>The name of the application to which you want to add the input processing configuration.</p>",
+        "AddApplicationInputRequest$ApplicationName": "<p>The name of your existing application to which you want to add the streaming source.</p>",
+        "AddApplicationOutputRequest$ApplicationName": "<p>The name of the application to which you want to add the output configuration.</p>",
+        "AddApplicationReferenceDataSourceRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "AddApplicationVpcConfigurationRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "ApplicationDetail$ApplicationName": "<p>The name of the application.</p>",
+        "ApplicationSummary$ApplicationName": "<p>The name of the application.</p>",
+        "CreateApplicationRequest$ApplicationName": "<p>The name of your application (for example, <code>sample-app</code>).</p>",
+        "CreateApplicationSnapshotRequest$ApplicationName": "<p>The name of an existing application</p>",
+        "DeleteApplicationCloudWatchLoggingOptionRequest$ApplicationName": "<p>The application name.</p>",
+        "DeleteApplicationInputProcessingConfigurationRequest$ApplicationName": "<p>The name of the application.</p>",
+        "DeleteApplicationOutputRequest$ApplicationName": "<p>The application name.</p>",
+        "DeleteApplicationReferenceDataSourceRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "DeleteApplicationRequest$ApplicationName": "<p>The name of the application to delete.</p>",
+        "DeleteApplicationSnapshotRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "DeleteApplicationVpcConfigurationRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "DescribeApplicationRequest$ApplicationName": "<p>The name of the application.</p>",
+        "DescribeApplicationSnapshotRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "ListApplicationSnapshotsRequest$ApplicationName": "<p>The name of an existing application.</p>",
+        "ListApplicationsRequest$NextToken": "<p>If a previous command returned a pagination token, pass it into this value to retrieve the next set of results. For more information about pagination, see <a href=\"https://docs.aws.amazon.com/cli/latest/userguide/pagination.html\">Using the AWS Command Line Interface's Pagination Options</a>.</p>",
+        "ListApplicationsResponse$NextToken": "<p>The pagination token for the next set of results, or <code>null</code> if there are no additional results. Pass this token into a subsequent command to retrieve the next set of items For more information about pagination, see <a href=\"https://docs.aws.amazon.com/cli/latest/userguide/pagination.html\">Using the AWS Command Line Interface's Pagination Options</a>.</p>",
+        "StartApplicationRequest$ApplicationName": "<p>The name of the application.</p>",
+        "StopApplicationRequest$ApplicationName": "<p>The name of the running application to stop.</p>",
+        "UpdateApplicationRequest$ApplicationName": "<p>The name of the application to update.</p>"
+      }
+    },
+    "ApplicationRestoreConfiguration": {
+      "base": "<p>Specifies the method and snapshot to use when restarting an application using previously saved application state.</p>",
+      "refs": {
+        "RunConfiguration$ApplicationRestoreConfiguration": "<p>Describes the restore behavior of a restarting application.</p>",
+        "RunConfigurationDescription$ApplicationRestoreConfigurationDescription": "<p>Describes the restore behavior of a restarting application.</p>",
+        "RunConfigurationUpdate$ApplicationRestoreConfiguration": "<p>Describes updates to the restore behavior of a restarting application.</p>"
+      }
+    },
+    "ApplicationRestoreType": {
+      "base": null,
+      "refs": {
+        "ApplicationRestoreConfiguration$ApplicationRestoreType": "<p>Specifies how the application should be restored.</p>"
+      }
+    },
+    "ApplicationSnapshotConfiguration": {
+      "base": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfiguration$ApplicationSnapshotConfiguration": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ApplicationSnapshotConfigurationDescription": {
+      "base": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$ApplicationSnapshotConfigurationDescription": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ApplicationSnapshotConfigurationUpdate": {
+      "base": "<p>Describes updates to whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationUpdate$ApplicationSnapshotConfigurationUpdate": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ApplicationStatus": {
+      "base": null,
+      "refs": {
+        "ApplicationDetail$ApplicationStatus": "<p>The status of the application.</p>",
+        "ApplicationSummary$ApplicationStatus": "<p>The status of the application.</p>"
+      }
+    },
+    "ApplicationSummaries": {
+      "base": null,
+      "refs": {
+        "ListApplicationsResponse$ApplicationSummaries": "<p>A list of <code>ApplicationSummary</code> objects.</p>"
+      }
+    },
+    "ApplicationSummary": {
+      "base": "<p>Provides application summary information, including the application Amazon Resource Name (ARN), name, and status.</p>",
+      "refs": {
+        "ApplicationSummaries$member": null
+      }
+    },
+    "ApplicationVersionId": {
+      "base": null,
+      "refs": {
+        "AddApplicationCloudWatchLoggingOptionRequest$CurrentApplicationVersionId": "<p>The version ID of the Kinesis Data Analytics application. You can retrieve the application version ID using <a>DescribeApplication</a>.</p>",
+        "AddApplicationCloudWatchLoggingOptionResponse$ApplicationVersionId": "<p>The new version ID of the Kinesis Data Analytics application. Kinesis Data Analytics updates the <code>ApplicationVersionId</code> each time you change the CloudWatch logging options. </p>",
+        "AddApplicationInputProcessingConfigurationRequest$CurrentApplicationVersionId": "<p>The version of the application to which you want to add the input processing configuration. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned.</p>",
+        "AddApplicationInputProcessingConfigurationResponse$ApplicationVersionId": "<p>Provides the current application version.</p>",
+        "AddApplicationInputRequest$CurrentApplicationVersionId": "<p>The current version of your application. You can use the <a>DescribeApplication</a> operation to find the current application version.</p>",
+        "AddApplicationInputResponse$ApplicationVersionId": "<p>Provides the current application version.</p>",
+        "AddApplicationOutputRequest$CurrentApplicationVersionId": "<p>The version of the application to which you want to add the output configuration. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned. </p>",
+        "AddApplicationOutputResponse$ApplicationVersionId": "<p>The updated application version ID. Kinesis Data Analytics increments this ID when the application is updated.</p>",
+        "AddApplicationReferenceDataSourceRequest$CurrentApplicationVersionId": "<p>The version of the application for which you are adding the reference data source. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned.</p>",
+        "AddApplicationReferenceDataSourceResponse$ApplicationVersionId": "<p>The updated application version ID. Kinesis Data Analytics increments this ID when the application is updated.</p>",
+        "AddApplicationVpcConfigurationRequest$CurrentApplicationVersionId": "<p>The version of the application to which you want to add the VPC configuration. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned.</p>",
+        "AddApplicationVpcConfigurationResponse$ApplicationVersionId": "<p>Provides the current application version. Kinesis Data Analytics updates the ApplicationVersionId each time you update the application. </p>",
+        "ApplicationDetail$ApplicationVersionId": "<p>Provides the current application version. Kinesis Data Analytics updates the <code>ApplicationVersionId</code> each time you update the application.</p>",
+        "ApplicationSummary$ApplicationVersionId": "<p>Provides the current application version.</p>",
+        "DeleteApplicationCloudWatchLoggingOptionRequest$CurrentApplicationVersionId": "<p>The version ID of the application. You can retrieve the application version ID using <a>DescribeApplication</a>.</p>",
+        "DeleteApplicationCloudWatchLoggingOptionResponse$ApplicationVersionId": "<p>The version ID of the application. Kinesis Data Analytics updates the <code>ApplicationVersionId</code> each time you change the CloudWatch logging options.</p>",
+        "DeleteApplicationInputProcessingConfigurationRequest$CurrentApplicationVersionId": "<p>The application version. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned. </p>",
+        "DeleteApplicationInputProcessingConfigurationResponse$ApplicationVersionId": "<p>The current application version ID.</p>",
+        "DeleteApplicationOutputRequest$CurrentApplicationVersionId": "<p>The application version. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned. </p>",
+        "DeleteApplicationOutputResponse$ApplicationVersionId": "<p>The current application version ID.</p>",
+        "DeleteApplicationReferenceDataSourceRequest$CurrentApplicationVersionId": "<p>The current application version. You can use the <a>DescribeApplication</a> operation to get the current application version. If the version specified is not the current version, the <code>ConcurrentModificationException</code> is returned.</p>",
+        "DeleteApplicationReferenceDataSourceResponse$ApplicationVersionId": "<p>The updated version ID of the application.</p>",
+        "DeleteApplicationVpcConfigurationRequest$CurrentApplicationVersionId": "<p>The current application version ID. You can retrieve the application version ID using <a>DescribeApplication</a>.</p>",
+        "DeleteApplicationVpcConfigurationResponse$ApplicationVersionId": "<p>The updated version ID of the application.</p>",
+        "SnapshotDetails$ApplicationVersionId": "<p>The current application version ID when the snapshot was created.</p>",
+        "UpdateApplicationRequest$CurrentApplicationVersionId": "<p>The current application version ID. You can retrieve the application version ID using <a>DescribeApplication</a>.</p>"
+      }
+    },
+    "BooleanObject": {
+      "base": null,
+      "refs": {
+        "ApplicationSnapshotConfiguration$SnapshotsEnabled": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+        "ApplicationSnapshotConfigurationDescription$SnapshotsEnabled": "<p>Describes whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+        "ApplicationSnapshotConfigurationUpdate$SnapshotsEnabledUpdate": "<p>Describes updates to whether snapshots are enabled for a Flink-based Kinesis Data Analytics application.</p>",
+        "CheckpointConfiguration$CheckpointingEnabled": "<p>Describes whether checkpointing is enabled for a Flink-based Kinesis Data Analytics application.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointingEnabled</code> value of <code>true</code>, even if this value is set to another value using this API or in application code.</p> </note>",
+        "CheckpointConfigurationDescription$CheckpointingEnabled": "<p>Describes whether checkpointing is enabled for a Flink-based Kinesis Data Analytics application.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointingEnabled</code> value of <code>true</code>, even if this value is set to another value using this API or in application code.</p> </note>",
+        "CheckpointConfigurationUpdate$CheckpointingEnabledUpdate": "<p>Describes updates to whether checkpointing is enabled for an application.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointingEnabled</code> value of <code>true</code>, even if this value is set to another value using this API or in application code.</p> </note>",
+        "DescribeApplicationRequest$IncludeAdditionalDetails": "<p>Displays verbose information about a Kinesis Data Analytics application, including the application's job plan.</p>",
+        "FlinkRunConfiguration$AllowNonRestoredState": "<p>When restoring from a snapshot, specifies whether the runtime is allowed to skip a state that cannot be mapped to the new program. This will happen if the program is updated between snapshots to remove stateful parameters, and state data in the snapshot no longer corresponds to valid application data. For more information, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/ops/state/savepoints.html#allowing-non-restored-state\"> Allowing Non-Restored State</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink documentation</a>.</p> <note> <p>This value defaults to <code>false</code>. If you update your application without specifying this parameter, <code>AllowNonRestoredState</code> will be set to <code>false</code>, even if it was previously set to <code>true</code>.</p> </note>",
+        "ParallelismConfiguration$AutoScalingEnabled": "<p>Describes whether the Kinesis Data Analytics service can increase the parallelism of the application in response to increased throughput.</p>",
+        "ParallelismConfigurationDescription$AutoScalingEnabled": "<p>Describes whether the Kinesis Data Analytics service can increase the parallelism of the application in response to increased throughput.</p>",
+        "ParallelismConfigurationUpdate$AutoScalingEnabledUpdate": "<p>Describes updates to whether the Kinesis Data Analytics service can increase the parallelism of the application in response to increased throughput.</p>",
+        "StopApplicationRequest$Force": "<p>Set to <code>true</code> to force the application to stop. If you set <code>Force</code> to <code>true</code>, Kinesis Data Analytics stops the application without taking a snapshot.</p> <p>You can only force stop a Flink-based Kinesis Data Analytics application. You can't force stop a SQL-based Kinesis Data Analytics application.</p> <p>The application must be in the <code>STARTING</code>, <code>UPDATING</code>, <code>STOPPING</code>, <code>AUTOSCALING</code>, or <code>RUNNING</code> state. </p>"
+      }
+    },
+    "BucketARN": {
+      "base": null,
+      "refs": {
+        "S3ApplicationCodeLocationDescription$BucketARN": "<p>The Amazon Resource Name (ARN) for the S3 bucket containing the application code.</p>",
+        "S3Configuration$BucketARN": "<p>The ARN of the S3 bucket that contains the data.</p>",
+        "S3ContentLocation$BucketARN": "<p>The Amazon Resource Name (ARN) for the S3 bucket containing the application code.</p>",
+        "S3ContentLocationUpdate$BucketARNUpdate": "<p>The new Amazon Resource Name (ARN) for the S3 bucket containing the application code.</p>",
+        "S3ReferenceDataSource$BucketARN": "<p>The Amazon Resource Name (ARN) of the S3 bucket.</p>",
+        "S3ReferenceDataSourceDescription$BucketARN": "<p>The Amazon Resource Name (ARN) of the S3 bucket.</p>",
+        "S3ReferenceDataSourceUpdate$BucketARNUpdate": "<p>The Amazon Resource Name (ARN) of the S3 bucket.</p>"
+      }
+    },
+    "CSVMappingParameters": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides additional mapping information when the record format uses delimiters, such as CSV. For example, the following sample records use CSV format, where the records use the <i>'\\n'</i> as the row delimiter and a comma (\",\") as the column delimiter: </p> <p> <code>\"name1\", \"address1\"</code> </p> <p> <code>\"name2\", \"address2\"</code> </p>",
+      "refs": {
+        "MappingParameters$CSVMappingParameters": "<p>Provides additional mapping information when the record format uses delimiters (for example, CSV).</p>"
+      }
+    },
+    "CheckpointConfiguration": {
+      "base": "<p>Describes an application's checkpointing configuration. Checkpointing is the process of persisting application state for fault tolerance. For more information, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/concepts/programming-model.html#checkpoints-for-fault-tolerance\"> Checkpoints for Fault Tolerance</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink Documentation</a>.</p>",
+      "refs": {
+        "FlinkApplicationConfiguration$CheckpointConfiguration": "<p>Describes an application's checkpointing configuration. Checkpointing is the process of persisting application state for fault tolerance. For more information, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/concepts/programming-model.html#checkpoints-for-fault-tolerance\"> Checkpoints for Fault Tolerance</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink Documentation</a>. </p>"
+      }
+    },
+    "CheckpointConfigurationDescription": {
+      "base": "<p>Describes checkpointing parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationDescription$CheckpointConfigurationDescription": "<p>Describes an application's checkpointing configuration. Checkpointing is the process of persisting application state for fault tolerance.</p>"
+      }
+    },
+    "CheckpointConfigurationUpdate": {
+      "base": "<p>Describes updates to the checkpointing parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationUpdate$CheckpointConfigurationUpdate": "<p>Describes updates to an application's checkpointing configuration. Checkpointing is the process of persisting application state for fault tolerance.</p>"
+      }
+    },
+    "CheckpointInterval": {
+      "base": null,
+      "refs": {
+        "CheckpointConfiguration$CheckpointInterval": "<p>Describes the interval in milliseconds between checkpoint operations. </p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointInterval</code> vaue of 60000, even if this value is set to another value using this API or in application code.</p> </note>",
+        "CheckpointConfigurationDescription$CheckpointInterval": "<p>Describes the interval in milliseconds between checkpoint operations. </p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointInterval</code> vaue of 60000, even if this value is set to another value using this API or in application code.</p> </note>",
+        "CheckpointConfigurationUpdate$CheckpointIntervalUpdate": "<p>Describes updates to the interval in milliseconds between checkpoint operations.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>CheckpointInterval</code> vaue of 60000, even if this value is set to another value using this API or in application code.</p> </note>"
+      }
+    },
+    "CloudWatchLoggingOption": {
+      "base": "<p>Provides a description of Amazon CloudWatch logging options, including the log stream Amazon Resource Name (ARN). </p>",
+      "refs": {
+        "AddApplicationCloudWatchLoggingOptionRequest$CloudWatchLoggingOption": "<p>Provides the Amazon CloudWatch log stream Amazon Resource Name (ARN). </p>",
+        "CloudWatchLoggingOptions$member": null
+      }
+    },
+    "CloudWatchLoggingOptionDescription": {
+      "base": "<p>Describes the Amazon CloudWatch logging option.</p>",
+      "refs": {
+        "CloudWatchLoggingOptionDescriptions$member": null
+      }
+    },
+    "CloudWatchLoggingOptionDescriptions": {
+      "base": null,
+      "refs": {
+        "AddApplicationCloudWatchLoggingOptionResponse$CloudWatchLoggingOptionDescriptions": "<p>The descriptions of the current CloudWatch logging options for the Kinesis Data Analytics application.</p>",
+        "ApplicationDetail$CloudWatchLoggingOptionDescriptions": "<p>Describes the application Amazon CloudWatch logging options.</p>",
+        "DeleteApplicationCloudWatchLoggingOptionResponse$CloudWatchLoggingOptionDescriptions": "<p>The descriptions of the remaining CloudWatch logging options for the application.</p>"
+      }
+    },
+    "CloudWatchLoggingOptionUpdate": {
+      "base": "<p>Describes the Amazon CloudWatch logging option updates.</p>",
+      "refs": {
+        "CloudWatchLoggingOptionUpdates$member": null
+      }
+    },
+    "CloudWatchLoggingOptionUpdates": {
+      "base": null,
+      "refs": {
+        "UpdateApplicationRequest$CloudWatchLoggingOptionUpdates": "<p>Describes application Amazon CloudWatch logging option updates. You can only update existing CloudWatch logging options with this action. To add a new CloudWatch logging option, use <a>AddApplicationCloudWatchLoggingOption</a>.</p>"
+      }
+    },
+    "CloudWatchLoggingOptions": {
+      "base": null,
+      "refs": {
+        "CreateApplicationRequest$CloudWatchLoggingOptions": "<p>Use this parameter to configure an Amazon CloudWatch log stream to monitor application configuration errors. </p>"
+      }
+    },
+    "CodeContent": {
+      "base": "<p>Specifies either the application code, or the location of the application code, for a Flink-based Kinesis Data Analytics application. </p>",
+      "refs": {
+        "ApplicationCodeConfiguration$CodeContent": "<p>The location and type of the application code.</p>"
+      }
+    },
+    "CodeContentDescription": {
+      "base": "<p>Describes details about the application code for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationCodeConfigurationDescription$CodeContentDescription": "<p>Describes details about the location and format of the application code.</p>"
+      }
+    },
+    "CodeContentType": {
+      "base": null,
+      "refs": {
+        "ApplicationCodeConfiguration$CodeContentType": "<p>Specifies whether the code content is in text or zip format.</p>",
+        "ApplicationCodeConfigurationDescription$CodeContentType": "<p>Specifies whether the code content is in text or zip format.</p>",
+        "ApplicationCodeConfigurationUpdate$CodeContentTypeUpdate": "<p>Describes updates to the code content type.</p>"
+      }
+    },
+    "CodeContentUpdate": {
+      "base": "<p>Describes an update to the code of a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationCodeConfigurationUpdate$CodeContentUpdate": "<p>Describes updates to the code content of an application.</p>"
+      }
+    },
+    "CodeMD5": {
+      "base": null,
+      "refs": {
+        "CodeContentDescription$CodeMD5": "<p>The checksum that can be used to validate zip-format code.</p>"
+      }
+    },
+    "CodeSize": {
+      "base": null,
+      "refs": {
+        "CodeContentDescription$CodeSize": "<p>The size in bytes of the application code. Can be used to validate zip-format code.</p>"
+      }
+    },
+    "CodeValidationException": {
+      "base": "<p>The user-provided application code (query) is not valid. This can be a simple syntax error.</p>",
+      "refs": {
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p>Exception thrown as a result of concurrent modifications to an application. This error can be the result of attempting to modify an application without using the current application ID.</p>",
+      "refs": {
+      }
+    },
+    "ConfigurationType": {
+      "base": null,
+      "refs": {
+        "CheckpointConfiguration$ConfigurationType": "<p>Describes whether the application uses Kinesis Data Analytics' default checkpointing behavior. You must set this property to <code>CUSTOM</code> in order to set the <code>CheckpointingEnabled</code>, <code>CheckpointInterval</code>, or <code>MinPauseBetweenCheckpoints</code> parameters.</p> <note> <p>If this value is set to <code>DEFAULT</code>, the application will use the following values, even if they are set to other values using APIs or application code:</p> <ul> <li> <p> <b>CheckpointingEnabled:</b> true</p> </li> <li> <p> <b>CheckpointInterval:</b> 60000</p> </li> <li> <p> <b>MinPauseBetweenCheckpoints:</b> 5000</p> </li> </ul> </note>",
+        "CheckpointConfigurationDescription$ConfigurationType": "<p>Describes whether the application uses the default checkpointing behavior in Kinesis Data Analytics. </p> <note> <p>If this value is set to <code>DEFAULT</code>, the application will use the following values, even if they are set to other values using APIs or application code:</p> <ul> <li> <p> <b>CheckpointingEnabled:</b> true</p> </li> <li> <p> <b>CheckpointInterval:</b> 60000</p> </li> <li> <p> <b>MinPauseBetweenCheckpoints:</b> 5000</p> </li> </ul> </note>",
+        "CheckpointConfigurationUpdate$ConfigurationTypeUpdate": "<p>Describes updates to whether the application uses the default checkpointing behavior of Kinesis Data Analytics. You must set this property to <code>CUSTOM</code> in order to set the <code>CheckpointingEnabled</code>, <code>CheckpointInterval</code>, or <code>MinPauseBetweenCheckpoints</code> parameters. </p> <note> <p>If this value is set to <code>DEFAULT</code>, the application will use the following values, even if they are set to other values using APIs or application code:</p> <ul> <li> <p> <b>CheckpointingEnabled:</b> true</p> </li> <li> <p> <b>CheckpointInterval:</b> 60000</p> </li> <li> <p> <b>MinPauseBetweenCheckpoints:</b> 5000</p> </li> </ul> </note>",
+        "MonitoringConfiguration$ConfigurationType": "<p>Describes whether to use the default CloudWatch logging configuration for an application. You must set this property to <code>CUSTOM</code> in order to set the <code>LogLevel</code> or <code>MetricsLevel</code> parameters.</p>",
+        "MonitoringConfigurationDescription$ConfigurationType": "<p>Describes whether to use the default CloudWatch logging configuration for an application.</p>",
+        "MonitoringConfigurationUpdate$ConfigurationTypeUpdate": "<p>Describes updates to whether to use the default CloudWatch logging configuration for an application. You must set this property to <code>CUSTOM</code> in order to set the <code>LogLevel</code> or <code>MetricsLevel</code> parameters.</p>",
+        "ParallelismConfiguration$ConfigurationType": "<p>Describes whether the application uses the default parallelism for the Kinesis Data Analytics service. You must set this property to <code>CUSTOM</code> in order to change your application's <code>AutoScalingEnabled</code>, <code>Parallelism</code>, or <code>ParallelismPerKPU</code> properties.</p>",
+        "ParallelismConfigurationDescription$ConfigurationType": "<p>Describes whether the application uses the default parallelism for the Kinesis Data Analytics service. </p>",
+        "ParallelismConfigurationUpdate$ConfigurationTypeUpdate": "<p>Describes updates to whether the application uses the default parallelism for the Kinesis Data Analytics service, or if a custom parallelism is used. You must set this property to <code>CUSTOM</code> in order to change your application's <code>AutoScalingEnabled</code>, <code>Parallelism</code>, or <code>ParallelismPerKPU</code> properties.</p>"
+      }
+    },
+    "CreateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateApplicationSnapshotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateApplicationSnapshotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationCloudWatchLoggingOptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationCloudWatchLoggingOptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationInputProcessingConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationInputProcessingConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationOutputRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationOutputResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationReferenceDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationReferenceDataSourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationSnapshotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationSnapshotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationVpcConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationVpcConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationSnapshotRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationSnapshotResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DestinationSchema": {
+      "base": "<p>Describes the data format when records are written to the destination in a SQL-based Kinesis Data Analytics application. </p>",
+      "refs": {
+        "Output$DestinationSchema": "<p>Describes the data format when records are written to the destination. </p>",
+        "OutputDescription$DestinationSchema": "<p>The data format used for writing data to the destination.</p>",
+        "OutputUpdate$DestinationSchemaUpdate": "<p>Describes the data format when records are written to the destination. </p>"
+      }
+    },
+    "DiscoverInputSchemaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DiscoverInputSchemaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnvironmentProperties": {
+      "base": "<p>Describes execution properties for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfiguration$EnvironmentProperties": "<p>Describes execution properties for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "EnvironmentPropertyDescriptions": {
+      "base": "<p>Describes the execution properties for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$EnvironmentPropertyDescriptions": "<p>Describes execution properties for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "EnvironmentPropertyUpdates": {
+      "base": "<p>Describes updates to the execution property groups for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationUpdate$EnvironmentPropertyUpdates": "<p>Describes updates to the environment properties for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "CodeValidationException$Message": null,
+        "ConcurrentModificationException$Message": null,
+        "InvalidApplicationConfigurationException$Message": null,
+        "InvalidArgumentException$Message": null,
+        "InvalidRequestException$Message": null,
+        "LimitExceededException$Message": null,
+        "ResourceInUseException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ResourceProvisionedThroughputExceededException$Message": null,
+        "ServiceUnavailableException$Message": null,
+        "TooManyTagsException$message": null,
+        "UnableToDetectSchemaException$Message": null,
+        "UnsupportedOperationException$Message": null
+      }
+    },
+    "FileKey": {
+      "base": null,
+      "refs": {
+        "S3ApplicationCodeLocationDescription$FileKey": "<p>The file key for the object containing the application code.</p>",
+        "S3Configuration$FileKey": "<p>The name of the object that contains the data.</p>",
+        "S3ContentLocation$FileKey": "<p>The file key for the object containing the application code.</p>",
+        "S3ContentLocationUpdate$FileKeyUpdate": "<p>The new file key for the object containing the application code.</p>",
+        "S3ReferenceDataSource$FileKey": "<p>The object key name containing the reference data.</p>",
+        "S3ReferenceDataSourceDescription$FileKey": "<p>Amazon S3 object key name.</p>",
+        "S3ReferenceDataSourceUpdate$FileKeyUpdate": "<p>The object key name.</p>"
+      }
+    },
+    "FlinkApplicationConfiguration": {
+      "base": "<p>Describes configuration parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfiguration$FlinkApplicationConfiguration": "<p>The creation and update parameters for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "FlinkApplicationConfigurationDescription": {
+      "base": "<p>Describes configuration parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$FlinkApplicationConfigurationDescription": "<p>The details about a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "FlinkApplicationConfigurationUpdate": {
+      "base": "<p>Describes updates to the configuration parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationUpdate$FlinkApplicationConfigurationUpdate": "<p>Describes updates to a Flink-based Kinesis Data Analytics application's configuration.</p>"
+      }
+    },
+    "FlinkRunConfiguration": {
+      "base": "<p>Describes the starting parameters for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "RunConfiguration$FlinkRunConfiguration": "<p>Describes the starting parameters for a Flink-based Kinesis Data Analytics application.</p>",
+        "RunConfigurationDescription$FlinkRunConfigurationDescription": null,
+        "RunConfigurationUpdate$FlinkRunConfiguration": "<p>Describes the starting parameters for a Flink-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "AddApplicationInputProcessingConfigurationRequest$InputId": "<p>The ID of the input configuration to add the input processing configuration to. You can get a list of the input IDs for an application using the <a>DescribeApplication</a> operation.</p>",
+        "AddApplicationInputProcessingConfigurationResponse$InputId": "<p>The input ID that is associated with the application input. This is the ID that Kinesis Data Analytics assigns to each input configuration that you add to your application.</p>",
+        "CloudWatchLoggingOptionDescription$CloudWatchLoggingOptionId": "<p>The ID of the CloudWatch logging option description.</p>",
+        "CloudWatchLoggingOptionUpdate$CloudWatchLoggingOptionId": "<p>The ID of the CloudWatch logging option to update</p>",
+        "DeleteApplicationCloudWatchLoggingOptionRequest$CloudWatchLoggingOptionId": "<p>The <code>CloudWatchLoggingOptionId</code> of the Amazon CloudWatch logging option to delete. You can get the <code>CloudWatchLoggingOptionId</code> by using the <a>DescribeApplication</a> operation. </p>",
+        "DeleteApplicationInputProcessingConfigurationRequest$InputId": "<p>The ID of the input configuration from which to delete the input processing configuration. You can get a list of the input IDs for an application by using the <a>DescribeApplication</a> operation.</p>",
+        "DeleteApplicationOutputRequest$OutputId": "<p>The ID of the configuration to delete. Each output configuration that is added to the application (either when the application is created or later) using the <a>AddApplicationOutput</a> operation has a unique ID. You need to provide the ID to uniquely identify the output configuration that you want to delete from the application configuration. You can use the <a>DescribeApplication</a> operation to get the specific <code>OutputId</code>. </p>",
+        "DeleteApplicationReferenceDataSourceRequest$ReferenceId": "<p>The ID of the reference data source. When you add a reference data source to your application using the <a>AddApplicationReferenceDataSource</a>, Kinesis Data Analytics assigns an ID. You can use the <a>DescribeApplication</a> operation to get the reference ID. </p>",
+        "DeleteApplicationVpcConfigurationRequest$VpcConfigurationId": "<p>The ID of the VPC configuration to delete.</p>",
+        "InputDescription$InputId": "<p>The input ID that is associated with the application input. This is the ID that Kinesis Data Analytics assigns to each input configuration that you add to your application. </p>",
+        "InputUpdate$InputId": "<p>The input ID of the application input to be updated.</p>",
+        "OutputDescription$OutputId": "<p>A unique identifier for the output configuration.</p>",
+        "OutputUpdate$OutputId": "<p>Identifies the specific output configuration that you want to update.</p>",
+        "PropertyGroup$PropertyGroupId": "<p>Describes the key of an application execution property key-value pair.</p>",
+        "ReferenceDataSourceDescription$ReferenceId": "<p>The ID of the reference data source. This is the ID that Kinesis Data Analytics assigns when you add the reference data source to your application using the <a>CreateApplication</a> or <a>UpdateApplication</a> operation.</p>",
+        "ReferenceDataSourceUpdate$ReferenceId": "<p>The ID of the reference data source that is being updated. You can use the <a>DescribeApplication</a> operation to get this value.</p>",
+        "SqlRunConfiguration$InputId": "<p>The input source ID. You can get this ID by calling the <a>DescribeApplication</a> operation. </p>",
+        "VpcConfigurationDescription$VpcConfigurationId": "<p>The ID of the VPC configuration.</p>",
+        "VpcConfigurationUpdate$VpcConfigurationId": "<p>Describes an update to the ID of the VPC configuration.</p>"
+      }
+    },
+    "InAppStreamName": {
+      "base": null,
+      "refs": {
+        "InAppStreamNames$member": null,
+        "Input$NamePrefix": "<p>The name prefix to use when creating an in-application stream. Suppose that you specify a prefix \"<code>MyInApplicationStream</code>.\" Kinesis Data Analytics then creates one or more (as per the <code>InputParallelism</code> count you specified) in-application streams with the names \"<code>MyInApplicationStream_001</code>,\" \"<code>MyInApplicationStream_002</code>,\" and so on. </p>",
+        "InputDescription$NamePrefix": "<p>The in-application name prefix.</p>",
+        "InputUpdate$NamePrefixUpdate": "<p>The name prefix for in-application streams that Kinesis Data Analytics creates for the specific streaming source.</p>",
+        "Output$Name": "<p>The name of the in-application stream.</p>",
+        "OutputDescription$Name": "<p>The name of the in-application stream that is configured as output.</p>",
+        "OutputUpdate$NameUpdate": "<p>If you want to specify a different in-application stream for this output configuration, use this field to specify the new in-application stream name.</p>"
+      }
+    },
+    "InAppStreamNames": {
+      "base": null,
+      "refs": {
+        "InputDescription$InAppStreamNames": "<p>Returns the in-application stream names that are mapped to the stream source. </p>"
+      }
+    },
+    "InAppTableName": {
+      "base": null,
+      "refs": {
+        "ReferenceDataSource$TableName": "<p>The name of the in-application table to create.</p>",
+        "ReferenceDataSourceDescription$TableName": "<p>The in-application table name created by the specific reference data source configuration.</p>",
+        "ReferenceDataSourceUpdate$TableNameUpdate": "<p>The in-application table name that is created by this update.</p>"
+      }
+    },
+    "Input": {
+      "base": "<p>When you configure the application input for a SQL-based Kinesis Data Analytics application, you specify the streaming source, the in-application stream name that is created, and the mapping between the two. </p>",
+      "refs": {
+        "AddApplicationInputRequest$Input": "<p>The <a>Input</a> to add.</p>",
+        "Inputs$member": null
+      }
+    },
+    "InputDescription": {
+      "base": "<p>Describes the application input configuration for a SQL-based Kinesis Data Analytics application. </p>",
+      "refs": {
+        "InputDescriptions$member": null
+      }
+    },
+    "InputDescriptions": {
+      "base": null,
+      "refs": {
+        "AddApplicationInputResponse$InputDescriptions": "<p>Describes the application input configuration. </p>",
+        "SqlApplicationConfigurationDescription$InputDescriptions": "<p>The array of <a>InputDescription</a> objects describing the input streams used by the application.</p>"
+      }
+    },
+    "InputLambdaProcessor": {
+      "base": "<p>An object that contains the Amazon Resource Name (ARN) of the AWS Lambda function that is used to preprocess records in the stream in a SQL-based Kinesis Data Analytics application. </p>",
+      "refs": {
+        "InputProcessingConfiguration$InputLambdaProcessor": "<p>The <a>InputLambdaProcessor</a> that is used to preprocess the records in the stream before being processed by your application code.</p>"
+      }
+    },
+    "InputLambdaProcessorDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, an object that contains the Amazon Resource Name (ARN) of the AWS Lambda function that is used to preprocess records in the stream.</p>",
+      "refs": {
+        "InputProcessingConfigurationDescription$InputLambdaProcessorDescription": "<p>Provides configuration information about the associated <a>InputLambdaProcessorDescription</a> </p>"
+      }
+    },
+    "InputLambdaProcessorUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, represents an update to the <a>InputLambdaProcessor</a> that is used to preprocess the records in the stream.</p>",
+      "refs": {
+        "InputProcessingConfigurationUpdate$InputLambdaProcessorUpdate": "<p>Provides update information for an <a>InputLambdaProcessor</a>.</p>"
+      }
+    },
+    "InputParallelism": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the number of in-application streams to create for a given streaming source. </p>",
+      "refs": {
+        "Input$InputParallelism": "<p>Describes the number of in-application streams to create. </p>",
+        "InputDescription$InputParallelism": "<p>Describes the configured parallelism (number of in-application streams mapped to the streaming source). </p>"
+      }
+    },
+    "InputParallelismCount": {
+      "base": null,
+      "refs": {
+        "InputParallelism$Count": "<p>The number of in-application streams to create.</p>",
+        "InputParallelismUpdate$CountUpdate": "<p>The number of in-application streams to create for the specified streaming source.</p>"
+      }
+    },
+    "InputParallelismUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides updates to the parallelism count.</p>",
+      "refs": {
+        "InputUpdate$InputParallelismUpdate": "<p>Describes the parallelism updates (the number of in-application streams Kinesis Data Analytics creates for the specific streaming source).</p>"
+      }
+    },
+    "InputProcessingConfiguration": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes a processor that is used to preprocess the records in the stream before being processed by your application code. Currently, the only input processor available is <a href=\"https://docs.aws.amazon.com/lambda/\">AWS Lambda</a>.</p>",
+      "refs": {
+        "AddApplicationInputProcessingConfigurationRequest$InputProcessingConfiguration": "<p>The <a>InputProcessingConfiguration</a> to add to the application.</p>",
+        "DiscoverInputSchemaRequest$InputProcessingConfiguration": "<p>The <a>InputProcessingConfiguration</a> to use to preprocess the records before discovering the schema of the records.</p>",
+        "Input$InputProcessingConfiguration": "<p>The <a>InputProcessingConfiguration</a> for the input. An input processor transforms records as they are received from the stream, before the application's SQL code executes. Currently, the only input processing configuration available is <a>InputLambdaProcessor</a>. </p>"
+      }
+    },
+    "InputProcessingConfigurationDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides the configuration information about an input processor. Currently, the only input processor available is <a href=\"https://docs.aws.amazon.com/lambda/\">AWS Lambda</a>.</p>",
+      "refs": {
+        "AddApplicationInputProcessingConfigurationResponse$InputProcessingConfigurationDescription": "<p>The description of the preprocessor that executes on records in this input before the application's code is run.</p>",
+        "InputDescription$InputProcessingConfigurationDescription": "<p>The description of the preprocessor that executes on records in this input before the application's code is run. </p>"
+      }
+    },
+    "InputProcessingConfigurationUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes updates to an <a>InputProcessingConfiguration</a>.</p>",
+      "refs": {
+        "InputUpdate$InputProcessingConfigurationUpdate": "<p>Describes updates to an <a>InputProcessingConfiguration</a>.</p>"
+      }
+    },
+    "InputSchemaUpdate": {
+      "base": "<p>Describes updates for an SQL-based Kinesis Data Analytics application's input schema.</p>",
+      "refs": {
+        "InputUpdate$InputSchemaUpdate": "<p>Describes the data format on the streaming source, and how record elements on the streaming source map to columns of the in-application stream that is created.</p>"
+      }
+    },
+    "InputStartingPosition": {
+      "base": null,
+      "refs": {
+        "InputStartingPositionConfiguration$InputStartingPosition": "<p>The starting position on the stream.</p> <ul> <li> <p> <code>NOW</code> - Start reading just after the most recent record in the stream, and start at the request timestamp that the customer issued.</p> </li> <li> <p> <code>TRIM_HORIZON</code> - Start reading at the last untrimmed record in the stream, which is the oldest record available in the stream. This option is not available for an Amazon Kinesis Data Firehose delivery stream.</p> </li> <li> <p> <code>LAST_STOPPED_POINT</code> - Resume reading from where the application last stopped reading.</p> </li> </ul>"
+      }
+    },
+    "InputStartingPositionConfiguration": {
+      "base": "<p>Describes the point at which the application reads from the streaming source.</p>",
+      "refs": {
+        "DiscoverInputSchemaRequest$InputStartingPositionConfiguration": "<p>The point at which you want Kinesis Data Analytics to start reading records from the specified streaming source discovery purposes.</p>",
+        "InputDescription$InputStartingPositionConfiguration": "<p>The point at which the application is configured to read from the input stream.</p>",
+        "SqlRunConfiguration$InputStartingPositionConfiguration": "<p>The point at which you want the application to start processing records from the streaming source. </p>"
+      }
+    },
+    "InputUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes updates to a specific input configuration (identified by the <code>InputId</code> of an application). </p>",
+      "refs": {
+        "InputUpdates$member": null
+      }
+    },
+    "InputUpdates": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfigurationUpdate$InputUpdates": "<p>The array of <a>InputUpdate</a> objects describing the new input streams used by the application.</p>"
+      }
+    },
+    "Inputs": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfiguration$Inputs": "<p>The array of <a>Input</a> objects describing the input streams used by the application.</p>"
+      }
+    },
+    "InvalidApplicationConfigurationException": {
+      "base": "<p>The user-provided application configuration is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidArgumentException": {
+      "base": "<p>The specified input parameter value is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request JSON is not valid for the operation.</p>",
+      "refs": {
+      }
+    },
+    "JSONMappingParameters": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides additional mapping information when JSON is the record format on the streaming source.</p>",
+      "refs": {
+        "MappingParameters$JSONMappingParameters": "<p>Provides additional mapping information when JSON is the record format on the streaming source.</p>"
+      }
+    },
+    "JobPlanDescription": {
+      "base": null,
+      "refs": {
+        "FlinkApplicationConfigurationDescription$JobPlanDescription": "<p>The job plan for an application. For more information about the job plan, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/internals/job_scheduling.html\">Jobs and Scheduling</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink Documentation</a>. To retrieve the job plan for the application, use the <a>DescribeApplicationRequest$IncludeAdditionalDetails</a> parameter of the <a>DescribeApplication</a> operation.</p>"
+      }
+    },
+    "KinesisAnalyticsARN": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceARN": "<p>The ARN of the application for which to retrieve tags.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The ARN of the application to assign the tags.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The ARN of the Kinesis Data Analytics application from which to remove the tags.</p>"
+      }
+    },
+    "KinesisFirehoseInput": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, identifies a Kinesis Data Firehose delivery stream as the streaming source. You provide the delivery stream's Amazon Resource Name (ARN).</p>",
+      "refs": {
+        "Input$KinesisFirehoseInput": "<p>If the streaming source is an Amazon Kinesis Data Firehose delivery stream, identifies the delivery stream's ARN.</p>"
+      }
+    },
+    "KinesisFirehoseInputDescription": {
+      "base": "<p>Describes the Amazon Kinesis Data Firehose delivery stream that is configured as the streaming source in the application input configuration. </p>",
+      "refs": {
+        "InputDescription$KinesisFirehoseInputDescription": "<p>If a Kinesis Data Firehose delivery stream is configured as a streaming source, provides the delivery stream's ARN. </p>"
+      }
+    },
+    "KinesisFirehoseInputUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, when updating application input configuration, provides information about a Kinesis Data Firehose delivery stream as the streaming source.</p>",
+      "refs": {
+        "InputUpdate$KinesisFirehoseInputUpdate": "<p>If a Kinesis Data Firehose delivery stream is the streaming source to be updated, provides an updated stream ARN.</p>"
+      }
+    },
+    "KinesisFirehoseOutput": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, when configuring application output, identifies a Kinesis Data Firehose delivery stream as the destination. You provide the stream Amazon Resource Name (ARN) of the delivery stream. </p>",
+      "refs": {
+        "Output$KinesisFirehoseOutput": "<p>Identifies a Kinesis Data Firehose delivery stream as the destination.</p>"
+      }
+    },
+    "KinesisFirehoseOutputDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application's output, describes the Kinesis Data Firehose delivery stream that is configured as its destination.</p>",
+      "refs": {
+        "OutputDescription$KinesisFirehoseOutputDescription": "<p>Describes the Kinesis Data Firehose delivery stream that is configured as the destination where output is written.</p>"
+      }
+    },
+    "KinesisFirehoseOutputUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, when updating an output configuration using the <a>UpdateApplication</a> operation, provides information about a Kinesis Data Firehose delivery stream that is configured as the destination.</p>",
+      "refs": {
+        "OutputUpdate$KinesisFirehoseOutputUpdate": "<p>Describes a Kinesis Data Firehose delivery stream as the destination for the output.</p>"
+      }
+    },
+    "KinesisStreamsInput": {
+      "base": "<p> Identifies a Kinesis data stream as the streaming source. You provide the stream's Amazon Resource Name (ARN).</p>",
+      "refs": {
+        "Input$KinesisStreamsInput": "<p>If the streaming source is an Amazon Kinesis data stream, identifies the stream's Amazon Resource Name (ARN). </p>"
+      }
+    },
+    "KinesisStreamsInputDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the Kinesis data stream that is configured as the streaming source in the application input configuration. </p>",
+      "refs": {
+        "InputDescription$KinesisStreamsInputDescription": "<p>If a Kinesis data stream is configured as a streaming source, provides the Kinesis data stream's Amazon Resource Name (ARN). </p>"
+      }
+    },
+    "KinesisStreamsInputUpdate": {
+      "base": "<p>When you update the input configuration for a SQL-based Kinesis Data Analytics application, provides information about a Kinesis stream as the streaming source.</p>",
+      "refs": {
+        "InputUpdate$KinesisStreamsInputUpdate": "<p>If a Kinesis data stream is the streaming source to be updated, provides an updated stream Amazon Resource Name (ARN).</p>"
+      }
+    },
+    "KinesisStreamsOutput": {
+      "base": "<p>When you configure a SQL-based Kinesis Data Analytics application's output, identifies a Kinesis data stream as the destination. You provide the stream Amazon Resource Name (ARN). </p>",
+      "refs": {
+        "Output$KinesisStreamsOutput": "<p>Identifies a Kinesis data stream as the destination.</p>"
+      }
+    },
+    "KinesisStreamsOutputDescription": {
+      "base": "<p>For an SQL-based Kinesis Data Analytics application's output, describes the Kinesis data stream that is configured as its destination. </p>",
+      "refs": {
+        "OutputDescription$KinesisStreamsOutputDescription": "<p>Describes the Kinesis data stream that is configured as the destination where output is written.</p>"
+      }
+    },
+    "KinesisStreamsOutputUpdate": {
+      "base": "<p>When you update a SQL-based Kinesis Data Analytics application's output configuration using the <a>UpdateApplication</a> operation, provides information about a Kinesis data stream that is configured as the destination.</p>",
+      "refs": {
+        "OutputUpdate$KinesisStreamsOutputUpdate": "<p>Describes a Kinesis data stream as the destination for the output.</p>"
+      }
+    },
+    "LambdaOutput": {
+      "base": "<p>When you configure a SQL-based Kinesis Data Analytics application's output, identifies an AWS Lambda function as the destination. You provide the function Amazon Resource Name (ARN) of the Lambda function. </p>",
+      "refs": {
+        "Output$LambdaOutput": "<p>Identifies an AWS Lambda function as the destination.</p>"
+      }
+    },
+    "LambdaOutputDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application's output, describes the AWS Lambda function that is configured as its destination. </p>",
+      "refs": {
+        "OutputDescription$LambdaOutputDescription": "<p>Describes the Lambda function that is configured as the destination where output is written.</p>"
+      }
+    },
+    "LambdaOutputUpdate": {
+      "base": "<p>When you update an SQL-based Kinesis Data Analytics application's output configuration using the <a>UpdateApplication</a> operation, provides information about an AWS Lambda function that is configured as the destination.</p>",
+      "refs": {
+        "OutputUpdate$LambdaOutputUpdate": "<p>Describes an AWS Lambda function as the destination for the output.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The number of allowed resources has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListApplicationSnapshotsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListApplicationSnapshotsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListApplicationsInputLimit": {
+      "base": null,
+      "refs": {
+        "ListApplicationsRequest$Limit": "<p>The maximum number of applications to list.</p>"
+      }
+    },
+    "ListApplicationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListApplicationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSnapshotsInputLimit": {
+      "base": null,
+      "refs": {
+        "ListApplicationSnapshotsRequest$Limit": "<p>The maximum number of application snapshots to list.</p>"
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogLevel": {
+      "base": null,
+      "refs": {
+        "MonitoringConfiguration$LogLevel": "<p>Describes the verbosity of the CloudWatch Logs for an application.</p>",
+        "MonitoringConfigurationDescription$LogLevel": "<p>Describes the verbosity of the CloudWatch Logs for an application.</p>",
+        "MonitoringConfigurationUpdate$LogLevelUpdate": "<p>Describes updates to the verbosity of the CloudWatch Logs for an application.</p>"
+      }
+    },
+    "LogStreamARN": {
+      "base": null,
+      "refs": {
+        "CloudWatchLoggingOption$LogStreamARN": "<p>The ARN of the CloudWatch log to receive application messages.</p>",
+        "CloudWatchLoggingOptionDescription$LogStreamARN": "<p>The Amazon Resource Name (ARN) of the CloudWatch log to receive application messages.</p>",
+        "CloudWatchLoggingOptionUpdate$LogStreamARNUpdate": "<p>The Amazon Resource Name (ARN) of the CloudWatch log to receive application messages.</p>"
+      }
+    },
+    "MappingParameters": {
+      "base": "<p>When you configure a SQL-based Kinesis Data Analytics application's input at the time of creating or updating an application, provides additional mapping information specific to the record format (such as JSON, CSV, or record fields delimited by some delimiter) on the streaming source.</p>",
+      "refs": {
+        "RecordFormat$MappingParameters": "<p>When you configure application input at the time of creating or updating an application, provides additional mapping information specific to the record format (such as JSON, CSV, or record fields delimited by some delimiter) on the streaming source.</p>"
+      }
+    },
+    "MetricsLevel": {
+      "base": null,
+      "refs": {
+        "MonitoringConfiguration$MetricsLevel": "<p>Describes the granularity of the CloudWatch Logs for an application. The <code>Parallelism</code> level is not recommended for applications with a Parallelism over 64 due to excessive costs.</p>",
+        "MonitoringConfigurationDescription$MetricsLevel": "<p>Describes the granularity of the CloudWatch Logs for an application.</p>",
+        "MonitoringConfigurationUpdate$MetricsLevelUpdate": "<p>Describes updates to the granularity of the CloudWatch Logs for an application. The <code>Parallelism</code> level is not recommended for applications with a Parallelism over 64 due to excessive costs.</p>"
+      }
+    },
+    "MinPauseBetweenCheckpoints": {
+      "base": null,
+      "refs": {
+        "CheckpointConfiguration$MinPauseBetweenCheckpoints": "<p>Describes the minimum time in milliseconds after a checkpoint operation completes that a new checkpoint operation can start. If a checkpoint operation takes longer than the <code>CheckpointInterval</code>, the application otherwise performs continual checkpoint operations. For more information, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/ops/state/large_state_tuning.html#tuning-checkpointing\"> Tuning Checkpointing</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink Documentation</a>.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>MinPauseBetweenCheckpoints</code> value of 5000, even if this value is set using this API or in application code.</p> </note>",
+        "CheckpointConfigurationDescription$MinPauseBetweenCheckpoints": "<p>Describes the minimum time in milliseconds after a checkpoint operation completes that a new checkpoint operation can start. </p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>MinPauseBetweenCheckpoints</code> value of 5000, even if this value is set using this API or in application code.</p> </note>",
+        "CheckpointConfigurationUpdate$MinPauseBetweenCheckpointsUpdate": "<p>Describes updates to the minimum time in milliseconds after a checkpoint operation completes that a new checkpoint operation can start.</p> <note> <p>If <code>CheckpointConfiguration.ConfigurationType</code> is <code>DEFAULT</code>, the application will use a <code>MinPauseBetweenCheckpoints</code> value of 5000, even if this value is set using this API or in application code.</p> </note>"
+      }
+    },
+    "MonitoringConfiguration": {
+      "base": "<p>Describes configuration parameters for Amazon CloudWatch logging for a Flink-based Kinesis Data Analytics application. For more information about CloudWatch logging, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/monitoring-overview.html\">Monitoring</a>.</p>",
+      "refs": {
+        "FlinkApplicationConfiguration$MonitoringConfiguration": "<p>Describes configuration parameters for Amazon CloudWatch logging for an application.</p>"
+      }
+    },
+    "MonitoringConfigurationDescription": {
+      "base": "<p>Describes configuration parameters for CloudWatch logging for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationDescription$MonitoringConfigurationDescription": "<p>Describes configuration parameters for Amazon CloudWatch logging for an application.</p>"
+      }
+    },
+    "MonitoringConfigurationUpdate": {
+      "base": "<p>Describes updates to configuration parameters for Amazon CloudWatch logging for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationUpdate$MonitoringConfigurationUpdate": "<p>Describes updates to the configuration parameters for Amazon CloudWatch logging for an application.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListApplicationSnapshotsRequest$NextToken": "<p>Use this parameter if you receive a <code>NextToken</code> response in a previous request that indicates that there is more output available. Set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from. </p>",
+        "ListApplicationSnapshotsResponse$NextToken": "<p>The token for the next set of results, or <code>null</code> if there are no additional results.</p>"
+      }
+    },
+    "ObjectVersion": {
+      "base": null,
+      "refs": {
+        "S3ApplicationCodeLocationDescription$ObjectVersion": "<p>The version of the object containing the application code.</p>",
+        "S3ContentLocation$ObjectVersion": "<p>The version of the object containing the application code.</p>",
+        "S3ContentLocationUpdate$ObjectVersionUpdate": "<p>The new version of the object containing the application code.</p>"
+      }
+    },
+    "Output": {
+      "base": "<p> Describes a SQL-based Kinesis Data Analytics application's output configuration, in which you identify an in-application stream and a destination where you want the in-application stream data to be written. The destination can be a Kinesis data stream or a Kinesis Data Firehose delivery stream. </p> <p/>",
+      "refs": {
+        "AddApplicationOutputRequest$Output": "<p>An array of objects, each describing one output configuration. In the output configuration, you specify the name of an in-application stream, a destination (that is, a Kinesis data stream, a Kinesis Data Firehose delivery stream, or an AWS Lambda function), and record the formation to use when writing to the destination.</p>",
+        "Outputs$member": null
+      }
+    },
+    "OutputDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the application output configuration, which includes the in-application stream name and the destination where the stream data is written. The destination can be a Kinesis data stream or a Kinesis Data Firehose delivery stream. </p>",
+      "refs": {
+        "OutputDescriptions$member": null
+      }
+    },
+    "OutputDescriptions": {
+      "base": null,
+      "refs": {
+        "AddApplicationOutputResponse$OutputDescriptions": "<p>Describes the application output configuration. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/dev/how-it-works-output.html\">Configuring Application Output</a>. </p>",
+        "SqlApplicationConfigurationDescription$OutputDescriptions": "<p>The array of <a>OutputDescription</a> objects describing the destination streams used by the application.</p>"
+      }
+    },
+    "OutputUpdate": {
+      "base": "<p> For a SQL-based Kinesis Data Analytics application, describes updates to the output configuration identified by the <code>OutputId</code>. </p>",
+      "refs": {
+        "OutputUpdates$member": null
+      }
+    },
+    "OutputUpdates": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfigurationUpdate$OutputUpdates": "<p>The array of <a>OutputUpdate</a> objects describing the new destination streams used by the application.</p>"
+      }
+    },
+    "Outputs": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfiguration$Outputs": "<p>The array of <a>Output</a> objects describing the destination streams used by the application.</p>"
+      }
+    },
+    "Parallelism": {
+      "base": null,
+      "refs": {
+        "ParallelismConfiguration$Parallelism": "<p>Describes the initial number of parallel tasks that a Flink-based Kinesis Data Analytics application can perform. If <code>AutoScalingEnabled</code> is set to True, Kinesis Data Analytics increases the <code>CurrentParallelism</code> value in response to application load. The service can increase the <code>CurrentParallelism</code> value up to the maximum parallelism, which is <code>ParalellismPerKPU</code> times the maximum KPUs for the application. The maximum KPUs for an application is 32 by default, and can be increased by requesting a limit increase. If application load is reduced, the service can reduce the <code>CurrentParallelism</code> value down to the <code>Parallelism</code> setting.</p>",
+        "ParallelismConfigurationDescription$Parallelism": "<p>Describes the initial number of parallel tasks that a Flink-based Kinesis Data Analytics application can perform. If <code>AutoScalingEnabled</code> is set to True, then Kinesis Data Analytics can increase the <code>CurrentParallelism</code> value in response to application load. The service can increase <code>CurrentParallelism</code> up to the maximum parallelism, which is <code>ParalellismPerKPU</code> times the maximum KPUs for the application. The maximum KPUs for an application is 32 by default, and can be increased by requesting a limit increase. If application load is reduced, the service can reduce the <code>CurrentParallelism</code> value down to the <code>Parallelism</code> setting.</p>",
+        "ParallelismConfigurationDescription$CurrentParallelism": "<p>Describes the current number of parallel tasks that a Flink-based Kinesis Data Analytics application can perform. If <code>AutoScalingEnabled</code> is set to True, Kinesis Data Analytics can increase this value in response to application load. The service can increase this value up to the maximum parallelism, which is <code>ParalellismPerKPU</code> times the maximum KPUs for the application. The maximum KPUs for an application is 32 by default, and can be increased by requesting a limit increase. If application load is reduced, the service can reduce the <code>CurrentParallelism</code> value down to the <code>Parallelism</code> setting.</p>",
+        "ParallelismConfigurationUpdate$ParallelismUpdate": "<p>Describes updates to the initial number of parallel tasks an application can perform. If <code>AutoScalingEnabled</code> is set to True, then Kinesis Data Analytics can increase the <code>CurrentParallelism</code> value in response to application load. The service can increase <code>CurrentParallelism</code> up to the maximum parallelism, which is <code>ParalellismPerKPU</code> times the maximum KPUs for the application. The maximum KPUs for an application is 32 by default, and can be increased by requesting a limit increase. If application load is reduced, the service will reduce <code>CurrentParallelism</code> down to the <code>Parallelism</code> setting.</p>"
+      }
+    },
+    "ParallelismConfiguration": {
+      "base": "<p>Describes parameters for how a Flink-based Kinesis Data Analytics application application executes multiple tasks simultaneously. For more information about parallelism, see <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/dev/parallel.html\">Parallel Execution</a> in the <a href=\"https://ci.apache.org/projects/flink/flink-docs-release-1.8/\">Apache Flink Documentation</a>.</p>",
+      "refs": {
+        "FlinkApplicationConfiguration$ParallelismConfiguration": "<p>Describes parameters for how an application executes multiple tasks simultaneously.</p>"
+      }
+    },
+    "ParallelismConfigurationDescription": {
+      "base": "<p>Describes parameters for how a Flink-based Kinesis Data Analytics application executes multiple tasks simultaneously.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationDescription$ParallelismConfigurationDescription": "<p>Describes parameters for how an application executes multiple tasks simultaneously.</p>"
+      }
+    },
+    "ParallelismConfigurationUpdate": {
+      "base": "<p>Describes updates to parameters for how a Flink-based Kinesis Data Analytics application executes multiple tasks simultaneously.</p>",
+      "refs": {
+        "FlinkApplicationConfigurationUpdate$ParallelismConfigurationUpdate": "<p>Describes updates to the parameters for how an application executes multiple tasks simultaneously.</p>"
+      }
+    },
+    "ParallelismPerKPU": {
+      "base": null,
+      "refs": {
+        "ParallelismConfiguration$ParallelismPerKPU": "<p>Describes the number of parallel tasks that a Flink-based Kinesis Data Analytics application can perform per Kinesis Processing Unit (KPU) used by the application. For more information about KPUs, see <a href=\"http://aws.amazon.com/kinesis/data-analytics/pricing/\">Amazon Kinesis Data Analytics Pricing</a>.</p>",
+        "ParallelismConfigurationDescription$ParallelismPerKPU": "<p>Describes the number of parallel tasks that a Flink-based Kinesis Data Analytics application can perform per Kinesis Processing Unit (KPU) used by the application.</p>",
+        "ParallelismConfigurationUpdate$ParallelismPerKPUUpdate": "<p>Describes updates to the number of parallel tasks an application can perform per Kinesis Processing Unit (KPU) used by the application.</p>"
+      }
+    },
+    "ParsedInputRecord": {
+      "base": null,
+      "refs": {
+        "ParsedInputRecords$member": null
+      }
+    },
+    "ParsedInputRecordField": {
+      "base": null,
+      "refs": {
+        "ParsedInputRecord$member": null
+      }
+    },
+    "ParsedInputRecords": {
+      "base": null,
+      "refs": {
+        "DiscoverInputSchemaResponse$ParsedInputRecords": "<p>An array of elements, where each element corresponds to a row in a stream record (a stream record can have more than one row).</p>"
+      }
+    },
+    "ProcessedInputRecord": {
+      "base": null,
+      "refs": {
+        "ProcessedInputRecords$member": null
+      }
+    },
+    "ProcessedInputRecords": {
+      "base": null,
+      "refs": {
+        "DiscoverInputSchemaResponse$ProcessedInputRecords": "<p>The stream data that was modified by the processor specified in the <code>InputProcessingConfiguration</code> parameter.</p>",
+        "UnableToDetectSchemaException$ProcessedInputRecords": "<p>Stream data that was modified by the processor specified in the <code>InputProcessingConfiguration</code> parameter. </p>"
+      }
+    },
+    "PropertyGroup": {
+      "base": "<p>Property key-value pairs passed into a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "PropertyGroups$member": null
+      }
+    },
+    "PropertyGroups": {
+      "base": null,
+      "refs": {
+        "EnvironmentProperties$PropertyGroups": "<p>Describes the execution property groups.</p>",
+        "EnvironmentPropertyDescriptions$PropertyGroupDescriptions": "<p>Describes the execution property groups.</p>",
+        "EnvironmentPropertyUpdates$PropertyGroups": "<p>Describes updates to the execution property groups.</p>"
+      }
+    },
+    "PropertyKey": {
+      "base": null,
+      "refs": {
+        "PropertyMap$key": null
+      }
+    },
+    "PropertyMap": {
+      "base": null,
+      "refs": {
+        "PropertyGroup$PropertyMap": "<p>Describes the value of an application execution property key-value pair.</p>"
+      }
+    },
+    "PropertyValue": {
+      "base": null,
+      "refs": {
+        "PropertyMap$value": null
+      }
+    },
+    "RawInputRecord": {
+      "base": null,
+      "refs": {
+        "RawInputRecords$member": null
+      }
+    },
+    "RawInputRecords": {
+      "base": null,
+      "refs": {
+        "DiscoverInputSchemaResponse$RawInputRecords": "<p>The raw stream data that was sampled to infer the schema.</p>",
+        "UnableToDetectSchemaException$RawInputRecords": "<p>Raw stream data that was sampled to infer the schema.</p>"
+      }
+    },
+    "RecordColumn": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the mapping of each data element in the streaming source to the corresponding column in the in-application stream.</p> <p>Also used to describe the format of the reference data source.</p>",
+      "refs": {
+        "RecordColumns$member": null
+      }
+    },
+    "RecordColumnDelimiter": {
+      "base": null,
+      "refs": {
+        "CSVMappingParameters$RecordColumnDelimiter": "<p>The column delimiter. For example, in a CSV format, a comma (\",\") is the typical column delimiter.</p>"
+      }
+    },
+    "RecordColumnMapping": {
+      "base": null,
+      "refs": {
+        "RecordColumn$Mapping": "<p>A reference to the data element in the streaming input or the reference data source.</p>"
+      }
+    },
+    "RecordColumnName": {
+      "base": null,
+      "refs": {
+        "RecordColumn$Name": "<p>The name of the column that is created in the in-application input stream or reference table.</p>"
+      }
+    },
+    "RecordColumnSqlType": {
+      "base": null,
+      "refs": {
+        "RecordColumn$SqlType": "<p>The type of column created in the in-application input stream or reference table.</p>"
+      }
+    },
+    "RecordColumns": {
+      "base": null,
+      "refs": {
+        "InputSchemaUpdate$RecordColumnUpdates": "<p>A list of <code>RecordColumn</code> objects. Each object describes the mapping of the streaming source element to the corresponding column in the in-application stream.</p>",
+        "SourceSchema$RecordColumns": "<p>A list of <code>RecordColumn</code> objects. </p>"
+      }
+    },
+    "RecordEncoding": {
+      "base": null,
+      "refs": {
+        "InputSchemaUpdate$RecordEncodingUpdate": "<p>Specifies the encoding of the records in the streaming source; for example, UTF-8.</p>",
+        "SourceSchema$RecordEncoding": "<p>Specifies the encoding of the records in the streaming source. For example, UTF-8.</p>"
+      }
+    },
+    "RecordFormat": {
+      "base": "<p> For a SQL-based Kinesis Data Analytics application, describes the record format and relevant mapping information that should be applied to schematize the records on the stream. </p>",
+      "refs": {
+        "InputSchemaUpdate$RecordFormatUpdate": "<p>Specifies the format of the records on the streaming source.</p>",
+        "SourceSchema$RecordFormat": "<p>Specifies the format of the records on the streaming source.</p>"
+      }
+    },
+    "RecordFormatType": {
+      "base": null,
+      "refs": {
+        "DestinationSchema$RecordFormatType": "<p>Specifies the format of the records on the output stream.</p>",
+        "RecordFormat$RecordFormatType": "<p>The type of record format.</p>"
+      }
+    },
+    "RecordRowDelimiter": {
+      "base": null,
+      "refs": {
+        "CSVMappingParameters$RecordRowDelimiter": "<p>The row delimiter. For example, in a CSV format, <i>'\\n'</i> is the typical row delimiter.</p>"
+      }
+    },
+    "RecordRowPath": {
+      "base": null,
+      "refs": {
+        "JSONMappingParameters$RecordRowPath": "<p>The path to the top-level parent that contains the records.</p>"
+      }
+    },
+    "ReferenceDataSource": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the reference data source by providing the source information (Amazon S3 bucket name and object key name), the resulting in-application table name that is created, and the necessary schema to map the data elements in the Amazon S3 object to the in-application table.</p>",
+      "refs": {
+        "AddApplicationReferenceDataSourceRequest$ReferenceDataSource": "<p>The reference data source can be an object in your Amazon S3 bucket. Kinesis Data Analytics reads the object and copies the data into the in-application table that is created. You provide an S3 bucket, object key name, and the resulting in-application table that is created. </p>",
+        "ReferenceDataSources$member": null
+      }
+    },
+    "ReferenceDataSourceDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the reference data source configured for an application.</p>",
+      "refs": {
+        "ReferenceDataSourceDescriptions$member": null
+      }
+    },
+    "ReferenceDataSourceDescriptions": {
+      "base": null,
+      "refs": {
+        "AddApplicationReferenceDataSourceResponse$ReferenceDataSourceDescriptions": "<p>Describes reference data sources configured for the application. </p>",
+        "SqlApplicationConfigurationDescription$ReferenceDataSourceDescriptions": "<p>The array of <a>ReferenceDataSourceDescription</a> objects describing the reference data sources used by the application.</p>"
+      }
+    },
+    "ReferenceDataSourceUpdate": {
+      "base": "<p>When you update a reference data source configuration for a SQL-based Kinesis Data Analytics application, this object provides all the updated values (such as the source bucket name and object key name), the in-application table name that is created, and updated mapping information that maps the data in the Amazon S3 object to the in-application reference table that is created.</p>",
+      "refs": {
+        "ReferenceDataSourceUpdates$member": null
+      }
+    },
+    "ReferenceDataSourceUpdates": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfigurationUpdate$ReferenceDataSourceUpdates": "<p>The array of <a>ReferenceDataSourceUpdate</a> objects describing the new reference data sources used by the application.</p>"
+      }
+    },
+    "ReferenceDataSources": {
+      "base": null,
+      "refs": {
+        "SqlApplicationConfiguration$ReferenceDataSources": "<p>The array of <a>ReferenceDataSource</a> objects describing the reference data sources used by the application.</p>"
+      }
+    },
+    "ResourceARN": {
+      "base": null,
+      "refs": {
+        "AddApplicationCloudWatchLoggingOptionResponse$ApplicationARN": "<p>The application's ARN.</p>",
+        "AddApplicationInputProcessingConfigurationResponse$ApplicationARN": "<p>The Amazon Resource Name (ARN) of the application.</p>",
+        "AddApplicationInputResponse$ApplicationARN": "<p>The Amazon Resource Name (ARN) of the application.</p>",
+        "AddApplicationOutputResponse$ApplicationARN": "<p>The application Amazon Resource Name (ARN).</p>",
+        "AddApplicationReferenceDataSourceResponse$ApplicationARN": "<p>The application Amazon Resource Name (ARN).</p>",
+        "AddApplicationVpcConfigurationResponse$ApplicationARN": "<p>The ARN of the application.</p>",
+        "ApplicationDetail$ApplicationARN": "<p>The ARN of the application.</p>",
+        "ApplicationSummary$ApplicationARN": "<p>The ARN of the application.</p>",
+        "DeleteApplicationCloudWatchLoggingOptionResponse$ApplicationARN": "<p>The application's Amazon Resource Name (ARN).</p>",
+        "DeleteApplicationInputProcessingConfigurationResponse$ApplicationARN": "<p>The Amazon Resource Name (ARN) of the application.</p>",
+        "DeleteApplicationOutputResponse$ApplicationARN": "<p>The application Amazon Resource Name (ARN).</p>",
+        "DeleteApplicationReferenceDataSourceResponse$ApplicationARN": "<p>The application Amazon Resource Name (ARN).</p>",
+        "DeleteApplicationVpcConfigurationResponse$ApplicationARN": "<p>The ARN of the Kinesis Data Analytics application.</p>",
+        "DiscoverInputSchemaRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the streaming source.</p>",
+        "InputLambdaProcessor$ResourceARN": "<p>The ARN of the AWS Lambda function that operates on records in the stream.</p> <note> <p>To specify an earlier version of the Lambda function than the latest, include the Lambda function version in the Lambda function ARN. For more information about Lambda ARNs, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-lambda\">Example ARNs: AWS Lambda</a> </p> </note>",
+        "InputLambdaProcessorDescription$ResourceARN": "<p>The ARN of the AWS Lambda function that is used to preprocess the records in the stream.</p> <note> <p>To specify an earlier version of the Lambda function than the latest, include the Lambda function version in the Lambda function ARN. For more information about Lambda ARNs, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-lambda\">Example ARNs: AWS Lambda</a> </p> </note>",
+        "InputLambdaProcessorUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the new AWS Lambda function that is used to preprocess the records in the stream.</p> <note> <p>To specify an earlier version of the Lambda function than the latest, include the Lambda function version in the Lambda function ARN. For more information about Lambda ARNs, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-lambda\">Example ARNs: AWS Lambda</a> </p> </note>",
+        "KinesisFirehoseInput$ResourceARN": "<p>The Amazon Resource Name (ARN) of the delivery stream.</p>",
+        "KinesisFirehoseInputDescription$ResourceARN": "<p>The Amazon Resource Name (ARN) of the delivery stream.</p>",
+        "KinesisFirehoseInputUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the input delivery stream to read.</p>",
+        "KinesisFirehoseOutput$ResourceARN": "<p>The ARN of the destination delivery stream to write to.</p>",
+        "KinesisFirehoseOutputDescription$ResourceARN": "<p>The Amazon Resource Name (ARN) of the delivery stream.</p>",
+        "KinesisFirehoseOutputUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the delivery stream to write to. </p>",
+        "KinesisStreamsInput$ResourceARN": "<p>The ARN of the input Kinesis data stream to read.</p>",
+        "KinesisStreamsInputDescription$ResourceARN": "<p>The Amazon Resource Name (ARN) of the Kinesis data stream.</p>",
+        "KinesisStreamsInputUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the input Kinesis data stream to read.</p>",
+        "KinesisStreamsOutput$ResourceARN": "<p>The ARN of the destination Kinesis data stream to write to.</p>",
+        "KinesisStreamsOutputDescription$ResourceARN": "<p>The Amazon Resource Name (ARN) of the Kinesis data stream.</p>",
+        "KinesisStreamsOutputUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the Kinesis data stream where you want to write the output.</p>",
+        "LambdaOutput$ResourceARN": "<p>The Amazon Resource Name (ARN) of the destination Lambda function to write to.</p> <note> <p>To specify an earlier version of the Lambda function than the latest, include the Lambda function version in the Lambda function ARN. For more information about Lambda ARNs, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-lambda\">Example ARNs: AWS Lambda</a> </p> </note>",
+        "LambdaOutputDescription$ResourceARN": "<p>The Amazon Resource Name (ARN) of the destination Lambda function.</p>",
+        "LambdaOutputUpdate$ResourceARNUpdate": "<p>The Amazon Resource Name (ARN) of the destination AWS Lambda function.</p> <note> <p>To specify an earlier version of the Lambda function than the latest, include the Lambda function version in the Lambda function ARN. For more information about Lambda ARNs, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-lambda\">Example ARNs: AWS Lambda</a> </p> </note>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The application is not available for this operation.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Specified application can't be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceProvisionedThroughputExceededException": {
+      "base": "<p>Discovery failed to get a record from the streaming source because of the Kinesis Streams <code>ProvisionedThroughputExceededException</code>. For more information, see <a href=\"http://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html\">GetRecords</a> in the Amazon Kinesis Streams API Reference.</p>",
+      "refs": {
+      }
+    },
+    "RoleARN": {
+      "base": null,
+      "refs": {
+        "ApplicationDetail$ServiceExecutionRole": "<p>Specifies the IAM role that the application uses to access external resources.</p>",
+        "CloudWatchLoggingOptionDescription$RoleARN": "<p>The IAM ARN of the role to use to send application messages. </p> <note> <p>Provided for backward compatibility. Applications created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "CreateApplicationRequest$ServiceExecutionRole": "<p>The IAM role used by the application to access Kinesis data streams, Kinesis Data Firehose delivery streams, Amazon S3 objects, and other external resources.</p>",
+        "DiscoverInputSchemaRequest$ServiceExecutionRole": "<p>The ARN of the role that is used to access the streaming source.</p>",
+        "InputLambdaProcessorDescription$RoleARN": "<p>The ARN of the IAM role that is used to access the AWS Lambda function.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "KinesisFirehoseInputDescription$RoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics assumes to access the stream.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "KinesisFirehoseOutputDescription$RoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics can assume to access the stream.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "KinesisStreamsInputDescription$RoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics can assume to access the stream.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "KinesisStreamsOutputDescription$RoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics can assume to access the stream.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "LambdaOutputDescription$RoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics can assume to write to the destination function.</p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "S3ReferenceDataSourceDescription$ReferenceRoleARN": "<p>The ARN of the IAM role that Kinesis Data Analytics can assume to read the Amazon S3 object on your behalf to populate the in-application reference table. </p> <note> <p>Provided for backward compatibility. Applications that are created with the current API version have an application-level service execution role rather than a resource-level role.</p> </note>",
+        "UpdateApplicationRequest$ServiceExecutionRoleUpdate": "<p>Describes updates to the service execution role.</p>"
+      }
+    },
+    "RunConfiguration": {
+      "base": "<p>Describes the starting parameters for an Kinesis Data Analytics application.</p>",
+      "refs": {
+        "StartApplicationRequest$RunConfiguration": "<p>Identifies the run configuration (start parameters) of a Kinesis Data Analytics application.</p>"
+      }
+    },
+    "RunConfigurationDescription": {
+      "base": "<p>Describes the starting properties for a Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$RunConfigurationDescription": "<p>The details about the starting properties for a Kinesis Data Analytics application.</p>"
+      }
+    },
+    "RunConfigurationUpdate": {
+      "base": "<p>Describes the updates to the starting parameters for a Kinesis Data Analytics application.</p>",
+      "refs": {
+        "UpdateApplicationRequest$RunConfigurationUpdate": "<p>Describes updates to the application's starting parameters.</p>"
+      }
+    },
+    "RuntimeEnvironment": {
+      "base": null,
+      "refs": {
+        "ApplicationDetail$RuntimeEnvironment": "<p>The runtime environment for the application (<code>SQL-1.0</code>, <code>FLINK-1_6</code>, or <code>FLINK-1_8</code>).</p>",
+        "ApplicationSummary$RuntimeEnvironment": "<p>The runtime environment for the application (<code>SQL-1.0</code>, <code>FLINK-1_6</code>, or <code>FLINK-1_8</code>).</p>",
+        "CreateApplicationRequest$RuntimeEnvironment": "<p>The runtime environment for the application (<code>SQL-1.0</code>, <code>FLINK-1_6</code>, or <code>FLINK-1_8</code>).</p>"
+      }
+    },
+    "S3ApplicationCodeLocationDescription": {
+      "base": "<p>Describes the location of a Flink-based Kinesis Data Analytics application's code stored in an S3 bucket.</p>",
+      "refs": {
+        "CodeContentDescription$S3ApplicationCodeLocationDescription": "<p>The S3 bucket Amazon Resource Name (ARN), file key, and object version of the application code stored in Amazon S3.</p>"
+      }
+    },
+    "S3Configuration": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides a description of an Amazon S3 data source, including the Amazon Resource Name (ARN) of the S3 bucket and the name of the Amazon S3 object that contains the data.</p>",
+      "refs": {
+        "DiscoverInputSchemaRequest$S3Configuration": "<p>Specify this parameter to discover a schema from data in an Amazon S3 object.</p>"
+      }
+    },
+    "S3ContentLocation": {
+      "base": "<p>For a Flink-based Kinesis Data Analytics application, provides a description of an Amazon S3 object, including the Amazon Resource Name (ARN) of the S3 bucket, the name of the Amazon S3 object that contains the data, and the version number of the Amazon S3 object that contains the data. </p>",
+      "refs": {
+        "CodeContent$S3ContentLocation": "<p>Information about the Amazon S3 bucket containing the application code.</p>"
+      }
+    },
+    "S3ContentLocationUpdate": {
+      "base": "<p>Describes an update for the Amazon S3 code content location for a Flink-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "CodeContentUpdate$S3ContentLocationUpdate": "<p>Describes an update to the location of code for an application.</p>"
+      }
+    },
+    "S3ReferenceDataSource": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, identifies the Amazon S3 bucket and object that contains the reference data.</p> <p>A Kinesis Data Analytics application loads reference data only once. If the data changes, you call the <a>UpdateApplication</a> operation to trigger reloading of data into your application. </p>",
+      "refs": {
+        "ReferenceDataSource$S3ReferenceDataSource": "<p>Identifies the S3 bucket and object that contains the reference data. A Kinesis Data Analytics application loads reference data only once. If the data changes, you call the <a>UpdateApplication</a> operation to trigger reloading of data into your application. </p>"
+      }
+    },
+    "S3ReferenceDataSourceDescription": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, provides the bucket name and object key name that stores the reference data.</p>",
+      "refs": {
+        "ReferenceDataSourceDescription$S3ReferenceDataSourceDescription": "<p>Provides the Amazon S3 bucket name, the object key name that contains the reference data. </p>"
+      }
+    },
+    "S3ReferenceDataSourceUpdate": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the Amazon S3 bucket name and object key name for an in-application reference table. </p>",
+      "refs": {
+        "ReferenceDataSourceUpdate$S3ReferenceDataSourceUpdate": "<p>Describes the S3 bucket name, object key name, and IAM role that Kinesis Data Analytics can assume to read the Amazon S3 object on your behalf and populate the in-application reference table.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "SecurityGroupIds$member": null
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "VpcConfiguration$SecurityGroupIds": "<p>The array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html\">SecurityGroup</a> IDs used by the VPC configuration.</p>",
+        "VpcConfigurationDescription$SecurityGroupIds": "<p>The array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html\">SecurityGroup</a> IDs used by the VPC configuration.</p>",
+        "VpcConfigurationUpdate$SecurityGroupIdUpdates": "<p>Describes updates to the array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html\">SecurityGroup</a> IDs used by the VPC configuration.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The service cannot complete the request.</p>",
+      "refs": {
+      }
+    },
+    "SnapshotDetails": {
+      "base": "<p>Provides details about a snapshot of application state.</p>",
+      "refs": {
+        "DescribeApplicationSnapshotResponse$SnapshotDetails": "<p>An object containing information about the application snapshot.</p>",
+        "SnapshotSummaries$member": null
+      }
+    },
+    "SnapshotName": {
+      "base": null,
+      "refs": {
+        "ApplicationRestoreConfiguration$SnapshotName": "<p>The identifier of an existing snapshot of application state to use to restart an application. The application uses this value if <code>RESTORE_FROM_CUSTOM_SNAPSHOT</code> is specified for the <code>ApplicationRestoreType</code>.</p>",
+        "CreateApplicationSnapshotRequest$SnapshotName": "<p>An identifier for the application snapshot.</p>",
+        "DeleteApplicationSnapshotRequest$SnapshotName": "<p>The identifier for the snapshot delete.</p>",
+        "DescribeApplicationSnapshotRequest$SnapshotName": "<p>The identifier of an application snapshot. You can retrieve this value using .</p>",
+        "SnapshotDetails$SnapshotName": "<p>The identifier for the application snapshot.</p>"
+      }
+    },
+    "SnapshotStatus": {
+      "base": null,
+      "refs": {
+        "SnapshotDetails$SnapshotStatus": "<p>The status of the application snapshot.</p>"
+      }
+    },
+    "SnapshotSummaries": {
+      "base": null,
+      "refs": {
+        "ListApplicationSnapshotsResponse$SnapshotSummaries": "<p>A collection of objects containing information about the application snapshots.</p>"
+      }
+    },
+    "SourceSchema": {
+      "base": "<p>For a SQL-based Kinesis Data Analytics application, describes the format of the data in the streaming source, and how each data element maps to corresponding columns created in the in-application stream. </p>",
+      "refs": {
+        "DiscoverInputSchemaResponse$InputSchema": "<p>The schema inferred from the streaming source. It identifies the format of the data in the streaming source and how each data element maps to corresponding columns in the in-application stream that you can create.</p>",
+        "Input$InputSchema": "<p>Describes the format of the data in the streaming source, and how each data element maps to corresponding columns in the in-application stream that is being created.</p> <p>Also used to describe the format of the reference data source.</p>",
+        "InputDescription$InputSchema": "<p>Describes the format of the data in the streaming source, and how each data element maps to corresponding columns in the in-application stream that is being created. </p>",
+        "ReferenceDataSource$ReferenceSchema": "<p>Describes the format of the data in the streaming source, and how each data element maps to corresponding columns created in the in-application stream.</p>",
+        "ReferenceDataSourceDescription$ReferenceSchema": "<p>Describes the format of the data in the streaming source, and how each data element maps to corresponding columns created in the in-application stream.</p>",
+        "ReferenceDataSourceUpdate$ReferenceSchemaUpdate": "<p>Describes the format of the data in the streaming source, and how each data element maps to corresponding columns created in the in-application stream. </p>"
+      }
+    },
+    "SqlApplicationConfiguration": {
+      "base": "<p>Describes the inputs, outputs, and reference data sources for a SQL-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfiguration$SqlApplicationConfiguration": "<p>The creation and update parameters for a SQL-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "SqlApplicationConfigurationDescription": {
+      "base": "<p>Describes the inputs, outputs, and reference data sources for a SQL-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationDescription$SqlApplicationConfigurationDescription": "<p>The details about inputs, outputs, and reference data sources for a SQL-based Kinesis Data Analytics application.</p>"
+      }
+    },
+    "SqlApplicationConfigurationUpdate": {
+      "base": "<p>Describes updates to the input streams, destination streams, and reference data sources for a SQL-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "ApplicationConfigurationUpdate$SqlApplicationConfigurationUpdate": "<p>Describes updates to a SQL-based Kinesis Data Analytics application's configuration.</p>"
+      }
+    },
+    "SqlRunConfiguration": {
+      "base": "<p>Describes the starting parameters for a SQL-based Kinesis Data Analytics application.</p>",
+      "refs": {
+        "SqlRunConfigurations$member": null
+      }
+    },
+    "SqlRunConfigurations": {
+      "base": null,
+      "refs": {
+        "RunConfiguration$SqlRunConfigurations": "<p>Describes the starting parameters for a SQL-based Kinesis Data Analytics application application.</p>"
+      }
+    },
+    "StartApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "VpcConfiguration$SubnetIds": "<p>The array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html\">Subnet</a> IDs used by the VPC configuration.</p>",
+        "VpcConfigurationDescription$SubnetIds": "<p>The array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html\">Subnet</a> IDs used by the VPC configuration.</p>",
+        "VpcConfigurationUpdate$SubnetIdUpdates": "<p>Describes updates to the array of <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html\">Subnet</a> IDs used by the VPC configuration.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A key-value pair (the value is optional) that you can define and assign to AWS resources. If you specify a tag that already exists, the tag value is replaced with the value that you specify in the request. Note that the maximum number of application tags includes system tags. The maximum number of user-defined application tags is 50. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-tagging.html\">Using Tagging</a>.</p>",
+      "refs": {
+        "Tags$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the key-value tag.</p>",
+        "TagKeys$member": null
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>A list of keys of tags to remove from the specified application.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the key-value tag. The value is optional.</p>"
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateApplicationRequest$Tags": "<p>A list of one or more tags to assign to the application. A tag is a key-value pair that identifies an application. Note that the maximum number of application tags includes system tags. The maximum number of user-defined application tags is 50. For more information, see <a href=\"https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-tagging.html\">Using Tagging</a>.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>The key-value tags assigned to the application.</p>",
+        "TagResourceRequest$Tags": "<p>The key-value tags to assign to the application.</p>"
+      }
+    },
+    "TextContent": {
+      "base": null,
+      "refs": {
+        "CodeContent$TextContent": "<p>The text-format code for a Flink-based Kinesis Data Analytics application.</p>",
+        "CodeContentDescription$TextContent": "<p>The text-format code</p>",
+        "CodeContentUpdate$TextContentUpdate": "<p>Describes an update to the text code for an application.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "ApplicationDetail$CreateTimestamp": "<p>The current timestamp when the application was created.</p>",
+        "ApplicationDetail$LastUpdateTimestamp": "<p>The current timestamp when the application was last updated.</p>",
+        "DeleteApplicationRequest$CreateTimestamp": "<p>Use the <code>DescribeApplication</code> operation to get this value.</p>",
+        "DeleteApplicationSnapshotRequest$SnapshotCreationTimestamp": "<p>The creation timestamp of the application snapshot to delete. You can retrieve this value using or .</p>",
+        "SnapshotDetails$SnapshotCreationTimestamp": "<p>The timestamp of the application snapshot.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>Application created with too many tags, or too many tags added to an application. Note that the maximum number of application tags includes system tags. The maximum number of user-defined application tags is 50.</p>",
+      "refs": {
+      }
+    },
+    "UnableToDetectSchemaException": {
+      "base": "<p>The data format is not valid. Kinesis Data Analytics cannot detect the schema for the given streaming source.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedOperationException": {
+      "base": "<p>The request was rejected because a specified parameter is not supported or a specified resource is not valid for this operation. </p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VpcConfiguration": {
+      "base": "<p>Describes the parameters of a VPC used by the application.</p>",
+      "refs": {
+        "AddApplicationVpcConfigurationRequest$VpcConfiguration": "<p>Description of the VPC to add to the application.</p>",
+        "VpcConfigurations$member": null
+      }
+    },
+    "VpcConfigurationDescription": {
+      "base": "<p>Describes the parameters of a VPC used by the application.</p>",
+      "refs": {
+        "AddApplicationVpcConfigurationResponse$VpcConfigurationDescription": "<p>The parameters of the new VPC configuration.</p>",
+        "VpcConfigurationDescriptions$member": null
+      }
+    },
+    "VpcConfigurationDescriptions": {
+      "base": null,
+      "refs": {
+        "ApplicationConfigurationDescription$VpcConfigurationDescriptions": "<p>The array of descriptions of VPC configurations available to the application.</p>"
+      }
+    },
+    "VpcConfigurationUpdate": {
+      "base": "<p>Describes updates to the VPC configuration used by the application.</p>",
+      "refs": {
+        "VpcConfigurationUpdates$member": null
+      }
+    },
+    "VpcConfigurationUpdates": {
+      "base": null,
+      "refs": {
+        "ApplicationConfigurationUpdate$VpcConfigurationUpdates": "<p>Updates to the array of descriptions of VPC configurations available to the application.</p>"
+      }
+    },
+    "VpcConfigurations": {
+      "base": null,
+      "refs": {
+        "ApplicationConfiguration$VpcConfigurations": "<p>The array of descriptions of VPC configurations available to the application.</p>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "VpcConfigurationDescription$VpcId": "<p>The ID of the associated VPC.</p>"
+      }
+    },
+    "ZipFileContent": {
+      "base": null,
+      "refs": {
+        "CodeContent$ZipFileContent": "<p>The zip-format code for a Flink-based Kinesis Data Analytics application.</p>",
+        "CodeContentUpdate$ZipFileContentUpdate": "<p>Describes an update to the zipped code for an application.</p>"
+      }
+    }
+  }
+}

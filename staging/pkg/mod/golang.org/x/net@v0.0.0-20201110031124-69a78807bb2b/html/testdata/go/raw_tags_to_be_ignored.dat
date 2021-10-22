@@ -1,0 +1,97 @@
+#data
+<!doctype html><table><select><iframe>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><noembed>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><noframes>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><noscript>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><style>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><title>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"
+
+#data
+<!doctype html><table><select><xmp>a<caption>b
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "a"
+|     <table>
+|       <caption>
+|         "b"

@@ -1,0 +1,1146 @@
+{
+  "version": "2.0",
+  "service": "<p> AWS CodeArtifact is a fully managed artifact repository compatible with language-native package managers and build tools such as npm, Apache Maven, and pip. You can use CodeArtifact to share packages with development teams and pull packages. Packages can be pulled from both public and CodeArtifact repositories. You can also create an upstream relationship between a CodeArtifact repository and another repository, which effectively merges their contents from the point of view of a package manager client. </p> <p> <b>AWS CodeArtifact Components</b> </p> <p>Use the information in this guide to help you work with the following CodeArtifact components:</p> <ul> <li> <p> <b>Repository</b>: A CodeArtifact repository contains a set of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/welcome.html#welcome-concepts-package-version\">package versions</a>, each of which maps to a set of assets, or files. Repositories are polyglot, so a single repository can contain packages of any supported type. Each repository exposes endpoints for fetching and publishing packages using tools like the <b> <code>npm</code> </b> CLI, the Maven CLI (<b> <code>mvn</code> </b>), and <b> <code>pip</code> </b>.</p> </li> <li> <p> <b>Domain</b>: Repositories are aggregated into a higher-level entity known as a <i>domain</i>. All package assets and metadata are stored in the domain, but are consumed through repositories. A given package asset, such as a Maven JAR file, is stored once per domain, no matter how many repositories it's present in. All of the assets and metadata in a domain are encrypted with the same customer master key (CMK) stored in AWS Key Management Service (AWS KMS).</p> <p>Each repository is a member of a single domain and can't be moved to a different domain.</p> <p>The domain allows organizational policy to be applied across multiple repositories, such as which accounts can access repositories in the domain, and which public repositories can be used as sources of packages.</p> <p>Although an organization can have multiple domains, we recommend a single production domain that contains all published artifacts so that teams can find and share packages across their organization.</p> </li> <li> <p> <b>Package</b>: A <i>package</i> is a bundle of software and the metadata required to resolve dependencies and install the software. CodeArtifact supports <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/using-npm.html\">npm</a>, <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/using-python.html\">PyPI</a>, and <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/using-maven\">Maven</a> package formats.</p> <p>In CodeArtifact, a package consists of:</p> <ul> <li> <p>A <i>name</i> (for example, <code>webpack</code> is the name of a popular npm package)</p> </li> <li> <p>An optional namespace (for example, <code>@types</code> in <code>@types/node</code>)</p> </li> <li> <p>A set of versions (for example, <code>1.0.0</code>, <code>1.0.1</code>, <code>1.0.2</code>, etc.)</p> </li> <li> <p> Package-level metadata (for example, npm tags)</p> </li> </ul> </li> <li> <p> <b>Package version</b>: A version of a package, such as <code>@types/node 12.6.9</code>. The version number format and semantics vary for different package formats. For example, npm package versions must conform to the <a href=\"https://semver.org/\">Semantic Versioning specification</a>. In CodeArtifact, a package version consists of the version identifier, metadata at the package version level, and a set of assets.</p> </li> <li> <p> <b>Upstream repository</b>: One repository is <i>upstream</i> of another when the package versions in it can be accessed from the repository endpoint of the downstream repository, effectively merging the contents of the two repositories from the point of view of a client. CodeArtifact allows creating an upstream relationship between two repositories.</p> </li> <li> <p> <b>Asset</b>: An individual file stored in CodeArtifact associated with a package version, such as an npm <code>.tgz</code> file or Maven POM and JAR files.</p> </li> </ul> <p>CodeArtifact supports these operations:</p> <ul> <li> <p> <code>AssociateExternalConnection</code>: Adds an existing external connection to a repository. </p> </li> <li> <p> <code>CopyPackageVersions</code>: Copies package versions from one repository to another repository in the same domain.</p> </li> <li> <p> <code>CreateDomain</code>: Creates a domain</p> </li> <li> <p> <code>CreateRepository</code>: Creates a CodeArtifact repository in a domain. </p> </li> <li> <p> <code>DeleteDomain</code>: Deletes a domain. You cannot delete a domain that contains repositories. </p> </li> <li> <p> <code>DeleteDomainPermissionsPolicy</code>: Deletes the resource policy that is set on a domain.</p> </li> <li> <p> <code>DeletePackageVersions</code>: Deletes versions of a package. After a package has been deleted, it can be republished, but its assets and metadata cannot be restored because they have been permanently removed from storage.</p> </li> <li> <p> <code>DeleteRepository</code>: Deletes a repository. </p> </li> <li> <p> <code>DeleteRepositoryPermissionsPolicy</code>: Deletes the resource policy that is set on a repository.</p> </li> <li> <p> <code>DescribeDomain</code>: Returns a <code>DomainDescription</code> object that contains information about the requested domain.</p> </li> <li> <p> <code>DescribePackageVersion</code>: Returns a <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionDescription.html\">PackageVersionDescription</a> </code> object that contains details about a package version. </p> </li> <li> <p> <code>DescribeRepository</code>: Returns a <code>RepositoryDescription</code> object that contains detailed information about the requested repository. </p> </li> <li> <p> <code>DisposePackageVersions</code>: Disposes versions of a package. A package version with the status <code>Disposed</code> cannot be restored because they have been permanently removed from storage.</p> </li> <li> <p> <code>DisassociateExternalConnection</code>: Removes an existing external connection from a repository. </p> </li> <li> <p> <code>GetAuthorizationToken</code>: Generates a temporary authorization token for accessing repositories in the domain. The token expires the authorization period has passed. The default authorization period is 12 hours and can be customized to any length with a maximum of 12 hours.</p> </li> <li> <p> <code>GetDomainPermissionsPolicy</code>: Returns the policy of a resource that is attached to the specified domain. </p> </li> <li> <p> <code>GetPackageVersionAsset</code>: Returns the contents of an asset that is in a package version. </p> </li> <li> <p> <code>GetPackageVersionReadme</code>: Gets the readme file or descriptive text for a package version.</p> </li> <li> <p> <code>GetRepositoryEndpoint</code>: Returns the endpoint of a repository for a specific package format. A repository has one endpoint for each package format: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul> </li> <li> <p> <code>GetRepositoryPermissionsPolicy</code>: Returns the resource policy that is set on a repository. </p> </li> <li> <p> <code>ListDomains</code>: Returns a list of <code>DomainSummary</code> objects. Each returned <code>DomainSummary</code> object contains information about a domain.</p> </li> <li> <p> <code>ListPackages</code>: Lists the packages in a repository.</p> </li> <li> <p> <code>ListPackageVersionAssets</code>: Lists the assets for a given package version.</p> </li> <li> <p> <code>ListPackageVersionDependencies</code>: Returns a list of the direct dependencies for a package version. </p> </li> <li> <p> <code>ListPackageVersions</code>: Returns a list of package versions for a specified package in a repository.</p> </li> <li> <p> <code>ListRepositories</code>: Returns a list of repositories owned by the AWS account that called this method.</p> </li> <li> <p> <code>ListRepositoriesInDomain</code>: Returns a list of the repositories in a domain.</p> </li> <li> <p> <code>PutDomainPermissionsPolicy</code>: Attaches a resource policy to a domain.</p> </li> <li> <p> <code>PutRepositoryPermissionsPolicy</code>: Sets the resource policy on a repository that specifies permissions to access it. </p> </li> <li> <p> <code>UpdatePackageVersionsStatus</code>: Updates the status of one or more versions of a package.</p> </li> <li> <p> <code>UpdateRepository</code>: Updates the properties of a repository.</p> </li> </ul>",
+  "operations": {
+    "AssociateExternalConnection": "<p>Adds an existing external connection to a repository. One external connection is allowed per repository.</p> <note> <p>A repository can have one or more upstream repositories, or an external connection.</p> </note>",
+    "CopyPackageVersions": "<p> Copies package versions from one repository to another repository in the same domain. </p> <note> <p> You must specify <code>versions</code> or <code>versionRevisions</code>. You cannot specify both. </p> </note>",
+    "CreateDomain": "<p> Creates a domain. CodeArtifact <i>domains</i> make it easier to manage multiple repositories across an organization. You can use a domain to apply permissions across many repositories owned by different AWS accounts. An asset is stored only once in a domain, even if it's in multiple repositories. </p> <p>Although you can have multiple domains, we recommend a single production domain that contains all published artifacts so that your development teams can find and share packages. You can use a second pre-production domain to test changes to the production domain configuration. </p>",
+    "CreateRepository": "<p> Creates a repository. </p>",
+    "DeleteDomain": "<p> Deletes a domain. You cannot delete a domain that contains repositories. If you want to delete a domain with repositories, first delete its repositories. </p>",
+    "DeleteDomainPermissionsPolicy": "<p> Deletes the resource policy set on a domain. </p>",
+    "DeletePackageVersions": "<p> Deletes one or more versions of a package. A deleted package version cannot be restored in your repository. If you want to remove a package version from your repository and be able to restore it later, set its status to <code>Archived</code>. Archived packages cannot be downloaded from a repository and don't show up with list package APIs (for example, <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackageVersions.html\">ListackageVersions</a> </code>), but you can restore them using <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_UpdatePackageVersionsStatus.html\">UpdatePackageVersionsStatus</a> </code>. </p>",
+    "DeleteRepository": "<p> Deletes a repository. </p>",
+    "DeleteRepositoryPermissionsPolicy": "<p> Deletes the resource policy that is set on a repository. After a resource policy is deleted, the permissions allowed and denied by the deleted policy are removed. The effect of deleting a resource policy might not be immediate. </p> <important> <p> Use <code>DeleteRepositoryPermissionsPolicy</code> with caution. After a policy is deleted, AWS users, roles, and accounts lose permissions to perform the repository actions granted by the deleted policy. </p> </important>",
+    "DescribeDomain": "<p> Returns a <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_DomainDescription.html\"> <code>DomainDescription</code> </a> object that contains information about the requested domain. </p>",
+    "DescribePackageVersion": "<p> Returns a <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionDescription.html\"> <code>PackageVersionDescription</code> </a> object that contains information about the requested package version. </p>",
+    "DescribeRepository": "<p> Returns a <code>RepositoryDescription</code> object that contains detailed information about the requested repository. </p>",
+    "DisassociateExternalConnection": "<p> Removes an existing external connection from a repository. </p>",
+    "DisposePackageVersions": "<p> Deletes the assets in package versions and sets the package versions' status to <code>Disposed</code>. A disposed package version cannot be restored in your repository because its assets are deleted. </p> <p> To view all disposed package versions in a repository, use <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackageVersions.html\"> <code>ListPackageVersions</code> </a> and set the <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackageVersions.html#API_ListPackageVersions_RequestSyntax\"> <code>status</code> </a> parameter to <code>Disposed</code>. </p> <p> To view information about a disposed package version, use <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_DescribePackageVersion.html\"> <code>DescribePackageVersion</code> </a>.. </p>",
+    "GetAuthorizationToken": "<p> Generates a temporary authorization token for accessing repositories in the domain. This API requires the <code>codeartifact:GetAuthorizationToken</code> and <code>sts:GetServiceBearerToken</code> permissions. For more information about authorization tokens, see <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/tokens-authentication.html\">AWS CodeArtifact authentication and tokens</a>. </p> <note> <p>CodeArtifact authorization tokens are valid for a period of 12 hours when created with the <code>login</code> command. You can call <code>login</code> periodically to refresh the token. When you create an authorization token with the <code>GetAuthorizationToken</code> API, you can set a custom authorization period, up to a maximum of 12 hours, with the <code>durationSeconds</code> parameter.</p> <p>The authorization period begins after <code>login</code> or <code>GetAuthorizationToken</code> is called. If <code>login</code> or <code>GetAuthorizationToken</code> is called while assuming a role, the token lifetime is independent of the maximum session duration of the role. For example, if you call <code>sts assume-role</code> and specify a session duration of 15 minutes, then generate a CodeArtifact authorization token, the token will be valid for the full authorization period even though this is longer than the 15-minute session duration.</p> <p>See <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html\">Using IAM Roles</a> for more information on controlling session duration. </p> </note>",
+    "GetDomainPermissionsPolicy": "<p> Returns the resource policy attached to the specified domain. </p> <note> <p> The policy is a resource-based policy, not an identity-based policy. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_identity-vs-resource.html\">Identity-based policies and resource-based policies </a> in the <i>AWS Identity and Access Management User Guide</i>. </p> </note>",
+    "GetPackageVersionAsset": "<p> Returns an asset (or file) that is in a package. For example, for a Maven package version, use <code>GetPackageVersionAsset</code> to download a <code>JAR</code> file, a <code>POM</code> file, or any other assets in the package version. </p>",
+    "GetPackageVersionReadme": "<p> Gets the readme file or descriptive text for a package version. For packages that do not contain a readme file, CodeArtifact extracts a description from a metadata file. For example, from the <code>&lt;description&gt;</code> element in the <code>pom.xml</code> file of a Maven package. </p> <p> The returned text might contain formatting. For example, it might contain formatting for Markdown or reStructuredText. </p>",
+    "GetRepositoryEndpoint": "<p> Returns the endpoint of a repository for a specific package format. A repository has one endpoint for each package format: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+    "GetRepositoryPermissionsPolicy": "<p> Returns the resource policy that is set on a repository. </p>",
+    "ListDomains": "<p> Returns a list of <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionDescription.html\">DomainSummary</a> </code> objects for all domains owned by the AWS account that makes this call. Each returned <code>DomainSummary</code> object contains information about a domain. </p>",
+    "ListPackageVersionAssets": "<p> Returns a list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_AssetSummary.html\"> <code>AssetSummary</code> </a> objects for assets in a package version. </p>",
+    "ListPackageVersionDependencies": "<p> Returns the direct dependencies for a package version. The dependencies are returned as <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageDependency.html\"> <code>PackageDependency</code> </a> objects. CodeArtifact extracts the dependencies for a package version from the metadata file for the package format (for example, the <code>package.json</code> file for npm packages and the <code>pom.xml</code> file for Maven). Any package version dependencies that are not listed in the configuration file are not returned. </p>",
+    "ListPackageVersions": "<p> Returns a list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionSummary.html\"> <code>PackageVersionSummary</code> </a> objects for package versions in a repository that match the request parameters. </p>",
+    "ListPackages": "<p> Returns a list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageSummary.html\"> <code>PackageSummary</code> </a> objects for packages in a repository that match the request parameters. </p>",
+    "ListRepositories": "<p> Returns a list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_RepositorySummary.html\"> <code>RepositorySummary</code> </a> objects. Each <code>RepositorySummary</code> contains information about a repository in the specified AWS account and that matches the input parameters. </p>",
+    "ListRepositoriesInDomain": "<p> Returns a list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_RepositorySummary.html\"> <code>RepositorySummary</code> </a> objects. Each <code>RepositorySummary</code> contains information about a repository in the specified domain and that matches the input parameters. </p>",
+    "ListTagsForResource": "<p>Gets information about AWS tags for a specified Amazon Resource Name (ARN) in AWS CodeArtifact.</p>",
+    "PutDomainPermissionsPolicy": "<p> Sets a resource policy on a domain that specifies permissions to access it. </p> <p> When you call <code>PutDomainPermissionsPolicy</code>, the resource policy on the domain is ignored when evaluting permissions. This ensures that the owner of a domain cannot lock themselves out of the domain, which would prevent them from being able to update the resource policy. </p>",
+    "PutRepositoryPermissionsPolicy": "<p> Sets the resource policy on a repository that specifies permissions to access it. </p> <p> When you call <code>PutRepositoryPermissionsPolicy</code>, the resource policy on the repository is ignored when evaluting permissions. This ensures that the owner of a repository cannot lock themselves out of the repository, which would prevent them from being able to update the resource policy. </p>",
+    "TagResource": "<p>Adds or updates tags for a resource in AWS CodeArtifact.</p>",
+    "UntagResource": "<p>Removes tags from a resource in AWS CodeArtifact.</p>",
+    "UpdatePackageVersionsStatus": "<p> Updates the status of one or more versions of a package. </p>",
+    "UpdateRepository": "<p> Update the properties of a repository. </p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p> The operation did not succeed because of an unauthorized access attempt. </p>",
+      "refs": {
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "AssociateExternalConnectionRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "CopyPackageVersionsRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "CreateRepositoryRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DeleteDomainPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DeleteDomainRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DeletePackageVersionsRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DeleteRepositoryPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DeleteRepositoryRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DescribeDomainRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DescribePackageVersionRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DescribeRepositoryRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DisassociateExternalConnectionRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DisposePackageVersionsRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "DomainDescription$owner": "<p> The AWS account ID that owns the domain. </p>",
+        "DomainSummary$owner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "GetAuthorizationTokenRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "GetDomainPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "GetPackageVersionAssetRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "GetPackageVersionReadmeRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "GetRepositoryEndpointRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain that contains the repository. It does not include dashes or spaces. </p>",
+        "GetRepositoryPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListPackageVersionAssetsRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListPackageVersionDependenciesRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListPackageVersionsRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListPackagesRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListRepositoriesInDomainRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "ListRepositoriesInDomainRequest$administratorAccount": "<p> Filter the list of repositories to only include those that are managed by the AWS account ID. </p>",
+        "PutDomainPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "PutRepositoryPermissionsPolicyRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "RepositoryDescription$administratorAccount": "<p> The 12-digit account number of the AWS account that manages the repository. </p>",
+        "RepositoryDescription$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain that contains the repository. It does not include dashes or spaces. </p>",
+        "RepositorySummary$administratorAccount": "<p> The AWS account ID that manages the repository. </p>",
+        "RepositorySummary$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "UpdatePackageVersionsStatusRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>",
+        "UpdateRepositoryRequest$domainOwner": "<p> The 12-digit account number of the AWS account that owns the domain. It does not include dashes or spaces. </p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "CreateDomainRequest$encryptionKey": "<p> The encryption key for the domain. This is used to encrypt content stored in a domain. An encryption key can be a key ID, a key Amazon Resource Name (ARN), a key alias, or a key alias ARN. To specify an <code>encryptionKey</code>, your IAM role must have <code>kms:DescribeKey</code> and <code>kms:CreateGrant</code> permissions on the encryption key that is used. For more information, see <a href=\"https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html#API_DescribeKey_RequestSyntax\">DescribeKey</a> in the <i>AWS Key Management Service API Reference</i> and <a href=\"https://docs.aws.amazon.com/kms/latest/developerguide/kms-api-permissions-reference.html\">AWS KMS API Permissions Reference</a> in the <i>AWS Key Management Service Developer Guide</i>. </p> <important> <p> CodeArtifact supports only symmetric CMKs. Do not associate an asymmetric CMK with your domain. For more information, see <a href=\"https://docs.aws.amazon.com/kms/latest/developerguide/symmetric-asymmetric.html\">Using symmetric and asymmetric keys</a> in the <i>AWS Key Management Service Developer Guide</i>. </p> </important>",
+        "DomainDescription$arn": "<p> The Amazon Resource Name (ARN) of the domain. </p>",
+        "DomainDescription$encryptionKey": "<p> The ARN of an AWS Key Management Service (AWS KMS) key associated with a domain. </p>",
+        "DomainDescription$s3BucketArn": "<p>The Amazon Resource Name (ARN) of the Amazon S3 bucket that is used to store package assets in the domain.</p>",
+        "DomainSummary$arn": "<p> The ARN of the domain. </p>",
+        "DomainSummary$encryptionKey": "<p> The key used to encrypt the domain. </p>",
+        "ListTagsForResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource to get tags for.</p>",
+        "RepositoryDescription$arn": "<p> The Amazon Resource Name (ARN) of the repository. </p>",
+        "RepositorySummary$arn": "<p> The ARN of the repository. </p>",
+        "ResourcePolicy$resourceArn": "<p> The ARN of the resource associated with the resource policy </p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource to which you want to add or update tags.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource to which you want to remove tags.</p>"
+      }
+    },
+    "Asset": {
+      "base": null,
+      "refs": {
+        "GetPackageVersionAssetResult$asset": "<p> The binary file, or asset, that is downloaded.</p>"
+      }
+    },
+    "AssetHashes": {
+      "base": null,
+      "refs": {
+        "AssetSummary$hashes": "<p> The hashes of the asset. </p>"
+      }
+    },
+    "AssetName": {
+      "base": null,
+      "refs": {
+        "AssetSummary$name": "<p> The name of the asset. </p>",
+        "GetPackageVersionAssetRequest$asset": "<p> The name of the requested asset. </p>",
+        "GetPackageVersionAssetResult$assetName": "<p> The name of the asset that is downloaded. </p>"
+      }
+    },
+    "AssetSummary": {
+      "base": "<p> Contains details about a package version asset. </p>",
+      "refs": {
+        "AssetSummaryList$member": null
+      }
+    },
+    "AssetSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionAssetsResult$assets": "<p> The returned list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_AssetSummary.html\"> <code>AssetSummary</code> </a> objects. </p>"
+      }
+    },
+    "AssociateExternalConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateExternalConnectionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AuthorizationTokenDurationSeconds": {
+      "base": null,
+      "refs": {
+        "GetAuthorizationTokenRequest$durationSeconds": "<p>The time, in seconds, that the generated authorization token is valid. Valid values are <code>0</code> and any number between <code>900</code> (15 minutes) and <code>43200</code> (12 hours). A value of <code>0</code> will set the expiration of the authorization token to the same expiration of the user's role's temporary credentials.</p>"
+      }
+    },
+    "BooleanOptional": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$allowOverwrite": "<p> Set to true to overwrite a package version that already exists in the destination repository. If set to false and the package version already exists in the destination repository, the package version is returned in the <code>failedVersions</code> field of the response with an <code>ALREADY_EXISTS</code> error code. </p>",
+        "CopyPackageVersionsRequest$includeFromUpstream": "<p> Set to true to copy packages from repositories that are upstream from the source repository to the destination repository. The default setting is false. For more information, see <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/repos-upstream.html\">Working with upstream repositories</a>. </p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p> The operation did not succeed because prerequisites are not met. </p>",
+      "refs": {
+      }
+    },
+    "CopyPackageVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyPackageVersionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDomainResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRepositoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRepositoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDomainPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDomainPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDomainResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePackageVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePackageVersionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRepositoryPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRepositoryPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRepositoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRepositoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDomainResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePackageVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePackageVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRepositoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRepositoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "CreateRepositoryRequest$description": "<p> A description of the created repository. </p>",
+        "RepositoryDescription$description": "<p> A text description of the repository. </p>",
+        "RepositorySummary$description": "<p> The description of the repository. </p>",
+        "UpdateRepositoryRequest$description": "<p> An updated repository description. </p>"
+      }
+    },
+    "DisassociateExternalConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateExternalConnectionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisposePackageVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisposePackageVersionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DomainDescription": {
+      "base": "<p> Information about a domain. A domain is a container for repositories. When you create a domain, it is empty until you add one or more repositories. </p>",
+      "refs": {
+        "CreateDomainResult$domain": "<p> Contains information about the created domain after processing the request. </p>",
+        "DeleteDomainResult$domain": "<p> Contains information about the deleted domain after processing the request. </p>",
+        "DescribeDomainResult$domain": null
+      }
+    },
+    "DomainName": {
+      "base": null,
+      "refs": {
+        "AssociateExternalConnectionRequest$domain": "<p>The name of the domain that contains the repository.</p>",
+        "CopyPackageVersionsRequest$domain": "<p> The name of the domain that contains the source and destination repositories. </p>",
+        "CreateDomainRequest$domain": "<p> The name of the domain to create. All domain names in an AWS Region that are in the same AWS account must be unique. The domain name is used as the prefix in DNS hostnames. Do not use sensitive information in a domain name because it is publicly discoverable. </p>",
+        "CreateRepositoryRequest$domain": "<p> The domain that contains the created repository. </p>",
+        "DeleteDomainPermissionsPolicyRequest$domain": "<p> The name of the domain associated with the resource policy to be deleted. </p>",
+        "DeleteDomainRequest$domain": "<p> The name of the domain to delete. </p>",
+        "DeletePackageVersionsRequest$domain": "<p> The name of the domain that contains the package to delete. </p>",
+        "DeleteRepositoryPermissionsPolicyRequest$domain": "<p> The name of the domain that contains the repository associated with the resource policy to be deleted. </p>",
+        "DeleteRepositoryRequest$domain": "<p> The name of the domain that contains the repository to delete. </p>",
+        "DescribeDomainRequest$domain": "<p> A string that specifies the name of the requested domain. </p>",
+        "DescribePackageVersionRequest$domain": "<p> The name of the domain that contains the repository that contains the package version. </p>",
+        "DescribeRepositoryRequest$domain": "<p> The name of the domain that contains the repository to describe. </p>",
+        "DisassociateExternalConnectionRequest$domain": "<p>The name of the domain that contains the repository from which to remove the external repository. </p>",
+        "DisposePackageVersionsRequest$domain": "<p> The name of the domain that contains the repository you want to dispose. </p>",
+        "DomainDescription$name": "<p> The name of the domain. </p>",
+        "DomainSummary$name": "<p> The name of the domain. </p>",
+        "GetAuthorizationTokenRequest$domain": "<p> The name of the domain that is in scope for the generated authorization token. </p>",
+        "GetDomainPermissionsPolicyRequest$domain": "<p> The name of the domain to which the resource policy is attached. </p>",
+        "GetPackageVersionAssetRequest$domain": "<p> The domain that contains the repository that contains the package version with the requested asset. </p>",
+        "GetPackageVersionReadmeRequest$domain": "<p> The name of the domain that contains the repository that contains the package version with the requested readme file. </p>",
+        "GetRepositoryEndpointRequest$domain": "<p> The name of the domain that contains the repository. </p>",
+        "GetRepositoryPermissionsPolicyRequest$domain": "<p> The name of the domain containing the repository whose associated resource policy is to be retrieved. </p>",
+        "ListPackageVersionAssetsRequest$domain": "<p> The name of the domain that contains the repository associated with the package version assets. </p>",
+        "ListPackageVersionDependenciesRequest$domain": "<p> The domain that contains the repository that contains the requested package version dependencies. </p>",
+        "ListPackageVersionsRequest$domain": "<p> The name of the domain that contains the repository that contains the returned package versions. </p>",
+        "ListPackagesRequest$domain": "<p> The domain that contains the repository that contains the requested list of packages. </p>",
+        "ListRepositoriesInDomainRequest$domain": "<p> The name of the domain that contains the returned list of repositories. </p>",
+        "PutDomainPermissionsPolicyRequest$domain": "<p> The name of the domain on which to set the resource policy. </p>",
+        "PutRepositoryPermissionsPolicyRequest$domain": "<p> The name of the domain containing the repository to set the resource policy on. </p>",
+        "RepositoryDescription$domainName": "<p> The name of the domain that contains the repository. </p>",
+        "RepositorySummary$domainName": "<p> The name of the domain that contains the repository. </p>",
+        "UpdatePackageVersionsStatusRequest$domain": "<p> The domain that contains the repository that contains the package versions with a status to be updated. </p>",
+        "UpdateRepositoryRequest$domain": "<p> The name of the domain associated with the repository to update. </p>"
+      }
+    },
+    "DomainStatus": {
+      "base": null,
+      "refs": {
+        "DomainDescription$status": "<p> The current status of a domain. The valid values are </p> <ul> <li> <p> <code>Active</code> </p> </li> <li> <p> <code>Deleted</code> </p> </li> </ul>",
+        "DomainSummary$status": "<p> A string that contains the status of the domain. The valid values are: </p> <ul> <li> <p> <code>Active</code> </p> </li> <li> <p> <code>Deleted</code> </p> </li> </ul>"
+      }
+    },
+    "DomainSummary": {
+      "base": "<p> Information about a domain, including its name, Amazon Resource Name (ARN), and status. The <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListDomains.html\"> <code>ListDomains</code> </a> operation returns a list of <code>DomainSummary</code> objects. </p>",
+      "refs": {
+        "DomainSummaryList$member": null
+      }
+    },
+    "DomainSummaryList": {
+      "base": null,
+      "refs": {
+        "ListDomainsResult$domains": "<p> The returned list of <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_DomainSummary.html\">DomainSummary</a> </code> objects. </p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "PackageVersionError$errorMessage": "<p> The error message associated with the error. </p>"
+      }
+    },
+    "ExternalConnectionName": {
+      "base": null,
+      "refs": {
+        "AssociateExternalConnectionRequest$externalConnection": "<p> The name of the external connection to add to the repository. The following values are supported: </p> <ul> <li> <p> <code>public:npmjs</code> - for the npm public repository. </p> </li> <li> <p> <code>public:pypi</code> - for the Python Package Index. </p> </li> <li> <p> <code>public:maven-central</code> - for Maven Central. </p> </li> <li> <p> <code>public:maven-googleandroid</code> - for the Google Android repository. </p> </li> <li> <p> <code>public:maven-gradleplugins</code> - for the Gradle plugins repository. </p> </li> <li> <p> <code>public:maven-commonsware</code> - for the CommonsWare Android repository. </p> </li> </ul>",
+        "DisassociateExternalConnectionRequest$externalConnection": "<p>The name of the external connection to be removed from the repository. </p>",
+        "RepositoryExternalConnectionInfo$externalConnectionName": "<p> The name of the external connection associated with a repository. </p>"
+      }
+    },
+    "ExternalConnectionStatus": {
+      "base": null,
+      "refs": {
+        "RepositoryExternalConnectionInfo$status": "<p> The status of the external connection of a repository. There is one valid value, <code>Available</code>. </p>"
+      }
+    },
+    "GetAuthorizationTokenRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAuthorizationTokenResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDomainPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDomainPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPackageVersionAssetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPackageVersionAssetResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPackageVersionReadmeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPackageVersionReadmeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRepositoryEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRepositoryEndpointResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRepositoryPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRepositoryPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HashAlgorithm": {
+      "base": null,
+      "refs": {
+        "AssetHashes$key": null
+      }
+    },
+    "HashValue": {
+      "base": null,
+      "refs": {
+        "AssetHashes$value": null
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "DomainDescription$repositoryCount": "<p> The number of repositories in the domain. </p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p> The operation did not succeed because of an error that occurred inside AWS CodeArtifact. </p>",
+      "refs": {
+      }
+    },
+    "LicenseInfo": {
+      "base": "<p> Details of the license data. </p>",
+      "refs": {
+        "LicenseInfoList$member": null
+      }
+    },
+    "LicenseInfoList": {
+      "base": null,
+      "refs": {
+        "PackageVersionDescription$licenses": "<p> Information about licenses associated with the package version. </p>"
+      }
+    },
+    "ListDomainsMaxResults": {
+      "base": null,
+      "refs": {
+        "ListDomainsRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListDomainsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDomainsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionAssetsMaxResults": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionAssetsRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListPackageVersionAssetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionAssetsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionDependenciesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionDependenciesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionsMaxResults": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionsRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListPackageVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackageVersionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackagesMaxResults": {
+      "base": null,
+      "refs": {
+        "ListPackagesRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListPackagesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPackagesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRepositoriesInDomainMaxResults": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesInDomainRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListRepositoriesInDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRepositoriesInDomainResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRepositoriesMaxResults": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesRequest$maxResults": "<p> The maximum number of results to return per page. </p>"
+      }
+    },
+    "ListRepositoriesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRepositoriesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "DomainDescription$assetSizeBytes": "<p> The total size of all assets in the domain. </p>"
+      }
+    },
+    "LongOptional": {
+      "base": null,
+      "refs": {
+        "AssetSummary$size": "<p> The size of the asset. </p>"
+      }
+    },
+    "PackageDependency": {
+      "base": "<p> Details about a package dependency. </p>",
+      "refs": {
+        "PackageDependencyList$member": null
+      }
+    },
+    "PackageDependencyList": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionDependenciesResult$dependencies": "<p> The returned list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageDependency.html\"> <code>PackageDependency</code> </a> objects. </p>"
+      }
+    },
+    "PackageFormat": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$format": "<p> The format of the package that is copied. The valid package types are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "DeletePackageVersionsRequest$format": "<p> The format of the package versions to delete. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "DescribePackageVersionRequest$format": "<p> A format that specifies the type of the requested package version. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "DisposePackageVersionsRequest$format": "<p> A format that specifies the type of package versions you want to dispose. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "GetPackageVersionAssetRequest$format": "<p> A format that specifies the type of the package version with the requested asset file. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "GetPackageVersionReadmeRequest$format": "<p> A format that specifies the type of the package version with the requested readme file. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "GetPackageVersionReadmeResult$format": "<p> The format of the package with the requested readme file. Valid format types are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "GetRepositoryEndpointRequest$format": "<p> Returns which endpoint of a repository to return. A repository has one endpoint for each package format: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "ListPackageVersionAssetsRequest$format": "<p> The format of the package that contains the returned package version assets. The valid package types are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "ListPackageVersionAssetsResult$format": "<p> The format of the package that contains the returned package version assets. </p>",
+        "ListPackageVersionDependenciesRequest$format": "<p> The format of the package with the requested dependencies. The valid package types are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "ListPackageVersionDependenciesResult$format": "<p> A format that specifies the type of the package that contains the returned dependencies. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "ListPackageVersionsRequest$format": "<p> The format of the returned packages. The valid package types are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "ListPackageVersionsResult$format": "<p> A format of the package. Valid package format values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "ListPackagesRequest$format": "<p> The format of the packages. The valid package types are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "PackageSummary$format": "<p> The format of the package. Valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>",
+        "PackageVersionDescription$format": "<p> The format of the package version. The valid package formats are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "RepositoryExternalConnectionInfo$packageFormat": "<p> The package format associated with a repository's external connection. The valid package formats are: </p> <ul> <li> <p> <code>npm</code>: A Node Package Manager (npm) package. </p> </li> <li> <p> <code>pypi</code>: A Python Package Index (PyPI) package. </p> </li> <li> <p> <code>maven</code>: A Maven package that contains compiled code in a distributable format, such as a JAR file. </p> </li> </ul>",
+        "UpdatePackageVersionsStatusRequest$format": "<p> A format that specifies the type of the package with the statuses to update. The valid values are: </p> <ul> <li> <p> <code>npm</code> </p> </li> <li> <p> <code>pypi</code> </p> </li> <li> <p> <code>maven</code> </p> </li> </ul>"
+      }
+    },
+    "PackageName": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$package": "<p> The name of the package that is copied. </p>",
+        "DeletePackageVersionsRequest$package": "<p> The name of the package with the versions to delete. </p>",
+        "DescribePackageVersionRequest$package": "<p> The name of the requested package version. </p>",
+        "DisposePackageVersionsRequest$package": "<p> The name of the package with the versions you want to dispose. </p>",
+        "GetPackageVersionAssetRequest$package": "<p> The name of the package that contains the requested asset. </p>",
+        "GetPackageVersionReadmeRequest$package": "<p> The name of the package version that contains the requested readme file. </p>",
+        "GetPackageVersionReadmeResult$package": "<p> The name of the package that contains the returned readme file. </p>",
+        "ListPackageVersionAssetsRequest$package": "<p> The name of the package that contains the returned package version assets. </p>",
+        "ListPackageVersionAssetsResult$package": "<p> The name of the package that contains the returned package version assets. </p>",
+        "ListPackageVersionDependenciesRequest$package": "<p> The name of the package versions' package. </p>",
+        "ListPackageVersionDependenciesResult$package": "<p> The name of the package that contains the returned package versions dependencies. </p>",
+        "ListPackageVersionsRequest$package": "<p> The name of the package for which you want to return a list of package versions. </p>",
+        "ListPackageVersionsResult$package": "<p> The name of the package. </p>",
+        "ListPackagesRequest$packagePrefix": "<p> A prefix used to filter returned repositories. Only repositories with names that start with <code>repositoryPrefix</code> are returned. </p>",
+        "PackageDependency$package": "<p> The name of the package that this package depends on. </p>",
+        "PackageSummary$package": "<p> The name of the package. </p>",
+        "PackageVersionDescription$packageName": "<p> The name of the requested package. </p>",
+        "UpdatePackageVersionsStatusRequest$package": "<p> The name of the package with the version statuses to update. </p>"
+      }
+    },
+    "PackageNamespace": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "DeletePackageVersionsRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "DescribePackageVersionRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "DisposePackageVersionsRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "GetPackageVersionAssetRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "GetPackageVersionReadmeRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "GetPackageVersionReadmeResult$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionAssetsRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionAssetsResult$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionDependenciesRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionDependenciesResult$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionsRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackageVersionsResult$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "ListPackagesRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "PackageDependency$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "PackageSummary$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "PackageVersionDescription$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>",
+        "UpdatePackageVersionsStatusRequest$namespace": "<p> The namespace of the package. The package component that specifies its namespace depends on its type. For example: </p> <ul> <li> <p> The namespace of a Maven package is its <code>groupId</code>. </p> </li> <li> <p> The namespace of an npm package is its <code>scope</code>. </p> </li> <li> <p> A Python package does not contain a corresponding component, so Python packages do not have a namespace. </p> </li> </ul>"
+      }
+    },
+    "PackageSummary": {
+      "base": "<p> Details about a package, including its format, namespace, and name. The <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackages.html\"> <code>ListPackages</code> </a> operation returns a list of <code>PackageSummary</code> objects. </p>",
+      "refs": {
+        "PackageSummaryList$member": null
+      }
+    },
+    "PackageSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPackagesResult$packages": "<p> The list of returned <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageSummary.html\"> <code>PackageSummary</code> </a> objects. </p>"
+      }
+    },
+    "PackageVersion": {
+      "base": null,
+      "refs": {
+        "DescribePackageVersionRequest$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "GetPackageVersionAssetRequest$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "GetPackageVersionAssetResult$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "GetPackageVersionReadmeRequest$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "GetPackageVersionReadmeResult$version": "<p> The version of the package with the requested readme file. </p>",
+        "ListPackageVersionAssetsRequest$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "ListPackageVersionAssetsResult$version": "<p> The version of the package associated with the returned assets. </p>",
+        "ListPackageVersionDependenciesRequest$packageVersion": "<p> A string that contains the package version (for example, <code>3.5.2</code>). </p>",
+        "ListPackageVersionDependenciesResult$version": "<p> The version of the package that is specified in the request. </p>",
+        "ListPackageVersionsResult$defaultDisplayVersion": "<p> The default package version to display. This depends on the package format: </p> <ul> <li> <p> For Maven and PyPI packages, it's the most recently published package version. </p> </li> <li> <p> For npm packages, it's the version referenced by the <code>latest</code> tag. If the <code>latest</code> tag is not set, it's the most recently published package version. </p> </li> </ul>",
+        "PackageVersionDescription$version": "<p> The version of the package. </p>",
+        "PackageVersionErrorMap$key": null,
+        "PackageVersionList$member": null,
+        "PackageVersionRevisionMap$key": null,
+        "PackageVersionSummary$version": "<p> Information about a package version. </p>",
+        "SuccessfulPackageVersionInfoMap$key": null
+      }
+    },
+    "PackageVersionDescription": {
+      "base": "<p> Details about a package version. </p>",
+      "refs": {
+        "DescribePackageVersionResult$packageVersion": "<p> A <code> <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionDescription.html\">PackageVersionDescription</a> </code> object that contains information about the requested package version. </p>"
+      }
+    },
+    "PackageVersionError": {
+      "base": "<p> An error associated with package. </p>",
+      "refs": {
+        "PackageVersionErrorMap$value": null
+      }
+    },
+    "PackageVersionErrorCode": {
+      "base": null,
+      "refs": {
+        "PackageVersionError$errorCode": "<p> The error code associated with the error. Valid error codes are: </p> <ul> <li> <p> <code>ALREADY_EXISTS</code> </p> </li> <li> <p> <code>MISMATCHED_REVISION</code> </p> </li> <li> <p> <code>MISMATCHED_STATUS</code> </p> </li> <li> <p> <code>NOT_ALLOWED</code> </p> </li> <li> <p> <code>NOT_FOUND</code> </p> </li> <li> <p> <code>SKIPPED</code> </p> </li> </ul>"
+      }
+    },
+    "PackageVersionErrorMap": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsResult$failedVersions": "<p> A map of package versions that failed to copy and their error codes. The possible error codes are in the <code>PackageVersionError</code> data type. They are: </p> <ul> <li> <p> <code>ALREADY_EXISTS</code> </p> </li> <li> <p> <code>MISMATCHED_REVISION</code> </p> </li> <li> <p> <code>MISMATCHED_STATUS</code> </p> </li> <li> <p> <code>NOT_ALLOWED</code> </p> </li> <li> <p> <code>NOT_FOUND</code> </p> </li> <li> <p> <code>SKIPPED</code> </p> </li> </ul>",
+        "DeletePackageVersionsResult$failedVersions": "<p> A <code>PackageVersionError</code> object that contains a map of errors codes for the deleted package that failed. The possible error codes are: </p> <ul> <li> <p> <code>ALREADY_EXISTS</code> </p> </li> <li> <p> <code>MISMATCHED_REVISION</code> </p> </li> <li> <p> <code>MISMATCHED_STATUS</code> </p> </li> <li> <p> <code>NOT_ALLOWED</code> </p> </li> <li> <p> <code>NOT_FOUND</code> </p> </li> <li> <p> <code>SKIPPED</code> </p> </li> </ul>",
+        "DisposePackageVersionsResult$failedVersions": "<p> A <code>PackageVersionError</code> object that contains a map of errors codes for the disposed package versions that failed. The possible error codes are: </p> <ul> <li> <p> <code>ALREADY_EXISTS</code> </p> </li> <li> <p> <code>MISMATCHED_REVISION</code> </p> </li> <li> <p> <code>MISMATCHED_STATUS</code> </p> </li> <li> <p> <code>NOT_ALLOWED</code> </p> </li> <li> <p> <code>NOT_FOUND</code> </p> </li> <li> <p> <code>SKIPPED</code> </p> </li> </ul>",
+        "UpdatePackageVersionsStatusResult$failedVersions": "<p> A list of <code>SuccessfulPackageVersionInfo</code> objects, one for each package version with a status that successfully updated. </p>"
+      }
+    },
+    "PackageVersionList": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$versions": "<p> The versions of the package to copy. </p> <note> <p> You must specify <code>versions</code> or <code>versionRevisions</code>. You cannot specify both. </p> </note>",
+        "DeletePackageVersionsRequest$versions": "<p> An array of strings that specify the versions of the package to delete. </p>",
+        "DisposePackageVersionsRequest$versions": "<p> The versions of the package you want to dispose. </p>",
+        "UpdatePackageVersionsStatusRequest$versions": "<p> An array of strings that specify the versions of the package with the statuses to update. </p>"
+      }
+    },
+    "PackageVersionRevision": {
+      "base": null,
+      "refs": {
+        "GetPackageVersionAssetRequest$packageVersionRevision": "<p> The name of the package version revision that contains the requested asset. </p>",
+        "GetPackageVersionAssetResult$packageVersionRevision": "<p> The name of the package version revision that contains the downloaded asset. </p>",
+        "GetPackageVersionReadmeResult$versionRevision": "<p> The current revision associated with the package version. </p>",
+        "ListPackageVersionAssetsResult$versionRevision": "<p> The current revision associated with the package version. </p>",
+        "ListPackageVersionDependenciesResult$versionRevision": "<p> The current revision associated with the package version. </p>",
+        "PackageVersionDescription$revision": "<p> The revision of the package version. </p>",
+        "PackageVersionRevisionMap$value": null,
+        "PackageVersionSummary$revision": "<p> The revision associated with a package version. </p>"
+      }
+    },
+    "PackageVersionRevisionMap": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsRequest$versionRevisions": "<p> A list of key-value pairs. The keys are package versions and the values are package version revisions. A <code>CopyPackageVersion</code> operation succeeds if the specified versions in the source repository match the specified package version revision. </p> <note> <p> You must specify <code>versions</code> or <code>versionRevisions</code>. You cannot specify both. </p> </note>",
+        "DisposePackageVersionsRequest$versionRevisions": "<p> The revisions of the package versions you want to dispose. </p>",
+        "UpdatePackageVersionsStatusRequest$versionRevisions": "<p> A map of package versions and package version revisions. The map <code>key</code> is the package version (for example, <code>3.5.2</code>), and the map <code>value</code> is the package version revision. </p>"
+      }
+    },
+    "PackageVersionSortType": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionsRequest$sortBy": "<p> How to sort the returned list of package versions. </p>"
+      }
+    },
+    "PackageVersionStatus": {
+      "base": null,
+      "refs": {
+        "DeletePackageVersionsRequest$expectedStatus": "<p> The expected status of the package version to delete. Valid values are: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "DisposePackageVersionsRequest$expectedStatus": "<p> The expected status of the package version to dispose. Valid values are: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "ListPackageVersionsRequest$status": "<p> A string that specifies the status of the package versions to include in the returned list. It can be one of the following: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "PackageVersionDescription$status": "<p> A string that contains the status of the package version. It can be one of the following: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "PackageVersionSummary$status": "<p> A string that contains the status of the package version. It can be one of the following: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "SuccessfulPackageVersionInfo$status": "<p> The status of a package version. Valid statuses are: </p> <ul> <li> <p> <code>Published</code> </p> </li> <li> <p> <code>Unfinished</code> </p> </li> <li> <p> <code>Unlisted</code> </p> </li> <li> <p> <code>Archived</code> </p> </li> <li> <p> <code>Disposed</code> </p> </li> </ul>",
+        "UpdatePackageVersionsStatusRequest$expectedStatus": "<p> The package version’s expected status before it is updated. If <code>expectedStatus</code> is provided, the package version's status is updated only if its status at the time <code>UpdatePackageVersionsStatus</code> is called matches <code>expectedStatus</code>. </p>",
+        "UpdatePackageVersionsStatusRequest$targetStatus": "<p> The status you want to change the package version status to. </p>"
+      }
+    },
+    "PackageVersionSummary": {
+      "base": "<p> Details about a package version, including its status, version, and revision. The <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListPackageVersions.html\"> <code>ListPackageVersions</code> </a> operation returns a list of <code>PackageVersionSummary</code> objects. </p>",
+      "refs": {
+        "PackageVersionSummaryList$member": null
+      }
+    },
+    "PackageVersionSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPackageVersionsResult$versions": "<p> The returned list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_PackageVersionSummary.html\"> <code>PackageVersionSummary</code> </a> objects. </p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListDomainsRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListDomainsResult$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackageVersionAssetsRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackageVersionAssetsResult$nextToken": "<p> If there are additional results, this is the token for the next set of results. </p>",
+        "ListPackageVersionDependenciesRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackageVersionDependenciesResult$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackageVersionsRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackageVersionsResult$nextToken": "<p> If there are additional results, this is the token for the next set of results. </p>",
+        "ListPackagesRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListPackagesResult$nextToken": "<p> If there are additional results, this is the token for the next set of results. </p>",
+        "ListRepositoriesInDomainRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListRepositoriesInDomainResult$nextToken": "<p> If there are additional results, this is the token for the next set of results. </p>",
+        "ListRepositoriesRequest$nextToken": "<p> The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results. </p>",
+        "ListRepositoriesResult$nextToken": "<p> If there are additional results, this is the token for the next set of results. </p>"
+      }
+    },
+    "PolicyDocument": {
+      "base": null,
+      "refs": {
+        "PutDomainPermissionsPolicyRequest$policyDocument": "<p> A valid displayable JSON Aspen policy string to be set as the access control resource policy on the provided domain. </p>",
+        "PutRepositoryPermissionsPolicyRequest$policyDocument": "<p> A valid displayable JSON Aspen policy string to be set as the access control resource policy on the provided repository. </p>",
+        "ResourcePolicy$document": "<p> The resource policy formatted in JSON. </p>"
+      }
+    },
+    "PolicyRevision": {
+      "base": null,
+      "refs": {
+        "DeleteDomainPermissionsPolicyRequest$policyRevision": "<p> The current revision of the resource policy to be deleted. This revision is used for optimistic locking, which prevents others from overwriting your changes to the domain's resource policy. </p>",
+        "DeleteRepositoryPermissionsPolicyRequest$policyRevision": "<p> The revision of the repository's resource policy to be deleted. This revision is used for optimistic locking, which prevents others from accidentally overwriting your changes to the repository's resource policy. </p>",
+        "PutDomainPermissionsPolicyRequest$policyRevision": "<p> The current revision of the resource policy to be set. This revision is used for optimistic locking, which prevents others from overwriting your changes to the domain's resource policy. </p>",
+        "PutRepositoryPermissionsPolicyRequest$policyRevision": "<p> Sets the revision of the resource policy that specifies permissions to access the repository. This revision is used for optimistic locking, which prevents others from overwriting your changes to the repository's resource policy. </p>",
+        "ResourcePolicy$revision": "<p> The current revision of the resource policy. </p>"
+      }
+    },
+    "PutDomainPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutDomainPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRepositoryPermissionsPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRepositoryPermissionsPolicyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RepositoryDescription": {
+      "base": "<p> The details of a repository stored in AWS CodeArtifact. A CodeArtifact repository contains a set of package versions, each of which maps to a set of assets. Repositories are polyglot—a single repository can contain packages of any supported type. Each repository exposes endpoints for fetching and publishing packages using tools like the <code>npm</code> CLI, the Maven CLI (<code>mvn</code>), and <code>pip</code>. You can create up to 100 repositories per AWS account. </p>",
+      "refs": {
+        "AssociateExternalConnectionResult$repository": "<p> Information about the connected repository after processing the request. </p>",
+        "CreateRepositoryResult$repository": "<p> Information about the created repository after processing the request. </p>",
+        "DeleteRepositoryResult$repository": "<p> Information about the deleted repository after processing the request. </p>",
+        "DescribeRepositoryResult$repository": "<p> A <code>RepositoryDescription</code> object that contains the requested repository information. </p>",
+        "DisassociateExternalConnectionResult$repository": "<p> The repository associated with the removed external connection. </p>",
+        "UpdateRepositoryResult$repository": "<p> The updated repository. </p>"
+      }
+    },
+    "RepositoryExternalConnectionInfo": {
+      "base": "<p> Contains information about the external connection of a repository. </p>",
+      "refs": {
+        "RepositoryExternalConnectionInfoList$member": null
+      }
+    },
+    "RepositoryExternalConnectionInfoList": {
+      "base": null,
+      "refs": {
+        "RepositoryDescription$externalConnections": "<p> An array of external connections associated with the repository. </p>"
+      }
+    },
+    "RepositoryName": {
+      "base": null,
+      "refs": {
+        "AssociateExternalConnectionRequest$repository": "<p> The name of the repository to which the external connection is added. </p>",
+        "CopyPackageVersionsRequest$sourceRepository": "<p> The name of the repository that contains the package versions to copy. </p>",
+        "CopyPackageVersionsRequest$destinationRepository": "<p> The name of the repository into which package versions are copied. </p>",
+        "CreateRepositoryRequest$repository": "<p> The name of the repository to create. </p>",
+        "DeletePackageVersionsRequest$repository": "<p> The name of the repository that contains the package versions to delete. </p>",
+        "DeleteRepositoryPermissionsPolicyRequest$repository": "<p> The name of the repository that is associated with the resource policy to be deleted </p>",
+        "DeleteRepositoryRequest$repository": "<p> The name of the repository to delete. </p>",
+        "DescribePackageVersionRequest$repository": "<p> The name of the repository that contains the package version. </p>",
+        "DescribeRepositoryRequest$repository": "<p> A string that specifies the name of the requested repository. </p>",
+        "DisassociateExternalConnectionRequest$repository": "<p>The name of the repository from which the external connection will be removed. </p>",
+        "DisposePackageVersionsRequest$repository": "<p> The name of the repository that contains the package versions you want to dispose. </p>",
+        "GetPackageVersionAssetRequest$repository": "<p> The repository that contains the package version with the requested asset. </p>",
+        "GetPackageVersionReadmeRequest$repository": "<p> The repository that contains the package with the requested readme file. </p>",
+        "GetRepositoryEndpointRequest$repository": "<p> The name of the repository. </p>",
+        "GetRepositoryPermissionsPolicyRequest$repository": "<p> The name of the repository whose associated resource policy is to be retrieved. </p>",
+        "ListPackageVersionAssetsRequest$repository": "<p> The name of the repository that contains the package that contains the returned package version assets. </p>",
+        "ListPackageVersionDependenciesRequest$repository": "<p> The name of the repository that contains the requested package version. </p>",
+        "ListPackageVersionsRequest$repository": "<p> The name of the repository that contains the package. </p>",
+        "ListPackagesRequest$repository": "<p> The name of the repository from which packages are to be listed. </p>",
+        "ListRepositoriesInDomainRequest$repositoryPrefix": "<p> A prefix used to filter returned repositories. Only repositories with names that start with <code>repositoryPrefix</code> are returned. </p>",
+        "ListRepositoriesRequest$repositoryPrefix": "<p> A prefix used to filter returned repositories. Only repositories with names that start with <code>repositoryPrefix</code> are returned.</p>",
+        "PutRepositoryPermissionsPolicyRequest$repository": "<p> The name of the repository to set the resource policy on. </p>",
+        "RepositoryDescription$name": "<p> The name of the repository. </p>",
+        "RepositorySummary$name": "<p> The name of the repository. </p>",
+        "UpdatePackageVersionsStatusRequest$repository": "<p> The repository that contains the package versions with the status you want to update. </p>",
+        "UpdateRepositoryRequest$repository": "<p> The name of the repository to update. </p>",
+        "UpstreamRepository$repositoryName": "<p> The name of an upstream repository. </p>",
+        "UpstreamRepositoryInfo$repositoryName": "<p> The name of an upstream repository. </p>"
+      }
+    },
+    "RepositorySummary": {
+      "base": "<p> Details about a repository, including its Amazon Resource Name (ARN), description, and domain information. The <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_ListRepositories.html\"> <code>ListRepositories</code> </a> operation returns a list of <code>RepositorySummary</code> objects. </p>",
+      "refs": {
+        "RepositorySummaryList$member": null
+      }
+    },
+    "RepositorySummaryList": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesInDomainResult$repositories": "<p> The returned list of repositories. </p>",
+        "ListRepositoriesResult$repositories": "<p> The returned list of <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_RepositorySummary.html\"> <code>RepositorySummary</code> </a> objects. </p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p> The operation did not succeed because the resource requested is not found in the service. </p>",
+      "refs": {
+      }
+    },
+    "ResourcePolicy": {
+      "base": "<p> An AWS CodeArtifact resource policy that contains a resource ARN, document details, and a revision. </p>",
+      "refs": {
+        "DeleteDomainPermissionsPolicyResult$policy": "<p> Information about the deleted resource policy after processing the request. </p>",
+        "DeleteRepositoryPermissionsPolicyResult$policy": "<p> Information about the deleted policy after processing the request. </p>",
+        "GetDomainPermissionsPolicyResult$policy": "<p> The returned resource policy. </p>",
+        "GetRepositoryPermissionsPolicyResult$policy": "<p> The returned resource policy. </p>",
+        "PutDomainPermissionsPolicyResult$policy": "<p> The resource policy that was set after processing the request. </p>",
+        "PutRepositoryPermissionsPolicyResult$policy": "<p> The resource policy that was set after processing the request. </p>"
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "ConflictException$resourceType": "<p> The type of AWS resource. </p>",
+        "ResourceNotFoundException$resourceType": "<p> The type of AWS resource. </p>",
+        "ServiceQuotaExceededException$resourceType": "<p> The type of AWS resource. </p>"
+      }
+    },
+    "RetryAfterSeconds": {
+      "base": null,
+      "refs": {
+        "ThrottlingException$retryAfterSeconds": "<p> The time period, in seconds, to wait before retrying the request. </p>"
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p> The operation did not succeed because it would have exceeded a service limit for your account. </p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "ConflictException$message": null,
+        "ConflictException$resourceId": "<p> The ID of the resource. </p>",
+        "GetAuthorizationTokenResult$authorizationToken": "<p> The returned authentication token. </p>",
+        "GetPackageVersionReadmeResult$readme": "<p> The text of the returned readme file. </p>",
+        "GetRepositoryEndpointResult$repositoryEndpoint": "<p> A string that specifies the URL of the returned endpoint. </p>",
+        "InternalServerException$message": null,
+        "LicenseInfo$name": "<p> Name of the license. </p>",
+        "LicenseInfo$url": "<p> The URL for license data. </p>",
+        "PackageDependency$dependencyType": "<p> The type of a package dependency. The possible values depend on the package type. Example types are <code>compile</code>, <code>runtime</code>, and <code>test</code> for Maven packages, and <code>dev</code>, <code>prod</code>, and <code>optional</code> for npm packages. </p>",
+        "PackageDependency$versionRequirement": "<p> The required version, or version range, of the package that this package depends on. The version format is specific to the package type. For example, the following are possible valid required versions: <code>1.2.3</code>, <code>^2.3.4</code>, or <code>4.x</code>. </p>",
+        "PackageVersionDescription$summary": "<p> A summary of the package version. The summary is extracted from the package. The information in and detail level of the summary depends on the package version's format. </p>",
+        "PackageVersionDescription$homePage": "<p> The homepage associated with the package. </p>",
+        "PackageVersionDescription$sourceCodeRepository": "<p> The repository for the source code in the package version, or the source code used to build it. </p>",
+        "ResourceNotFoundException$message": null,
+        "ResourceNotFoundException$resourceId": "<p> The ID of the resource. </p>",
+        "ServiceQuotaExceededException$message": null,
+        "ServiceQuotaExceededException$resourceId": "<p> The ID of the resource. </p>",
+        "SuccessfulPackageVersionInfo$revision": "<p> The revision of a package version. </p>",
+        "ThrottlingException$message": null,
+        "ValidationException$message": null
+      }
+    },
+    "String255": {
+      "base": null,
+      "refs": {
+        "PackageVersionDescription$displayName": "<p> The name of the package that is displayed. The <code>displayName</code> varies depending on the package version's format. For example, if an npm package is named <code>ui</code>, is in the namespace <code>vue</code>, and has the format <code>npm</code>, then the <code>displayName</code> is <code>@vue/ui</code>. </p>"
+      }
+    },
+    "SuccessfulPackageVersionInfo": {
+      "base": "<p> Contains the revision and status of a package version. </p>",
+      "refs": {
+        "SuccessfulPackageVersionInfoMap$value": null
+      }
+    },
+    "SuccessfulPackageVersionInfoMap": {
+      "base": null,
+      "refs": {
+        "CopyPackageVersionsResult$successfulVersions": "<p> A list of the package versions that were successfully copied to your repository. </p>",
+        "DeletePackageVersionsResult$successfulVersions": "<p> A list of the package versions that were successfully deleted. </p>",
+        "DisposePackageVersionsResult$successfulVersions": "<p> A list of the package versions that were successfully disposed. </p>",
+        "UpdatePackageVersionsStatusResult$successfulVersions": "<p> A list of <code>PackageVersionError</code> objects, one for each package version with a status that failed to update. </p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A tag is a key-value pair that can be used to manage, search for, or filter resources in AWS CodeArtifact.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>The tag's key.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The tag key for each tag that you want to remove from the resource.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateDomainRequest$tags": "<p>One or more tag key-value pairs for the domain.</p>",
+        "CreateRepositoryRequest$tags": "<p>One or more tag key-value pairs for the repository.</p>",
+        "ListTagsForResourceResult$tags": "<p>A list of tag key and value pairs associated with the specified resource.</p>",
+        "TagResourceRequest$tags": "<p>The tags you want to modify or add to the resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>The tag's value.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p> The operation did not succeed because too many requests are sent to the service. </p>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "DomainDescription$createdTime": "<p> A timestamp that represents the date and time the domain was created. </p>",
+        "DomainSummary$createdTime": "<p> A timestamp that contains the date and time the domain was created. </p>",
+        "GetAuthorizationTokenResult$expiration": "<p> A timestamp that specifies the date and time the authorization token expires. </p>",
+        "PackageVersionDescription$publishedTime": "<p> A timestamp that contains the date and time the package version was published. </p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePackageVersionsStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePackageVersionsStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRepositoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRepositoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpstreamRepository": {
+      "base": "<p> Information about an upstream repository. A list of <code>UpstreamRepository</code> objects is an input parameter to <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_CreateRepository.html\"> <code>CreateRepository</code> </a> and <a href=\"https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_UpdateRepository.html\"> <code>UpdateRepository</code> </a>. </p>",
+      "refs": {
+        "UpstreamRepositoryList$member": null
+      }
+    },
+    "UpstreamRepositoryInfo": {
+      "base": "<p> Information about an upstream repository. </p>",
+      "refs": {
+        "UpstreamRepositoryInfoList$member": null
+      }
+    },
+    "UpstreamRepositoryInfoList": {
+      "base": null,
+      "refs": {
+        "RepositoryDescription$upstreams": "<p> A list of upstream repositories to associate with the repository. The order of the upstream repositories in the list determines their priority order when AWS CodeArtifact looks for a requested package version. For more information, see <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/repos-upstream.html\">Working with upstream repositories</a>. </p>"
+      }
+    },
+    "UpstreamRepositoryList": {
+      "base": null,
+      "refs": {
+        "CreateRepositoryRequest$upstreams": "<p> A list of upstream repositories to associate with the repository. The order of the upstream repositories in the list determines their priority order when AWS CodeArtifact looks for a requested package version. For more information, see <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/repos-upstream.html\">Working with upstream repositories</a>. </p>",
+        "UpdateRepositoryRequest$upstreams": "<p> A list of upstream repositories to associate with the repository. The order of the upstream repositories in the list determines their priority order when AWS CodeArtifact looks for a requested package version. For more information, see <a href=\"https://docs.aws.amazon.com/codeartifact/latest/ug/repos-upstream.html\">Working with upstream repositories</a>. </p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p> The operation did not succeed because a parameter in the request was sent with an invalid value. </p>",
+      "refs": {
+      }
+    },
+    "ValidationExceptionReason": {
+      "base": null,
+      "refs": {
+        "ValidationException$reason": "<p> </p>"
+      }
+    }
+  }
+}

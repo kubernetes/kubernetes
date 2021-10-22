@@ -1,0 +1,74 @@
+{
+  "pagination": {
+    "GetCurrentMetricData": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    },
+    "GetMetricData": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken"
+    },
+    "ListContactFlows": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ContactFlowSummaryList"
+    },
+    "ListHoursOfOperations": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "HoursOfOperationSummaryList"
+    },
+    "ListPhoneNumbers": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PhoneNumberSummaryList"
+    },
+    "ListPrompts": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PromptSummaryList"
+    },
+    "ListQueues": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "QueueSummaryList"
+    },
+    "ListRoutingProfileQueues": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "RoutingProfileQueueConfigSummaryList"
+    },
+    "ListRoutingProfiles": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "RoutingProfileSummaryList"
+    },
+    "ListSecurityProfiles": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "SecurityProfileSummaryList"
+    },
+    "ListUserHierarchyGroups": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "UserHierarchyGroupSummaryList"
+    },
+    "ListUsers": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "UserSummaryList"
+    }
+  }
+}

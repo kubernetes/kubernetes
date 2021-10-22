@@ -1,0 +1,42 @@
+{
+  "version": "2.0",
+  "service": "<p>The WorkMail Message Flow API provides access to email messages as they are being sent and received by a WorkMail organization.</p>",
+  "operations": {
+    "GetRawMessageContent": "<p>Retrieves the raw content of an in-transit email message, in MIME format. </p>"
+  },
+  "shapes": {
+    "GetRawMessageContentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRawMessageContentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The requested email message is not found.</p>",
+      "refs": {
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "messageContentBlob": {
+      "base": null,
+      "refs": {
+        "GetRawMessageContentResponse$messageContent": "<p>The raw content of the email message, in MIME format.</p>"
+      }
+    },
+    "messageIdType": {
+      "base": null,
+      "refs": {
+        "GetRawMessageContentRequest$messageId": "<p>The identifier of the email message to retrieve.</p>"
+      }
+    }
+  }
+}

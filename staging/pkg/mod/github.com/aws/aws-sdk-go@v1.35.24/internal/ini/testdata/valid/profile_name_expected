@@ -1,0 +1,5 @@
+{
+	"profile foo": {
+		"bar": "baz"
+	}
+}

@@ -1,0 +1,25 @@
+{
+  "pagination": {
+    "GetFindingsReportAccountSummary": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListFindingsReports": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListProfileTimes": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "profileTimes"
+    },
+    "ListProfilingGroups": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# IntelliJ IDEA
+.idea
+# Eclipse
+.checkstyle
+.project
+.settings
+# Swift
+.build
+Packages
+# Node
+node_modules
+package-lock.json
+bundle.json
+# vi
+*.swp
+# vscode
+.vscode
+.DS_Store
+*~
+Package.resolved
+extensions/sample/generated

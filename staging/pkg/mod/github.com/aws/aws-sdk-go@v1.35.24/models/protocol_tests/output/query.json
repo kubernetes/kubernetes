@@ -1,0 +1,893 @@
+[
+  {
+    "description": "Scalar members",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Str": {
+            "shape": "StringType"
+          },
+          "Num": {
+            "shape": "IntegerType",
+            "locationName": "FooNum"
+          },
+          "FalseBool": {
+            "shape": "BooleanType"
+          },
+          "TrueBool": {
+            "shape": "BooleanType"
+          },
+          "Float": {
+            "shape": "FloatType"
+          },
+          "Double": {
+            "shape": "DoubleType"
+          },
+          "Long": {
+            "shape": "LongType"
+          },
+          "Char": {
+            "shape": "CharType"
+          },
+          "Timestamp": {
+            "shape": "TimestampType"
+          }
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "IntegerType": {
+        "type": "integer"
+      },
+      "BooleanType": {
+        "type": "boolean"
+      },
+      "FloatType": {
+        "type": "float"
+      },
+      "DoubleType": {
+        "type": "double"
+      },
+      "LongType": {
+        "type": "long"
+      },
+      "CharType": {
+        "type": "character"
+      },
+      "TimestampType": {
+        "type": "timestamp"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Str": "myname",
+          "Num": 123,
+          "FalseBool": false,
+          "TrueBool": true,
+          "Float": 1.2,
+          "Double": 1.3,
+          "Long": 200,
+          "Char": "a",
+          "Timestamp": 1422172800
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Str>myname</Str><FooNum>123</FooNum><FalseBool>false</FalseBool><TrueBool>true</TrueBool><Float>1.2</Float><Double>1.3</Double><Long>200</Long><Char>a</Char><Timestamp>2015-01-25T08:00:00Z</Timestamp></OperationNameResult><ResponseMetadata><RequestId>request-id</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Not all members in response",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Str": {
+            "shape": "StringType"
+          },
+          "Num": {
+            "shape": "IntegerType"
+          }
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "IntegerType": {
+        "type": "integer"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Str": "myname"
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Str>myname</Str></OperationNameResult><ResponseMetadata><RequestId>request-id</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Blob",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Blob": {
+            "shape": "BlobType"
+          }
+        }
+      },
+      "BlobType": {
+        "type": "blob"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Blob": "value"
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Blob>dmFsdWU=</Blob></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Lists",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListShape"
+          }
+        }
+      },
+      "ListShape": {
+        "type": "list",
+        "member": {
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": ["abc", "123"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><ListMember><member>abc</member><member>123</member></ListMember></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "List with custom member name",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListShape"
+          }
+        }
+      },
+      "ListShape": {
+        "type": "list",
+        "member": {
+          "shape": "StringType",
+          "locationName": "item"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": ["abc", "123"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><ListMember><item>abc</item><item>123</item></ListMember></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened List",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "flattened": true,
+        "member": {
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": ["abc", "123"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><ListMember>abc</ListMember><ListMember>123</ListMember></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened single element list",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "flattened": true,
+        "member": {
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": ["abc"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><ListMember>abc</ListMember></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "List of structures",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "List": {
+            "shape": "ListOfStructs"
+          }
+        }
+      },
+      "ListOfStructs": {
+        "type": "list",
+        "member": {
+          "shape": "StructureShape"
+        }
+      },
+      "StructureShape": {
+        "type": "structure",
+        "members": {
+          "Foo": {
+            "shape": "StringShape"
+          },
+          "Bar": {
+            "shape": "StringShape"
+          },
+          "Baz": {
+            "shape": "StringShape"
+          }
+        }
+      },
+      "StringShape": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "List": [{"Foo": "firstfoo", "Bar": "firstbar", "Baz": "firstbaz"}, {"Foo": "secondfoo", "Bar": "secondbar", "Baz": "secondbaz"}]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse xmlns=\"https://service.amazonaws.com/doc/2010-05-08/\"><OperationNameResult><List><member><Foo>firstfoo</Foo><Bar>firstbar</Bar><Baz>firstbaz</Baz></member><member><Foo>secondfoo</Foo><Bar>secondbar</Bar><Baz>secondbaz</Baz></member></List></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened list of structures",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "resultWrapper": "OperationNameResult",
+        "members": {
+          "List": {
+            "shape": "ListOfStructs"
+          }
+        }
+      },
+      "ListOfStructs": {
+        "type": "list",
+        "flattened": true,
+        "member": {
+          "shape": "StructureShape"
+        }
+      },
+      "StructureShape": {
+        "type": "structure",
+        "members": {
+          "Foo": {
+            "shape": "StringShape"
+          },
+          "Bar": {
+            "shape": "StringShape"
+          },
+          "Baz": {
+            "shape": "StringShape"
+          }
+        }
+      },
+      "StringShape": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "List": [{"Foo": "firstfoo", "Bar": "firstbar", "Baz": "firstbaz"}, {"Foo": "secondfoo", "Bar": "secondbar", "Baz": "secondbaz"}]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse xmlns=\"https://service.amazonaws.com/doc/2010-05-08/\"><OperationNameResult><List><Foo>firstfoo</Foo><Bar>firstbar</Bar><Baz>firstbaz</Baz></List><List><Foo>secondfoo</Foo><Bar>secondbar</Bar><Baz>secondbaz</Baz></List></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened list with location name",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "List": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "flattened": true,
+        "member": {
+          "shape": "StringShape",
+          "locationName": "NamedList"
+        }
+      },
+      "StringShape": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "List": ["a", "b"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse xmlns=\"https://service.amazonaws.com/doc/2010-05-08/\"><OperationNameResult><NamedList>a</NamedList><NamedList>b</NamedList></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Normal map",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Map": {
+            "shape": "StringMap"
+          }
+        }
+      },
+      "StringMap": {
+        "type": "map",
+        "key": {
+            "shape": "StringType"
+        },
+        "value": {
+            "shape": "StructType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "StructType": {
+        "type": "structure",
+        "members": {
+          "foo": {
+            "shape": "StringType"
+          }
+        }
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Map": {
+            "qux": {
+              "foo": "bar"
+            },
+            "baz": {
+              "foo": "bam"
+            }
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse xmlns=\"https://service.amazonaws.com/doc/2010-05-08\"><OperationNameResult><Map><entry><key>qux</key><value><foo>bar</foo></value></entry><entry><key>baz</key><value><foo>bam</foo></value></entry></Map></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened map",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Map": {
+            "shape": "StringMap",
+            "flattened": true
+          }
+        }
+      },
+      "StringMap": {
+        "type": "map",
+        "key": {
+            "shape": "StringType"
+        },
+        "value": {
+            "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Map": {
+            "qux": "bar",
+            "baz": "bam"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Map><key>qux</key><value>bar</value></Map><Map><key>baz</key><value>bam</value></Map></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Flattened map in shape definition",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Map": {
+            "shape": "StringMap",
+            "locationName": "Attribute"
+          }
+        }
+      },
+      "StringMap": {
+        "type": "map",
+        "key": {
+            "shape": "StringType",
+            "locationName": "Name"
+        },
+        "value": {
+            "shape": "StringType",
+            "locationName": "Value"
+        },
+        "flattened": true,
+        "locationName": "Attribute"
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Map": {
+            "qux": "bar"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Attribute><Name>qux</Name><Value>bar</Value></Attribute></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Named map",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Map": {
+            "shape": "MapType"
+          }
+        }
+      },
+      "MapType": {
+        "type": "map",
+        "flattened": true,
+        "key": {
+          "locationName": "foo",
+          "shape": "StringType"
+        },
+        "value": {
+          "locationName": "bar",
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Map": {
+            "qux": "bar",
+            "baz": "bam"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Map><foo>qux</foo><bar>bar</bar></Map><Map><foo>baz</foo><bar>bam</bar></Map></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Empty string",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "Foo": {
+            "shape": "StringType"
+          }
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "resultWrapper": "OperationNameResult",
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Foo": ""
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><OperationNameResult><Foo/></OperationNameResult><ResponseMetadata><RequestId>requestid</RequestId></ResponseMetadata></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Timestamp members",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "TimeArg": {
+            "shape": "TimestampType"
+          },
+          "TimeCustom": {
+            "timestampFormat": "rfc822",
+            "shape": "TimestampType"
+          },
+          "TimeFormat": {
+            "shape": "TimestampFormatType"
+          },
+          "StructMember": {
+            "shape": "TimeContainer"
+          }
+        }
+      },
+      "TimeContainer": {
+        "type": "structure",
+        "members": {
+          "foo": {
+            "shape": "TimestampType"
+          },
+          "bar": {
+            "shape": "TimestampFormatType"
+          }
+        }
+      },
+      "TimestampFormatType": {
+        "timestampFormat": "unixTimestamp",
+        "type": "timestamp"
+      },
+      "TimestampType": {
+        "type": "timestamp"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "TimeArg": 1398796238,
+          "TimeCustom": 1398796238,
+          "TimeFormat": 1398796238,
+          "StructMember": {
+            "foo": 1398796238,
+            "bar": 1398796238
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><StructMember><foo>2014-04-29T18:30:38Z</foo><bar>1398796238</bar></StructMember><TimeArg>2014-04-29T18:30:38Z</TimeArg><TimeCustom>Tue, 29 Apr 2014 18:30:38 GMT</TimeCustom><TimeFormat>1398796238</TimeFormat><RequestId>requestid</RequestId></OperationNameResponse>"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Enum output",
+    "metadata": {
+      "protocol": "query"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "FooEnum": {
+            "shape": "EC2EnumType"
+          },
+          "ListEnums": {
+            "shape": "EC2EnumList"
+          }
+        }
+      },
+      "EC2EnumType":{
+        "type":"string",
+        "enum":[
+          "foo",
+          "bar"
+        ]
+      },
+      "EC2EnumList":{
+        "type":"list",
+        "member": {"shape": "EC2EnumType"}
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "FooEnum": "foo",
+          "ListEnums": ["foo", "bar"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "<OperationNameResponse><FooEnum>foo</FooEnum><ListEnums><member>foo</member><member>bar</member></ListEnums></OperationNameResponse>"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "pagination": {
+    "ListDataSourceSyncJobs": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListDataSources": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListIndices": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

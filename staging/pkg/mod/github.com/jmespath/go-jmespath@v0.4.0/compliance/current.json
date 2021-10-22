@@ -1,0 +1,25 @@
+[
+    {
+        "given": {
+            "foo": [{"name": "a"}, {"name": "b"}],
+            "bar": {"baz": "qux"}
+        },
+        "cases": [
+            {
+                "expression": "@",
+                "result": {
+                    "foo": [{"name": "a"}, {"name": "b"}],
+                    "bar": {"baz": "qux"}
+                }
+            },
+            {
+                "expression": "@.bar",
+                "result": {"baz": "qux"}
+            },
+            {
+                "expression": "@.foo[0]",
+                "result": {"name": "a"}
+            }
+        ]
+    }
+]

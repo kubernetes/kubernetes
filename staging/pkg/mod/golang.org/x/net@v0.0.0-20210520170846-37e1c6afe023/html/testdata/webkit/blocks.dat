@@ -1,0 +1,719 @@
+#data
+<!doctype html><p>foo<address>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “address”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <address>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><address><p>foo</address>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <address>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<article>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “article”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <article>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><article><p>foo</article>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <article>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<aside>bar<p>baz
+#errors
+(1,37): expected-closing-tag-but-got-eof
+28: Unclosed element “aside”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <aside>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><aside><p>foo</aside>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <aside>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<blockquote>bar<p>baz
+#errors
+(1,42): expected-closing-tag-but-got-eof
+33: Unclosed element “blockquote”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <blockquote>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><blockquote><p>foo</blockquote>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <blockquote>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<center>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “center”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <center>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><center><p>foo</center>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <center>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<details>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “details”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <details>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><details><p>foo</details>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <details>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<dialog>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “dialog”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <dialog>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><dialog><p>foo</dialog>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dialog>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<dir>bar<p>baz
+#errors
+(1,35): expected-closing-tag-but-got-eof
+26: Unclosed element “dir”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <dir>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><dir><p>foo</dir>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dir>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<div>bar<p>baz
+#errors
+(1,35): expected-closing-tag-but-got-eof
+26: Unclosed element “div”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <div>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><div><p>foo</div>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<dl>bar<p>baz
+#errors
+(1,34): expected-closing-tag-but-got-eof
+25: Unclosed element “dl”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <dl>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><dl><p>foo</dl>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dl>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<fieldset>bar<p>baz
+#errors
+(1,40): expected-closing-tag-but-got-eof
+31: Unclosed element “fieldset”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <fieldset>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><fieldset><p>foo</fieldset>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <fieldset>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<figcaption>bar<p>baz
+#errors
+(1,42): expected-closing-tag-but-got-eof
+33: Unclosed element “figcaption”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <figcaption>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><figcaption><p>foo</figcaption>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <figcaption>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<figure>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “figure”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <figure>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><figure><p>foo</figure>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <figure>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<footer>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “footer”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <footer>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><footer><p>foo</footer>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <footer>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<header>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “header”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <header>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><header><p>foo</header>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <header>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<hgroup>bar<p>baz
+#errors
+(1,38): expected-closing-tag-but-got-eof
+29: Unclosed element “hgroup”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <hgroup>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><hgroup><p>foo</hgroup>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <hgroup>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<listing>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “listing”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <listing>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><listing><p>foo</listing>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <listing>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<menu>bar<p>baz
+#errors
+(1,36): expected-closing-tag-but-got-eof
+27: Unclosed element “menu”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <menu>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><menu><p>foo</menu>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menu>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<nav>bar<p>baz
+#errors
+(1,35): expected-closing-tag-but-got-eof
+26: Unclosed element “nav”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <nav>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><nav><p>foo</nav>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <nav>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<ol>bar<p>baz
+#errors
+(1,34): expected-closing-tag-but-got-eof
+25: Unclosed element “ol”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <ol>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><ol><p>foo</ol>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ol>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<pre>bar<p>baz
+#errors
+(1,35): expected-closing-tag-but-got-eof
+26: Unclosed element “pre”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <pre>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><pre><p>foo</pre>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<section>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “section”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <section>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><section><p>foo</section>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <section>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<summary>bar<p>baz
+#errors
+(1,39): expected-closing-tag-but-got-eof
+30: Unclosed element “summary”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <summary>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><summary><p>foo</summary>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <summary>
+|       <p>
+|         "foo"
+|     "bar"
+
+#data
+<!doctype html><p>foo<ul>bar<p>baz
+#errors
+(1,34): expected-closing-tag-but-got-eof
+25: Unclosed element “ul”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|     <ul>
+|       "bar"
+|       <p>
+|         "baz"
+
+#data
+<!doctype html><ul><p>foo</ul>bar
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ul>
+|       <p>
+|         "foo"
+|     "bar"

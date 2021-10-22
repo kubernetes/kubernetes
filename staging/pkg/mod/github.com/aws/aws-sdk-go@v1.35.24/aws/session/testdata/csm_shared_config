@@ -1,0 +1,33 @@
+
+; Complete CSM profile
+[aws_csm]
+csm_enabled = true
+csm_host = bar
+csm_port = 1234
+csm_client_id = foo
+
+; CSM profile enable only
+[aws_csm_enabled]
+csm_enabled = true
+
+; CSM profile with no properties
+[aws_csm_empty]
+
+; CSM profile invalid port
+[aws_csm_invalidport]
+csm_enabled = true
+csm_port = onetwothreefour
+csm_client_id = foo
+
+; Multiple profiles with CSM properties
+[aws_csm_1]
+csm_enabled = true
+csm_host = bar1
+csm_port = 1234
+csm_client_id = foo
+
+[aws_csm_2]
+csm_enabled = false
+csm_host = bar2
+csm_port = 5678
+csm_client_id = bar

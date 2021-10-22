@@ -1,0 +1,124 @@
+/*
+    {4} ({1} and []{1})
+*/
+
+// {4} gets the value as a {1}, returns the optionalDefault
+// value or a system default object if the value is the wrong type.
+func (v *Value) {4}(optionalDefault ...{1}) {1} {
+    if s, ok := v.data.({1}); ok {
+        return s
+    }
+    if len(optionalDefault) == 1 {
+        return optionalDefault[0]
+    }
+    return {3}
+}
+
+// Must{4} gets the value as a {1}.
+//
+// Panics if the object is not a {1}.
+func (v *Value) Must{4}() {1} {
+    return v.data.({1})
+}
+
+// {4}Slice gets the value as a []{1}, returns the optionalDefault
+// value or nil if the value is not a []{1}.
+func (v *Value) {4}Slice(optionalDefault ...[]{1}) []{1} {
+    if s, ok := v.data.([]{1}); ok {
+        return s
+    }
+    if len(optionalDefault) == 1 {
+        return optionalDefault[0]
+    }
+    return nil
+}
+
+// Must{4}Slice gets the value as a []{1}.
+//
+// Panics if the object is not a []{1}.
+func (v *Value) Must{4}Slice() []{1} {
+    return v.data.([]{1})
+}
+
+// Is{4} gets whether the object contained is a {1} or not.
+func (v *Value) Is{4}() bool {
+    _, ok := v.data.({1})
+    return ok
+}
+
+// Is{4}Slice gets whether the object contained is a []{1} or not.
+func (v *Value) Is{4}Slice() bool {
+    _, ok := v.data.([]{1})
+    return ok
+}
+
+// Each{4} calls the specified callback for each object
+// in the []{1}.
+//
+// Panics if the object is the wrong type.
+func (v *Value) Each{4}(callback func(int, {1}) bool) *Value {
+    for index, val := range v.Must{4}Slice() {
+		    carryon := callback(index, val)
+		    if !carryon {
+            break
+        }
+    }
+    return v
+}
+
+// Where{4} uses the specified decider function to select items
+// from the []{1}.  The object contained in the result will contain
+// only the selected items.
+func (v *Value) Where{4}(decider func(int, {1}) bool) *Value {
+    var selected []{1}
+    v.Each{4}(func(index int, val {1}) bool {
+		    shouldSelect := decider(index, val)
+		    if !shouldSelect {
+			      selected = append(selected, val)
+        }
+        return true
+    })
+    return &Value{data:selected}
+}
+
+// Group{4} uses the specified grouper function to group the items
+// keyed by the return of the grouper.  The object contained in the
+// result will contain a map[string][]{1}.
+func (v *Value) Group{4}(grouper func(int, {1}) string) *Value {
+    groups := make(map[string][]{1})
+    v.Each{4}(func(index int, val {1}) bool {
+        group := grouper(index, val)
+        if _, ok := groups[group]; !ok {
+            groups[group] = make([]{1}, 0)
+        }
+        groups[group] = append(groups[group], val)
+        return true
+    })
+    return &Value{data:groups}
+}
+
+// Replace{4} uses the specified function to replace each {1}s
+// by iterating each item.  The data in the returned result will be a
+// []{1} containing the replaced items.
+func (v *Value) Replace{4}(replacer func(int, {1}) {1}) *Value {
+    arr := v.Must{4}Slice()
+    replaced := make([]{1}, len(arr))
+    v.Each{4}(func(index int, val {1}) bool {
+        replaced[index] = replacer(index, val)
+        return true
+    })
+    return &Value{data:replaced}
+}
+
+// Collect{4} uses the specified collector function to collect a value
+// for each of the {1}s in the slice.  The data returned will be a
+// []interface{}.
+func (v *Value) Collect{4}(collector func(int, {1}) interface{}) *Value {
+    arr := v.Must{4}Slice()
+    collected := make([]interface{}, len(arr))
+    v.Each{4}(func(index int, val {1}) bool {
+        collected[index] = collector(index, val)
+        return true
+    })
+    return &Value{data:collected}
+}

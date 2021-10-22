@@ -1,0 +1,151 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:OosbPz1sPaaGORHGt5aedORiLAiZDB2zifGYEDstd2M=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/42storageblobsuitetestsetpageblo?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:10 GMT
+      Etag:
+      - '"0x8D8FE94CC67C3EA"'
+      Last-Modified:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 2c9d7961-801e-004c-067d-300fdd000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:DwpNvU9R4RfPz4m82AMtsi/Sh/o9Xkr5VWHC0uw/WBA=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-blob-content-length:
+      - "1024"
+      x-ms-blob-sequence-number:
+      - "0"
+      x-ms-blob-type:
+      - PageBlob
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/42storageblobsuitetestsetpageblo/blob/42storageblobsuitetestsetpageblobproperties
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:10 GMT
+      Etag:
+      - '"0x8D8FE94CC6C623E"'
+      Last-Modified:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 2c9d796d-801e-004c-0f7d-300fdd000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:XbVHAtkPvkx02hh0+Rj7UWlM7H0Kvaf+GCPIVjg7sLM=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-blob-content-length:
+      - "512"
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/42storageblobsuitetestsetpageblo/blob/42storageblobsuitetestsetpageblobproperties?comp=properties&timeout=30
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:10 GMT
+      Etag:
+      - '"0x8D8FE94CC6F972B"'
+      Last-Modified:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Sequence-Number:
+      - "0"
+      X-Ms-Request-Id:
+      - 2c9d7979-801e-004c-1a7d-300fdd000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:LjNMlX/A1D7jlDaGZ7dQNlmGejKT070yknBCUONvwqU=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/42storageblobsuitetestsetpageblo?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:10 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 2c9d7980-801e-004c-207d-300fdd000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

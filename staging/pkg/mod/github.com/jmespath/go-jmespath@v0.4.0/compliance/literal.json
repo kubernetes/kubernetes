@@ -1,0 +1,185 @@
+[
+    {
+        "given": {
+            "foo": [{"name": "a"}, {"name": "b"}],
+            "bar": {"baz": "qux"}
+        },
+        "cases": [
+            {
+                "expression": "`\"foo\"`",
+                "result": "foo"
+            },
+            {
+                "comment": "Interpret escaped unicode.",
+                "expression": "`\"\\u03a6\"`",
+                "result": "Φ"
+            },
+            {
+                "expression": "`\"✓\"`",
+                "result": "✓"
+            },
+            {
+                "expression": "`[1, 2, 3]`",
+                "result": [1, 2, 3]
+            },
+            {
+                "expression": "`{\"a\": \"b\"}`",
+                "result": {"a": "b"}
+            },
+            {
+                "expression": "`true`",
+                "result": true
+            },
+            {
+                "expression": "`false`",
+                "result": false
+            },
+            {
+                "expression": "`null`",
+                "result": null
+            },
+            {
+                "expression": "`0`",
+                "result": 0
+            },
+            {
+                "expression": "`1`",
+                "result": 1
+            },
+            {
+                "expression": "`2`",
+                "result": 2
+            },
+            {
+                "expression": "`3`",
+                "result": 3
+            },
+            {
+                "expression": "`4`",
+                "result": 4
+            },
+            {
+                "expression": "`5`",
+                "result": 5
+            },
+            {
+                "expression": "`6`",
+                "result": 6
+            },
+            {
+                "expression": "`7`",
+                "result": 7
+            },
+            {
+                "expression": "`8`",
+                "result": 8
+            },
+            {
+                "expression": "`9`",
+                "result": 9
+            },
+            {
+                "comment": "Escaping a backtick in quotes",
+                "expression": "`\"foo\\`bar\"`",
+                "result": "foo`bar"
+            },
+            {
+                "comment": "Double quote in literal",
+                "expression": "`\"foo\\\"bar\"`",
+                "result": "foo\"bar"
+            },
+            {
+                "expression": "`\"1\\`\"`",
+                "result": "1`"
+            },
+            {
+                "comment": "Multiple literal expressions with escapes",
+                "expression": "`\"\\\\\"`.{a:`\"b\"`}",
+                "result": {"a": "b"}
+            },
+            {
+                "comment": "literal . identifier",
+                "expression": "`{\"a\": \"b\"}`.a",
+                "result": "b"
+            },
+            {
+                "comment": "literal . identifier . identifier",
+                "expression": "`{\"a\": {\"b\": \"c\"}}`.a.b",
+                "result": "c"
+            },
+            {
+                "comment": "literal . identifier bracket-expr",
+                "expression": "`[0, 1, 2]`[1]",
+                "result": 1
+            }
+        ]
+    },
+    {
+      "comment": "Literals",
+      "given": {"type": "object"},
+      "cases": [
+        {
+          "comment": "Literal with leading whitespace",
+          "expression": "`  {\"foo\": true}`",
+          "result": {"foo": true}
+        },
+        {
+          "comment": "Literal with trailing whitespace",
+          "expression": "`{\"foo\": true}   `",
+          "result": {"foo": true}
+        },
+        {
+          "comment": "Literal on RHS of subexpr not allowed",
+          "expression": "foo.`\"bar\"`",
+          "error": "syntax"
+        }
+      ]
+    },
+    {
+      "comment": "Raw String Literals",
+      "given": {},
+      "cases": [
+        {
+          "expression": "'foo'",
+          "result": "foo"
+        },
+        {
+          "expression": "'  foo  '",
+          "result": "  foo  "
+        },
+        {
+          "expression": "'0'",
+          "result": "0"
+        },
+        {
+          "expression": "'newline\n'",
+          "result": "newline\n"
+        },
+        {
+          "expression": "'\n'",
+          "result": "\n"
+        },
+        {
+          "expression": "'✓'",
+	  "result": "✓"
+        },
+        {
+          "expression": "'𝄞'",
+	  "result": "𝄞"
+        },
+        {
+          "expression": "'  [foo]  '",
+          "result": "  [foo]  "
+        },
+        {
+          "expression": "'[foo]'",
+          "result": "[foo]"
+        },
+        {
+          "comment": "Do not interpret escaped unicode.",
+          "expression": "'\\u03a6'",
+          "result": "\\u03a6"
+        }
+      ]
+    }
+]

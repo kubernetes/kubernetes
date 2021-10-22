@@ -1,0 +1,2357 @@
+{
+  "version": "2.0",
+  "service": "<p>Welcome to the AWS Device Farm API documentation, which contains APIs for:</p> <ul> <li> <p>Testing on desktop browsers</p> <p> Device Farm makes it possible for you to test your web applications on desktop browsers using Selenium. The APIs for desktop browser testing contain <code>TestGrid</code> in their names. For more information, see <a href=\"https://docs.aws.amazon.com/devicefarm/latest/testgrid/\">Testing Web Applications on Selenium with Device Farm</a>.</p> </li> <li> <p>Testing on real mobile devices</p> <p>Device Farm makes it possible for you to test apps on physical phones, tablets, and other devices in the cloud. For more information, see the <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/\">Device Farm Developer Guide</a>.</p> </li> </ul>",
+  "operations": {
+    "CreateDevicePool": "<p>Creates a device pool.</p>",
+    "CreateInstanceProfile": "<p>Creates a profile that can be applied to one or more private fleet device instances.</p>",
+    "CreateNetworkProfile": "<p>Creates a network profile.</p>",
+    "CreateProject": "<p>Creates a project.</p>",
+    "CreateRemoteAccessSession": "<p>Specifies and starts a remote access session.</p>",
+    "CreateTestGridProject": "<p>Creates a Selenium testing project. Projects are used to track <a>TestGridSession</a> instances.</p>",
+    "CreateTestGridUrl": "<p>Creates a signed, short-term URL that can be passed to a Selenium <code>RemoteWebDriver</code> constructor.</p>",
+    "CreateUpload": "<p>Uploads an app or test scripts.</p>",
+    "CreateVPCEConfiguration": "<p>Creates a configuration record in Device Farm for your Amazon Virtual Private Cloud (VPC) endpoint.</p>",
+    "DeleteDevicePool": "<p>Deletes a device pool given the pool ARN. Does not allow deletion of curated pools owned by the system.</p>",
+    "DeleteInstanceProfile": "<p>Deletes a profile that can be applied to one or more private device instances.</p>",
+    "DeleteNetworkProfile": "<p>Deletes a network profile.</p>",
+    "DeleteProject": "<p>Deletes an AWS Device Farm project, given the project ARN.</p> <p> Deleting this resource does not stop an in-progress run.</p>",
+    "DeleteRemoteAccessSession": "<p>Deletes a completed remote access session and its results.</p>",
+    "DeleteRun": "<p>Deletes the run, given the run ARN.</p> <p> Deleting this resource does not stop an in-progress run.</p>",
+    "DeleteTestGridProject": "<p> Deletes a Selenium testing project and all content generated under it. </p> <important> <p>You cannot undo this operation.</p> </important> <note> <p>You cannot delete a project if it has active sessions.</p> </note>",
+    "DeleteUpload": "<p>Deletes an upload given the upload ARN.</p>",
+    "DeleteVPCEConfiguration": "<p>Deletes a configuration for your Amazon Virtual Private Cloud (VPC) endpoint.</p>",
+    "GetAccountSettings": "<p>Returns the number of unmetered iOS or unmetered Android devices that have been purchased by the account.</p>",
+    "GetDevice": "<p>Gets information about a unique device type.</p>",
+    "GetDeviceInstance": "<p>Returns information about a device instance that belongs to a private device fleet.</p>",
+    "GetDevicePool": "<p>Gets information about a device pool.</p>",
+    "GetDevicePoolCompatibility": "<p>Gets information about compatibility with a device pool.</p>",
+    "GetInstanceProfile": "<p>Returns information about the specified instance profile.</p>",
+    "GetJob": "<p>Gets information about a job.</p>",
+    "GetNetworkProfile": "<p>Returns information about a network profile.</p>",
+    "GetOfferingStatus": "<p>Gets the current status and future status of all offerings purchased by an AWS account. The response indicates how many offerings are currently available and the offerings that will be available in the next period. The API returns a <code>NotEligible</code> error if the user is not permitted to invoke the operation. If you must be able to invoke this operation, contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a>.</p>",
+    "GetProject": "<p>Gets information about a project.</p>",
+    "GetRemoteAccessSession": "<p>Returns a link to a currently running remote access session.</p>",
+    "GetRun": "<p>Gets information about a run.</p>",
+    "GetSuite": "<p>Gets information about a suite.</p>",
+    "GetTest": "<p>Gets information about a test.</p>",
+    "GetTestGridProject": "<p>Retrieves information about a Selenium testing project.</p>",
+    "GetTestGridSession": "<p>A session is an instance of a browser created through a <code>RemoteWebDriver</code> with the URL from <a>CreateTestGridUrlResult$url</a>. You can use the following to look up sessions:</p> <ul> <li> <p>The session ARN (<a>GetTestGridSessionRequest$sessionArn</a>).</p> </li> <li> <p>The project ARN and a session ID (<a>GetTestGridSessionRequest$projectArn</a> and <a>GetTestGridSessionRequest$sessionId</a>).</p> </li> </ul> <p/>",
+    "GetUpload": "<p>Gets information about an upload.</p>",
+    "GetVPCEConfiguration": "<p>Returns information about the configuration settings for your Amazon Virtual Private Cloud (VPC) endpoint.</p>",
+    "InstallToRemoteAccessSession": "<p>Installs an application to the device in a remote access session. For Android applications, the file must be in .apk format. For iOS applications, the file must be in .ipa format.</p>",
+    "ListArtifacts": "<p>Gets information about artifacts.</p>",
+    "ListDeviceInstances": "<p>Returns information about the private device instances associated with one or more AWS accounts.</p>",
+    "ListDevicePools": "<p>Gets information about device pools.</p>",
+    "ListDevices": "<p>Gets information about unique device types.</p>",
+    "ListInstanceProfiles": "<p>Returns information about all the instance profiles in an AWS account.</p>",
+    "ListJobs": "<p>Gets information about jobs for a given test run.</p>",
+    "ListNetworkProfiles": "<p>Returns the list of available network profiles.</p>",
+    "ListOfferingPromotions": "<p>Returns a list of offering promotions. Each offering promotion record contains the ID and description of the promotion. The API returns a <code>NotEligible</code> error if the caller is not permitted to invoke the operation. Contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a> if you must be able to invoke this operation.</p>",
+    "ListOfferingTransactions": "<p>Returns a list of all historical purchases, renewals, and system renewal transactions for an AWS account. The list is paginated and ordered by a descending timestamp (most recent transactions are first). The API returns a <code>NotEligible</code> error if the user is not permitted to invoke the operation. If you must be able to invoke this operation, contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a>.</p>",
+    "ListOfferings": "<p>Returns a list of products or offerings that the user can manage through the API. Each offering record indicates the recurring price per unit and the frequency for that offering. The API returns a <code>NotEligible</code> error if the user is not permitted to invoke the operation. If you must be able to invoke this operation, contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a>.</p>",
+    "ListProjects": "<p>Gets information about projects.</p>",
+    "ListRemoteAccessSessions": "<p>Returns a list of all currently running remote access sessions.</p>",
+    "ListRuns": "<p>Gets information about runs, given an AWS Device Farm project ARN.</p>",
+    "ListSamples": "<p>Gets information about samples, given an AWS Device Farm job ARN.</p>",
+    "ListSuites": "<p>Gets information about test suites for a given job.</p>",
+    "ListTagsForResource": "<p>List the tags for an AWS Device Farm resource.</p>",
+    "ListTestGridProjects": "<p>Gets a list of all Selenium testing projects in your account.</p>",
+    "ListTestGridSessionActions": "<p>Returns a list of the actions taken in a <a>TestGridSession</a>.</p>",
+    "ListTestGridSessionArtifacts": "<p>Retrieves a list of artifacts created during the session.</p>",
+    "ListTestGridSessions": "<p>Retrieves a list of sessions for a <a>TestGridProject</a>.</p>",
+    "ListTests": "<p>Gets information about tests in a given test suite.</p>",
+    "ListUniqueProblems": "<p>Gets information about unique problems, such as exceptions or crashes.</p> <p>Unique problems are defined as a single instance of an error across a run, job, or suite. For example, if a call in your application consistently raises an exception (<code>OutOfBoundsException in MyActivity.java:386</code>), <code>ListUniqueProblems</code> returns a single entry instead of many individual entries for that exception.</p>",
+    "ListUploads": "<p>Gets information about uploads, given an AWS Device Farm project ARN.</p>",
+    "ListVPCEConfigurations": "<p>Returns information about all Amazon Virtual Private Cloud (VPC) endpoint configurations in the AWS account.</p>",
+    "PurchaseOffering": "<p>Immediately purchases offerings for an AWS account. Offerings renew with the latest total purchased quantity for an offering, unless the renewal was overridden. The API returns a <code>NotEligible</code> error if the user is not permitted to invoke the operation. If you must be able to invoke this operation, contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a>.</p>",
+    "RenewOffering": "<p>Explicitly sets the quantity of devices to renew for an offering, starting from the <code>effectiveDate</code> of the next period. The API returns a <code>NotEligible</code> error if the user is not permitted to invoke the operation. If you must be able to invoke this operation, contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a>.</p>",
+    "ScheduleRun": "<p>Schedules a run.</p>",
+    "StopJob": "<p>Initiates a stop request for the current job. AWS Device Farm immediately stops the job on the device where tests have not started. You are not billed for this device. On the device where tests have started, setup suite and teardown suite tests run to completion on the device. You are billed for setup, teardown, and any tests that were in progress or already completed.</p>",
+    "StopRemoteAccessSession": "<p>Ends a specified remote access session.</p>",
+    "StopRun": "<p>Initiates a stop request for the current test run. AWS Device Farm immediately stops the run on devices where tests have not started. You are not billed for these devices. On devices where tests have started executing, setup suite and teardown suite tests run to completion on those devices. You are billed for setup, teardown, and any tests that were in progress or already completed.</p>",
+    "TagResource": "<p>Associates the specified tags to a resource with the specified <code>resourceArn</code>. If existing tags on a resource are not specified in the request parameters, they are not changed. When a resource is deleted, the tags associated with that resource are also deleted.</p>",
+    "UntagResource": "<p>Deletes the specified tags from a resource.</p>",
+    "UpdateDeviceInstance": "<p>Updates information about a private device instance.</p>",
+    "UpdateDevicePool": "<p>Modifies the name, description, and rules in a device pool given the attributes and the pool ARN. Rule updates are all-or-nothing, meaning they can only be updated as a whole (or not at all).</p>",
+    "UpdateInstanceProfile": "<p>Updates information about an existing private device instance profile.</p>",
+    "UpdateNetworkProfile": "<p>Updates the network profile.</p>",
+    "UpdateProject": "<p>Modifies the specified project name, given the project ARN and a new name.</p>",
+    "UpdateTestGridProject": "<p>Change details of a project.</p>",
+    "UpdateUpload": "<p>Updates an uploaded test spec.</p>",
+    "UpdateVPCEConfiguration": "<p>Updates information about an Amazon Virtual Private Cloud (VPC) endpoint configuration.</p>"
+  },
+  "shapes": {
+    "AWSAccountNumber": {
+      "base": null,
+      "refs": {
+        "AccountSettings$awsAccountNumber": "<p>The AWS account number specified in the <code>AccountSettings</code> container.</p>"
+      }
+    },
+    "AccountSettings": {
+      "base": "<p>A container for account-level settings in AWS Device Farm.</p>",
+      "refs": {
+        "GetAccountSettingsResult$accountSettings": "<p>The account settings.</p>"
+      }
+    },
+    "AccountsCleanup": {
+      "base": null,
+      "refs": {
+        "ExecutionConfiguration$accountsCleanup": "<p>True if account cleanup is enabled at the beginning of the test. Otherwise, false.</p>"
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "AmazonResourceNames$member": null,
+        "Artifact$arn": "<p>The artifact's ARN.</p>",
+        "CreateDevicePoolRequest$projectArn": "<p>The ARN of the project for the device pool.</p>",
+        "CreateNetworkProfileRequest$projectArn": "<p>The Amazon Resource Name (ARN) of the project for which you want to create a network profile.</p>",
+        "CreateRemoteAccessSessionRequest$projectArn": "<p>The Amazon Resource Name (ARN) of the project for which you want to create a remote access session.</p>",
+        "CreateRemoteAccessSessionRequest$deviceArn": "<p>The ARN of the device for which you want to create a remote access session.</p>",
+        "CreateRemoteAccessSessionRequest$instanceArn": "<p>The Amazon Resource Name (ARN) of the device instance for which you want to create a remote access session.</p>",
+        "CreateRemoteAccessSessionRequest$remoteRecordAppArn": "<p>The Amazon Resource Name (ARN) for the app to be recorded in the remote access session.</p>",
+        "CreateUploadRequest$projectArn": "<p>The ARN of the project for the upload.</p>",
+        "DeleteDevicePoolRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm device pool to delete.</p>",
+        "DeleteInstanceProfileRequest$arn": "<p>The Amazon Resource Name (ARN) of the instance profile you are requesting to delete.</p>",
+        "DeleteNetworkProfileRequest$arn": "<p>The ARN of the network profile to delete.</p>",
+        "DeleteProjectRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm project to delete.</p>",
+        "DeleteRemoteAccessSessionRequest$arn": "<p>The Amazon Resource Name (ARN) of the session for which you want to delete remote access.</p>",
+        "DeleteRunRequest$arn": "<p>The Amazon Resource Name (ARN) for the run to delete.</p>",
+        "DeleteUploadRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm upload to delete.</p>",
+        "DeleteVPCEConfigurationRequest$arn": "<p>The Amazon Resource Name (ARN) of the VPC endpoint configuration you want to delete.</p>",
+        "Device$arn": "<p>The device's ARN.</p>",
+        "DeviceInstance$arn": "<p>The Amazon Resource Name (ARN) of the device instance.</p>",
+        "DeviceInstance$deviceArn": "<p>The ARN of the device.</p>",
+        "DevicePool$arn": "<p>The device pool's ARN.</p>",
+        "GetDeviceInstanceRequest$arn": "<p>The Amazon Resource Name (ARN) of the instance you're requesting information about.</p>",
+        "GetDevicePoolCompatibilityRequest$devicePoolArn": "<p>The device pool's ARN.</p>",
+        "GetDevicePoolCompatibilityRequest$appArn": "<p>The ARN of the app that is associated with the specified device pool.</p>",
+        "GetDevicePoolRequest$arn": "<p>The device pool's ARN.</p>",
+        "GetDeviceRequest$arn": "<p>The device type's ARN.</p>",
+        "GetInstanceProfileRequest$arn": "<p>The Amazon Resource Name (ARN) of an instance profile.</p>",
+        "GetJobRequest$arn": "<p>The job's ARN.</p>",
+        "GetNetworkProfileRequest$arn": "<p>The ARN of the network profile to return information about.</p>",
+        "GetProjectRequest$arn": "<p>The project's ARN.</p>",
+        "GetRemoteAccessSessionRequest$arn": "<p>The Amazon Resource Name (ARN) of the remote access session about which you want to get session information.</p>",
+        "GetRunRequest$arn": "<p>The run's ARN.</p>",
+        "GetSuiteRequest$arn": "<p>The suite's ARN.</p>",
+        "GetTestRequest$arn": "<p>The test's ARN.</p>",
+        "GetUploadRequest$arn": "<p>The upload's ARN.</p>",
+        "GetVPCEConfigurationRequest$arn": "<p>The Amazon Resource Name (ARN) of the VPC endpoint configuration you want to describe.</p>",
+        "InstallToRemoteAccessSessionRequest$remoteAccessSessionArn": "<p>The Amazon Resource Name (ARN) of the remote access session about which you are requesting information.</p>",
+        "InstallToRemoteAccessSessionRequest$appArn": "<p>The ARN of the app about which you are requesting information.</p>",
+        "InstanceProfile$arn": "<p>The Amazon Resource Name (ARN) of the instance profile.</p>",
+        "Job$arn": "<p>The job's ARN.</p>",
+        "Job$instanceArn": "<p>The ARN of the instance.</p>",
+        "ListArtifactsRequest$arn": "<p>The run, job, suite, or test ARN.</p>",
+        "ListDevicePoolsRequest$arn": "<p>The project ARN.</p>",
+        "ListDevicesRequest$arn": "<p>The Amazon Resource Name (ARN) of the project.</p>",
+        "ListJobsRequest$arn": "<p>The run's Amazon Resource Name (ARN).</p>",
+        "ListNetworkProfilesRequest$arn": "<p>The Amazon Resource Name (ARN) of the project for which you want to list network profiles.</p>",
+        "ListProjectsRequest$arn": "<p>Optional. If no Amazon Resource Name (ARN) is specified, then AWS Device Farm returns a list of all projects for the AWS account. You can also specify a project ARN.</p>",
+        "ListRemoteAccessSessionsRequest$arn": "<p>The Amazon Resource Name (ARN) of the project about which you are requesting information.</p>",
+        "ListRunsRequest$arn": "<p>The Amazon Resource Name (ARN) of the project for which you want to list runs.</p>",
+        "ListSamplesRequest$arn": "<p>The Amazon Resource Name (ARN) of the job used to list samples.</p>",
+        "ListSuitesRequest$arn": "<p>The job's Amazon Resource Name (ARN).</p>",
+        "ListTestsRequest$arn": "<p>The test suite's Amazon Resource Name (ARN).</p>",
+        "ListUniqueProblemsRequest$arn": "<p>The unique problems' ARNs.</p>",
+        "ListUploadsRequest$arn": "<p>The Amazon Resource Name (ARN) of the project for which you want to list uploads.</p>",
+        "NetworkProfile$arn": "<p>The Amazon Resource Name (ARN) of the network profile.</p>",
+        "ProblemDetail$arn": "<p>The problem detail's ARN.</p>",
+        "Project$arn": "<p>The project's ARN.</p>",
+        "RemoteAccessSession$arn": "<p>The Amazon Resource Name (ARN) of the remote access session.</p>",
+        "RemoteAccessSession$instanceArn": "<p>The ARN of the instance.</p>",
+        "RemoteAccessSession$remoteRecordAppArn": "<p>The ARN for the app to be recorded in the remote access session.</p>",
+        "Run$arn": "<p>The run's ARN.</p>",
+        "Run$appUpload": "<p>An app to upload or that has been uploaded.</p>",
+        "Run$devicePoolArn": "<p>The ARN of the device pool for the run.</p>",
+        "Run$testSpecArn": "<p>The ARN of the YAML-formatted test specification for the run.</p>",
+        "Sample$arn": "<p>The sample's ARN.</p>",
+        "ScheduleRunConfiguration$extraDataPackageArn": "<p>The ARN of the extra data for the run. The extra data is a .zip file that AWS Device Farm extracts to external data for Android or the app's sandbox for iOS.</p>",
+        "ScheduleRunConfiguration$networkProfileArn": "<p>Reserved for internal use.</p>",
+        "ScheduleRunRequest$projectArn": "<p>The ARN of the project for the run to be scheduled.</p>",
+        "ScheduleRunRequest$appArn": "<p>The ARN of an application package to run tests against, created with <a>CreateUpload</a>. See <a>ListUploads</a>.</p>",
+        "ScheduleRunRequest$devicePoolArn": "<p>The ARN of the device pool for the run to be scheduled.</p>",
+        "ScheduleRunTest$testPackageArn": "<p>The ARN of the uploaded test to be run.</p>",
+        "ScheduleRunTest$testSpecArn": "<p>The ARN of the YAML-formatted test specification.</p>",
+        "StopJobRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm job to stop.</p>",
+        "StopRemoteAccessSessionRequest$arn": "<p>The Amazon Resource Name (ARN) of the remote access session to stop.</p>",
+        "StopRunRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm run to stop.</p>",
+        "Suite$arn": "<p>The suite's ARN.</p>",
+        "TagOperationException$resourceName": null,
+        "TagPolicyException$resourceName": null,
+        "Test$arn": "<p>The test's ARN.</p>",
+        "TooManyTagsException$resourceName": null,
+        "UpdateDeviceInstanceRequest$arn": "<p>The Amazon Resource Name (ARN) of the device instance.</p>",
+        "UpdateDeviceInstanceRequest$profileArn": "<p>The ARN of the profile that you want to associate with the device instance.</p>",
+        "UpdateDevicePoolRequest$arn": "<p>The Amazon Resource Name (ARN) of the Device Farm device pool to update.</p>",
+        "UpdateInstanceProfileRequest$arn": "<p>The Amazon Resource Name (ARN) of the instance profile.</p>",
+        "UpdateNetworkProfileRequest$arn": "<p>The Amazon Resource Name (ARN) of the project for which you want to update network profile settings.</p>",
+        "UpdateProjectRequest$arn": "<p>The Amazon Resource Name (ARN) of the project whose name to update.</p>",
+        "UpdateUploadRequest$arn": "<p>The Amazon Resource Name (ARN) of the uploaded test spec.</p>",
+        "UpdateVPCEConfigurationRequest$arn": "<p>The Amazon Resource Name (ARN) of the VPC endpoint configuration you want to update.</p>",
+        "Upload$arn": "<p>The upload's ARN.</p>",
+        "VPCEConfiguration$arn": "<p>The Amazon Resource Name (ARN) of the VPC endpoint configuration.</p>"
+      }
+    },
+    "AmazonResourceNames": {
+      "base": null,
+      "refs": {
+        "CreateRemoteAccessSessionConfiguration$vpceConfigurationArns": "<p>An array of ARNs included in the VPC endpoint configuration.</p>",
+        "ScheduleRunConfiguration$vpceConfigurationArns": "<p>An array of ARNs for your VPC endpoint configurations.</p>",
+        "ScheduleRunConfiguration$auxiliaryApps": "<p>A list of upload ARNs for app packages to be installed with your app.</p>"
+      }
+    },
+    "AndroidPaths": {
+      "base": null,
+      "refs": {
+        "CustomerArtifactPaths$androidPaths": "<p>Comma-separated list of paths on the Android device where the artifacts generated by the customer's tests are pulled from.</p>"
+      }
+    },
+    "AppPackagesCleanup": {
+      "base": null,
+      "refs": {
+        "ExecutionConfiguration$appPackagesCleanup": "<p>True if app package cleanup is enabled at the beginning of the test. Otherwise, false.</p>"
+      }
+    },
+    "ArgumentException": {
+      "base": "<p>An invalid argument was specified.</p>",
+      "refs": {
+      }
+    },
+    "Artifact": {
+      "base": "<p>Represents the output of a test. Examples of artifacts include logs and screenshots.</p>",
+      "refs": {
+        "Artifacts$member": null
+      }
+    },
+    "ArtifactCategory": {
+      "base": null,
+      "refs": {
+        "ListArtifactsRequest$type": "<p>The artifacts' type.</p> <p>Allowed values include:</p> <ul> <li> <p>FILE</p> </li> <li> <p>LOG</p> </li> <li> <p>SCREENSHOT</p> </li> </ul>"
+      }
+    },
+    "ArtifactType": {
+      "base": null,
+      "refs": {
+        "Artifact$type": "<p>The artifact's type.</p> <p>Allowed values include the following:</p> <ul> <li> <p>UNKNOWN</p> </li> <li> <p>SCREENSHOT</p> </li> <li> <p>DEVICE_LOG</p> </li> <li> <p>MESSAGE_LOG</p> </li> <li> <p>VIDEO_LOG</p> </li> <li> <p>RESULT_LOG</p> </li> <li> <p>SERVICE_LOG</p> </li> <li> <p>WEBKIT_LOG</p> </li> <li> <p>INSTRUMENTATION_OUTPUT</p> </li> <li> <p>EXERCISER_MONKEY_OUTPUT: the artifact (log) generated by an Android fuzz test.</p> </li> <li> <p>CALABASH_JSON_OUTPUT</p> </li> <li> <p>CALABASH_PRETTY_OUTPUT</p> </li> <li> <p>CALABASH_STANDARD_OUTPUT</p> </li> <li> <p>CALABASH_JAVA_XML_OUTPUT</p> </li> <li> <p>AUTOMATION_OUTPUT</p> </li> <li> <p>APPIUM_SERVER_OUTPUT</p> </li> <li> <p>APPIUM_JAVA_OUTPUT</p> </li> <li> <p>APPIUM_JAVA_XML_OUTPUT</p> </li> <li> <p>APPIUM_PYTHON_OUTPUT</p> </li> <li> <p>APPIUM_PYTHON_XML_OUTPUT</p> </li> <li> <p>EXPLORER_EVENT_LOG</p> </li> <li> <p>EXPLORER_SUMMARY_LOG</p> </li> <li> <p>APPLICATION_CRASH_REPORT</p> </li> <li> <p>XCTEST_LOG</p> </li> <li> <p>VIDEO</p> </li> <li> <p>CUSTOMER_ARTIFACT</p> </li> <li> <p>CUSTOMER_ARTIFACT_LOG</p> </li> <li> <p>TESTSPEC_OUTPUT</p> </li> </ul>"
+      }
+    },
+    "Artifacts": {
+      "base": null,
+      "refs": {
+        "ListArtifactsResult$artifacts": "<p>Information about the artifacts.</p>"
+      }
+    },
+    "BillingMethod": {
+      "base": null,
+      "refs": {
+        "CreateRemoteAccessSessionConfiguration$billingMethod": "<p>The billing method for the remote access session.</p>",
+        "RemoteAccessSession$billingMethod": "<p>The billing method of the remote access session. Possible values include <code>METERED</code> or <code>UNMETERED</code>. For more information about metered devices, see <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/welcome.html#welcome-terminology\">AWS Device Farm terminology</a>.</p>",
+        "Run$billingMethod": "<p>Specifies the billing method for a test run: <code>metered</code> or <code>unmetered</code>. If the parameter is not specified, the default value is <code>metered</code>.</p> <note> <p>If you have unmetered device slots, you must set this to <code>unmetered</code> to use them. Otherwise, the run is counted toward metered device minutes.</p> </note>",
+        "ScheduleRunConfiguration$billingMethod": "<p>Specifies the billing method for a test run: <code>metered</code> or <code>unmetered</code>. If the parameter is not specified, the default value is <code>metered</code>.</p> <note> <p>If you have purchased unmetered device slots, you must set this parameter to <code>unmetered</code> to make use of them. Otherwise, your run counts against your metered time.</p> </note>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CreateInstanceProfileRequest$packageCleanup": "<p>When set to <code>true</code>, Device Farm removes app packages after a test run. The default value is <code>false</code> for private devices.</p>",
+        "CreateInstanceProfileRequest$rebootAfterUse": "<p>When set to <code>true</code>, Device Farm reboots the instance after a test run. The default value is <code>true</code>.</p>",
+        "CreateRemoteAccessSessionRequest$remoteDebugEnabled": "<p>Set to <code>true</code> if you want to access devices remotely for debugging in your remote access session.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>",
+        "CreateRemoteAccessSessionRequest$remoteRecordEnabled": "<p>Set to <code>true</code> to enable remote recording for the remote access session.</p>",
+        "CreateRemoteAccessSessionRequest$skipAppResign": "<p>When set to <code>true</code>, for private devices, Device Farm does not sign your app again. For public devices, Device Farm always signs your apps again.</p> <p>For more information on how Device Farm modifies your uploads during tests, see <a href=\"https://aws.amazon.com/device-farm/faq/\">Do you modify my app?</a> </p>",
+        "Device$remoteAccessEnabled": "<p>Specifies whether remote access has been enabled for the specified device.</p>",
+        "Device$remoteDebugEnabled": "<p>This flag is set to <code>true</code> if remote debugging is enabled for the device.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>",
+        "DevicePoolCompatibilityResult$compatible": "<p>Whether the result was compatible with the device pool.</p>",
+        "InstanceProfile$packageCleanup": "<p>When set to <code>true</code>, Device Farm removes app packages after a test run. The default value is <code>false</code> for private devices.</p>",
+        "InstanceProfile$rebootAfterUse": "<p>When set to <code>true</code>, Device Farm reboots the instance after a test run. The default value is <code>true</code>.</p>",
+        "Radios$wifi": "<p>True if Wi-Fi is enabled at the beginning of the test. Otherwise, false.</p>",
+        "Radios$bluetooth": "<p>True if Bluetooth is enabled at the beginning of the test. Otherwise, false.</p>",
+        "Radios$nfc": "<p>True if NFC is enabled at the beginning of the test. Otherwise, false.</p>",
+        "Radios$gps": "<p>True if GPS is enabled at the beginning of the test. Otherwise, false.</p>",
+        "RemoteAccessSession$remoteDebugEnabled": "<p>This flag is set to <code>true</code> if remote debugging is enabled for the remote access session.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>",
+        "RemoteAccessSession$remoteRecordEnabled": "<p>This flag is set to <code>true</code> if remote recording is enabled for the remote access session.</p>",
+        "UpdateDevicePoolRequest$clearMaxDevices": "<p>Sets whether the <code>maxDevices</code> parameter applies to your device pool. If you set this parameter to <code>true</code>, the <code>maxDevices</code> parameter does not apply, and Device Farm does not limit the number of devices that it adds to your device pool. In this case, Device Farm adds all available devices that meet the criteria specified in the <code>rules</code> parameter.</p> <p>If you use this parameter in your request, you cannot use the <code>maxDevices</code> parameter in the same request.</p>",
+        "UpdateInstanceProfileRequest$packageCleanup": "<p>The updated choice for whether you want to specify package cleanup. The default value is <code>false</code> for private devices.</p>",
+        "UpdateInstanceProfileRequest$rebootAfterUse": "<p>The updated choice for whether you want to reboot the device after use. The default value is <code>true</code>.</p>",
+        "UpdateUploadRequest$editContent": "<p>Set to true if the YAML file has changed and must be updated. Otherwise, set to false.</p>"
+      }
+    },
+    "CPU": {
+      "base": "<p>Represents the amount of CPU that an app is using on a physical device. Does not represent system-wide CPU usage.</p>",
+      "refs": {
+        "Device$cpu": "<p>Information about the device's CPU.</p>"
+      }
+    },
+    "CannotDeleteException": {
+      "base": "<p>The requested object could not be deleted.</p>",
+      "refs": {
+      }
+    },
+    "ClientId": {
+      "base": null,
+      "refs": {
+        "CreateRemoteAccessSessionRequest$clientId": "<p>Unique identifier for the client. If you want access to multiple devices on the same client, you should pass the same <code>clientId</code> value in each call to <code>CreateRemoteAccessSession</code>. This identifier is required only if <code>remoteDebugEnabled</code> is set to <code>true</code>.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>",
+        "RemoteAccessSession$clientId": "<p>Unique identifier of your client for the remote access session. Only returned if remote debugging is enabled for the remote access session.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>"
+      }
+    },
+    "ContentType": {
+      "base": null,
+      "refs": {
+        "CreateUploadRequest$contentType": "<p>The upload's content type (for example, <code>application/octet-stream</code>).</p>",
+        "UpdateUploadRequest$contentType": "<p>The upload's content type (for example, <code>application/x-yaml</code>).</p>",
+        "Upload$contentType": "<p>The upload's content type (for example, <code>application/octet-stream</code>).</p>"
+      }
+    },
+    "Counters": {
+      "base": "<p>Represents entity counters.</p>",
+      "refs": {
+        "Job$counters": "<p>The job's result counters.</p>",
+        "Run$counters": "<p>The run's result counters.</p>",
+        "Suite$counters": "<p>The suite's result counters.</p>",
+        "Test$counters": "<p>The test's result counters.</p>"
+      }
+    },
+    "CreateDevicePoolRequest": {
+      "base": "<p>Represents a request to the create device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateDevicePoolResult": {
+      "base": "<p>Represents the result of a create device pool request.</p>",
+      "refs": {
+      }
+    },
+    "CreateInstanceProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateInstanceProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNetworkProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNetworkProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectRequest": {
+      "base": "<p>Represents a request to the create project operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateProjectResult": {
+      "base": "<p>Represents the result of a create project request.</p>",
+      "refs": {
+      }
+    },
+    "CreateRemoteAccessSessionConfiguration": {
+      "base": "<p>Configuration settings for a remote access session, including billing method.</p>",
+      "refs": {
+        "CreateRemoteAccessSessionRequest$configuration": "<p>The configuration information for the remote access session request.</p>"
+      }
+    },
+    "CreateRemoteAccessSessionRequest": {
+      "base": "<p>Creates and submits a request to start a remote access session.</p>",
+      "refs": {
+      }
+    },
+    "CreateRemoteAccessSessionResult": {
+      "base": "<p>Represents the server response from a request to create a remote access session.</p>",
+      "refs": {
+      }
+    },
+    "CreateTestGridProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTestGridProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTestGridUrlRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTestGridUrlResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUploadRequest": {
+      "base": "<p>Represents a request to the create upload operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateUploadResult": {
+      "base": "<p>Represents the result of a create upload request.</p>",
+      "refs": {
+      }
+    },
+    "CreateVPCEConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateVPCEConfigurationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CurrencyCode": {
+      "base": null,
+      "refs": {
+        "MonetaryAmount$currencyCode": "<p>The currency code of a monetary amount. For example, <code>USD</code> means U.S. dollars.</p>"
+      }
+    },
+    "CustomerArtifactPaths": {
+      "base": "<p>A JSON object that specifies the paths where the artifacts generated by the customer's tests, on the device or in the test environment, are pulled from.</p> <p>Specify <code>deviceHostPaths</code> and optionally specify either <code>iosPaths</code> or <code>androidPaths</code>.</p> <p>For web app tests, you can specify both <code>iosPaths</code> and <code>androidPaths</code>.</p>",
+      "refs": {
+        "Run$customerArtifactPaths": "<p>Output <code>CustomerArtifactPaths</code> object for the test run.</p>",
+        "ScheduleRunConfiguration$customerArtifactPaths": "<p>Input <code>CustomerArtifactPaths</code> object for the scheduled run configuration.</p>"
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "CreateTestGridUrlResult$expires": "<p>The number of seconds the URL from <a>CreateTestGridUrlResult$url</a> stays active.</p>",
+        "Job$created": "<p>When the job was created.</p>",
+        "Job$started": "<p>The job's start time.</p>",
+        "Job$stopped": "<p>The job's stop time.</p>",
+        "ListTestGridSessionsRequest$creationTimeAfter": "<p>Return only sessions created after this time.</p>",
+        "ListTestGridSessionsRequest$creationTimeBefore": "<p>Return only sessions created before this time.</p>",
+        "ListTestGridSessionsRequest$endTimeAfter": "<p>Return only sessions that ended after this time.</p>",
+        "ListTestGridSessionsRequest$endTimeBefore": "<p>Return only sessions that ended before this time.</p>",
+        "OfferingStatus$effectiveOn": "<p>The date on which the offering is effective.</p>",
+        "OfferingTransaction$createdOn": "<p>The date on which an offering transaction was created.</p>",
+        "Project$created": "<p>When the project was created.</p>",
+        "RemoteAccessSession$created": "<p>The date and time the remote access session was created.</p>",
+        "RemoteAccessSession$started": "<p>The date and time the remote access session was started.</p>",
+        "RemoteAccessSession$stopped": "<p>The date and time the remote access session was stopped.</p>",
+        "Run$created": "<p>When the run was created.</p>",
+        "Run$started": "<p>The run's start time.</p>",
+        "Run$stopped": "<p>The run's stop time.</p>",
+        "Suite$created": "<p>When the suite was created.</p>",
+        "Suite$started": "<p>The suite's start time.</p>",
+        "Suite$stopped": "<p>The suite's stop time.</p>",
+        "Test$created": "<p>When the test was created.</p>",
+        "Test$started": "<p>The test's start time.</p>",
+        "Test$stopped": "<p>The test's stop time.</p>",
+        "TestGridProject$created": "<p>When the project was created.</p>",
+        "TestGridSession$created": "<p>The time that the session was started.</p>",
+        "TestGridSession$ended": "<p>The time the session ended.</p>",
+        "TestGridSessionAction$started": "<p>The time that the session invoked the action.</p>",
+        "Upload$created": "<p>When the upload was created.</p>"
+      }
+    },
+    "DeleteDevicePoolRequest": {
+      "base": "<p>Represents a request to the delete device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDevicePoolResult": {
+      "base": "<p>Represents the result of a delete device pool request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteInstanceProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInstanceProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNetworkProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNetworkProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": "<p>Represents a request to the delete project operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteProjectResult": {
+      "base": "<p>Represents the result of a delete project request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRemoteAccessSessionRequest": {
+      "base": "<p>Represents the request to delete the specified remote access session.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRemoteAccessSessionResult": {
+      "base": "<p>The response from the server when a request is made to delete the remote access session.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRunRequest": {
+      "base": "<p>Represents a request to the delete run operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRunResult": {
+      "base": "<p>Represents the result of a delete run request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteTestGridProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTestGridProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteUploadRequest": {
+      "base": "<p>Represents a request to the delete upload operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteUploadResult": {
+      "base": "<p>Represents the result of a delete upload request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteVPCEConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVPCEConfigurationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Device": {
+      "base": "<p>Represents a device type that an app is tested against.</p>",
+      "refs": {
+        "DevicePoolCompatibilityResult$device": "<p>The device (phone or tablet) to return information about.</p>",
+        "Devices$member": null,
+        "GetDeviceResult$device": "<p>An object that contains information about the requested device.</p>",
+        "Job$device": "<p>The device (phone or tablet).</p>",
+        "Problem$device": "<p>Information about the associated device.</p>",
+        "RemoteAccessSession$device": "<p>The device (phone or tablet) used in the remote access session.</p>"
+      }
+    },
+    "DeviceAttribute": {
+      "base": null,
+      "refs": {
+        "IncompatibilityMessage$type": "<p>The type of incompatibility.</p> <p>Allowed values include:</p> <ul> <li> <p>ARN</p> </li> <li> <p>FORM_FACTOR (for example, phone or tablet)</p> </li> <li> <p>MANUFACTURER</p> </li> <li> <p>PLATFORM (for example, Android or iOS)</p> </li> <li> <p>REMOTE_ACCESS_ENABLED</p> </li> <li> <p>APPIUM_VERSION</p> </li> </ul>",
+        "Rule$attribute": "<p>The rule's stringified attribute. For example, specify the value as <code>\"\\\"abc\\\"\"</code>.</p> <p>The supported operators for each attribute are provided in the following list.</p> <dl> <dt>APPIUM_VERSION</dt> <dd> <p>The Appium version for the test.</p> <p>Supported operators: <code>CONTAINS</code> </p> </dd> <dt>ARN</dt> <dd> <p>The Amazon Resource Name (ARN) of the device (for example, <code>arn:aws:devicefarm:us-west-2::device:12345Example</code>.</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>AVAILABILITY</dt> <dd> <p>The current availability of the device. Valid values are AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>FLEET_TYPE</dt> <dd> <p>The fleet type. Valid values are PUBLIC or PRIVATE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>FORM_FACTOR</dt> <dd> <p>The device form factor. Valid values are PHONE or TABLET.</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>INSTANCE_ARN</dt> <dd> <p>The Amazon Resource Name (ARN) of the device instance.</p> <p>Supported operators: <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>INSTANCE_LABELS</dt> <dd> <p>The label of the device instance.</p> <p>Supported operators: <code>CONTAINS</code> </p> </dd> <dt>MANUFACTURER</dt> <dd> <p>The device manufacturer (for example, Apple).</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>MODEL</dt> <dd> <p>The device model, such as Apple iPad Air 2 or Google Pixel.</p> <p>Supported operators: <code>CONTAINS</code>, <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>OS_VERSION</dt> <dd> <p>The operating system version (for example, 10.3.2).</p> <p>Supported operators: <code>EQUALS</code>, <code>GREATER_THAN</code>, <code>GREATER_THAN_OR_EQUALS</code>, <code>IN</code>, <code>LESS_THAN</code>, <code>LESS_THAN_OR_EQUALS</code>, <code>NOT_IN</code> </p> </dd> <dt>PLATFORM</dt> <dd> <p>The device platform. Valid values are ANDROID or IOS.</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>REMOTE_ACCESS_ENABLED</dt> <dd> <p>Whether the device is enabled for remote access. Valid values are TRUE or FALSE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>REMOTE_DEBUG_ENABLED</dt> <dd> <p>Whether the device is enabled for remote debugging. Valid values are TRUE or FALSE.</p> <p>Supported operators: <code>EQUALS</code> </p> <p>Because remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>, this filter is ignored.</p> </dd> </dl>"
+      }
+    },
+    "DeviceAvailability": {
+      "base": null,
+      "refs": {
+        "Device$availability": "<p>Indicates how likely a device is available for a test run. Currently available in the <a>ListDevices</a> and GetDevice API methods.</p>"
+      }
+    },
+    "DeviceFarmArn": {
+      "base": null,
+      "refs": {
+        "CreateTestGridUrlRequest$projectArn": "<p>ARN (from <a>CreateTestGridProject</a> or <a>ListTestGridProjects</a>) to associate with the short-term URL. </p>",
+        "DeleteTestGridProjectRequest$projectArn": "<p>The ARN of the project to delete, from <a>CreateTestGridProject</a> or <a>ListTestGridProjects</a>.</p>",
+        "GetTestGridProjectRequest$projectArn": "<p>The ARN of the Selenium testing project, from either <a>CreateTestGridProject</a> or <a>ListTestGridProjects</a>.</p>",
+        "GetTestGridSessionRequest$projectArn": "<p>The ARN for the project that this session belongs to. See <a>CreateTestGridProject</a> and <a>ListTestGridProjects</a>.</p>",
+        "GetTestGridSessionRequest$sessionArn": "<p>An ARN that uniquely identifies a <a>TestGridSession</a>.</p>",
+        "ListTagsForResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the resource or resources for which to list tags. You can associate tags with the following Device Farm resources: <code>PROJECT</code>, <code>RUN</code>, <code>NETWORK_PROFILE</code>, <code>INSTANCE_PROFILE</code>, <code>DEVICE_INSTANCE</code>, <code>SESSION</code>, <code>DEVICE_POOL</code>, <code>DEVICE</code>, and <code>VPCE_CONFIGURATION</code>.</p>",
+        "ListTestGridSessionActionsRequest$sessionArn": "<p>The ARN of the session to retrieve.</p>",
+        "ListTestGridSessionArtifactsRequest$sessionArn": "<p>The ARN of a <a>TestGridSession</a>. </p>",
+        "ListTestGridSessionsRequest$projectArn": "<p>ARN of a <a>TestGridProject</a>.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the resource or resources to which to add tags. You can associate tags with the following Device Farm resources: <code>PROJECT</code>, <code>RUN</code>, <code>NETWORK_PROFILE</code>, <code>INSTANCE_PROFILE</code>, <code>DEVICE_INSTANCE</code>, <code>SESSION</code>, <code>DEVICE_POOL</code>, <code>DEVICE</code>, and <code>VPCE_CONFIGURATION</code>.</p>",
+        "TestGridProject$arn": "<p>The ARN for the project.</p>",
+        "TestGridSession$arn": "<p>The ARN of the session.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the resource or resources from which to delete tags. You can associate tags with the following Device Farm resources: <code>PROJECT</code>, <code>RUN</code>, <code>NETWORK_PROFILE</code>, <code>INSTANCE_PROFILE</code>, <code>DEVICE_INSTANCE</code>, <code>SESSION</code>, <code>DEVICE_POOL</code>, <code>DEVICE</code>, and <code>VPCE_CONFIGURATION</code>.</p>",
+        "UpdateTestGridProjectRequest$projectArn": "<p>ARN of the project to update.</p>"
+      }
+    },
+    "DeviceFilter": {
+      "base": "<p>Represents a device filter used to select a set of devices to be included in a test run. This data structure is passed in as the <code>deviceSelectionConfiguration</code> parameter to <code>ScheduleRun</code>. For an example of the JSON request syntax, see <a>ScheduleRun</a>.</p> <p>It is also passed in as the <code>filters</code> parameter to <code>ListDevices</code>. For an example of the JSON request syntax, see <a>ListDevices</a>.</p>",
+      "refs": {
+        "DeviceFilters$member": null
+      }
+    },
+    "DeviceFilterAttribute": {
+      "base": null,
+      "refs": {
+        "DeviceFilter$attribute": "<p>The aspect of a device such as platform or model used as the selection criteria in a device filter.</p> <p>The supported operators for each attribute are provided in the following list.</p> <dl> <dt>ARN</dt> <dd> <p>The Amazon Resource Name (ARN) of the device (for example, <code>arn:aws:devicefarm:us-west-2::device:12345Example</code>).</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>PLATFORM</dt> <dd> <p>The device platform. Valid values are ANDROID or IOS.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>OS_VERSION</dt> <dd> <p>The operating system version (for example, 10.3.2).</p> <p>Supported operators: <code>EQUALS</code>, <code>GREATER_THAN</code>, <code>GREATER_THAN_OR_EQUALS</code>, <code>IN</code>, <code>LESS_THAN</code>, <code>LESS_THAN_OR_EQUALS</code>, <code>NOT_IN</code> </p> </dd> <dt>MODEL</dt> <dd> <p>The device model (for example, iPad 5th Gen).</p> <p>Supported operators: <code>CONTAINS</code>, <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>AVAILABILITY</dt> <dd> <p>The current availability of the device. Valid values are AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>FORM_FACTOR</dt> <dd> <p>The device form factor. Valid values are PHONE or TABLET.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>MANUFACTURER</dt> <dd> <p>The device manufacturer (for example, Apple).</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>REMOTE_ACCESS_ENABLED</dt> <dd> <p>Whether the device is enabled for remote access. Valid values are TRUE or FALSE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> <dt>REMOTE_DEBUG_ENABLED</dt> <dd> <p>Whether the device is enabled for remote debugging. Valid values are TRUE or FALSE.</p> <p>Supported operators: <code>EQUALS</code> </p> <p>Because remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>, this filter is ignored.</p> </dd> <dt>INSTANCE_ARN</dt> <dd> <p>The Amazon Resource Name (ARN) of the device instance.</p> <p>Supported operators: <code>EQUALS</code>, <code>IN</code>, <code>NOT_IN</code> </p> </dd> <dt>INSTANCE_LABELS</dt> <dd> <p>The label of the device instance.</p> <p>Supported operators: <code>CONTAINS</code> </p> </dd> <dt>FLEET_TYPE</dt> <dd> <p>The fleet type. Valid values are PUBLIC or PRIVATE.</p> <p>Supported operators: <code>EQUALS</code> </p> </dd> </dl>"
+      }
+    },
+    "DeviceFilterValues": {
+      "base": null,
+      "refs": {
+        "DeviceFilter$values": "<p>An array of one or more filter values used in a device filter.</p> <p class=\"title\"> <b>Operator Values</b> </p> <ul> <li> <p>The IN and NOT_IN operators can take a values array that has more than one element.</p> </li> <li> <p>The other operators require an array with a single element.</p> </li> </ul> <p class=\"title\"> <b>Attribute Values</b> </p> <ul> <li> <p>The PLATFORM attribute can be set to ANDROID or IOS.</p> </li> <li> <p>The AVAILABILITY attribute can be set to AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> </li> <li> <p>The FORM_FACTOR attribute can be set to PHONE or TABLET.</p> </li> <li> <p>The FLEET_TYPE attribute can be set to PUBLIC or PRIVATE.</p> </li> </ul>"
+      }
+    },
+    "DeviceFilters": {
+      "base": null,
+      "refs": {
+        "DeviceSelectionConfiguration$filters": "<p>Used to dynamically select a set of devices for a test run. A filter is made up of an attribute, an operator, and one or more values.</p> <ul> <li> <p> <b>Attribute</b> </p> <p>The aspect of a device such as platform or model used as the selection criteria in a device filter.</p> <p>Allowed values include:</p> <ul> <li> <p>ARN: The Amazon Resource Name (ARN) of the device (for example, <code>arn:aws:devicefarm:us-west-2::device:12345Example</code>).</p> </li> <li> <p>PLATFORM: The device platform. Valid values are ANDROID or IOS.</p> </li> <li> <p>OS_VERSION: The operating system version (for example, 10.3.2).</p> </li> <li> <p>MODEL: The device model (for example, iPad 5th Gen).</p> </li> <li> <p>AVAILABILITY: The current availability of the device. Valid values are AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> </li> <li> <p>FORM_FACTOR: The device form factor. Valid values are PHONE or TABLET.</p> </li> <li> <p>MANUFACTURER: The device manufacturer (for example, Apple).</p> </li> <li> <p>REMOTE_ACCESS_ENABLED: Whether the device is enabled for remote access. Valid values are TRUE or FALSE.</p> </li> <li> <p>REMOTE_DEBUG_ENABLED: Whether the device is enabled for remote debugging. Valid values are TRUE or FALSE. Because remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>, this filter is ignored.</p> </li> <li> <p>INSTANCE_ARN: The Amazon Resource Name (ARN) of the device instance.</p> </li> <li> <p>INSTANCE_LABELS: The label of the device instance.</p> </li> <li> <p>FLEET_TYPE: The fleet type. Valid values are PUBLIC or PRIVATE.</p> </li> </ul> </li> <li> <p> <b>Operator</b> </p> <p>The filter operator.</p> <ul> <li> <p>The EQUALS operator is available for every attribute except INSTANCE_LABELS.</p> </li> <li> <p>The CONTAINS operator is available for the INSTANCE_LABELS and MODEL attributes.</p> </li> <li> <p>The IN and NOT_IN operators are available for the ARN, OS_VERSION, MODEL, MANUFACTURER, and INSTANCE_ARN attributes.</p> </li> <li> <p>The LESS_THAN, GREATER_THAN, LESS_THAN_OR_EQUALS, and GREATER_THAN_OR_EQUALS operators are also available for the OS_VERSION attribute.</p> </li> </ul> </li> <li> <p> <b>Values</b> </p> <p>An array of one or more filter values.</p> <p class=\"title\"> <b>Operator Values</b> </p> <ul> <li> <p>The IN and NOT_IN operators can take a values array that has more than one element.</p> </li> <li> <p>The other operators require an array with a single element.</p> </li> </ul> <p class=\"title\"> <b>Attribute Values</b> </p> <ul> <li> <p>The PLATFORM attribute can be set to ANDROID or IOS.</p> </li> <li> <p>The AVAILABILITY attribute can be set to AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> </li> <li> <p>The FORM_FACTOR attribute can be set to PHONE or TABLET.</p> </li> <li> <p>The FLEET_TYPE attribute can be set to PUBLIC or PRIVATE.</p> </li> </ul> </li> </ul>",
+        "DeviceSelectionResult$filters": "<p>The filters in a device selection result.</p>",
+        "ListDevicesRequest$filters": "<p>Used to select a set of devices. A filter is made up of an attribute, an operator, and one or more values.</p> <ul> <li> <p>Attribute: The aspect of a device such as platform or model used as the selection criteria in a device filter.</p> <p>Allowed values include:</p> <ul> <li> <p>ARN: The Amazon Resource Name (ARN) of the device (for example, <code>arn:aws:devicefarm:us-west-2::device:12345Example</code>).</p> </li> <li> <p>PLATFORM: The device platform. Valid values are ANDROID or IOS.</p> </li> <li> <p>OS_VERSION: The operating system version (for example, 10.3.2).</p> </li> <li> <p>MODEL: The device model (for example, iPad 5th Gen).</p> </li> <li> <p>AVAILABILITY: The current availability of the device. Valid values are AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> </li> <li> <p>FORM_FACTOR: The device form factor. Valid values are PHONE or TABLET.</p> </li> <li> <p>MANUFACTURER: The device manufacturer (for example, Apple).</p> </li> <li> <p>REMOTE_ACCESS_ENABLED: Whether the device is enabled for remote access. Valid values are TRUE or FALSE.</p> </li> <li> <p>REMOTE_DEBUG_ENABLED: Whether the device is enabled for remote debugging. Valid values are TRUE or FALSE. Because remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>, this attribute is ignored.</p> </li> <li> <p>INSTANCE_ARN: The Amazon Resource Name (ARN) of the device instance.</p> </li> <li> <p>INSTANCE_LABELS: The label of the device instance.</p> </li> <li> <p>FLEET_TYPE: The fleet type. Valid values are PUBLIC or PRIVATE.</p> </li> </ul> </li> <li> <p>Operator: The filter operator.</p> <ul> <li> <p>The EQUALS operator is available for every attribute except INSTANCE_LABELS.</p> </li> <li> <p>The CONTAINS operator is available for the INSTANCE_LABELS and MODEL attributes.</p> </li> <li> <p>The IN and NOT_IN operators are available for the ARN, OS_VERSION, MODEL, MANUFACTURER, and INSTANCE_ARN attributes.</p> </li> <li> <p>The LESS_THAN, GREATER_THAN, LESS_THAN_OR_EQUALS, and GREATER_THAN_OR_EQUALS operators are also available for the OS_VERSION attribute.</p> </li> </ul> </li> <li> <p>Values: An array of one or more filter values.</p> <ul> <li> <p>The IN and NOT_IN operators take a values array that has one or more elements.</p> </li> <li> <p>The other operators require an array with a single element.</p> </li> <li> <p>In a request, the AVAILABILITY attribute takes the following values: AVAILABLE, HIGHLY_AVAILABLE, BUSY, or TEMPORARY_NOT_AVAILABLE.</p> </li> </ul> </li> </ul>"
+      }
+    },
+    "DeviceFormFactor": {
+      "base": null,
+      "refs": {
+        "Device$formFactor": "<p>The device's form factor.</p> <p>Allowed values include:</p> <ul> <li> <p>PHONE</p> </li> <li> <p>TABLET</p> </li> </ul>"
+      }
+    },
+    "DeviceHostPaths": {
+      "base": null,
+      "refs": {
+        "CustomerArtifactPaths$deviceHostPaths": "<p>Comma-separated list of paths in the test execution environment where the artifacts generated by the customer's tests are pulled from.</p>"
+      }
+    },
+    "DeviceInstance": {
+      "base": "<p>Represents the device instance.</p>",
+      "refs": {
+        "DeviceInstances$member": null,
+        "GetDeviceInstanceResult$deviceInstance": "<p>An object that contains information about your device instance.</p>",
+        "UpdateDeviceInstanceResult$deviceInstance": "<p>An object that contains information about your device instance.</p>"
+      }
+    },
+    "DeviceInstances": {
+      "base": null,
+      "refs": {
+        "Device$instances": "<p>The instances that belong to this device.</p>",
+        "ListDeviceInstancesResult$deviceInstances": "<p>An object that contains information about your device instances.</p>"
+      }
+    },
+    "DeviceMinutes": {
+      "base": "<p>Represents the total (metered or unmetered) minutes used by the resource to run tests. Contains the sum of minutes consumed by all children.</p>",
+      "refs": {
+        "Job$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the job.</p>",
+        "RemoteAccessSession$deviceMinutes": "<p>The number of minutes a device is used in a remote access session (including setup and teardown minutes).</p>",
+        "Run$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test run.</p>",
+        "Suite$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test suite.</p>",
+        "Test$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test.</p>"
+      }
+    },
+    "DevicePlatform": {
+      "base": null,
+      "refs": {
+        "Device$platform": "<p>The device's platform.</p> <p>Allowed values include:</p> <ul> <li> <p>ANDROID</p> </li> <li> <p>IOS</p> </li> </ul>",
+        "Offering$platform": "<p>The platform of the device (for example, <code>ANDROID</code> or <code>IOS</code>).</p>",
+        "PurchasedDevicesMap$key": null,
+        "Run$platform": "<p>The run's platform.</p> <p>Allowed values include:</p> <ul> <li> <p>ANDROID</p> </li> <li> <p>IOS</p> </li> </ul>"
+      }
+    },
+    "DevicePool": {
+      "base": "<p>Represents a collection of device types.</p>",
+      "refs": {
+        "CreateDevicePoolResult$devicePool": "<p>The newly created device pool.</p>",
+        "DevicePools$member": null,
+        "GetDevicePoolResult$devicePool": "<p>An object that contains information about the requested device pool.</p>",
+        "UpdateDevicePoolResult$devicePool": "<p>The device pool you just updated.</p>"
+      }
+    },
+    "DevicePoolCompatibilityResult": {
+      "base": "<p>Represents a device pool compatibility result.</p>",
+      "refs": {
+        "DevicePoolCompatibilityResults$member": null
+      }
+    },
+    "DevicePoolCompatibilityResults": {
+      "base": null,
+      "refs": {
+        "GetDevicePoolCompatibilityResult$compatibleDevices": "<p>Information about compatible devices.</p>",
+        "GetDevicePoolCompatibilityResult$incompatibleDevices": "<p>Information about incompatible devices.</p>"
+      }
+    },
+    "DevicePoolType": {
+      "base": null,
+      "refs": {
+        "DevicePool$type": "<p>The device pool's type.</p> <p>Allowed values include:</p> <ul> <li> <p>CURATED: A device pool that is created and managed by AWS Device Farm.</p> </li> <li> <p>PRIVATE: A device pool that is created and managed by the device pool developer.</p> </li> </ul>",
+        "ListDevicePoolsRequest$type": "<p>The device pools' type.</p> <p>Allowed values include:</p> <ul> <li> <p>CURATED: A device pool that is created and managed by AWS Device Farm.</p> </li> <li> <p>PRIVATE: A device pool that is created and managed by the device pool developer.</p> </li> </ul>"
+      }
+    },
+    "DevicePools": {
+      "base": null,
+      "refs": {
+        "ListDevicePoolsResult$devicePools": "<p>Information about the device pools.</p>"
+      }
+    },
+    "DeviceSelectionConfiguration": {
+      "base": "<p>Represents the device filters used in a test run and the maximum number of devices to be included in the run. It is passed in as the <code>deviceSelectionConfiguration</code> request parameter in <a>ScheduleRun</a>.</p>",
+      "refs": {
+        "ScheduleRunRequest$deviceSelectionConfiguration": "<p>The filter criteria used to dynamically select a set of devices for a test run and the maximum number of devices to be included in the run.</p> <p>Either <b> <code>devicePoolArn</code> </b> or <b> <code>deviceSelectionConfiguration</code> </b> is required in a request.</p>"
+      }
+    },
+    "DeviceSelectionResult": {
+      "base": "<p>Contains the run results requested by the device selection configuration and how many devices were returned. For an example of the JSON response syntax, see <a>ScheduleRun</a>.</p>",
+      "refs": {
+        "Run$deviceSelectionResult": "<p>The results of a device filter used to select the devices for a test run.</p>"
+      }
+    },
+    "Devices": {
+      "base": null,
+      "refs": {
+        "ListDevicesResult$devices": "<p>Information about the devices.</p>"
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "CPU$clock": "<p>The clock speed of the device's CPU, expressed in hertz (Hz). For example, a 1.2 GHz CPU is expressed as 1200000000.</p>",
+        "DeviceMinutes$total": "<p>When specified, represents the total minutes used by the resource to run tests.</p>",
+        "DeviceMinutes$metered": "<p>When specified, represents only the sum of metered minutes used by the resource to run tests.</p>",
+        "DeviceMinutes$unmetered": "<p>When specified, represents only the sum of unmetered minutes used by the resource to run tests.</p>",
+        "Location$latitude": "<p>The latitude.</p>",
+        "Location$longitude": "<p>The longitude.</p>",
+        "MonetaryAmount$amount": "<p>The numerical amount of an offering or transaction.</p>",
+        "TestGridSession$billingMinutes": "<p>The number of billed minutes that were used for this session. </p>",
+        "TrialMinutes$total": "<p>The total number of free trial minutes that the account started with.</p>",
+        "TrialMinutes$remaining": "<p>The number of free trial minutes remaining in the account.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "TagOperationException$message": null,
+        "TagPolicyException$message": null,
+        "TooManyTagsException$message": null
+      }
+    },
+    "ExecutionConfiguration": {
+      "base": "<p>Represents configuration information about a test run, such as the execution timeout (in minutes).</p>",
+      "refs": {
+        "ScheduleRunRequest$executionConfiguration": "<p>Specifies configuration information about a test run, such as the execution timeout (in minutes).</p>"
+      }
+    },
+    "ExecutionResult": {
+      "base": null,
+      "refs": {
+        "Job$result": "<p>The job's result.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>",
+        "Problem$result": "<p>The problem's result.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>",
+        "RemoteAccessSession$result": "<p>The result of the remote access session. Can be any of the following:</p> <ul> <li> <p>PENDING.</p> </li> <li> <p>PASSED.</p> </li> <li> <p>WARNED.</p> </li> <li> <p>FAILED.</p> </li> <li> <p>SKIPPED.</p> </li> <li> <p>ERRORED.</p> </li> <li> <p>STOPPED.</p> </li> </ul>",
+        "Run$result": "<p>The run's result.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>",
+        "Suite$result": "<p>The suite's result.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>",
+        "Test$result": "<p>The test's result.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>",
+        "UniqueProblemsByExecutionResultMap$key": null
+      }
+    },
+    "ExecutionResultCode": {
+      "base": null,
+      "refs": {
+        "Run$resultCode": "<p>Supporting field for the result field. Set only if <code>result</code> is <code>SKIPPED</code>. <code>PARSING_FAILED</code> if the result is skipped because of test package parsing failure.</p>"
+      }
+    },
+    "ExecutionStatus": {
+      "base": null,
+      "refs": {
+        "Job$status": "<p>The job's status.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PENDING_CONCURRENCY</p> </li> <li> <p>PENDING_DEVICE</p> </li> <li> <p>PROCESSING</p> </li> <li> <p>SCHEDULING</p> </li> <li> <p>PREPARING</p> </li> <li> <p>RUNNING</p> </li> <li> <p>COMPLETED</p> </li> <li> <p>STOPPING</p> </li> </ul>",
+        "RemoteAccessSession$status": "<p>The status of the remote access session. Can be any of the following:</p> <ul> <li> <p>PENDING.</p> </li> <li> <p>PENDING_CONCURRENCY.</p> </li> <li> <p>PENDING_DEVICE.</p> </li> <li> <p>PROCESSING.</p> </li> <li> <p>SCHEDULING.</p> </li> <li> <p>PREPARING.</p> </li> <li> <p>RUNNING.</p> </li> <li> <p>COMPLETED.</p> </li> <li> <p>STOPPING.</p> </li> </ul>",
+        "Run$status": "<p>The run's status.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PENDING_CONCURRENCY</p> </li> <li> <p>PENDING_DEVICE</p> </li> <li> <p>PROCESSING</p> </li> <li> <p>SCHEDULING</p> </li> <li> <p>PREPARING</p> </li> <li> <p>RUNNING</p> </li> <li> <p>COMPLETED</p> </li> <li> <p>STOPPING</p> </li> </ul>",
+        "Suite$status": "<p>The suite's status.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PENDING_CONCURRENCY</p> </li> <li> <p>PENDING_DEVICE</p> </li> <li> <p>PROCESSING</p> </li> <li> <p>SCHEDULING</p> </li> <li> <p>PREPARING</p> </li> <li> <p>RUNNING</p> </li> <li> <p>COMPLETED</p> </li> <li> <p>STOPPING</p> </li> </ul>",
+        "Test$status": "<p>The test's status.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PENDING_CONCURRENCY</p> </li> <li> <p>PENDING_DEVICE</p> </li> <li> <p>PROCESSING</p> </li> <li> <p>SCHEDULING</p> </li> <li> <p>PREPARING</p> </li> <li> <p>RUNNING</p> </li> <li> <p>COMPLETED</p> </li> <li> <p>STOPPING</p> </li> </ul>"
+      }
+    },
+    "Filter": {
+      "base": null,
+      "refs": {
+        "ScheduleRunTest$filter": "<p>The test's filter.</p>"
+      }
+    },
+    "GetAccountSettingsRequest": {
+      "base": "<p>Represents the request sent to retrieve the account settings.</p>",
+      "refs": {
+      }
+    },
+    "GetAccountSettingsResult": {
+      "base": "<p>Represents the account settings return values from the <code>GetAccountSettings</code> request.</p>",
+      "refs": {
+      }
+    },
+    "GetDeviceInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDeviceInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicePoolCompatibilityRequest": {
+      "base": "<p>Represents a request to the get device pool compatibility operation.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolCompatibilityResult": {
+      "base": "<p>Represents the result of describe device pool compatibility request.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolRequest": {
+      "base": "<p>Represents a request to the get device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolResult": {
+      "base": "<p>Represents the result of a get device pool request.</p>",
+      "refs": {
+      }
+    },
+    "GetDeviceRequest": {
+      "base": "<p>Represents a request to the get device request.</p>",
+      "refs": {
+      }
+    },
+    "GetDeviceResult": {
+      "base": "<p>Represents the result of a get device request.</p>",
+      "refs": {
+      }
+    },
+    "GetInstanceProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetInstanceProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetJobRequest": {
+      "base": "<p>Represents a request to the get job operation.</p>",
+      "refs": {
+      }
+    },
+    "GetJobResult": {
+      "base": "<p>Represents the result of a get job request.</p>",
+      "refs": {
+      }
+    },
+    "GetNetworkProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNetworkProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOfferingStatusRequest": {
+      "base": "<p>Represents the request to retrieve the offering status for the specified customer or account.</p>",
+      "refs": {
+      }
+    },
+    "GetOfferingStatusResult": {
+      "base": "<p>Returns the status result for a device offering.</p>",
+      "refs": {
+      }
+    },
+    "GetProjectRequest": {
+      "base": "<p>Represents a request to the get project operation.</p>",
+      "refs": {
+      }
+    },
+    "GetProjectResult": {
+      "base": "<p>Represents the result of a get project request.</p>",
+      "refs": {
+      }
+    },
+    "GetRemoteAccessSessionRequest": {
+      "base": "<p>Represents the request to get information about the specified remote access session.</p>",
+      "refs": {
+      }
+    },
+    "GetRemoteAccessSessionResult": {
+      "base": "<p>Represents the response from the server that lists detailed information about the remote access session.</p>",
+      "refs": {
+      }
+    },
+    "GetRunRequest": {
+      "base": "<p>Represents a request to the get run operation.</p>",
+      "refs": {
+      }
+    },
+    "GetRunResult": {
+      "base": "<p>Represents the result of a get run request.</p>",
+      "refs": {
+      }
+    },
+    "GetSuiteRequest": {
+      "base": "<p>Represents a request to the get suite operation.</p>",
+      "refs": {
+      }
+    },
+    "GetSuiteResult": {
+      "base": "<p>Represents the result of a get suite request.</p>",
+      "refs": {
+      }
+    },
+    "GetTestGridProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTestGridProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTestGridSessionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTestGridSessionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTestRequest": {
+      "base": "<p>Represents a request to the get test operation.</p>",
+      "refs": {
+      }
+    },
+    "GetTestResult": {
+      "base": "<p>Represents the result of a get test request.</p>",
+      "refs": {
+      }
+    },
+    "GetUploadRequest": {
+      "base": "<p>Represents a request to the get upload operation.</p>",
+      "refs": {
+      }
+    },
+    "GetUploadResult": {
+      "base": "<p>Represents the result of a get upload request.</p>",
+      "refs": {
+      }
+    },
+    "GetVPCEConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetVPCEConfigurationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HostAddress": {
+      "base": null,
+      "refs": {
+        "RemoteAccessSession$hostAddress": "<p>IP address of the EC2 host where you need to connect to remotely debug devices. Only returned if remote debugging is enabled for the remote access session.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>"
+      }
+    },
+    "IdempotencyException": {
+      "base": "<p>An entity with the same name already exists.</p>",
+      "refs": {
+      }
+    },
+    "IncompatibilityMessage": {
+      "base": "<p>Represents information about incompatibility.</p>",
+      "refs": {
+        "IncompatibilityMessages$member": null
+      }
+    },
+    "IncompatibilityMessages": {
+      "base": null,
+      "refs": {
+        "DevicePoolCompatibilityResult$incompatibilityMessages": "<p>Information about the compatibility.</p>"
+      }
+    },
+    "InstallToRemoteAccessSessionRequest": {
+      "base": "<p>Represents the request to install an Android application (in .apk format) or an iOS application (in .ipa format) as part of a remote access session.</p>",
+      "refs": {
+      }
+    },
+    "InstallToRemoteAccessSessionResult": {
+      "base": "<p>Represents the response from the server after AWS Device Farm makes a request to install to a remote access session.</p>",
+      "refs": {
+      }
+    },
+    "InstanceLabels": {
+      "base": null,
+      "refs": {
+        "DeviceInstance$labels": "<p>An array of strings that describe the device instance.</p>",
+        "UpdateDeviceInstanceRequest$labels": "<p>An array of strings that you want to associate with the device instance.</p>"
+      }
+    },
+    "InstanceProfile": {
+      "base": "<p>Represents the instance profile.</p>",
+      "refs": {
+        "CreateInstanceProfileResult$instanceProfile": "<p>An object that contains information about your instance profile.</p>",
+        "DeviceInstance$instanceProfile": "<p>A object that contains information about the instance profile.</p>",
+        "GetInstanceProfileResult$instanceProfile": "<p>An object that contains information about an instance profile.</p>",
+        "InstanceProfiles$member": null,
+        "UpdateInstanceProfileResult$instanceProfile": "<p>An object that contains information about your instance profile.</p>"
+      }
+    },
+    "InstanceProfiles": {
+      "base": null,
+      "refs": {
+        "ListInstanceProfilesResult$instanceProfiles": "<p>An object that contains information about your instance profiles.</p>"
+      }
+    },
+    "InstanceStatus": {
+      "base": null,
+      "refs": {
+        "DeviceInstance$status": "<p>The status of the device instance. Valid values are listed here.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Counters$total": "<p>The total number of entities.</p>",
+        "Counters$passed": "<p>The number of passed entities.</p>",
+        "Counters$failed": "<p>The number of failed entities.</p>",
+        "Counters$warned": "<p>The number of warned entities.</p>",
+        "Counters$errored": "<p>The number of errored entities.</p>",
+        "Counters$stopped": "<p>The number of stopped entities.</p>",
+        "Counters$skipped": "<p>The number of skipped entities.</p>",
+        "CreateDevicePoolRequest$maxDevices": "<p>The number of devices that Device Farm can add to your device pool. Device Farm adds devices that are available and meet the criteria that you assign for the <code>rules</code> parameter. Depending on how many devices meet these constraints, your device pool might contain fewer devices than the value for this parameter.</p> <p>By specifying the maximum number of devices, you can control the costs that you incur by running tests.</p>",
+        "DevicePool$maxDevices": "<p>The number of devices that Device Farm can add to your device pool. Device Farm adds devices that are available and meet the criteria that you assign for the <code>rules</code> parameter. Depending on how many devices meet these constraints, your device pool might contain fewer devices than the value for this parameter.</p> <p>By specifying the maximum number of devices, you can control the costs that you incur by running tests.</p>",
+        "DeviceSelectionConfiguration$maxDevices": "<p>The maximum number of devices to be included in a test run.</p>",
+        "DeviceSelectionResult$matchedDevicesCount": "<p>The number of devices that matched the device filter selection criteria.</p>",
+        "DeviceSelectionResult$maxDevices": "<p>The maximum number of devices to be selected by a device filter and included in a test run.</p>",
+        "ListDeviceInstancesRequest$maxResults": "<p>An integer that specifies the maximum number of items you want to return in the API response.</p>",
+        "ListInstanceProfilesRequest$maxResults": "<p>An integer that specifies the maximum number of items you want to return in the API response.</p>",
+        "ListVPCEConfigurationsRequest$maxResults": "<p>An integer that specifies the maximum number of items you want to return in the API response.</p>",
+        "MaxSlotMap$value": null,
+        "OfferingStatus$quantity": "<p>The number of available devices in the offering.</p>",
+        "PurchaseOfferingRequest$quantity": "<p>The number of device slots to purchase in an offering request.</p>",
+        "PurchasedDevicesMap$value": null,
+        "RenewOfferingRequest$quantity": "<p>The quantity requested in an offering renewal.</p>",
+        "Resolution$width": "<p>The screen resolution's width, expressed in pixels.</p>",
+        "Resolution$height": "<p>The screen resolution's height, expressed in pixels.</p>",
+        "Run$totalJobs": "<p>The total number of jobs for the run.</p>",
+        "Run$completedJobs": "<p>The total number of completed jobs.</p>",
+        "Run$seed": "<p>For fuzz tests, this is a seed to use for randomizing the UI fuzz test. Using the same seed value between tests ensures identical event sequences.</p>",
+        "Run$eventCount": "<p>For fuzz tests, this is the number of events, between 1 and 10000, that the UI fuzz test should perform.</p>",
+        "UpdateDevicePoolRequest$maxDevices": "<p>The number of devices that Device Farm can add to your device pool. Device Farm adds devices that are available and that meet the criteria that you assign for the <code>rules</code> parameter. Depending on how many devices meet these constraints, your device pool might contain fewer devices than the value for this parameter.</p> <p>By specifying the maximum number of devices, you can control the costs that you incur by running tests.</p> <p>If you use this parameter in your request, you cannot use the <code>clearMaxDevices</code> parameter in the same request.</p>"
+      }
+    },
+    "InteractionMode": {
+      "base": null,
+      "refs": {
+        "CreateRemoteAccessSessionRequest$interactionMode": "<p>The interaction mode of the remote access session. Valid values are:</p> <ul> <li> <p>INTERACTIVE: You can interact with the iOS device by viewing, touching, and rotating the screen. You cannot run XCUITest framework-based tests in this mode.</p> </li> <li> <p>NO_VIDEO: You are connected to the device, but cannot interact with it or view the screen. This mode has the fastest test execution speed. You can run XCUITest framework-based tests in this mode.</p> </li> <li> <p>VIDEO_ONLY: You can view the screen, but cannot touch or rotate it. You can run XCUITest framework-based tests and watch the screen in this mode.</p> </li> </ul>",
+        "RemoteAccessSession$interactionMode": "<p>The interaction mode of the remote access session. Valid values are:</p> <ul> <li> <p>INTERACTIVE: You can interact with the iOS device by viewing, touching, and rotating the screen. You cannot run XCUITest framework-based tests in this mode.</p> </li> <li> <p>NO_VIDEO: You are connected to the device, but cannot interact with it or view the screen. This mode has the fastest test execution speed. You can run XCUITest framework-based tests in this mode.</p> </li> <li> <p>VIDEO_ONLY: You can view the screen, but cannot touch or rotate it. You can run XCUITest framework-based tests and watch the screen in this mode.</p> </li> </ul>"
+      }
+    },
+    "InternalServiceException": {
+      "base": "<p>An internal exception was raised in the service. Contact <a href=\"mailto:aws-devicefarm-support@amazon.com\">aws-devicefarm-support@amazon.com</a> if you see this error. </p>",
+      "refs": {
+      }
+    },
+    "InvalidOperationException": {
+      "base": "<p>There was an error with the update request, or you do not have sufficient permissions to update this VPC endpoint configuration.</p>",
+      "refs": {
+      }
+    },
+    "IosPaths": {
+      "base": null,
+      "refs": {
+        "CustomerArtifactPaths$iosPaths": "<p>Comma-separated list of paths on the iOS device where the artifacts generated by the customer's tests are pulled from.</p>"
+      }
+    },
+    "Job": {
+      "base": "<p>Represents a device.</p>",
+      "refs": {
+        "GetJobResult$job": "<p>An object that contains information about the requested job.</p>",
+        "Jobs$member": null,
+        "StopJobResult$job": "<p>The job that was stopped.</p>"
+      }
+    },
+    "JobTimeoutMinutes": {
+      "base": null,
+      "refs": {
+        "AccountSettings$maxJobTimeoutMinutes": "<p>The maximum number of minutes a test run executes before it times out.</p>",
+        "AccountSettings$defaultJobTimeoutMinutes": "<p>The default number of minutes (at the account level) a test run executes before it times out. The default value is 150 minutes.</p>",
+        "CreateProjectRequest$defaultJobTimeoutMinutes": "<p>Sets the execution timeout value (in minutes) for a project. All test runs in this project use the specified execution timeout value unless overridden when scheduling a run.</p>",
+        "ExecutionConfiguration$jobTimeoutMinutes": "<p>The number of minutes a test run executes before it times out.</p>",
+        "Project$defaultJobTimeoutMinutes": "<p>The default number of minutes (at the project level) a test run executes before it times out. The default value is 150 minutes.</p>",
+        "Run$jobTimeoutMinutes": "<p>The number of minutes the job executes before it times out.</p>",
+        "UpdateProjectRequest$defaultJobTimeoutMinutes": "<p>The number of minutes a test run in the project executes before it times out.</p>"
+      }
+    },
+    "Jobs": {
+      "base": null,
+      "refs": {
+        "ListJobsResult$jobs": "<p>Information about the jobs.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>A limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListArtifactsRequest": {
+      "base": "<p>Represents a request to the list artifacts operation.</p>",
+      "refs": {
+      }
+    },
+    "ListArtifactsResult": {
+      "base": "<p>Represents the result of a list artifacts operation.</p>",
+      "refs": {
+      }
+    },
+    "ListDeviceInstancesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDeviceInstancesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDevicePoolsRequest": {
+      "base": "<p>Represents the result of a list device pools request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicePoolsResult": {
+      "base": "<p>Represents the result of a list device pools request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicesRequest": {
+      "base": "<p>Represents the result of a list devices request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicesResult": {
+      "base": "<p>Represents the result of a list devices operation.</p>",
+      "refs": {
+      }
+    },
+    "ListInstanceProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInstanceProfilesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListJobsRequest": {
+      "base": "<p>Represents a request to the list jobs operation.</p>",
+      "refs": {
+      }
+    },
+    "ListJobsResult": {
+      "base": "<p>Represents the result of a list jobs request.</p>",
+      "refs": {
+      }
+    },
+    "ListNetworkProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNetworkProfilesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOfferingPromotionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOfferingPromotionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOfferingTransactionsRequest": {
+      "base": "<p>Represents the request to list the offering transaction history.</p>",
+      "refs": {
+      }
+    },
+    "ListOfferingTransactionsResult": {
+      "base": "<p>Returns the transaction log of the specified offerings.</p>",
+      "refs": {
+      }
+    },
+    "ListOfferingsRequest": {
+      "base": "<p>Represents the request to list all offerings.</p>",
+      "refs": {
+      }
+    },
+    "ListOfferingsResult": {
+      "base": "<p>Represents the return values of the list of offerings.</p>",
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": "<p>Represents a request to the list projects operation.</p>",
+      "refs": {
+      }
+    },
+    "ListProjectsResult": {
+      "base": "<p>Represents the result of a list projects request.</p>",
+      "refs": {
+      }
+    },
+    "ListRemoteAccessSessionsRequest": {
+      "base": "<p>Represents the request to return information about the remote access session.</p>",
+      "refs": {
+      }
+    },
+    "ListRemoteAccessSessionsResult": {
+      "base": "<p>Represents the response from the server after AWS Device Farm makes a request to return information about the remote access session.</p>",
+      "refs": {
+      }
+    },
+    "ListRunsRequest": {
+      "base": "<p>Represents a request to the list runs operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRunsResult": {
+      "base": "<p>Represents the result of a list runs request.</p>",
+      "refs": {
+      }
+    },
+    "ListSamplesRequest": {
+      "base": "<p>Represents a request to the list samples operation.</p>",
+      "refs": {
+      }
+    },
+    "ListSamplesResult": {
+      "base": "<p>Represents the result of a list samples request.</p>",
+      "refs": {
+      }
+    },
+    "ListSuitesRequest": {
+      "base": "<p>Represents a request to the list suites operation.</p>",
+      "refs": {
+      }
+    },
+    "ListSuitesResult": {
+      "base": "<p>Represents the result of a list suites request.</p>",
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridProjectsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridProjectsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionActionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionActionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionArtifactsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionArtifactsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestGridSessionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTestsRequest": {
+      "base": "<p>Represents a request to the list tests operation.</p>",
+      "refs": {
+      }
+    },
+    "ListTestsResult": {
+      "base": "<p>Represents the result of a list tests request.</p>",
+      "refs": {
+      }
+    },
+    "ListUniqueProblemsRequest": {
+      "base": "<p>Represents a request to the list unique problems operation.</p>",
+      "refs": {
+      }
+    },
+    "ListUniqueProblemsResult": {
+      "base": "<p>Represents the result of a list unique problems request.</p>",
+      "refs": {
+      }
+    },
+    "ListUploadsRequest": {
+      "base": "<p>Represents a request to the list uploads operation.</p>",
+      "refs": {
+      }
+    },
+    "ListUploadsResult": {
+      "base": "<p>Represents the result of a list uploads request.</p>",
+      "refs": {
+      }
+    },
+    "ListVPCEConfigurationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVPCEConfigurationsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Location": {
+      "base": "<p>Represents a latitude and longitude pair, expressed in geographic coordinate system degrees (for example, 47.6204, -122.3491).</p> <p>Elevation is currently not supported.</p>",
+      "refs": {
+        "Run$location": "<p>Information about the location that is used for the run.</p>",
+        "ScheduleRunConfiguration$location": "<p>Information about the location that is used for the run.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "CreateNetworkProfileRequest$uplinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "CreateNetworkProfileRequest$downlinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "CreateNetworkProfileRequest$uplinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "CreateNetworkProfileRequest$downlinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "CreateNetworkProfileRequest$uplinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>",
+        "CreateNetworkProfileRequest$downlinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>",
+        "Device$heapSize": "<p>The device's heap size, expressed in bytes.</p>",
+        "Device$memory": "<p>The device's total memory size, expressed in bytes.</p>",
+        "NetworkProfile$uplinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "NetworkProfile$downlinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "NetworkProfile$uplinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "NetworkProfile$downlinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "NetworkProfile$uplinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>",
+        "NetworkProfile$downlinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>",
+        "TestGridSessionAction$duration": "<p>The time, in milliseconds, that the action took to complete in the browser.</p>",
+        "UpdateNetworkProfileRequest$uplinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "UpdateNetworkProfileRequest$downlinkBandwidthBits": "<p>The data throughput rate in bits per second, as an integer from 0 to 104857600.</p>",
+        "UpdateNetworkProfileRequest$uplinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "UpdateNetworkProfileRequest$downlinkDelayMs": "<p>Delay time for all packets to destination in milliseconds as an integer from 0 to 2000.</p>",
+        "UpdateNetworkProfileRequest$uplinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>",
+        "UpdateNetworkProfileRequest$downlinkJitterMs": "<p>Time variation in the delay of received packets in milliseconds as an integer from 0 to 2000.</p>"
+      }
+    },
+    "MaxPageSize": {
+      "base": null,
+      "refs": {
+        "ListTestGridProjectsRequest$maxResult": "<p>Return no more than this number of results.</p>",
+        "ListTestGridSessionActionsRequest$maxResult": "<p>The maximum number of sessions to return per response.</p>",
+        "ListTestGridSessionArtifactsRequest$maxResult": "<p>The maximum number of results to be returned by a request.</p>",
+        "ListTestGridSessionsRequest$maxResult": "<p>Return only this many results at a time.</p>"
+      }
+    },
+    "MaxSlotMap": {
+      "base": null,
+      "refs": {
+        "AccountSettings$maxSlots": "<p>The maximum number of device slots that the AWS account can purchase. Each maximum is expressed as an <code>offering-id:number</code> pair, where the <code>offering-id</code> represents one of the IDs returned by the <code>ListOfferings</code> command.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "ArgumentException$message": "<p>Any additional information about the exception.</p>",
+        "CannotDeleteException$message": null,
+        "CreateDevicePoolRequest$description": "<p>The device pool's description.</p>",
+        "CreateInstanceProfileRequest$description": "<p>The description of your instance profile.</p>",
+        "CreateNetworkProfileRequest$description": "<p>The description of the network profile.</p>",
+        "DevicePool$description": "<p>The device pool's description.</p>",
+        "IdempotencyException$message": "<p>Any additional information about the exception.</p>",
+        "IncompatibilityMessage$message": "<p>A message about the incompatibility.</p>",
+        "InstanceProfile$description": "<p>The description of the instance profile.</p>",
+        "InternalServiceException$message": null,
+        "InvalidOperationException$message": null,
+        "Job$message": "<p>A message about the job's result.</p>",
+        "LimitExceededException$message": "<p>Any additional information about the exception.</p>",
+        "NetworkProfile$description": "<p>The description of the network profile.</p>",
+        "NotEligibleException$message": "<p>The HTTP response code of a Not Eligible exception.</p>",
+        "NotFoundException$message": "<p>Any additional information about the exception.</p>",
+        "Offering$description": "<p>A string that describes the offering.</p>",
+        "OfferingPromotion$description": "<p>A string that describes the offering promotion.</p>",
+        "Problem$message": "<p>A message about the problem's result.</p>",
+        "RemoteAccessSession$message": "<p>A message about the remote access session.</p>",
+        "Run$message": "<p>A message about the run's result.</p>",
+        "ServiceAccountException$message": "<p>Any additional information about the exception.</p>",
+        "Suite$message": "<p>A message about the suite's result.</p>",
+        "Test$message": "<p>A message about the test's result.</p>",
+        "UniqueProblem$message": "<p>A message about the unique problems' result.</p>",
+        "UpdateDevicePoolRequest$description": "<p>A description of the device pool to update.</p>",
+        "UpdateInstanceProfileRequest$description": "<p>The updated description for your instance profile.</p>",
+        "UpdateNetworkProfileRequest$description": "<p>The description of the network profile about which you are returning information.</p>",
+        "Upload$message": "<p>A message about the upload's result.</p>"
+      }
+    },
+    "Metadata": {
+      "base": null,
+      "refs": {
+        "Upload$metadata": "<p>The upload's metadata. For example, for Android, this contains information that is parsed from the manifest and is displayed in the AWS Device Farm console after the associated app is uploaded.</p>"
+      }
+    },
+    "MonetaryAmount": {
+      "base": "<p>A number that represents the monetary amount for an offering or transaction.</p>",
+      "refs": {
+        "OfferingTransaction$cost": "<p>The cost of an offering transaction.</p>",
+        "RecurringCharge$cost": "<p>The cost of the recurring charge.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "Artifact$name": "<p>The artifact's name.</p>",
+        "CreateDevicePoolRequest$name": "<p>The device pool's name.</p>",
+        "CreateInstanceProfileRequest$name": "<p>The name of your instance profile.</p>",
+        "CreateNetworkProfileRequest$name": "<p>The name for the new network profile.</p>",
+        "CreateProjectRequest$name": "<p>The project's name.</p>",
+        "CreateRemoteAccessSessionRequest$name": "<p>The name of the remote access session to create.</p>",
+        "CreateUploadRequest$name": "<p>The upload's file name. The name should not contain any forward slashes (<code>/</code>). If you are uploading an iOS app, the file name must end with the <code>.ipa</code> extension. If you are uploading an Android app, the file name must end with the <code>.apk</code> extension. For all others, the file name must end with the <code>.zip</code> file extension.</p>",
+        "Device$name": "<p>The device's display name.</p>",
+        "DevicePool$name": "<p>The device pool's name.</p>",
+        "InstanceProfile$name": "<p>The name of the instance profile.</p>",
+        "Job$name": "<p>The job's name.</p>",
+        "NetworkProfile$name": "<p>The name of the network profile.</p>",
+        "ProblemDetail$name": "<p>The problem detail's name.</p>",
+        "Project$name": "<p>The project's name.</p>",
+        "RemoteAccessSession$name": "<p>The name of the remote access session.</p>",
+        "Run$name": "<p>The run's name.</p>",
+        "ScheduleRunRequest$name": "<p>The name for the run to be scheduled.</p>",
+        "Suite$name": "<p>The suite's name.</p>",
+        "Test$name": "<p>The test's name.</p>",
+        "UpdateDevicePoolRequest$name": "<p>A string that represents the name of the device pool to update.</p>",
+        "UpdateInstanceProfileRequest$name": "<p>The updated name for your instance profile.</p>",
+        "UpdateNetworkProfileRequest$name": "<p>The name of the network profile about which you are returning information.</p>",
+        "UpdateProjectRequest$name": "<p>A string that represents the new name of the project that you are updating.</p>",
+        "UpdateUploadRequest$name": "<p>The upload's test spec file name. The name must not contain any forward slashes (/). The test spec file name must end with the <code>.yaml</code> or <code>.yml</code> file extension.</p>",
+        "Upload$name": "<p>The upload's file name.</p>"
+      }
+    },
+    "NetworkProfile": {
+      "base": "<p>An array of settings that describes characteristics of a network profile.</p>",
+      "refs": {
+        "CreateNetworkProfileResult$networkProfile": "<p>The network profile that is returned by the create network profile request.</p>",
+        "GetNetworkProfileResult$networkProfile": "<p>The network profile.</p>",
+        "NetworkProfiles$member": null,
+        "Run$networkProfile": "<p>The network profile being used for a test run.</p>",
+        "UpdateNetworkProfileResult$networkProfile": "<p>A list of the available network profiles.</p>"
+      }
+    },
+    "NetworkProfileType": {
+      "base": null,
+      "refs": {
+        "CreateNetworkProfileRequest$type": "<p>The type of network profile to create. Valid values are listed here.</p>",
+        "ListNetworkProfilesRequest$type": "<p>The type of network profile to return information about. Valid values are listed here.</p>",
+        "NetworkProfile$type": "<p>The type of network profile. Valid values are listed here.</p>",
+        "UpdateNetworkProfileRequest$type": "<p>The type of network profile to return information about. Valid values are listed here.</p>"
+      }
+    },
+    "NetworkProfiles": {
+      "base": null,
+      "refs": {
+        "ListNetworkProfilesResult$networkProfiles": "<p>A list of the available network profiles.</p>"
+      }
+    },
+    "NotEligibleException": {
+      "base": "<p>Exception gets thrown when a user is not eligible to perform the specified transaction.</p>",
+      "refs": {
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The specified entity was not found.</p>",
+      "refs": {
+      }
+    },
+    "Offering": {
+      "base": "<p>Represents the metadata of a device offering.</p>",
+      "refs": {
+        "OfferingStatus$offering": "<p>Represents the metadata of an offering status.</p>",
+        "Offerings$member": null
+      }
+    },
+    "OfferingIdentifier": {
+      "base": null,
+      "refs": {
+        "Offering$id": "<p>The ID that corresponds to a device offering.</p>",
+        "OfferingStatusMap$key": null,
+        "PurchaseOfferingRequest$offeringId": "<p>The ID of the offering.</p>",
+        "RenewOfferingRequest$offeringId": "<p>The ID of a request to renew an offering.</p>"
+      }
+    },
+    "OfferingPromotion": {
+      "base": "<p>Represents information about an offering promotion.</p>",
+      "refs": {
+        "OfferingPromotions$member": null
+      }
+    },
+    "OfferingPromotionIdentifier": {
+      "base": null,
+      "refs": {
+        "OfferingPromotion$id": "<p>The ID of the offering promotion.</p>",
+        "OfferingTransaction$offeringPromotionId": "<p>The ID that corresponds to a device offering promotion.</p>",
+        "PurchaseOfferingRequest$offeringPromotionId": "<p>The ID of the offering promotion to be applied to the purchase.</p>"
+      }
+    },
+    "OfferingPromotions": {
+      "base": null,
+      "refs": {
+        "ListOfferingPromotionsResult$offeringPromotions": "<p>Information about the offering promotions.</p>"
+      }
+    },
+    "OfferingStatus": {
+      "base": "<p>The status of the offering.</p>",
+      "refs": {
+        "OfferingStatusMap$value": null,
+        "OfferingTransaction$offeringStatus": "<p>The status of an offering transaction.</p>"
+      }
+    },
+    "OfferingStatusMap": {
+      "base": null,
+      "refs": {
+        "GetOfferingStatusResult$current": "<p>When specified, gets the offering status for the current period.</p>",
+        "GetOfferingStatusResult$nextPeriod": "<p>When specified, gets the offering status for the next period.</p>"
+      }
+    },
+    "OfferingTransaction": {
+      "base": "<p>Represents the metadata of an offering transaction.</p>",
+      "refs": {
+        "OfferingTransactions$member": null,
+        "PurchaseOfferingResult$offeringTransaction": "<p>Represents the offering transaction for the purchase result.</p>",
+        "RenewOfferingResult$offeringTransaction": "<p>Represents the status of the offering transaction for the renewal.</p>"
+      }
+    },
+    "OfferingTransactionType": {
+      "base": null,
+      "refs": {
+        "OfferingStatus$type": "<p>The type specified for the offering status.</p>"
+      }
+    },
+    "OfferingTransactions": {
+      "base": null,
+      "refs": {
+        "ListOfferingTransactionsResult$offeringTransactions": "<p>The audit log of subscriptions you have purchased and modified through AWS Device Farm.</p>"
+      }
+    },
+    "OfferingType": {
+      "base": null,
+      "refs": {
+        "Offering$type": "<p>The type of offering (for example, <code>RECURRING</code>) for a device.</p>"
+      }
+    },
+    "Offerings": {
+      "base": null,
+      "refs": {
+        "ListOfferingsResult$offerings": "<p>A value that represents the list offering results.</p>"
+      }
+    },
+    "PackageIds": {
+      "base": null,
+      "refs": {
+        "CreateInstanceProfileRequest$excludeAppPackagesFromCleanup": "<p>An array of strings that specifies the list of app packages that should not be cleaned up from the device after a test run.</p> <p>The list of packages is considered only if you set <code>packageCleanup</code> to <code>true</code>.</p>",
+        "InstanceProfile$excludeAppPackagesFromCleanup": "<p>An array of strings containing the list of app packages that should not be cleaned up from the device after a test run completes.</p> <p>The list of packages is considered only if you set <code>packageCleanup</code> to <code>true</code>.</p>",
+        "UpdateInstanceProfileRequest$excludeAppPackagesFromCleanup": "<p>An array of strings that specifies the list of app packages that should not be cleaned up from the device after a test run is over.</p> <p>The list of packages is only considered if you set <code>packageCleanup</code> to <code>true</code>.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "GetOfferingStatusRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "GetOfferingStatusResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListArtifactsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListArtifactsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListDeviceInstancesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListDeviceInstancesResult$nextToken": "<p>An identifier that can be used in the next call to this operation to return the next set of items in the list.</p>",
+        "ListDevicePoolsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListDevicePoolsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListDevicesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListDevicesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListInstanceProfilesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListInstanceProfilesResult$nextToken": "<p>An identifier that can be used in the next call to this operation to return the next set of items in the list.</p>",
+        "ListJobsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListJobsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListNetworkProfilesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListNetworkProfilesResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListOfferingPromotionsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListOfferingPromotionsResult$nextToken": "<p>An identifier to be used in the next call to this operation, to return the next set of items in the list.</p>",
+        "ListOfferingTransactionsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListOfferingTransactionsResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListOfferingsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListOfferingsResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListProjectsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListProjectsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListRemoteAccessSessionsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListRemoteAccessSessionsResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListRunsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListRunsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListSamplesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListSamplesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListSuitesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListSuitesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListTestGridProjectsRequest$nextToken": "<p>From a response, used to continue a paginated listing. </p>",
+        "ListTestGridProjectsResult$nextToken": "<p>Used for pagination. Pass into <a>ListTestGridProjects</a> to get more results in a paginated request.</p>",
+        "ListTestGridSessionActionsRequest$nextToken": "<p>Pagination token.</p>",
+        "ListTestGridSessionActionsResult$nextToken": "<p>Pagination token.</p>",
+        "ListTestGridSessionArtifactsRequest$nextToken": "<p>Pagination token.</p>",
+        "ListTestGridSessionArtifactsResult$nextToken": "<p>Pagination token.</p>",
+        "ListTestGridSessionsRequest$nextToken": "<p>Pagination token.</p>",
+        "ListTestGridSessionsResult$nextToken": "<p>Pagination token.</p>",
+        "ListTestsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListTestsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListUniqueProblemsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListUniqueProblemsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListUploadsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListUploadsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned. It can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListVPCEConfigurationsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListVPCEConfigurationsResult$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>"
+      }
+    },
+    "PercentInteger": {
+      "base": null,
+      "refs": {
+        "CreateNetworkProfileRequest$uplinkLossPercent": "<p>Proportion of transmitted packets that fail to arrive from 0 to 100 percent.</p>",
+        "CreateNetworkProfileRequest$downlinkLossPercent": "<p>Proportion of received packets that fail to arrive from 0 to 100 percent.</p>",
+        "NetworkProfile$uplinkLossPercent": "<p>Proportion of transmitted packets that fail to arrive from 0 to 100 percent.</p>",
+        "NetworkProfile$downlinkLossPercent": "<p>Proportion of received packets that fail to arrive from 0 to 100 percent.</p>",
+        "UpdateNetworkProfileRequest$uplinkLossPercent": "<p>Proportion of transmitted packets that fail to arrive from 0 to 100 percent.</p>",
+        "UpdateNetworkProfileRequest$downlinkLossPercent": "<p>Proportion of received packets that fail to arrive from 0 to 100 percent.</p>"
+      }
+    },
+    "Problem": {
+      "base": "<p>Represents a specific warning or failure.</p>",
+      "refs": {
+        "Problems$member": null
+      }
+    },
+    "ProblemDetail": {
+      "base": "<p>Information about a problem detail.</p>",
+      "refs": {
+        "Problem$run": "<p>Information about the associated run.</p>",
+        "Problem$job": "<p>Information about the associated job.</p>",
+        "Problem$suite": "<p>Information about the associated suite.</p>",
+        "Problem$test": "<p>Information about the associated test.</p>"
+      }
+    },
+    "Problems": {
+      "base": null,
+      "refs": {
+        "UniqueProblem$problems": "<p>Information about the problems.</p>"
+      }
+    },
+    "Project": {
+      "base": "<p>Represents an operating-system neutral workspace for running and managing tests.</p>",
+      "refs": {
+        "CreateProjectResult$project": "<p>The newly created project.</p>",
+        "GetProjectResult$project": "<p>The project to get information about.</p>",
+        "Projects$member": null,
+        "UpdateProjectResult$project": "<p>The project to update.</p>"
+      }
+    },
+    "Projects": {
+      "base": null,
+      "refs": {
+        "ListProjectsResult$projects": "<p>Information about the projects.</p>"
+      }
+    },
+    "PurchaseOfferingRequest": {
+      "base": "<p>Represents a request for a purchase offering.</p>",
+      "refs": {
+      }
+    },
+    "PurchaseOfferingResult": {
+      "base": "<p>The result of the purchase offering (for example, success or failure).</p>",
+      "refs": {
+      }
+    },
+    "PurchasedDevicesMap": {
+      "base": null,
+      "refs": {
+        "AccountSettings$unmeteredDevices": "<p>Returns the unmetered devices you have purchased or want to purchase.</p>",
+        "AccountSettings$unmeteredRemoteAccessDevices": "<p>Returns the unmetered remote access devices you have purchased or want to purchase.</p>"
+      }
+    },
+    "Radios": {
+      "base": "<p>Represents the set of radios and their states on a device. Examples of radios include Wi-Fi, GPS, Bluetooth, and NFC.</p>",
+      "refs": {
+        "Run$radios": "<p>Information about the radio states for the run.</p>",
+        "ScheduleRunConfiguration$radios": "<p>Information about the radio states for the run.</p>"
+      }
+    },
+    "RecurringCharge": {
+      "base": "<p>Specifies whether charges for devices are recurring.</p>",
+      "refs": {
+        "RecurringCharges$member": null
+      }
+    },
+    "RecurringChargeFrequency": {
+      "base": null,
+      "refs": {
+        "RecurringCharge$frequency": "<p>The frequency in which charges recur.</p>"
+      }
+    },
+    "RecurringCharges": {
+      "base": null,
+      "refs": {
+        "Offering$recurringCharges": "<p>Specifies whether there are recurring charges for the offering.</p>"
+      }
+    },
+    "RemoteAccessSession": {
+      "base": "<p>Represents information about the remote access session.</p>",
+      "refs": {
+        "CreateRemoteAccessSessionResult$remoteAccessSession": "<p>A container that describes the remote access session when the request to create a remote access session is sent.</p>",
+        "GetRemoteAccessSessionResult$remoteAccessSession": "<p>A container that lists detailed information about the remote access session.</p>",
+        "RemoteAccessSessions$member": null,
+        "StopRemoteAccessSessionResult$remoteAccessSession": "<p>A container that represents the metadata from the service about the remote access session you are stopping.</p>"
+      }
+    },
+    "RemoteAccessSessions": {
+      "base": null,
+      "refs": {
+        "ListRemoteAccessSessionsResult$remoteAccessSessions": "<p>A container that represents the metadata from the service about each remote access session you are requesting.</p>"
+      }
+    },
+    "RenewOfferingRequest": {
+      "base": "<p>A request that represents an offering renewal.</p>",
+      "refs": {
+      }
+    },
+    "RenewOfferingResult": {
+      "base": "<p>The result of a renewal offering.</p>",
+      "refs": {
+      }
+    },
+    "Resolution": {
+      "base": "<p>Represents the screen resolution of a device in height and width, expressed in pixels.</p>",
+      "refs": {
+        "Device$resolution": "<p>The resolution of the device.</p>"
+      }
+    },
+    "ResourceDescription": {
+      "base": null,
+      "refs": {
+        "CreateTestGridProjectRequest$description": "<p>Human-readable description of the project.</p>",
+        "UpdateTestGridProjectRequest$description": "<p>Human-readable description for the project.</p>"
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "GetTestGridSessionRequest$sessionId": "<p>An ID associated with this session.</p>"
+      }
+    },
+    "ResourceName": {
+      "base": null,
+      "refs": {
+        "CreateTestGridProjectRequest$name": "<p>Human-readable name of the Selenium testing project.</p>",
+        "UpdateTestGridProjectRequest$name": "<p>Human-readable name for the project.</p>"
+      }
+    },
+    "Rule": {
+      "base": "<p>Represents a condition for a device pool.</p>",
+      "refs": {
+        "Rules$member": null
+      }
+    },
+    "RuleOperator": {
+      "base": null,
+      "refs": {
+        "DeviceFilter$operator": "<p>Specifies how Device Farm compares the filter's attribute to the value. See the attribute descriptions.</p>",
+        "Rule$operator": "<p>Specifies how Device Farm compares the rule's attribute to the value. For the operators that are supported by each attribute, see the attribute descriptions.</p>"
+      }
+    },
+    "Rules": {
+      "base": null,
+      "refs": {
+        "CreateDevicePoolRequest$rules": "<p>The device pool's rules.</p>",
+        "DevicePool$rules": "<p>Information about the device pool's rules.</p>",
+        "UpdateDevicePoolRequest$rules": "<p>Represents the rules to modify for the device pool. Updating rules is optional. If you update rules for your request, the update replaces the existing rules.</p>"
+      }
+    },
+    "Run": {
+      "base": "<p>Represents a test run on a set of devices with a given app package, test parameters, and so on.</p>",
+      "refs": {
+        "GetRunResult$run": "<p>The run to get results from.</p>",
+        "Runs$member": null,
+        "ScheduleRunResult$run": "<p>Information about the scheduled run.</p>",
+        "StopRunResult$run": "<p>The run that was stopped.</p>"
+      }
+    },
+    "Runs": {
+      "base": null,
+      "refs": {
+        "ListRunsResult$runs": "<p>Information about the runs.</p>"
+      }
+    },
+    "Sample": {
+      "base": "<p>Represents a sample of performance data.</p>",
+      "refs": {
+        "Samples$member": null
+      }
+    },
+    "SampleType": {
+      "base": null,
+      "refs": {
+        "Sample$type": "<p>The sample's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>CPU: A CPU sample type. This is expressed as the app processing CPU time (including child processes) as reported by process, as a percentage.</p> </li> <li> <p>MEMORY: A memory usage sample type. This is expressed as the total proportional set size of an app process, in kilobytes.</p> </li> <li> <p>NATIVE_AVG_DRAWTIME</p> </li> <li> <p>NATIVE_FPS</p> </li> <li> <p>NATIVE_FRAMES</p> </li> <li> <p>NATIVE_MAX_DRAWTIME</p> </li> <li> <p>NATIVE_MIN_DRAWTIME</p> </li> <li> <p>OPENGL_AVG_DRAWTIME</p> </li> <li> <p>OPENGL_FPS</p> </li> <li> <p>OPENGL_FRAMES</p> </li> <li> <p>OPENGL_MAX_DRAWTIME</p> </li> <li> <p>OPENGL_MIN_DRAWTIME</p> </li> <li> <p>RX</p> </li> <li> <p>RX_RATE: The total number of bytes per second (TCP and UDP) that are sent, by app process.</p> </li> <li> <p>THREADS: A threads sample type. This is expressed as the total number of threads per app process.</p> </li> <li> <p>TX</p> </li> <li> <p>TX_RATE: The total number of bytes per second (TCP and UDP) that are received, by app process.</p> </li> </ul>"
+      }
+    },
+    "Samples": {
+      "base": null,
+      "refs": {
+        "ListSamplesResult$samples": "<p>Information about the samples.</p>"
+      }
+    },
+    "ScheduleRunConfiguration": {
+      "base": "<p>Represents the settings for a run. Includes things like location, radio states, auxiliary apps, and network profiles.</p>",
+      "refs": {
+        "GetDevicePoolCompatibilityRequest$configuration": "<p>An object that contains information about the settings for a run.</p>",
+        "ScheduleRunRequest$configuration": "<p>Information about the settings for the run to be scheduled.</p>"
+      }
+    },
+    "ScheduleRunRequest": {
+      "base": "<p>Represents a request to the schedule run operation.</p>",
+      "refs": {
+      }
+    },
+    "ScheduleRunResult": {
+      "base": "<p>Represents the result of a schedule run request.</p>",
+      "refs": {
+      }
+    },
+    "ScheduleRunTest": {
+      "base": "<p>Represents test settings. This data structure is passed in as the test parameter to ScheduleRun. For an example of the JSON request syntax, see <a>ScheduleRun</a>.</p>",
+      "refs": {
+        "GetDevicePoolCompatibilityRequest$test": "<p>Information about the uploaded test to be run against the device pool.</p>",
+        "ScheduleRunRequest$test": "<p>Information about the test for the run to be scheduled.</p>"
+      }
+    },
+    "ServiceAccountException": {
+      "base": "<p>There was a problem with the service account.</p>",
+      "refs": {
+      }
+    },
+    "ServiceDnsName": {
+      "base": null,
+      "refs": {
+        "CreateVPCEConfigurationRequest$serviceDnsName": "<p>The DNS name of the service running in your VPC that you want Device Farm to test.</p>",
+        "UpdateVPCEConfigurationRequest$serviceDnsName": "<p>The DNS (domain) name used to connect to your private service in your VPC. The DNS name must not already be in use on the internet.</p>",
+        "VPCEConfiguration$serviceDnsName": "<p>The DNS name that maps to the private IP address of the service you want to access.</p>"
+      }
+    },
+    "SkipAppResign": {
+      "base": null,
+      "refs": {
+        "AccountSettings$skipAppResign": "<p>When set to <code>true</code>, for private devices, Device Farm does not sign your app again. For public devices, Device Farm always signs your apps again.</p> <p>For more information about how Device Farm re-signs your apps, see <a href=\"https://aws.amazon.com/device-farm/faq/\">Do you modify my app?</a> in the <i>AWS Device Farm FAQs</i>.</p>",
+        "ExecutionConfiguration$skipAppResign": "<p>When set to <code>true</code>, for private devices, Device Farm does not sign your app again. For public devices, Device Farm always signs your apps again.</p> <p>For more information about how Device Farm re-signs your apps, see <a href=\"https://aws.amazon.com/device-farm/faq/\">Do you modify my app?</a> in the <i>AWS Device Farm FAQs</i>.</p>",
+        "RemoteAccessSession$skipAppResign": "<p>When set to <code>true</code>, for private devices, Device Farm does not sign your app again. For public devices, Device Farm always signs your apps again.</p> <p>For more information about how Device Farm re-signs your apps, see <a href=\"https://aws.amazon.com/device-farm/faq/\">Do you modify my app?</a> in the <i>AWS Device Farm FAQs</i>.</p>",
+        "Run$skipAppResign": "<p>When set to <code>true</code>, for private devices, Device Farm does not sign your app again. For public devices, Device Farm always signs your apps again.</p> <p>For more information about how Device Farm re-signs your apps, see <a href=\"https://aws.amazon.com/device-farm/faq/\">Do you modify my app?</a> in the <i>AWS Device Farm FAQs</i>.</p>"
+      }
+    },
+    "SshPublicKey": {
+      "base": null,
+      "refs": {
+        "CreateRemoteAccessSessionRequest$sshPublicKey": "<p>Ignored. The public key of the <code>ssh</code> key pair you want to use for connecting to remote devices in your remote debugging session. This key is required only if <code>remoteDebugEnabled</code> is set to <code>true</code>.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>"
+      }
+    },
+    "StopJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopJobResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopRemoteAccessSessionRequest": {
+      "base": "<p>Represents the request to stop the remote access session.</p>",
+      "refs": {
+      }
+    },
+    "StopRemoteAccessSessionResult": {
+      "base": "<p>Represents the response from the server that describes the remote access session when AWS Device Farm stops the session.</p>",
+      "refs": {
+      }
+    },
+    "StopRunRequest": {
+      "base": "<p>Represents the request to stop a specific run.</p>",
+      "refs": {
+      }
+    },
+    "StopRunResult": {
+      "base": "<p>Represents the results of your stop run attempt.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AndroidPaths$member": null,
+        "Artifact$extension": "<p>The artifact's file extension.</p>",
+        "CPU$frequency": "<p>The CPU's frequency.</p>",
+        "CPU$architecture": "<p>The CPU's architecture (for example, x86 or ARM).</p>",
+        "CreateTestGridUrlResult$url": "<p>A signed URL, expiring in <a>CreateTestGridUrlRequest$expiresInSeconds</a> seconds, to be passed to a <code>RemoteWebDriver</code>. </p>",
+        "Device$manufacturer": "<p>The device's manufacturer name.</p>",
+        "Device$model": "<p>The device's model name.</p>",
+        "Device$modelId": "<p>The device's model ID.</p>",
+        "Device$os": "<p>The device's operating system type.</p>",
+        "Device$image": "<p>The device's image name.</p>",
+        "Device$carrier": "<p>The device's carrier.</p>",
+        "Device$radio": "<p>The device's radio.</p>",
+        "Device$fleetType": "<p>The type of fleet to which this device belongs. Possible values are PRIVATE and PUBLIC.</p>",
+        "Device$fleetName": "<p>The name of the fleet to which this device belongs.</p>",
+        "DeviceFilterValues$member": null,
+        "DeviceHostPaths$member": null,
+        "DeviceInstance$udid": "<p>Unique device identifier for the device instance.</p>",
+        "InstanceLabels$member": null,
+        "IosPaths$member": null,
+        "Job$videoEndpoint": "<p>The endpoint for streaming device video.</p>",
+        "MaxSlotMap$key": null,
+        "PackageIds$member": null,
+        "RemoteAccessSession$endpoint": "<p>The endpoint for the remote access sesssion.</p>",
+        "RemoteAccessSession$deviceUdid": "<p>Unique device identifier for the remote device. Only returned if remote debugging is enabled for the remote access session.</p> <p>Remote debugging is <a href=\"https://docs.aws.amazon.com/devicefarm/latest/developerguide/history.html\">no longer supported</a>.</p>",
+        "Rule$value": "<p>The rule's value.</p>",
+        "Run$parsingResultUrl": "<p>Read-only URL for an object in an S3 bucket where you can get the parsing results of the test package. If the test package doesn't parse, the reason why it doesn't parse appears in the file that this URL points to.</p>",
+        "Run$locale": "<p>Information about the locale that is used for the run.</p>",
+        "Run$webUrl": "<p>The Device Farm console URL for the recording of the run.</p>",
+        "ScheduleRunConfiguration$locale": "<p>Information about the locale that is used for the run.</p>",
+        "TestGridProject$name": "<p>A human-readable name for the project.</p>",
+        "TestGridProject$description": "<p>A human-readable description for the project.</p>",
+        "TestGridSession$seleniumProperties": "<p>A JSON object of options and parameters passed to the Selenium WebDriver.</p>",
+        "TestGridSessionAction$action": "<p>The action taken by the session.</p>",
+        "TestGridSessionAction$statusCode": "<p>HTTP status code returned to the browser when the action was taken.</p>",
+        "TestGridSessionAction$requestMethod": "<p>HTTP method that the browser used to make the request.</p>",
+        "TestGridSessionArtifact$filename": "<p>The file name of the artifact.</p>",
+        "TestGridSessionArtifact$url": "<p>A semi-stable URL to the content of the object.</p>",
+        "TestParameters$key": null,
+        "TestParameters$value": null
+      }
+    },
+    "Suite": {
+      "base": "<p>Represents a collection of one or more tests.</p>",
+      "refs": {
+        "GetSuiteResult$suite": "<p>A collection of one or more tests.</p>",
+        "Suites$member": null
+      }
+    },
+    "Suites": {
+      "base": null,
+      "refs": {
+        "ListSuitesResult$suites": "<p>Information about the suites.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>The metadata that you apply to a resource to help you categorize and organize it. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters. Tag values can have a maximum length of 256 characters. </p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>One part of a key-value pair that makes up a tag. A <code>key</code> is a general label that acts like a category for more specific tag values.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The keys of the tags to be removed.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceResponse$Tags": "<p>The tags to add to the resource. A tag is an array of key-value pairs. Tag keys can have a maximum character length of 128 characters. Tag values can have a maximum length of 256 characters.</p>",
+        "TagResourceRequest$Tags": "<p>The tags to add to the resource. A tag is an array of key-value pairs. Tag keys can have a maximum character length of 128 characters. Tag values can have a maximum length of 256 characters.</p>"
+      }
+    },
+    "TagOperationException": {
+      "base": "<p>The operation was not successful. Try again.</p>",
+      "refs": {
+      }
+    },
+    "TagPolicyException": {
+      "base": "<p>The request doesn't comply with the AWS Identity and Access Management (IAM) tag policy. Correct your request and then retry it.</p>",
+      "refs": {
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The optional part of a key-value pair that makes up a tag. A <code>value</code> acts as a descriptor in a tag category (key).</p>"
+      }
+    },
+    "Test": {
+      "base": "<p>Represents a condition that is evaluated.</p>",
+      "refs": {
+        "GetTestResult$test": "<p>A test condition that is evaluated.</p>",
+        "Tests$member": null
+      }
+    },
+    "TestGridProject": {
+      "base": "<p>A Selenium testing project. Projects are used to collect and collate sessions.</p>",
+      "refs": {
+        "CreateTestGridProjectResult$testGridProject": "<p>ARN of the Selenium testing project that was created.</p>",
+        "GetTestGridProjectResult$testGridProject": "<p>A <a>TestGridProject</a>.</p>",
+        "TestGridProjects$member": null,
+        "UpdateTestGridProjectResult$testGridProject": "<p>The project, including updated information.</p>"
+      }
+    },
+    "TestGridProjects": {
+      "base": null,
+      "refs": {
+        "ListTestGridProjectsResult$testGridProjects": "<p>The list of TestGridProjects, based on a <a>ListTestGridProjectsRequest</a>.</p>"
+      }
+    },
+    "TestGridSession": {
+      "base": "<p>A <a>TestGridSession</a> is a single instance of a browser launched from the URL provided by a call to <a>CreateTestGridUrl</a>.</p>",
+      "refs": {
+        "GetTestGridSessionResult$testGridSession": "<p>The <a>TestGridSession</a> that was requested.</p>",
+        "TestGridSessions$member": null
+      }
+    },
+    "TestGridSessionAction": {
+      "base": "<p>An action taken by a <a>TestGridSession</a> browser instance.</p>",
+      "refs": {
+        "TestGridSessionActions$member": null
+      }
+    },
+    "TestGridSessionActions": {
+      "base": null,
+      "refs": {
+        "ListTestGridSessionActionsResult$actions": "<p>The action taken by the session.</p>"
+      }
+    },
+    "TestGridSessionArtifact": {
+      "base": "<p>Artifacts are video and other files that are produced in the process of running a browser in an automated context. </p> <note> <p>Video elements might be broken up into multiple artifacts as they grow in size during creation. </p> </note>",
+      "refs": {
+        "TestGridSessionArtifacts$member": null
+      }
+    },
+    "TestGridSessionArtifactCategory": {
+      "base": null,
+      "refs": {
+        "ListTestGridSessionArtifactsRequest$type": "<p>Limit results to a specified type of artifact.</p>"
+      }
+    },
+    "TestGridSessionArtifactType": {
+      "base": null,
+      "refs": {
+        "TestGridSessionArtifact$type": "<p>The kind of artifact.</p>"
+      }
+    },
+    "TestGridSessionArtifacts": {
+      "base": null,
+      "refs": {
+        "ListTestGridSessionArtifactsResult$artifacts": "<p>A list of test grid session artifacts for a <a>TestGridSession</a>.</p>"
+      }
+    },
+    "TestGridSessionStatus": {
+      "base": null,
+      "refs": {
+        "ListTestGridSessionsRequest$status": "<p>Return only sessions in this state.</p>",
+        "TestGridSession$status": "<p>The state of the session.</p>"
+      }
+    },
+    "TestGridSessions": {
+      "base": null,
+      "refs": {
+        "ListTestGridSessionsResult$testGridSessions": "<p>The sessions that match the criteria in a <a>ListTestGridSessionsRequest</a>. </p>"
+      }
+    },
+    "TestGridUrlExpiresInSecondsInput": {
+      "base": null,
+      "refs": {
+        "CreateTestGridUrlRequest$expiresInSeconds": "<p>Lifetime, in seconds, of the URL.</p>"
+      }
+    },
+    "TestParameters": {
+      "base": null,
+      "refs": {
+        "ScheduleRunTest$parameters": "<p>The test's parameters, such as test framework parameters and fixture settings. Parameters are represented by name-value pairs of strings.</p> <p>For all tests:</p> <ul> <li> <p> <code>app_performance_monitoring</code>: Performance monitoring is enabled by default. Set this parameter to false to disable it.</p> </li> </ul> <p>For Calabash tests:</p> <ul> <li> <p>profile: A cucumber profile (for example, <code>my_profile_name</code>).</p> </li> <li> <p>tags: You can limit execution to features or scenarios that have (or don't have) certain tags (for example, @smoke or @smoke,~@wip).</p> </li> </ul> <p>For Appium tests (all types):</p> <ul> <li> <p>appium_version: The Appium version. Currently supported values are 1.6.5 (and later), latest, and default.</p> <ul> <li> <p>latest runs the latest Appium version supported by Device Farm (1.9.1).</p> </li> <li> <p>For default, Device Farm selects a compatible version of Appium for the device. The current behavior is to run 1.7.2 on Android devices and iOS 9 and earlier and 1.7.2 for iOS 10 and later.</p> </li> <li> <p>This behavior is subject to change.</p> </li> </ul> </li> </ul> <p>For fuzz tests (Android only):</p> <ul> <li> <p>event_count: The number of events, between 1 and 10000, that the UI fuzz test should perform.</p> </li> <li> <p>throttle: The time, in ms, between 0 and 1000, that the UI fuzz test should wait between events.</p> </li> <li> <p>seed: A seed to use for randomizing the UI fuzz test. Using the same seed value between tests ensures identical event sequences.</p> </li> </ul> <p>For Explorer tests:</p> <ul> <li> <p>username: A user name to use if the Explorer encounters a login form. If not supplied, no user name is inserted.</p> </li> <li> <p>password: A password to use if the Explorer encounters a login form. If not supplied, no password is inserted.</p> </li> </ul> <p>For Instrumentation:</p> <ul> <li> <p>filter: A test filter string. Examples:</p> <ul> <li> <p>Running a single test case: <code>com.android.abc.Test1</code> </p> </li> <li> <p>Running a single test: <code>com.android.abc.Test1#smoke</code> </p> </li> <li> <p>Running multiple tests: <code>com.android.abc.Test1,com.android.abc.Test2</code> </p> </li> </ul> </li> </ul> <p>For XCTest and XCTestUI:</p> <ul> <li> <p>filter: A test filter string. Examples:</p> <ul> <li> <p>Running a single test class: <code>LoginTests</code> </p> </li> <li> <p>Running a multiple test classes: <code>LoginTests,SmokeTests</code> </p> </li> <li> <p>Running a single test: <code>LoginTests/testValid</code> </p> </li> <li> <p>Running multiple tests: <code>LoginTests/testValid,LoginTests/testInvalid</code> </p> </li> </ul> </li> </ul> <p>For UIAutomator:</p> <ul> <li> <p>filter: A test filter string. Examples:</p> <ul> <li> <p>Running a single test case: <code>com.android.abc.Test1</code> </p> </li> <li> <p>Running a single test: <code>com.android.abc.Test1#smoke</code> </p> </li> <li> <p>Running multiple tests: <code>com.android.abc.Test1,com.android.abc.Test2</code> </p> </li> </ul> </li> </ul>"
+      }
+    },
+    "TestType": {
+      "base": null,
+      "refs": {
+        "GetDevicePoolCompatibilityRequest$testType": "<p>The test type for the specified device pool.</p> <p>Allowed values include the following:</p> <ul> <li> <p>BUILTIN_FUZZ.</p> </li> <li> <p>BUILTIN_EXPLORER. For Android, an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </li> <li> <p>APPIUM_JAVA_JUNIT.</p> </li> <li> <p>APPIUM_JAVA_TESTNG.</p> </li> <li> <p>APPIUM_PYTHON.</p> </li> <li> <p>APPIUM_NODE.</p> </li> <li> <p>APPIUM_RUBY.</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT.</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG.</p> </li> <li> <p>APPIUM_WEB_PYTHON.</p> </li> <li> <p>APPIUM_WEB_NODE.</p> </li> <li> <p>APPIUM_WEB_RUBY.</p> </li> <li> <p>CALABASH.</p> </li> <li> <p>INSTRUMENTATION.</p> </li> <li> <p>UIAUTOMATION.</p> </li> <li> <p>UIAUTOMATOR.</p> </li> <li> <p>XCTEST.</p> </li> <li> <p>XCTEST_UI.</p> </li> </ul>",
+        "Job$type": "<p>The job's type.</p> <p>Allowed values include the following:</p> <ul> <li> <p>BUILTIN_FUZZ</p> </li> <li> <p>BUILTIN_EXPLORER. For Android, an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </li> <li> <p>APPIUM_JAVA_JUNIT</p> </li> <li> <p>APPIUM_JAVA_TESTNG</p> </li> <li> <p>APPIUM_PYTHON</p> </li> <li> <p>APPIUM_NODE</p> </li> <li> <p>APPIUM_RUBY</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG</p> </li> <li> <p>APPIUM_WEB_PYTHON</p> </li> <li> <p>APPIUM_WEB_NODE</p> </li> <li> <p>APPIUM_WEB_RUBY</p> </li> <li> <p>CALABASH</p> </li> <li> <p>INSTRUMENTATION</p> </li> <li> <p>UIAUTOMATION</p> </li> <li> <p>UIAUTOMATOR</p> </li> <li> <p>XCTEST</p> </li> <li> <p>XCTEST_UI</p> </li> </ul>",
+        "Run$type": "<p>The run's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>BUILTIN_FUZZ</p> </li> <li> <p>BUILTIN_EXPLORER</p> <note> <p>For Android, an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </note> </li> <li> <p>APPIUM_JAVA_JUNIT</p> </li> <li> <p>APPIUM_JAVA_TESTNG</p> </li> <li> <p>APPIUM_PYTHON</p> </li> <li> <p>APPIUM_NODE</p> </li> <li> <p>APPIUM_RUBY</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG</p> </li> <li> <p>APPIUM_WEB_PYTHON</p> </li> <li> <p>APPIUM_WEB_NODE</p> </li> <li> <p>APPIUM_WEB_RUBY</p> </li> <li> <p>CALABASH</p> </li> <li> <p>INSTRUMENTATION</p> </li> <li> <p>UIAUTOMATION</p> </li> <li> <p>UIAUTOMATOR</p> </li> <li> <p>XCTEST</p> </li> <li> <p>XCTEST_UI</p> </li> </ul>",
+        "ScheduleRunTest$type": "<p>The test's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>BUILTIN_FUZZ</p> </li> <li> <p>BUILTIN_EXPLORER. For Android, an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </li> <li> <p>APPIUM_JAVA_JUNIT</p> </li> <li> <p>APPIUM_JAVA_TESTNG</p> </li> <li> <p>APPIUM_PYTHON</p> </li> <li> <p>APPIUM_NODE</p> </li> <li> <p>APPIUM_RUBY</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG</p> </li> <li> <p>APPIUM_WEB_PYTHON</p> </li> <li> <p>APPIUM_WEB_NODE</p> </li> <li> <p>APPIUM_WEB_RUBY</p> </li> <li> <p>CALABASH</p> </li> <li> <p>INSTRUMENTATION</p> </li> <li> <p>UIAUTOMATION</p> </li> <li> <p>UIAUTOMATOR</p> </li> <li> <p>XCTEST</p> </li> <li> <p>XCTEST_UI</p> </li> </ul>",
+        "Suite$type": "<p>The suite's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>BUILTIN_FUZZ</p> </li> <li> <p>BUILTIN_EXPLORER </p> <note> <p>Only available for Android; an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </note> </li> <li> <p>APPIUM_JAVA_JUNIT</p> </li> <li> <p>APPIUM_JAVA_TESTNG</p> </li> <li> <p>APPIUM_PYTHON</p> </li> <li> <p>APPIUM_NODE</p> </li> <li> <p>APPIUM_RUBY</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG</p> </li> <li> <p>APPIUM_WEB_PYTHON</p> </li> <li> <p>APPIUM_WEB_NODE</p> </li> <li> <p>APPIUM_WEB_RUBY</p> </li> <li> <p>CALABASH</p> </li> <li> <p>INSTRUMENTATION</p> </li> <li> <p>UIAUTOMATION</p> </li> <li> <p>UIAUTOMATOR</p> </li> <li> <p>XCTEST</p> </li> <li> <p>XCTEST_UI</p> </li> </ul>",
+        "Test$type": "<p>The test's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>BUILTIN_FUZZ</p> </li> <li> <p>BUILTIN_EXPLORER</p> <note> <p>For Android, an app explorer that traverses an Android app, interacting with it and capturing screenshots at the same time.</p> </note> </li> <li> <p>APPIUM_JAVA_JUNIT</p> </li> <li> <p>APPIUM_JAVA_TESTNG</p> </li> <li> <p>APPIUM_PYTHON</p> </li> <li> <p>APPIUM_NODE</p> </li> <li> <p>APPIUM_RUBY</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG</p> </li> <li> <p>APPIUM_WEB_PYTHON</p> </li> <li> <p>APPIUM_WEB_NODE</p> </li> <li> <p>APPIUM_WEB_RUBY</p> </li> <li> <p>CALABASH</p> </li> <li> <p>INSTRUMENTATION</p> </li> <li> <p>UIAUTOMATION</p> </li> <li> <p>UIAUTOMATOR</p> </li> <li> <p>XCTEST</p> </li> <li> <p>XCTEST_UI</p> </li> </ul>"
+      }
+    },
+    "Tests": {
+      "base": null,
+      "refs": {
+        "ListTestsResult$tests": "<p>Information about the tests.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>The list of tags on the repository is over the limit. The maximum number of tags that can be applied to a repository is 50. </p>",
+      "refs": {
+      }
+    },
+    "TransactionIdentifier": {
+      "base": null,
+      "refs": {
+        "OfferingTransaction$transactionId": "<p>The transaction ID of the offering transaction.</p>"
+      }
+    },
+    "TrialMinutes": {
+      "base": "<p>Represents information about free trial device minutes for an AWS account.</p>",
+      "refs": {
+        "AccountSettings$trialMinutes": "<p>Information about an AWS account's usage of free trial device minutes.</p>"
+      }
+    },
+    "URL": {
+      "base": null,
+      "refs": {
+        "Artifact$url": "<p>The presigned Amazon S3 URL that can be used with a GET request to download the artifact's file.</p>",
+        "Sample$url": "<p>The presigned Amazon S3 URL that can be used with a GET request to download the sample's file.</p>",
+        "Upload$url": "<p>The presigned Amazon S3 URL that was used to store a file using a PUT request.</p>"
+      }
+    },
+    "UniqueProblem": {
+      "base": "<p>A collection of one or more problems, grouped by their result.</p>",
+      "refs": {
+        "UniqueProblems$member": null
+      }
+    },
+    "UniqueProblems": {
+      "base": null,
+      "refs": {
+        "UniqueProblemsByExecutionResultMap$value": null
+      }
+    },
+    "UniqueProblemsByExecutionResultMap": {
+      "base": null,
+      "refs": {
+        "ListUniqueProblemsResult$uniqueProblems": "<p>Information about the unique problems.</p> <p>Allowed values include:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>PASSED</p> </li> <li> <p>WARNED</p> </li> <li> <p>FAILED</p> </li> <li> <p>SKIPPED</p> </li> <li> <p>ERRORED</p> </li> <li> <p>STOPPED</p> </li> </ul>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeviceInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeviceInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDevicePoolRequest": {
+      "base": "<p>Represents a request to the update device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateDevicePoolResult": {
+      "base": "<p>Represents the result of an update device pool request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateInstanceProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateInstanceProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNetworkProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNetworkProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": "<p>Represents a request to the update project operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateProjectResult": {
+      "base": "<p>Represents the result of an update project request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateTestGridProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTestGridProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUploadRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUploadResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVPCEConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVPCEConfigurationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Upload": {
+      "base": "<p>An app or a set of one or more tests to upload or that have been uploaded.</p>",
+      "refs": {
+        "CreateUploadResult$upload": "<p>The newly created upload.</p>",
+        "GetUploadResult$upload": "<p>An app or a set of one or more tests to upload or that have been uploaded.</p>",
+        "InstallToRemoteAccessSessionResult$appUpload": "<p>An app to upload or that has been uploaded.</p>",
+        "UpdateUploadResult$upload": "<p>A test spec uploaded to Device Farm.</p>",
+        "Uploads$member": null
+      }
+    },
+    "UploadCategory": {
+      "base": null,
+      "refs": {
+        "Upload$category": "<p>The upload's category. Allowed values include:</p> <ul> <li> <p>CURATED: An upload managed by AWS Device Farm.</p> </li> <li> <p>PRIVATE: An upload managed by the AWS Device Farm customer.</p> </li> </ul>"
+      }
+    },
+    "UploadStatus": {
+      "base": null,
+      "refs": {
+        "Upload$status": "<p>The upload's status.</p> <p>Must be one of the following values:</p> <ul> <li> <p>FAILED</p> </li> <li> <p>INITIALIZED</p> </li> <li> <p>PROCESSING</p> </li> <li> <p>SUCCEEDED</p> </li> </ul>"
+      }
+    },
+    "UploadType": {
+      "base": null,
+      "refs": {
+        "CreateUploadRequest$type": "<p>The upload's upload type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>ANDROID_APP</p> </li> <li> <p>IOS_APP</p> </li> <li> <p>WEB_APP</p> </li> <li> <p>EXTERNAL_DATA</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_RUBY_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_PACKAGE</p> </li> <li> <p>CALABASH_TEST_PACKAGE</p> </li> <li> <p>INSTRUMENTATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATOR_TEST_PACKAGE</p> </li> <li> <p>XCTEST_TEST_PACKAGE</p> </li> <li> <p>XCTEST_UI_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_NODE_TEST_SPEC</p> </li> <li> <p>APPIUM_RUBY_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_SPEC</p> </li> <li> <p>INSTRUMENTATION_TEST_SPEC</p> </li> <li> <p>XCTEST_UI_TEST_SPEC</p> </li> </ul> <p> If you call <code>CreateUpload</code> with <code>WEB_APP</code> specified, AWS Device Farm throws an <code>ArgumentException</code> error.</p>",
+        "ListUploadsRequest$type": "<p>The type of upload.</p> <p>Must be one of the following values:</p> <ul> <li> <p>ANDROID_APP</p> </li> <li> <p>IOS_APP</p> </li> <li> <p>WEB_APP</p> </li> <li> <p>EXTERNAL_DATA</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_RUBY_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_PACKAGE</p> </li> <li> <p>CALABASH_TEST_PACKAGE</p> </li> <li> <p>INSTRUMENTATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATOR_TEST_PACKAGE</p> </li> <li> <p>XCTEST_TEST_PACKAGE</p> </li> <li> <p>XCTEST_UI_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_NODE_TEST_SPEC</p> </li> <li> <p> APPIUM_RUBY_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_SPEC</p> </li> <li> <p>INSTRUMENTATION_TEST_SPEC</p> </li> <li> <p>XCTEST_UI_TEST_SPEC</p> </li> </ul>",
+        "Upload$type": "<p>The upload's type.</p> <p>Must be one of the following values:</p> <ul> <li> <p>ANDROID_APP</p> </li> <li> <p>IOS_APP</p> </li> <li> <p>WEB_APP</p> </li> <li> <p>EXTERNAL_DATA</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_RUBY_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_PACKAGE</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_PACKAGE</p> </li> <li> <p>CALABASH_TEST_PACKAGE</p> </li> <li> <p>INSTRUMENTATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATION_TEST_PACKAGE</p> </li> <li> <p>UIAUTOMATOR_TEST_PACKAGE</p> </li> <li> <p>XCTEST_TEST_PACKAGE</p> </li> <li> <p>XCTEST_UI_TEST_PACKAGE</p> </li> <li> <p>APPIUM_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_NODE_TEST_SPEC</p> </li> <li> <p>APPIUM_RUBY_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_JUNIT_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_JAVA_TESTNG_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_PYTHON_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_NODE_TEST_SPEC</p> </li> <li> <p>APPIUM_WEB_RUBY_TEST_SPEC</p> </li> <li> <p>INSTRUMENTATION_TEST_SPEC</p> </li> <li> <p>XCTEST_UI_TEST_SPEC</p> </li> </ul>"
+      }
+    },
+    "Uploads": {
+      "base": null,
+      "refs": {
+        "ListUploadsResult$uploads": "<p>Information about the uploads.</p>"
+      }
+    },
+    "VPCEConfiguration": {
+      "base": "<p>Represents an Amazon Virtual Private Cloud (VPC) endpoint configuration.</p>",
+      "refs": {
+        "CreateVPCEConfigurationResult$vpceConfiguration": "<p>An object that contains information about your VPC endpoint configuration.</p>",
+        "GetVPCEConfigurationResult$vpceConfiguration": "<p>An object that contains information about your VPC endpoint configuration.</p>",
+        "UpdateVPCEConfigurationResult$vpceConfiguration": "<p>An object that contains information about your VPC endpoint configuration.</p>",
+        "VPCEConfigurations$member": null
+      }
+    },
+    "VPCEConfigurationDescription": {
+      "base": null,
+      "refs": {
+        "CreateVPCEConfigurationRequest$vpceConfigurationDescription": "<p>An optional description that provides details about your VPC endpoint configuration.</p>",
+        "UpdateVPCEConfigurationRequest$vpceConfigurationDescription": "<p>An optional description that provides details about your VPC endpoint configuration.</p>",
+        "VPCEConfiguration$vpceConfigurationDescription": "<p>An optional description that provides details about your VPC endpoint configuration.</p>"
+      }
+    },
+    "VPCEConfigurationName": {
+      "base": null,
+      "refs": {
+        "CreateVPCEConfigurationRequest$vpceConfigurationName": "<p>The friendly name you give to your VPC endpoint configuration, to manage your configurations more easily.</p>",
+        "UpdateVPCEConfigurationRequest$vpceConfigurationName": "<p>The friendly name you give to your VPC endpoint configuration to manage your configurations more easily.</p>",
+        "VPCEConfiguration$vpceConfigurationName": "<p>The friendly name you give to your VPC endpoint configuration to manage your configurations more easily.</p>"
+      }
+    },
+    "VPCEConfigurations": {
+      "base": null,
+      "refs": {
+        "ListVPCEConfigurationsResult$vpceConfigurations": "<p>An array of <code>VPCEConfiguration</code> objects that contain information about your VPC endpoint configuration.</p>"
+      }
+    },
+    "VPCEServiceName": {
+      "base": null,
+      "refs": {
+        "CreateVPCEConfigurationRequest$vpceServiceName": "<p>The name of the VPC endpoint service running in your AWS account that you want Device Farm to test.</p>",
+        "UpdateVPCEConfigurationRequest$vpceServiceName": "<p>The name of the VPC endpoint service running in your AWS account that you want Device Farm to test.</p>",
+        "VPCEConfiguration$vpceServiceName": "<p>The name of the VPC endpoint service running in your AWS account that you want Device Farm to test.</p>"
+      }
+    },
+    "VideoCapture": {
+      "base": null,
+      "refs": {
+        "ExecutionConfiguration$videoCapture": "<p>Set to true to enable video capture. Otherwise, set to false. The default is true.</p>",
+        "Job$videoCapture": "<p>This value is set to true if video capture is enabled. Otherwise, it is set to false.</p>"
+      }
+    }
+  }
+}

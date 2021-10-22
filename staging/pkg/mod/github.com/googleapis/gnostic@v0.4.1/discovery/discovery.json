@@ -1,0 +1,451 @@
+{
+  "title": "A JSON Schema for the Google API Discovery Format.",
+  "id": "http://openapis.org/v3/schema.json#",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "description": "This is the root document object of the Discovery Format.",
+  "required": [
+    "kind",
+    "discoveryVersion"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "type": "string"
+    },
+    "discoveryVersion": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "icons": {
+      "$ref": "#/definitions/icons"
+    },
+    "documentationLink": {
+      "type": "string"
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "protocol": {
+      "type": "string"
+    },
+    "baseUrl": {
+      "type": "string"
+    },
+    "basePath": {
+      "type": "string"
+    },
+    "rootUrl": {
+      "type": "string"
+    },
+    "servicePath": {
+      "type": "string"
+    },
+    "batchPath": {
+      "type": "string"
+    },
+    "parameters": {
+      "$ref": "#/definitions/parameters"
+    },
+    "auth": {
+      "$ref": "#/definitions/auth"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schemas": {
+      "$ref": "#/definitions/schemas"
+    },
+    "methods": {
+      "$ref": "#/definitions/methods"
+    },
+    "resources": {
+      "$ref": "#/definitions/resources"
+    },
+    "etag": {
+      "type": "string"
+    },
+    "ownerDomain": {
+      "type": "string"
+    },
+    "ownerName": {
+      "type": "string"
+    },
+    "version_module": {
+      "type": "boolean"
+    },
+    "canonicalName": {
+      "type": "string"
+    },
+    "fullyEncodeReservedExpansion": {
+      "type": "boolean"
+    },
+    "packagePath": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "icons": {
+      "type": "object",
+      "description": "Icons that represent the API.",
+      "required": [
+        "x16",
+        "x32"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "x16": {
+          "type": "string"
+        },
+        "x32": {
+          "type": "string"
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/parameter"
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "$ref": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "string"
+        },
+        "maximum": {
+          "type": "string"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enumDescriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "repeated": {
+          "type": "boolean"
+        },
+        "location": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/definitions/schemas"
+        },
+        "additionalProperties": {
+          "$ref": "#/definitions/schema"
+        },
+        "items": {
+          "$ref": "#/definitions/schema"
+        },
+        "annotations": {
+          "$ref": "#/definitions/annotations"
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "oauth2": {
+          "type": "object",
+          "properties": {
+            "scopes": {
+              "$ref": "#/definitions/scopes"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/schema"
+      }
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "string"
+        },
+        "maximum": {
+          "type": "string"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enumDescriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "repeated": {
+          "type": "boolean"
+        },
+        "location": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/definitions/schemas"
+        },
+        "additionalProperties": {
+          "$ref": "#/definitions/schema"
+        },
+        "items": {
+          "$ref": "#/definitions/schema"
+        },
+        "$ref": {
+          "type": "string"
+        },
+        "annotations": {
+          "$ref": "#/definitions/annotations"
+        },
+        "readOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "methods": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/method"
+      }
+    },
+    "method": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "httpMethod": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/definitions/parameters"
+        },
+        "parameterOrder": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "request": {
+          "type": "object",
+          "properties": {
+            "$ref": {
+              "type": "string"
+            },
+            "parameterName": {
+              "type": "string"
+            }
+          }
+        },
+        "response": {
+          "type": "object",
+          "properties": {
+            "$ref": {
+              "type": "string"
+            }
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supportsMediaDownload": {
+          "type": "boolean"
+        },
+        "supportsMediaUpload": {
+          "type": "boolean"
+        },
+        "useMediaDownloadService": {
+          "type": "boolean"
+        },
+        "mediaUpload": {
+          "$ref": "#/definitions/mediaUpload"
+        },
+        "supportsSubscription": {
+          "type": "boolean"
+        },
+        "flatPath": {
+          "type": "string"
+        },
+        "etagRequired": {
+          "type": "boolean"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/resource"
+      }
+    },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "methods": {
+          "$ref": "#/definitions/methods"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "scopes": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/scope"
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "mediaUpload": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxSize": {
+          "type": "string"
+        },
+        "protocols": {
+          "type": "object",
+          "properties": {
+            "simple": {
+              "type": "object",
+              "properties": {
+                "multipart": {
+                  "type": "boolean"
+                },
+                "path": {
+                  "type": "string"
+                }
+              }
+            },
+            "resumable": {
+              "type": "object",
+              "properties": {
+                "multipart": {
+                  "type": "boolean"
+                },
+                "path": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "supportsSubscription": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

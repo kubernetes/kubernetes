@@ -1,0 +1,311 @@
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css");
+
+/* Clickability fix for selector on sm devices */
+@media (min-width: 768px) and (max-width: 991px) {
+  article h1:first-of-type:before {
+    height: 0;
+    margin-top: 0;
+  }  
+}
+
+#search {
+  border: none;
+}
+
+.fa-code {
+  font-size: 19px;
+}
+
+.sidetoc,
+body .toc,
+.sidefilter,
+.sidetoggle { 
+  background-color: #f9fbe7; 
+}
+
+.sidenav,
+.toc-toggle {
+  padding: 0;
+}
+
+.sidetoggle {
+  padding-bottom: 15px;
+}
+
+/* Remove center align from Navbar and Collapsible section */
+.collapse.in,
+.collapsing {
+  text-align: unset;
+}
+
+article h4 {
+  border-bottom: none;
+  line-height: normal;
+}
+
+@media (min-width: 768px) {
+  .sidetoc, .sidefilter {
+    margin-left: -15px;
+  }
+}
+
+@media (max-width: 767px) {
+  .navbar-collapse {
+    text-align: center !important;
+  }
+
+  .navbar-collapse li .active {
+    border-radius: 20px;
+  }
+}
+
+/* Collapsible Sections
+   ------------------------------------------------------- */
+.expander:after {
+    font-family: 'Glyphicons Halflings';
+    content: "\e260";
+    margin-left: 5px;
+    color: grey;
+    font-size: small;
+}
+
+.expander.collapsed:after {
+    content: "\e259";
+}
+
+/* Floating buttons
+   ------------------------------------------------------- */
+.fab {
+    width: 40px;
+    height: 40px;
+    text-align: center;
+    padding: 11px 0 0 0;
+    border: none;
+    outline: none;
+    color: #FFF;
+    border-radius: 100%;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    transition:.3s;
+}
+
+.fab:hover {
+    transform: scale(1.1);
+}
+
+.fab + .fab {
+  margin-right: 15px;
+}
+
+.contribution-panel {
+    z-index: 1000;
+    position: fixed;
+    right: 30px;
+    top: 70px;
+}
+
+/* Bootstrap docs like sidebar
+   ------------------------------------------------------- */
+.affix h5 {
+  display: none;
+}
+
+/* active & hover links */
+.affix ul > li > a:hover,
+.affix ul > li.active > a,
+.affix ul > li > a:focus {
+  color: #563d7c;                 
+  text-decoration: none;          
+  background-color: transparent;  
+  border-left-color: #563d7c; 
+}
+
+/* all active links */
+.affix ul > li.active > a, 
+.affix ul > li.active:hover > a,
+.affix ul > li.active:focus >a {
+    font-weight: 700;
+}
+
+/* nested active links */
+.affix ul ul > li.active > a, 
+.affix ul ul > li.active:hover > a,
+.affix ul ul > li.active:focus > a {
+    font-weight: 500;
+}
+
+/* all links */
+.affix ul > li > a {
+  color: #999;
+  border-left: 2px solid transparent;
+  padding: 4px 20px;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* nested links */
+.affix ul ul > li > a {
+  padding-top: 1px;
+  padding-bottom: 1px;
+  padding-left: 30px;
+  font-size: 12px;
+}
+
+/* hide inactive nested list */
+.affix ul ul {
+  display: none;
+}
+
+/* show active nested list */
+.affix ul > li.active > ul {
+  display: block;
+}
+
+.affix > ul > li > a:before {
+  content: '';
+}
+
+.affix ul ul > li > a:before {
+  content: '';
+}
+
+/* Style Buttons
+   ------------------------------------------------------- */
+.btn-warning {
+  background-color: #0071c5;
+}
+
+.btn-info {
+  background-color: #0071c5;
+}
+
+/* Navbar Hamburger
+   ------------------------------------------------------- */
+.icon-bar {
+    transition: 0.4s;
+}
+
+/* Rotate first bar */
+.change .icon-bar:nth-of-type(2) {
+    transform: rotate(-45deg) translate(-4px, 5px) ;
+}
+
+/* Fade out the second bar */
+.change .icon-bar:nth-of-type(3) {
+    opacity: 0;
+}
+
+/* Rotate last bar */
+.change .icon-bar:nth-of-type(4) {
+    transform: rotate(45deg) translate(-4px, -5px) ;
+}
+
+/* Custom Navbar
+   ------------------------------------------------------- */
+.navbar-inverse {
+  background-color: #0071c5;
+  opacity: 0.95;
+  border-color: #0071c5;
+}
+.navbar-inverse .navbar-brand {
+  color: #ffffff;
+}
+.navbar-inverse .navbar-brand:hover,
+.navbar-inverse .navbar-brand:focus {
+  color: #ecdbff;
+}
+.navbar-inverse .navbar-text {
+  color: #ffffff;
+}
+.navbar-inverse .navbar-nav > li > a {
+  color: #ffffff;
+}
+.navbar-inverse .navbar-nav > li > a:hover,
+.navbar-inverse .navbar-nav > li > a:focus {
+  color: #ecdbff;
+}
+.navbar-inverse .navbar-nav > .active > a,
+.navbar-inverse .navbar-nav > .active > a:hover,
+.navbar-inverse .navbar-nav > .active > a:focus {
+  color: #ecdbff;
+  background-color: #0071c5;
+}
+.navbar-inverse .navbar-nav > .open > a,
+.navbar-inverse .navbar-nav > .open > a:hover,
+.navbar-inverse .navbar-nav > .open > a:focus {
+  color: #ecdbff;
+  background-color: #0071c5;
+}
+.navbar-inverse .navbar-toggle {
+  border-color: #0071c5;
+}
+.navbar-inverse .navbar-toggle:hover,
+.navbar-inverse .navbar-toggle:focus {
+  background-color: #0071c5;
+}
+.navbar-inverse .navbar-toggle .icon-bar {
+  background-color: #ffffff;
+}
+.navbar-inverse .navbar-collapse,
+.navbar-inverse .navbar-form {
+  border: none;
+}
+.navbar-inverse .navbar-link {
+  color: #ffffff;
+}
+.navbar-inverse .navbar-link:hover {
+  color: #ecdbff;
+}
+.versionarrow {
+  margin-left: 0.8em;
+  margin-top: -1.5em;
+  margin-bottom: -1em;
+  padding: 1em;
+}
+
+.versionarrow::before {
+  position: absolute;
+  content: '';
+  width: 0;
+  height: 0;
+  border: .5em solid transparent;
+  border-left-color: gray;
+  transform-origin: 0 50%;
+  transition: transform .1s;
+  margin-top: 0.2em;
+}
+
+
+.versionarrow.disable {
+  text-decoration: line-through;
+}
+
+.versionarrow.down::before {
+  transform: rotate(90deg);
+  margin-top: 0em;
+  transition: transform .1s;
+}
+
+@media (max-width: 767px) {
+  .navbar-inverse .navbar-nav .open .dropdown-menu > li > a {
+    color: #ffffff;
+  }
+  .navbar-inverse .navbar-nav .open .dropdown-menu > li > a:hover,
+  .navbar-inverse .navbar-nav .open .dropdown-menu > li > a:focus {
+    color: #ecdbff;
+  }
+  .navbar-inverse .navbar-nav .open .dropdown-menu > .active > a,
+  .navbar-inverse .navbar-nav .open .dropdown-menu > .active > a:hover,
+  .navbar-inverse .navbar-nav .open .dropdown-menu > .active > a:focus {
+    color: #ecdbff;
+    background-color: #0071c5;
+  }
+}
+
+.navbar-version-select {	
+  padding: 2px;	
+  border: none;	
+  border-radius: 2px;	
+  box-shadow: none;	
+  -webkit-appearance: media-time-remaining-display;	
+  margin-top: 14px;	
+}

@@ -1,0 +1,27 @@
+# This step is used to prevent duplication of artifact publishes when there is an issue that would prevent the overall success of the job.
+# Ensuring that we only publish when successful (and two a differently named artifact otherwise) will allow easy retry on a build pipeline
+# without running into the "cannot override artifact" failure when we finally do get a passing run.
+
+# ArtifactName - The name of the artifact in the "successful" case.
+# ArtifactPath - The path we will be publishing.
+# CustomCondition - Used if there is additional logic necessary to prevent attempt of publish.
+
+parameters:
+  ArtifactName: ''
+  ArtifactPath: ''
+  CustomCondition: true
+
+steps:
+  - task: PublishPipelineArtifact@1
+    condition: and(succeeded(), ${{ parameters.CustomCondition }})
+    displayName: 'Publish ${{ parameters.ArtifactName }} Artifacts'
+    inputs:
+      artifactName: '${{ parameters.ArtifactName }}'
+      path: '${{ parameters.ArtifactPath }}'
+
+  - task: PublishPipelineArtifact@1
+    condition: failed()
+    displayName: 'Publish failed ${{ parameters.ArtifactName }} Artifacts'
+    inputs:
+      artifactName: '${{ parameters.ArtifactName }}-FailedAttempt$(System.JobAttempt)'
+      path: '${{ parameters.ArtifactPath }}'

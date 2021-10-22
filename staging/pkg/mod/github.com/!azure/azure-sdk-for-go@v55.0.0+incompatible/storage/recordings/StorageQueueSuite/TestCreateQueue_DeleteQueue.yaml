@@ -1,0 +1,65 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:cQYkMf3OvdDn8vBdEnMWsZlwad+X2wTOmnFxa/7v/L8=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:52 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-45storagequeuesuitetestcreatequeuedeletequeue
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:51 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - cfe7b7ba-a003-005b-4b7d-30a6d6000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:akhNbK2mZ434zB4MsoCa1LNfMP3erUwZvzgv/PKKnuM=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 13 Apr 2021 15:57:52 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-45storagequeuesuitetestcreatequeuedeletequeue
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 13 Apr 2021 15:57:51 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - cfe7b7c8-a003-005b-577d-30a6d6000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""

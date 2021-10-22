@@ -1,0 +1,194 @@
+{
+  "version": "2.0",
+  "service": "<p>The AWS Cost and Usage Report API enables you to programmatically create, query, and delete AWS Cost and Usage report definitions.</p> <p>AWS Cost and Usage reports track the monthly AWS costs and usage associated with your AWS account. The report contains line items for each unique combination of AWS product, usage type, and operation that your AWS account uses. You can configure the AWS Cost and Usage report to show only the data that you want, using the AWS Cost and Usage API.</p> <p>Service Endpoint</p> <p>The AWS Cost and Usage Report API provides the following endpoint:</p> <ul> <li> <p>cur.us-east-1.amazonaws.com</p> </li> </ul>",
+  "operations": {
+    "DeleteReportDefinition": "<p>Deletes the specified report.</p>",
+    "DescribeReportDefinitions": "<p>Lists the AWS Cost and Usage reports available to this account.</p>",
+    "ModifyReportDefinition": "<p>Allows you to programatically update your report preferences.</p>",
+    "PutReportDefinition": "<p>Creates a new report using the description that you provide.</p>"
+  },
+  "shapes": {
+    "AWSRegion": {
+      "base": "<p>The region of the S3 bucket that AWS delivers the report into.</p>",
+      "refs": {
+        "ReportDefinition$S3Region": null
+      }
+    },
+    "AdditionalArtifact": {
+      "base": "<p>The types of manifest that you want AWS to create for this report.</p>",
+      "refs": {
+        "AdditionalArtifactList$member": null
+      }
+    },
+    "AdditionalArtifactList": {
+      "base": "<p>A list of additional artifacts.</p>",
+      "refs": {
+        "ReportDefinition$AdditionalArtifacts": "<p>A list of manifests that you want Amazon Web Services to create for this report.</p>"
+      }
+    },
+    "CompressionFormat": {
+      "base": "<p>The compression format that AWS uses for the report.</p>",
+      "refs": {
+        "ReportDefinition$Compression": null
+      }
+    },
+    "DeleteReportDefinitionRequest": {
+      "base": "<p>Deletes the specified report.</p>",
+      "refs": {
+      }
+    },
+    "DeleteReportDefinitionResponse": {
+      "base": "<p>If the action is successful, the service sends back an HTTP 200 response.</p>",
+      "refs": {
+      }
+    },
+    "DeleteResponseMessage": {
+      "base": "<p>Whether the deletion was successful or not.</p>",
+      "refs": {
+        "DeleteReportDefinitionResponse$ResponseMessage": null
+      }
+    },
+    "DescribeReportDefinitionsRequest": {
+      "base": "<p>Requests a list of AWS Cost and Usage reports owned by the account.</p>",
+      "refs": {
+      }
+    },
+    "DescribeReportDefinitionsResponse": {
+      "base": "<p>If the action is successful, the service sends back an HTTP 200 response.</p>",
+      "refs": {
+      }
+    },
+    "DuplicateReportNameException": {
+      "base": "<p>A report with the specified name already exists in the account. Specify a different report name.</p>",
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": "<p>A message to show the detail of the exception.</p>",
+      "refs": {
+        "DuplicateReportNameException$Message": null,
+        "InternalErrorException$Message": null,
+        "ReportLimitReachedException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "GenericString": {
+      "base": "<p>A generic string.</p>",
+      "refs": {
+        "DescribeReportDefinitionsRequest$NextToken": null,
+        "DescribeReportDefinitionsResponse$NextToken": null
+      }
+    },
+    "InternalErrorException": {
+      "base": "<p>An error on the server occurred during the processing of your request. Try again later.</p>",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": "<p>The maximum number of results that AWS returns for the operation.</p>",
+      "refs": {
+        "DescribeReportDefinitionsRequest$MaxResults": null
+      }
+    },
+    "ModifyReportDefinitionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyReportDefinitionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutReportDefinitionRequest": {
+      "base": "<p>Creates a Cost and Usage Report.</p>",
+      "refs": {
+      }
+    },
+    "PutReportDefinitionResponse": {
+      "base": "<p>If the action is successful, the service sends back an HTTP 200 response with an empty HTTP body.</p>",
+      "refs": {
+      }
+    },
+    "RefreshClosedReports": {
+      "base": null,
+      "refs": {
+        "ReportDefinition$RefreshClosedReports": "<p>Whether you want Amazon Web Services to update your reports after they have been finalized if Amazon Web Services detects charges related to previous months. These charges can include refunds, credits, or support fees.</p>"
+      }
+    },
+    "ReportDefinition": {
+      "base": "<p>The definition of AWS Cost and Usage Report. You can specify the report name, time unit, report format, compression format, S3 bucket, additional artifacts, and schema elements in the definition. </p>",
+      "refs": {
+        "ModifyReportDefinitionRequest$ReportDefinition": null,
+        "PutReportDefinitionRequest$ReportDefinition": "<p>Represents the output of the PutReportDefinition operation. The content consists of the detailed metadata and data file information. </p>",
+        "ReportDefinitionList$member": null
+      }
+    },
+    "ReportDefinitionList": {
+      "base": "<p>A list of report definitions.</p>",
+      "refs": {
+        "DescribeReportDefinitionsResponse$ReportDefinitions": "<p>A list of AWS Cost and Usage reports owned by the account.</p>"
+      }
+    },
+    "ReportFormat": {
+      "base": "<p>The format that AWS saves the report in.</p>",
+      "refs": {
+        "ReportDefinition$Format": null
+      }
+    },
+    "ReportLimitReachedException": {
+      "base": "<p>This account already has five reports defined. To define a new report, you must delete an existing report.</p>",
+      "refs": {
+      }
+    },
+    "ReportName": {
+      "base": "<p>The name of the report that you want to create. The name must be unique, is case sensitive, and can't include spaces. </p>",
+      "refs": {
+        "DeleteReportDefinitionRequest$ReportName": "<p>The name of the report that you want to delete. The name must be unique, is case sensitive, and can't include spaces.</p>",
+        "ModifyReportDefinitionRequest$ReportName": null,
+        "ReportDefinition$ReportName": null
+      }
+    },
+    "ReportVersioning": {
+      "base": null,
+      "refs": {
+        "ReportDefinition$ReportVersioning": "<p>Whether you want Amazon Web Services to overwrite the previous version of each report or to deliver the report in addition to the previous versions.</p>"
+      }
+    },
+    "S3Bucket": {
+      "base": "<p>The S3 bucket where AWS delivers the report.</p>",
+      "refs": {
+        "ReportDefinition$S3Bucket": null
+      }
+    },
+    "S3Prefix": {
+      "base": "<p>The prefix that AWS adds to the report name when AWS delivers the report. Your prefix can't include spaces.</p>",
+      "refs": {
+        "ReportDefinition$S3Prefix": null
+      }
+    },
+    "SchemaElement": {
+      "base": "<p>Whether or not AWS includes resource IDs in the report. </p>",
+      "refs": {
+        "SchemaElementList$member": null
+      }
+    },
+    "SchemaElementList": {
+      "base": "<p>A list of strings that indicate the content that is included in the report, such as service or usage type.</p>",
+      "refs": {
+        "ReportDefinition$AdditionalSchemaElements": "<p>A list of strings that indicate additional content that Amazon Web Services includes in the report, such as individual resource IDs. </p>"
+      }
+    },
+    "TimeUnit": {
+      "base": "<p>The length of time covered by the report. </p>",
+      "refs": {
+        "ReportDefinition$TimeUnit": null
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The input fails to satisfy the constraints specified by an AWS service.</p>",
+      "refs": {
+      }
+    }
+  }
+}

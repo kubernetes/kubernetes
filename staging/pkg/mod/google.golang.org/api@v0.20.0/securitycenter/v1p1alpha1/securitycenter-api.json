@@ -1,0 +1,630 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://securitycenter.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Security Command Center",
+  "description": "Cloud Security Command Center API provides access to temporal views of assets and findings within an organization.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://console.cloud.google.com/apis/api/securitycenter.googleapis.com/overview",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "securitycenter:v1p1alpha1",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://securitycenter.mtls.googleapis.com/",
+  "name": "securitycenter",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "organizations": {
+      "resources": {
+        "operations": {
+          "methods": {
+            "cancel": {
+              "description": "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\nOperations.GetOperation or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan Operation.error value with a google.rpc.Status.code of 1,\ncorresponding to `Code.CANCELLED`.",
+              "flatPath": "v1p1alpha1/organizations/{organizationsId}/operations/{operationsId}:cancel",
+              "httpMethod": "POST",
+              "id": "securitycenter.organizations.operations.cancel",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the operation resource to be cancelled.",
+                  "location": "path",
+                  "pattern": "^organizations/[^/]+/operations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1p1alpha1/{+name}:cancel",
+              "response": {
+                "$ref": "Empty"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "delete": {
+              "description": "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.",
+              "flatPath": "v1p1alpha1/organizations/{organizationsId}/operations/{operationsId}",
+              "httpMethod": "DELETE",
+              "id": "securitycenter.organizations.operations.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the operation resource to be deleted.",
+                  "location": "path",
+                  "pattern": "^organizations/[^/]+/operations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1p1alpha1/{+name}",
+              "response": {
+                "$ref": "Empty"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
+              "flatPath": "v1p1alpha1/organizations/{organizationsId}/operations/{operationsId}",
+              "httpMethod": "GET",
+              "id": "securitycenter.organizations.operations.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the operation resource.",
+                  "location": "path",
+                  "pattern": "^organizations/[^/]+/operations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1p1alpha1/{+name}",
+              "response": {
+                "$ref": "Operation"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n\nNOTE: the `name` binding allows API services to override the binding\nto use different resource name schemes, such as `users/*/operations`. To\noverride the binding, API services can add a binding such as\n`\"/v1/{name=users/*}/operations\"` to their service configuration.\nFor backwards compatibility, the default name includes the operations\ncollection id, however overriding users must ensure the name binding\nis the parent resource, without the operations collection id.",
+              "flatPath": "v1p1alpha1/organizations/{organizationsId}/operations",
+              "httpMethod": "GET",
+              "id": "securitycenter.organizations.operations.list",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "The standard list filter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name of the operation's parent resource.",
+                  "location": "path",
+                  "pattern": "^organizations/[^/]+/operations$",
+                  "required": true,
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "The standard list page size.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "The standard list page token.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v1p1alpha1/{+name}",
+              "response": {
+                "$ref": "ListOperationsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20200224",
+  "rootUrl": "https://securitycenter.googleapis.com/",
+  "schemas": {
+    "Empty": {
+      "description": "A generic empty message that you can re-use to avoid defining duplicated\nempty messages in your APIs. A typical example is to use it as the request\nor the response type of an API method. For instance:\n\n    service Foo {\n      rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n    }\n\nThe JSON representation for `Empty` is empty JSON object `{}`.",
+      "id": "Empty",
+      "properties": {},
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1RunAssetDiscoveryResponse": {
+      "description": "Response of asset discovery run",
+      "id": "GoogleCloudSecuritycenterV1RunAssetDiscoveryResponse",
+      "properties": {
+        "duration": {
+          "description": "The duration between asset discovery run start and end",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "state": {
+          "description": "The state of an asset discovery run.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "COMPLETED",
+            "SUPERSEDED",
+            "TERMINATED"
+          ],
+          "enumDescriptions": [
+            "Asset discovery run state was unspecified.",
+            "Asset discovery run completed successfully.",
+            "Asset discovery run was cancelled with tasks still pending, as another\nrun for the same organization was started with a higher priority.",
+            "Asset discovery run was killed and terminated."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1beta1RunAssetDiscoveryResponse": {
+      "description": "Response of asset discovery run",
+      "id": "GoogleCloudSecuritycenterV1beta1RunAssetDiscoveryResponse",
+      "properties": {
+        "duration": {
+          "description": "The duration between asset discovery run start and end",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "state": {
+          "description": "The state of an asset discovery run.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "COMPLETED",
+            "SUPERSEDED",
+            "TERMINATED"
+          ],
+          "enumDescriptions": [
+            "Asset discovery run state was unspecified.",
+            "Asset discovery run completed successfully.",
+            "Asset discovery run was cancelled with tasks still pending, as another\nrun for the same organization was started with a higher priority.",
+            "Asset discovery run was killed and terminated."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1Asset": {
+      "description": "Cloud Security Command Center's (Cloud SCC) representation of a Google Cloud\nPlatform (GCP) resource.\n\nThe Asset is a Cloud SCC resource that captures information about a single\nGCP resource. All modifications to an Asset are only within the context of\nCloud SCC and don't affect the referenced GCP resource.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1Asset",
+      "properties": {
+        "createTime": {
+          "description": "The time at which the asset was created in Cloud SCC.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "iamPolicy": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1IamPolicy",
+          "description": "IAM Policy information associated with the GCP resource described by the\nCloud SCC asset. This information is managed and defined by the GCP\nresource and cannot be modified by the user."
+        },
+        "name": {
+          "description": "The relative resource name of this asset. See:\nhttps://cloud.google.com/apis/design/resource_names#relative_resource_name\nExample:\n\"organizations/{organization_id}/assets/{asset_id}\".",
+          "type": "string"
+        },
+        "resourceProperties": {
+          "additionalProperties": {
+            "type": "any"
+          },
+          "description": "Resource managed properties. These properties are managed and defined by\nthe GCP resource and cannot be modified by the user.",
+          "type": "object"
+        },
+        "securityCenterProperties": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1SecurityCenterProperties",
+          "description": "Cloud SCC managed properties. These properties are managed by\nCloud SCC and cannot be modified by the user."
+        },
+        "securityMarks": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1SecurityMarks",
+          "description": "User specified security marks. These marks are entirely managed by the user\nand come from the SecurityMarks resource that belongs to the asset."
+        },
+        "updateTime": {
+          "description": "The time at which the asset was last updated, added, or deleted in Cloud\nSCC.",
+          "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1Finding": {
+      "description": "Cloud Security Command Center (Cloud SCC) finding.\n\nA finding is a record of assessment data (security, risk, health or privacy)\ningested into Cloud SCC for presentation, notification, analysis,\npolicy testing, and enforcement. For example, an XSS vulnerability in an\nApp Engine application is a finding.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1Finding",
+      "properties": {
+        "category": {
+          "description": "The additional taxonomy group within findings from a given source.\nThis field is immutable after creation time.\nExample: \"XSS_FLASH_INJECTION\"",
+          "type": "string"
+        },
+        "createTime": {
+          "description": "The time at which the finding was created in Cloud SCC.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "eventTime": {
+          "description": "The time at which the event took place. For example, if the finding\nrepresents an open firewall it would capture the time the detector believes\nthe firewall became open. The accuracy is determined by the detector.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "externalUri": {
+          "description": "The URI that, if available, points to a web page outside of Cloud SCC\nwhere additional information about the finding can be found. This field is\nguaranteed to be either empty or a well formed URL.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The relative resource name of this finding. See:\nhttps://cloud.google.com/apis/design/resource_names#relative_resource_name\nExample:\n\"organizations/{organization_id}/sources/{source_id}/findings/{finding_id}\"",
+          "type": "string"
+        },
+        "parent": {
+          "description": "The relative resource name of the source the finding belongs to. See:\nhttps://cloud.google.com/apis/design/resource_names#relative_resource_name\nThis field is immutable after creation time.\nFor example:\n\"organizations/{organization_id}/sources/{source_id}\"",
+          "type": "string"
+        },
+        "resourceName": {
+          "description": "For findings on Google Cloud Platform (GCP) resources, the full resource\nname of the GCP resource this finding is for. See:\nhttps://cloud.google.com/apis/design/resource_names#full_resource_name\nWhen the finding is for a non-GCP resource, the resourceName can be a\ncustomer or partner defined string.\nThis field is immutable after creation time.",
+          "type": "string"
+        },
+        "securityMarks": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1SecurityMarks",
+          "description": "Output only. User specified security marks. These marks are entirely\nmanaged by the user and come from the SecurityMarks resource that belongs\nto the finding."
+        },
+        "sourceProperties": {
+          "additionalProperties": {
+            "type": "any"
+          },
+          "description": "Source specific properties. These properties are managed by the source\nthat writes the finding. The key names in the source_properties map must be\nbetween 1 and 255 characters, and must start with a letter and contain\nalphanumeric characters or underscores only.",
+          "type": "object"
+        },
+        "state": {
+          "description": "The state of the finding.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "ACTIVE",
+            "INACTIVE"
+          ],
+          "enumDescriptions": [
+            "Unspecified state.",
+            "The finding requires attention and has not been addressed yet.",
+            "The finding has been fixed, triaged as a non-issue or otherwise addressed\nand is no longer active."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1IamPolicy": {
+      "description": "IAM Policy information associated with the GCP resource described by the\nCloud SCC asset. This information is managed and defined by the GCP\nresource and cannot be modified by the user.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1IamPolicy",
+      "properties": {
+        "policyBlob": {
+          "description": "The JSON representation of the Policy associated with the asset.\nSee https://cloud.google.com/iam/reference/rest/v1p1beta1/Policy for\nformat details.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1NotificationMessage": {
+      "description": "Cloud SCC's Notification",
+      "id": "GoogleCloudSecuritycenterV1p1beta1NotificationMessage",
+      "properties": {
+        "finding": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1Finding",
+          "description": "If it's a Finding based notification config, this field will be\npopulated."
+        },
+        "notificationConfigName": {
+          "description": "Name of the notification config that generated current notification.",
+          "type": "string"
+        },
+        "temporalAsset": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1TemporalAsset",
+          "description": "If it's an asset based notification config, this field will be\npopulated."
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1RunAssetDiscoveryResponse": {
+      "description": "Response of asset discovery run",
+      "id": "GoogleCloudSecuritycenterV1p1beta1RunAssetDiscoveryResponse",
+      "properties": {
+        "duration": {
+          "description": "The duration between asset discovery run start and end",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "state": {
+          "description": "The state of an asset discovery run.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "COMPLETED",
+            "SUPERSEDED",
+            "TERMINATED"
+          ],
+          "enumDescriptions": [
+            "Asset discovery run state was unspecified.",
+            "Asset discovery run completed successfully.",
+            "Asset discovery run was cancelled with tasks still pending, as another\nrun for the same organization was started with a higher priority.",
+            "Asset discovery run was killed and terminated."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1SecurityCenterProperties": {
+      "description": "Cloud SCC managed properties. These properties are managed by Cloud SCC and\ncannot be modified by the user.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1SecurityCenterProperties",
+      "properties": {
+        "resourceDisplayName": {
+          "description": "The user defined display name for this resource.",
+          "type": "string"
+        },
+        "resourceName": {
+          "description": "The full resource name of the GCP resource this asset\nrepresents. This field is immutable after create time. See:\nhttps://cloud.google.com/apis/design/resource_names#full_resource_name",
+          "type": "string"
+        },
+        "resourceOwners": {
+          "description": "Owners of the Google Cloud resource.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resourceParent": {
+          "description": "The full resource name of the immediate parent of the resource. See:\nhttps://cloud.google.com/apis/design/resource_names#full_resource_name",
+          "type": "string"
+        },
+        "resourceParentDisplayName": {
+          "description": "The user defined display name for the parent of this resource.",
+          "type": "string"
+        },
+        "resourceProject": {
+          "description": "The full resource name of the project the resource belongs to. See:\nhttps://cloud.google.com/apis/design/resource_names#full_resource_name",
+          "type": "string"
+        },
+        "resourceProjectDisplayName": {
+          "description": "The user defined display name for the project of this resource.",
+          "type": "string"
+        },
+        "resourceType": {
+          "description": "The type of the GCP resource. Examples include: APPLICATION,\nPROJECT, and ORGANIZATION. This is a case insensitive field defined by\nCloud SCC and/or the producer of the resource and is immutable\nafter create time.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1SecurityMarks": {
+      "description": "User specified security marks that are attached to the parent Cloud Security\nCommand Center (Cloud SCC) resource. Security marks are scoped within a Cloud\nSCC organization -- they can be modified and viewed by all users who have\nproper permissions on the organization.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1SecurityMarks",
+      "properties": {
+        "marks": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mutable user specified security marks belonging to the parent resource.\nConstraints are as follows:\n\n  * Keys and values are treated as case insensitive\n  * Keys must be between 1 - 256 characters (inclusive)\n  * Keys must be letters, numbers, underscores, or dashes\n  * Values have leading and trailing whitespace trimmed, remaining\n    characters must be between 1 - 4096 characters (inclusive)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The relative resource name of the SecurityMarks. See:\nhttps://cloud.google.com/apis/design/resource_names#relative_resource_name\nExamples:\n\"organizations/{organization_id}/assets/{asset_id}/securityMarks\"\n\"organizations/{organization_id}/sources/{source_id}/findings/{finding_id}/securityMarks\".",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GoogleCloudSecuritycenterV1p1beta1TemporalAsset": {
+      "description": "Wrapper over asset object that also captures the state change for the asset\ne.g. if it was a newly created asset vs updated or deleted asset.",
+      "id": "GoogleCloudSecuritycenterV1p1beta1TemporalAsset",
+      "properties": {
+        "asset": {
+          "$ref": "GoogleCloudSecuritycenterV1p1beta1Asset",
+          "description": "Asset data that includes attributes, properties and marks about the asset."
+        },
+        "changeType": {
+          "description": "Represents if the asset was created/updated/deleted.",
+          "enum": [
+            "CHANGE_TYPE_UNSPECIFIED",
+            "CREATED",
+            "UPDATED",
+            "DELETED"
+          ],
+          "enumDescriptions": [
+            "Unspecified or default.",
+            "Newly created Asset",
+            "Asset was updated.",
+            "Asset was deleted."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListOperationsResponse": {
+      "description": "The response message for Operations.ListOperations.",
+      "id": "ListOperationsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        },
+        "operations": {
+          "description": "A list of operations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Operation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call.",
+      "id": "Operation",
+      "properties": {
+        "done": {
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable.",
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`.",
+          "type": "string"
+        },
+        "response": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The normal response of the operation in case of success.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors).",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use.",
+          "items": {
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\ngoogle.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Security Command Center API",
+  "version": "v1p1alpha1",
+  "version_module": true
+}

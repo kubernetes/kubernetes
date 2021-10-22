@@ -1,0 +1,22 @@
+apt:
+  update: true
+
+env:
+  - PROTOBUF_VERSION=2.6.1
+  - PROTOBUF_VERSION=3.0.2
+  - PROTOBUF_VERSION=3.14.0
+
+before_install:
+  - HOME=/home/travis ./install-protobuf.sh
+  - PATH=/home/travis/bin:$PATH protoc --version
+
+script:
+  - PATH=/home/travis/bin:$PATH make buildserverall
+  - echo $TRAVIS_GO_VERSION
+  - if [[ "$PROTOBUF_VERSION" == "3.14.0" ]] && [[ "$TRAVIS_GO_VERSION" == "1.15.x" ]]; then ! git status --porcelain | read || (git status; git diff; exit 1); fi
+
+language: go
+
+go:
+  - 1.12.x
+  - 1.15.x

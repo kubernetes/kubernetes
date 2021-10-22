@@ -1,0 +1,2525 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/bigtable.admin": {
+          "description": "Administer your Cloud Bigtable tables and clusters"
+        },
+        "https://www.googleapis.com/auth/bigtable.admin.cluster": {
+          "description": "Administer your Cloud Bigtable clusters"
+        },
+        "https://www.googleapis.com/auth/bigtable.admin.instance": {
+          "description": "Administer your Cloud Bigtable clusters"
+        },
+        "https://www.googleapis.com/auth/bigtable.admin.table": {
+          "description": "Administer your Cloud Bigtable tables"
+        },
+        "https://www.googleapis.com/auth/cloud-bigtable.admin": {
+          "description": "Administer your Cloud Bigtable tables and clusters"
+        },
+        "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster": {
+          "description": "Administer your Cloud Bigtable clusters"
+        },
+        "https://www.googleapis.com/auth/cloud-bigtable.admin.table": {
+          "description": "Administer your Cloud Bigtable tables"
+        },
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/cloud-platform.read-only": {
+          "description": "View your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://bigtableadmin.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Bigtable Admin",
+  "description": "Administer your Cloud Bigtable tables and instances.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/bigtable/",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "bigtableadmin:v2",
+  "kind": "discovery#restDescription",
+  "name": "bigtableadmin",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "operations": {
+      "methods": {
+        "cancel": {
+          "description": "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\nOperations.GetOperation or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan Operation.error value with a google.rpc.Status.code of 1,\ncorresponding to `Code.CANCELLED`.",
+          "flatPath": "v2/operations/{operationsId}:cancel",
+          "httpMethod": "POST",
+          "id": "bigtableadmin.operations.cancel",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "The name of the operation resource to be cancelled.",
+              "location": "path",
+              "pattern": "^operations/.+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}:cancel",
+          "response": {
+            "$ref": "Empty"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/bigtable.admin",
+            "https://www.googleapis.com/auth/bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/bigtable.admin.instance",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "delete": {
+          "description": "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.",
+          "flatPath": "v2/operations/{operationsId}",
+          "httpMethod": "DELETE",
+          "id": "bigtableadmin.operations.delete",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "The name of the operation resource to be deleted.",
+              "location": "path",
+              "pattern": "^operations/.+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}",
+          "response": {
+            "$ref": "Empty"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/bigtable.admin",
+            "https://www.googleapis.com/auth/bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/bigtable.admin.instance",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "get": {
+          "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
+          "flatPath": "v2/operations/{operationsId}",
+          "httpMethod": "GET",
+          "id": "bigtableadmin.operations.get",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "The name of the operation resource.",
+              "location": "path",
+              "pattern": "^operations/.+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/bigtable.admin",
+            "https://www.googleapis.com/auth/bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/bigtable.admin.instance",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin",
+            "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        }
+      },
+      "resources": {
+        "projects": {
+          "resources": {
+            "operations": {
+              "methods": {
+                "list": {
+                  "description": "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n\nNOTE: the `name` binding allows API services to override the binding\nto use different resource name schemes, such as `users/*/operations`. To\noverride the binding, API services can add a binding such as\n`\"/v1/{name=users/*}/operations\"` to their service configuration.\nFor backwards compatibility, the default name includes the operations\ncollection id, however overriding users must ensure the name binding\nis the parent resource, without the operations collection id.",
+                  "flatPath": "v2/operations/projects/{projectsId}/operations",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.operations.projects.operations.list",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "filter": {
+                      "description": "The standard list filter.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name of the operation's parent resource.",
+                      "location": "path",
+                      "pattern": "^operations/projects/.+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "pageSize": {
+                      "description": "The standard list page size.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "The standard list page token.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}/operations",
+                  "response": {
+                    "$ref": "ListOperationsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "projects": {
+      "resources": {
+        "instances": {
+          "methods": {
+            "create": {
+              "description": "Create an instance within a project.",
+              "flatPath": "v2/projects/{projectsId}/instances",
+              "httpMethod": "POST",
+              "id": "bigtableadmin.projects.instances.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "The unique name of the project in which to create the new instance.\nValues are of the form `projects/\u003cproject\u003e`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+parent}/instances",
+              "request": {
+                "$ref": "CreateInstanceRequest"
+              },
+              "response": {
+                "$ref": "Operation"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "delete": {
+              "description": "Delete an instance from a project.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}",
+              "httpMethod": "DELETE",
+              "id": "bigtableadmin.projects.instances.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The unique name of the instance to be deleted.\nValues are of the form `projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}",
+              "response": {
+                "$ref": "Empty"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "get": {
+              "description": "Gets information about an instance.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}",
+              "httpMethod": "GET",
+              "id": "bigtableadmin.projects.instances.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The unique name of the requested instance. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}",
+              "response": {
+                "$ref": "Instance"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/cloud-platform.read-only"
+              ]
+            },
+            "getIamPolicy": {
+              "description": "Gets the access control policy for an instance resource. Returns an empty\npolicy if an instance exists but does not have a policy set.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}:getIamPolicy",
+              "httpMethod": "POST",
+              "id": "bigtableadmin.projects.instances.getIamPolicy",
+              "parameterOrder": [
+                "resource"
+              ],
+              "parameters": {
+                "resource": {
+                  "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+resource}:getIamPolicy",
+              "request": {
+                "$ref": "GetIamPolicyRequest"
+              },
+              "response": {
+                "$ref": "Policy"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "list": {
+              "description": "Lists information about instances in a project.",
+              "flatPath": "v2/projects/{projectsId}/instances",
+              "httpMethod": "GET",
+              "id": "bigtableadmin.projects.instances.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "pageToken": {
+                  "description": "DEPRECATED: This field is unused and ignored.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "parent": {
+                  "description": "The unique name of the project for which a list of instances is requested.\nValues are of the form `projects/\u003cproject\u003e`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+parent}/instances",
+              "response": {
+                "$ref": "ListInstancesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/cloud-platform.read-only"
+              ]
+            },
+            "partialUpdateInstance": {
+              "description": "Partially updates an instance within a project. This method can modify all\nfields of an Instance and is the preferred way to update an Instance.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}",
+              "httpMethod": "PATCH",
+              "id": "bigtableadmin.projects.instances.partialUpdateInstance",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "(`OutputOnly`)\nThe unique name of the instance. Values are of the form\n`projects/\u003cproject\u003e/instances/a-z+[a-z0-9]`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "updateMask": {
+                  "description": "The subset of Instance fields which should be replaced.\nMust be explicitly set.",
+                  "format": "google-fieldmask",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}",
+              "request": {
+                "$ref": "Instance"
+              },
+              "response": {
+                "$ref": "Operation"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "setIamPolicy": {
+              "description": "Sets the access control policy on an instance resource. Replaces any\nexisting policy.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}:setIamPolicy",
+              "httpMethod": "POST",
+              "id": "bigtableadmin.projects.instances.setIamPolicy",
+              "parameterOrder": [
+                "resource"
+              ],
+              "parameters": {
+                "resource": {
+                  "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+resource}:setIamPolicy",
+              "request": {
+                "$ref": "SetIamPolicyRequest"
+              },
+              "response": {
+                "$ref": "Policy"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "testIamPermissions": {
+              "description": "Returns permissions that the caller has on the specified instance resource.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}:testIamPermissions",
+              "httpMethod": "POST",
+              "id": "bigtableadmin.projects.instances.testIamPermissions",
+              "parameterOrder": [
+                "resource"
+              ],
+              "parameters": {
+                "resource": {
+                  "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+resource}:testIamPermissions",
+              "request": {
+                "$ref": "TestIamPermissionsRequest"
+              },
+              "response": {
+                "$ref": "TestIamPermissionsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            },
+            "update": {
+              "description": "Updates an instance within a project. This method updates only the display\nname and type for an Instance. To update other Instance properties, such as\nlabels, use PartialUpdateInstance.",
+              "flatPath": "v2/projects/{projectsId}/instances/{instancesId}",
+              "httpMethod": "PUT",
+              "id": "bigtableadmin.projects.instances.update",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "(`OutputOnly`)\nThe unique name of the instance. Values are of the form\n`projects/\u003cproject\u003e/instances/a-z+[a-z0-9]`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/instances/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}",
+              "request": {
+                "$ref": "Instance"
+              },
+              "response": {
+                "$ref": "Instance"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          },
+          "resources": {
+            "appProfiles": {
+              "methods": {
+                "create": {
+                  "description": "Creates an app profile within an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/appProfiles",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.appProfiles.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "appProfileId": {
+                      "description": "The ID to be used when referring to the new app profile within its\ninstance, e.g., just `myprofile` rather than\n`projects/myproject/instances/myinstance/appProfiles/myprofile`.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "ignoreWarnings": {
+                      "description": "If true, ignore safety checks when creating the app profile.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "parent": {
+                      "description": "The unique name of the instance in which to create the new app profile.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/appProfiles",
+                  "request": {
+                    "$ref": "AppProfile"
+                  },
+                  "response": {
+                    "$ref": "AppProfile"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Deletes an app profile from an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/appProfiles/{appProfilesId}",
+                  "httpMethod": "DELETE",
+                  "id": "bigtableadmin.projects.instances.appProfiles.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "ignoreWarnings": {
+                      "description": "If true, ignore safety checks when deleting the app profile.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "The unique name of the app profile to be deleted. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/appProfiles/\u003capp_profile\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/appProfiles/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Gets information about an app profile.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/appProfiles/{appProfilesId}",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.appProfiles.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the requested app profile. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/appProfiles/\u003capp_profile\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/appProfiles/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "AppProfile"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                },
+                "list": {
+                  "description": "Lists information about app profiles in an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/appProfiles",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.appProfiles.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "pageSize": {
+                      "description": "Maximum number of results per page.\n\nA page_size of zero lets the server choose the number of items to return.\nA page_size which is strictly positive will return at most that many items.\nA negative page_size will cause an error.\n\nFollowing the first request, subsequent paginated calls are not required\nto pass a page_size. If a page_size is set in subsequent calls, it must\nmatch the page_size given in the first request.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "The value of `next_page_token` returned by a previous call.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The unique name of the instance for which a list of app profiles is\nrequested. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.\nUse `\u003cinstance\u003e = '-'` to list AppProfiles for all Instances in a project,\ne.g., `projects/myproject/instances/-`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/appProfiles",
+                  "response": {
+                    "$ref": "ListAppProfilesResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "patch": {
+                  "description": "Updates an app profile within an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/appProfiles/{appProfilesId}",
+                  "httpMethod": "PATCH",
+                  "id": "bigtableadmin.projects.instances.appProfiles.patch",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "ignoreWarnings": {
+                      "description": "If true, ignore safety checks when updating the app profile.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "(`OutputOnly`)\nThe unique name of the app profile. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/appProfiles/_a-zA-Z0-9*`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/appProfiles/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "updateMask": {
+                      "description": "The subset of app profile fields which should be replaced.\nIf unset, all fields will be replaced.",
+                      "format": "google-fieldmask",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "request": {
+                    "$ref": "AppProfile"
+                  },
+                  "response": {
+                    "$ref": "Operation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "clusters": {
+              "methods": {
+                "create": {
+                  "description": "Creates a cluster within an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.clusters.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "clusterId": {
+                      "description": "The ID to be used when referring to the new cluster within its instance,\ne.g., just `mycluster` rather than\n`projects/myproject/instances/myinstance/clusters/mycluster`.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The unique name of the instance in which to create the new cluster.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/clusters",
+                  "request": {
+                    "$ref": "Cluster"
+                  },
+                  "response": {
+                    "$ref": "Operation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Deletes a cluster from an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters/{clustersId}",
+                  "httpMethod": "DELETE",
+                  "id": "bigtableadmin.projects.instances.clusters.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the cluster to be deleted. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/clusters/\u003ccluster\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/clusters/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Gets information about a cluster.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters/{clustersId}",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.clusters.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the requested cluster. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/clusters/\u003ccluster\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/clusters/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "Cluster"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                },
+                "list": {
+                  "description": "Lists information about clusters in an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.clusters.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "pageToken": {
+                      "description": "DEPRECATED: This field is unused and ignored.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The unique name of the instance for which a list of clusters is requested.\nValues are of the form `projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.\nUse `\u003cinstance\u003e = '-'` to list Clusters for all Instances in a project,\ne.g., `projects/myproject/instances/-`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/clusters",
+                  "response": {
+                    "$ref": "ListClustersResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                },
+                "update": {
+                  "description": "Updates a cluster within an instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters/{clustersId}",
+                  "httpMethod": "PUT",
+                  "id": "bigtableadmin.projects.instances.clusters.update",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "(`OutputOnly`)\nThe unique name of the cluster. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/clusters/a-z*`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/clusters/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "request": {
+                    "$ref": "Cluster"
+                  },
+                  "response": {
+                    "$ref": "Operation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/bigtable.admin.instance",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              },
+              "resources": {
+                "backups": {
+                  "methods": {
+                    "getIamPolicy": {
+                      "description": "Gets the access control policy for a Table or Backup resource.\nReturns an empty policy if the resource exists but does not have a policy\nset.",
+                      "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters/{clustersId}/backups/{backupsId}:getIamPolicy",
+                      "httpMethod": "POST",
+                      "id": "bigtableadmin.projects.instances.clusters.backups.getIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/instances/[^/]+/clusters/[^/]+/backups/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v2/{+resource}:getIamPolicy",
+                      "request": {
+                        "$ref": "GetIamPolicyRequest"
+                      },
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/bigtable.admin",
+                        "https://www.googleapis.com/auth/bigtable.admin.table",
+                        "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                        "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "setIamPolicy": {
+                      "description": "Sets the access control policy on a Table or Backup resource.\nReplaces any existing policy.",
+                      "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/clusters/{clustersId}/backups/{backupsId}:setIamPolicy",
+                      "httpMethod": "POST",
+                      "id": "bigtableadmin.projects.instances.clusters.backups.setIamPolicy",
+                      "parameterOrder": [
+                        "resource"
+                      ],
+                      "parameters": {
+                        "resource": {
+                          "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/instances/[^/]+/clusters/[^/]+/backups/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v2/{+resource}:setIamPolicy",
+                      "request": {
+                        "$ref": "SetIamPolicyRequest"
+                      },
+                      "response": {
+                        "$ref": "Policy"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/bigtable.admin",
+                        "https://www.googleapis.com/auth/bigtable.admin.table",
+                        "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                        "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "tables": {
+              "methods": {
+                "checkConsistency": {
+                  "description": "Checks replication consistency based on a consistency token, that is, if\nreplication has caught up based on the conditions specified in the token\nand the check request.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:checkConsistency",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.checkConsistency",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the Table for which to check replication consistency.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}:checkConsistency",
+                  "request": {
+                    "$ref": "CheckConsistencyRequest"
+                  },
+                  "response": {
+                    "$ref": "CheckConsistencyResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "create": {
+                  "description": "Creates a new table in the specified instance.\nThe table can be created with a full set of initial column families,\nspecified in the request.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "The unique name of the instance in which to create the table.\nValues are of the form `projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/tables",
+                  "request": {
+                    "$ref": "CreateTableRequest"
+                  },
+                  "response": {
+                    "$ref": "Table"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Permanently deletes a specified table and all of its data.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}",
+                  "httpMethod": "DELETE",
+                  "id": "bigtableadmin.projects.instances.tables.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the table to be deleted.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "dropRowRange": {
+                  "description": "Permanently drop/delete a row range from a specified table. The request can\nspecify whether to delete all rows in a table, or only those that match a\nparticular prefix.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:dropRowRange",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.dropRowRange",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the table on which to drop a range of rows.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}:dropRowRange",
+                  "request": {
+                    "$ref": "DropRowRangeRequest"
+                  },
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "generateConsistencyToken": {
+                  "description": "Generates a consistency token for a Table, which can be used in\nCheckConsistency to check whether mutations to the table that finished\nbefore this call started have been replicated. The tokens will be available\nfor 90 days.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:generateConsistencyToken",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.generateConsistencyToken",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the Table for which to create a consistency token.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}:generateConsistencyToken",
+                  "request": {
+                    "$ref": "GenerateConsistencyTokenRequest"
+                  },
+                  "response": {
+                    "$ref": "GenerateConsistencyTokenResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Gets metadata information about the specified table.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.tables.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the requested table.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "view": {
+                      "description": "The view to be applied to the returned table's fields.\nDefaults to `SCHEMA_VIEW` if unspecified.",
+                      "enum": [
+                        "VIEW_UNSPECIFIED",
+                        "NAME_ONLY",
+                        "SCHEMA_VIEW",
+                        "REPLICATION_VIEW",
+                        "FULL"
+                      ],
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}",
+                  "response": {
+                    "$ref": "Table"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                },
+                "getIamPolicy": {
+                  "description": "Gets the access control policy for a Table or Backup resource.\nReturns an empty policy if the resource exists but does not have a policy\nset.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:getIamPolicy",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.getIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+resource}:getIamPolicy",
+                  "request": {
+                    "$ref": "GetIamPolicyRequest"
+                  },
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "Lists all tables served from a specified instance.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables",
+                  "httpMethod": "GET",
+                  "id": "bigtableadmin.projects.instances.tables.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "pageSize": {
+                      "description": "Maximum number of results per page.\n\nA page_size of zero lets the server choose the number of items to return.\nA page_size which is strictly positive will return at most that many items.\nA negative page_size will cause an error.\n\nFollowing the first request, subsequent paginated calls are not required\nto pass a page_size. If a page_size is set in subsequent calls, it must\nmatch the page_size given in the first request.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "The value of `next_page_token` returned by a previous call.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The unique name of the instance for which tables should be listed.\nValues are of the form `projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "view": {
+                      "description": "The view to be applied to the returned tables' fields.\nOnly NAME_ONLY view (default) and REPLICATION_VIEW are supported.",
+                      "enum": [
+                        "VIEW_UNSPECIFIED",
+                        "NAME_ONLY",
+                        "SCHEMA_VIEW",
+                        "REPLICATION_VIEW",
+                        "FULL"
+                      ],
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+parent}/tables",
+                  "response": {
+                    "$ref": "ListTablesResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/cloud-platform.read-only"
+                  ]
+                },
+                "modifyColumnFamilies": {
+                  "description": "Performs a series of column family modifications on the specified table.\nEither all or none of the modifications will occur before this method\nreturns, but data requests received prior to that point may see a table\nwhere only some modifications have taken effect.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:modifyColumnFamilies",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.modifyColumnFamilies",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The unique name of the table whose families should be modified.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+name}:modifyColumnFamilies",
+                  "request": {
+                    "$ref": "ModifyColumnFamiliesRequest"
+                  },
+                  "response": {
+                    "$ref": "Table"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "setIamPolicy": {
+                  "description": "Sets the access control policy on a Table or Backup resource.\nReplaces any existing policy.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:setIamPolicy",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.setIamPolicy",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+resource}:setIamPolicy",
+                  "request": {
+                    "$ref": "SetIamPolicyRequest"
+                  },
+                  "response": {
+                    "$ref": "Policy"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "testIamPermissions": {
+                  "description": "Returns permissions that the caller has on the specified table resource.",
+                  "flatPath": "v2/projects/{projectsId}/instances/{instancesId}/tables/{tablesId}:testIamPermissions",
+                  "httpMethod": "POST",
+                  "id": "bigtableadmin.projects.instances.tables.testIamPermissions",
+                  "parameterOrder": [
+                    "resource"
+                  ],
+                  "parameters": {
+                    "resource": {
+                      "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/instances/[^/]+/tables/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v2/{+resource}:testIamPermissions",
+                  "request": {
+                    "$ref": "TestIamPermissionsRequest"
+                  },
+                  "response": {
+                    "$ref": "TestIamPermissionsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigtable.admin",
+                    "https://www.googleapis.com/auth/bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                    "https://www.googleapis.com/auth/cloud-bigtable.admin.table",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "locations": {
+          "methods": {
+            "get": {
+              "description": "Gets information about a location.",
+              "flatPath": "v2/projects/{projectsId}/locations/{locationsId}",
+              "httpMethod": "GET",
+              "id": "bigtableadmin.projects.locations.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Resource name for the location.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/locations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}",
+              "response": {
+                "$ref": "Location"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/cloud-platform.read-only"
+              ]
+            },
+            "list": {
+              "description": "Lists information about the supported locations for this service.",
+              "flatPath": "v2/projects/{projectsId}/locations",
+              "httpMethod": "GET",
+              "id": "bigtableadmin.projects.locations.list",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "The standard list filter.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The resource that owns the locations collection, if applicable.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "The standard list page size.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "The standard list page token.",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v2/{+name}/locations",
+              "response": {
+                "$ref": "ListLocationsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigtable.admin",
+                "https://www.googleapis.com/auth/bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/bigtable.admin.instance",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin",
+                "https://www.googleapis.com/auth/cloud-bigtable.admin.cluster",
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/cloud-platform.read-only"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20200204",
+  "rootUrl": "https://bigtableadmin.googleapis.com/",
+  "schemas": {
+    "AppProfile": {
+      "description": "A configuration object describing how Cloud Bigtable should treat traffic\nfrom a particular end user application.",
+      "id": "AppProfile",
+      "properties": {
+        "description": {
+          "description": "Optional long form description of the use case for this AppProfile.",
+          "type": "string"
+        },
+        "etag": {
+          "description": "Strongly validated etag for optimistic concurrency control. Preserve the\nvalue returned from `GetAppProfile` when calling `UpdateAppProfile` to\nfail the request if there has been a modification in the mean time. The\n`update_mask` of the request need not include `etag` for this protection\nto apply.\nSee [Wikipedia](https://en.wikipedia.org/wiki/HTTP_ETag) and\n[RFC 7232](https://tools.ietf.org/html/rfc7232#section-2.3) for more\ndetails.",
+          "type": "string"
+        },
+        "multiClusterRoutingUseAny": {
+          "$ref": "MultiClusterRoutingUseAny",
+          "description": "Use a multi-cluster routing policy."
+        },
+        "name": {
+          "description": "(`OutputOnly`)\nThe unique name of the app profile. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/appProfiles/_a-zA-Z0-9*`.",
+          "type": "string"
+        },
+        "singleClusterRouting": {
+          "$ref": "SingleClusterRouting",
+          "description": "Use a single-cluster routing policy."
+        }
+      },
+      "type": "object"
+    },
+    "AuditConfig": {
+      "description": "Specifies the audit configuration for a service.\nThe configuration determines which permission types are logged, and what\nidentities, if any, are exempted from logging.\nAn AuditConfig must have one or more AuditLogConfigs.\n\nIf there are AuditConfigs for both `allServices` and a specific service,\nthe union of the two AuditConfigs is used for that service: the log_types\nspecified in each AuditConfig are enabled, and the exempted_members in each\nAuditLogConfig are exempted.\n\nExample Policy with multiple AuditConfigs:\n\n    {\n      \"audit_configs\": [\n        {\n          \"service\": \"allServices\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n              \"exempted_members\": [\n                \"user:jose@example.com\"\n              ]\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n            },\n            {\n              \"log_type\": \"ADMIN_READ\",\n            }\n          ]\n        },\n        {\n          \"service\": \"sampleservice.googleapis.com\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n              \"exempted_members\": [\n                \"user:aliya@example.com\"\n              ]\n            }\n          ]\n        }\n      ]\n    }\n\nFor sampleservice, this policy enables DATA_READ, DATA_WRITE and ADMIN_READ\nlogging. It also exempts jose@example.com from DATA_READ logging, and\naliya@example.com from DATA_WRITE logging.",
+      "id": "AuditConfig",
+      "properties": {
+        "auditLogConfigs": {
+          "description": "The configuration for logging of each type of permission.",
+          "items": {
+            "$ref": "AuditLogConfig"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "Specifies a service that will be enabled for audit logging.\nFor example, `storage.googleapis.com`, `cloudsql.googleapis.com`.\n`allServices` is a special value that covers all services.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditLogConfig": {
+      "description": "Provides the configuration for logging a type of permissions.\nExample:\n\n    {\n      \"audit_log_configs\": [\n        {\n          \"log_type\": \"DATA_READ\",\n          \"exempted_members\": [\n            \"user:jose@example.com\"\n          ]\n        },\n        {\n          \"log_type\": \"DATA_WRITE\",\n        }\n      ]\n    }\n\nThis enables 'DATA_READ' and 'DATA_WRITE' logging, while exempting\njose@example.com from DATA_READ logging.",
+      "id": "AuditLogConfig",
+      "properties": {
+        "exemptedMembers": {
+          "description": "Specifies the identities that do not cause logging for this type of\npermission.\nFollows the same format of Binding.members.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logType": {
+          "description": "The log type that this config enables.",
+          "enum": [
+            "LOG_TYPE_UNSPECIFIED",
+            "ADMIN_READ",
+            "DATA_WRITE",
+            "DATA_READ"
+          ],
+          "enumDescriptions": [
+            "Default case. Should never be this.",
+            "Admin reads. Example: CloudIAM getIamPolicy",
+            "Data writes. Example: CloudSQL Users create",
+            "Data reads. Example: CloudSQL Users list"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "description": "Associates `members` with a `role`.",
+      "id": "Binding",
+      "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "The condition that is associated with this binding.\nNOTE: An unsatisfied condition will not allow user access via current\nbinding. Different bindings, including their conditions, are examined\nindependently."
+        },
+        "members": {
+          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@example.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n* `deleted:user:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a user that has been recently deleted. For\n   example, `alice@example.com?uid=123456789012345678901`. If the user is\n   recovered, this value reverts to `user:{emailid}` and the recovered user\n   retains the role in the binding.\n\n* `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address (plus\n   unique identifier) representing a service account that has been recently\n   deleted. For example,\n   `my-other-app@appspot.gserviceaccount.com?uid=123456789012345678901`.\n   If the service account is undeleted, this value reverts to\n   `serviceAccount:{emailid}` and the undeleted service account retains the\n   role in the binding.\n\n* `deleted:group:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a Google group that has been recently\n   deleted. For example, `admins@example.com?uid=123456789012345678901`. If\n   the group is recovered, this value reverts to `group:{emailid}` and the\n   recovered group retains the role in the binding.\n\n\n* `domain:{domain}`: The G Suite domain (primary) that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "role": {
+          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CheckConsistencyRequest": {
+      "description": "Request message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.CheckConsistency",
+      "id": "CheckConsistencyRequest",
+      "properties": {
+        "consistencyToken": {
+          "description": "The token created using GenerateConsistencyToken for the Table.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CheckConsistencyResponse": {
+      "description": "Response message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.CheckConsistency",
+      "id": "CheckConsistencyResponse",
+      "properties": {
+        "consistent": {
+          "description": "True only if the token is consistent. A token is consistent if replication\nhas caught up with the restrictions specified in the request.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Cluster": {
+      "description": "A resizable group of nodes in a particular cloud location, capable\nof serving all Tables in the parent\nInstance.",
+      "id": "Cluster",
+      "properties": {
+        "defaultStorageType": {
+          "description": "(`CreationOnly`)\nThe type of storage used by this cluster to serve its\nparent instance's tables, unless explicitly overridden.",
+          "enum": [
+            "STORAGE_TYPE_UNSPECIFIED",
+            "SSD",
+            "HDD"
+          ],
+          "enumDescriptions": [
+            "The user did not specify a storage type.",
+            "Flash (SSD) storage should be used.",
+            "Magnetic drive (HDD) storage should be used."
+          ],
+          "type": "string"
+        },
+        "location": {
+          "description": "(`CreationOnly`)\nThe location where this cluster's nodes and storage reside. For best\nperformance, clients should be located as close as possible to this\ncluster. Currently only zones are supported, so values should be of the\nform `projects/\u003cproject\u003e/locations/\u003czone\u003e`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "(`OutputOnly`)\nThe unique name of the cluster. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/clusters/a-z*`.",
+          "type": "string"
+        },
+        "serveNodes": {
+          "description": "The number of nodes allocated to this cluster. More nodes enable higher\nthroughput and more consistent performance.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "state": {
+          "description": "(`OutputOnly`)\nThe current state of the cluster.",
+          "enum": [
+            "STATE_NOT_KNOWN",
+            "READY",
+            "CREATING",
+            "RESIZING",
+            "DISABLED"
+          ],
+          "enumDescriptions": [
+            "The state of the cluster could not be determined.",
+            "The cluster has been successfully created and is ready to serve requests.",
+            "The cluster is currently being created, and may be destroyed\nif the creation process encounters an error.\nA cluster may not be able to serve requests while being created.",
+            "The cluster is currently being resized, and may revert to its previous\nnode count if the process encounters an error.\nA cluster is still capable of serving requests while being resized,\nbut may exhibit performance as if its number of allocated nodes is\nbetween the starting and requested states.",
+            "The cluster has no backing nodes. The data (tables) still\nexist, but no operations can be performed on the cluster."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ClusterState": {
+      "description": "The state of a table's data in a particular cluster.",
+      "id": "ClusterState",
+      "properties": {
+        "replicationState": {
+          "description": "Output only. The state of replication for the table in this cluster.",
+          "enum": [
+            "STATE_NOT_KNOWN",
+            "INITIALIZING",
+            "PLANNED_MAINTENANCE",
+            "UNPLANNED_MAINTENANCE",
+            "READY"
+          ],
+          "enumDescriptions": [
+            "The replication state of the table is unknown in this cluster.",
+            "The cluster was recently created, and the table must finish copying\nover pre-existing data from other clusters before it can begin\nreceiving live replication updates and serving Data API requests.",
+            "The table is temporarily unable to serve Data API requests from this\ncluster due to planned internal maintenance.",
+            "The table is temporarily unable to serve Data API requests from this\ncluster due to unplanned or emergency maintenance.",
+            "The table can serve Data API requests from this cluster. Depending on\nreplication delay, reads may not immediately reflect the state of the\ntable in other clusters."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ColumnFamily": {
+      "description": "A set of columns within a table which share a common configuration.",
+      "id": "ColumnFamily",
+      "properties": {
+        "gcRule": {
+          "$ref": "GcRule",
+          "description": "Garbage collection rule specified as a protobuf.\nMust serialize to at most 500 bytes.\n\nNOTE: Garbage collection executes opportunistically in the background, and\nso it's possible for reads to return a cell even if it matches the active\nGC expression for its family."
+        }
+      },
+      "type": "object"
+    },
+    "CreateClusterMetadata": {
+      "description": "The metadata for the Operation returned by CreateCluster.",
+      "id": "CreateClusterMetadata",
+      "properties": {
+        "finishTime": {
+          "description": "The time at which the operation failed or was completed successfully.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "originalRequest": {
+          "$ref": "CreateClusterRequest",
+          "description": "The request that prompted the initiation of this CreateCluster operation."
+        },
+        "requestTime": {
+          "description": "The time at which the original request was received.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "tables": {
+          "additionalProperties": {
+            "$ref": "TableProgress"
+          },
+          "description": "Keys: the full `name` of each table that existed in the instance when\nCreateCluster was first called, i.e.\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/\u003ctable\u003e`. Any table added\nto the instance by a later API call will be created in the new cluster by\nthat API call, not this one.\n\nValues: information on how much of a table's data has been copied to the\nnewly-created cluster so far.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "CreateClusterRequest": {
+      "description": "Request message for BigtableInstanceAdmin.CreateCluster.",
+      "id": "CreateClusterRequest",
+      "properties": {
+        "cluster": {
+          "$ref": "Cluster",
+          "description": "The cluster to be created.\nFields marked `OutputOnly` must be left blank."
+        },
+        "clusterId": {
+          "description": "The ID to be used when referring to the new cluster within its instance,\ne.g., just `mycluster` rather than\n`projects/myproject/instances/myinstance/clusters/mycluster`.",
+          "type": "string"
+        },
+        "parent": {
+          "description": "The unique name of the instance in which to create the new cluster.\nValues are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CreateInstanceMetadata": {
+      "description": "The metadata for the Operation returned by CreateInstance.",
+      "id": "CreateInstanceMetadata",
+      "properties": {
+        "finishTime": {
+          "description": "The time at which the operation failed or was completed successfully.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "originalRequest": {
+          "$ref": "CreateInstanceRequest",
+          "description": "The request that prompted the initiation of this CreateInstance operation."
+        },
+        "requestTime": {
+          "description": "The time at which the original request was received.",
+          "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CreateInstanceRequest": {
+      "description": "Request message for BigtableInstanceAdmin.CreateInstance.",
+      "id": "CreateInstanceRequest",
+      "properties": {
+        "clusters": {
+          "additionalProperties": {
+            "$ref": "Cluster"
+          },
+          "description": "The clusters to be created within the instance, mapped by desired\ncluster ID, e.g., just `mycluster` rather than\n`projects/myproject/instances/myinstance/clusters/mycluster`.\nFields marked `OutputOnly` must be left blank.\nCurrently, at most four clusters can be specified.",
+          "type": "object"
+        },
+        "instance": {
+          "$ref": "Instance",
+          "description": "The instance to create.\nFields marked `OutputOnly` must be left blank."
+        },
+        "instanceId": {
+          "description": "The ID to be used when referring to the new instance within its project,\ne.g., just `myinstance` rather than\n`projects/myproject/instances/myinstance`.",
+          "type": "string"
+        },
+        "parent": {
+          "description": "The unique name of the project in which to create the new instance.\nValues are of the form `projects/\u003cproject\u003e`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CreateTableRequest": {
+      "description": "Request message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.CreateTable",
+      "id": "CreateTableRequest",
+      "properties": {
+        "initialSplits": {
+          "description": "The optional list of row keys that will be used to initially split the\ntable into several tablets (tablets are similar to HBase regions).\nGiven two split keys, `s1` and `s2`, three tablets will be created,\nspanning the key ranges: `[, s1), [s1, s2), [s2, )`.\n\nExample:\n\n* Row keys := `[\"a\", \"apple\", \"custom\", \"customer_1\", \"customer_2\",`\n               `\"other\", \"zz\"]`\n* initial_split_keys := `[\"apple\", \"customer_1\", \"customer_2\", \"other\"]`\n* Key assignment:\n    - Tablet 1 `[, apple)                =\u003e {\"a\"}.`\n    - Tablet 2 `[apple, customer_1)      =\u003e {\"apple\", \"custom\"}.`\n    - Tablet 3 `[customer_1, customer_2) =\u003e {\"customer_1\"}.`\n    - Tablet 4 `[customer_2, other)      =\u003e {\"customer_2\"}.`\n    - Tablet 5 `[other, )                =\u003e {\"other\", \"zz\"}.`",
+          "items": {
+            "$ref": "Split"
+          },
+          "type": "array"
+        },
+        "table": {
+          "$ref": "Table",
+          "description": "The Table to create."
+        },
+        "tableId": {
+          "description": "The name by which the new table should be referred to within the parent\ninstance, e.g., `foobar` rather than `\u003cparent\u003e/tables/foobar`.\nMaximum 50 characters.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DropRowRangeRequest": {
+      "description": "Request message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.DropRowRange",
+      "id": "DropRowRangeRequest",
+      "properties": {
+        "deleteAllDataFromTable": {
+          "description": "Delete all rows in the table. Setting this to false is a no-op.",
+          "type": "boolean"
+        },
+        "rowKeyPrefix": {
+          "description": "Delete all rows that start with this row key prefix. Prefix cannot be\nzero length.",
+          "format": "byte",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Empty": {
+      "description": "A generic empty message that you can re-use to avoid defining duplicated\nempty messages in your APIs. A typical example is to use it as the request\nor the response type of an API method. For instance:\n\n    service Foo {\n      rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n    }\n\nThe JSON representation for `Empty` is empty JSON object `{}`.",
+      "id": "Empty",
+      "properties": {},
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information.",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GcRule": {
+      "description": "Rule for determining which cells to delete during garbage collection.",
+      "id": "GcRule",
+      "properties": {
+        "intersection": {
+          "$ref": "Intersection",
+          "description": "Delete cells that would be deleted by every nested rule."
+        },
+        "maxAge": {
+          "description": "Delete cells in a column older than the given age.\nValues must be at least one millisecond, and will be truncated to\nmicrosecond granularity.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "maxNumVersions": {
+          "description": "Delete all cells in a column except the most recent N.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "union": {
+          "$ref": "Union",
+          "description": "Delete cells that would be deleted by any nested rule."
+        }
+      },
+      "type": "object"
+    },
+    "GenerateConsistencyTokenRequest": {
+      "description": "Request message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.GenerateConsistencyToken",
+      "id": "GenerateConsistencyTokenRequest",
+      "properties": {},
+      "type": "object"
+    },
+    "GenerateConsistencyTokenResponse": {
+      "description": "Response message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.GenerateConsistencyToken",
+      "id": "GenerateConsistencyTokenResponse",
+      "properties": {
+        "consistencyToken": {
+          "description": "The generated consistency token.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GetIamPolicyRequest": {
+      "description": "Request message for `GetIamPolicy` method.",
+      "id": "GetIamPolicyRequest",
+      "properties": {
+        "options": {
+          "$ref": "GetPolicyOptions",
+          "description": "OPTIONAL: A `GetPolicyOptions` object for specifying options to\n`GetIamPolicy`. This field is only used by Cloud IAM."
+        }
+      },
+      "type": "object"
+    },
+    "GetPolicyOptions": {
+      "description": "Encapsulates settings provided to GetIamPolicy.",
+      "id": "GetPolicyOptions",
+      "properties": {
+        "requestedPolicyVersion": {
+          "description": "Optional. The policy format version to be returned.\n\nValid values are 0, 1, and 3. Requests specifying an invalid value will be\nrejected.\n\nRequests for policies with any conditional bindings must specify version 3.\nPolicies without any conditional bindings may specify any valid value or\nleave the field unset.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Instance": {
+      "description": "A collection of Bigtable Tables and\nthe resources that serve them.\nAll tables in an instance are served from all\nClusters in the instance.",
+      "id": "Instance",
+      "properties": {
+        "displayName": {
+          "description": "The descriptive name for this instance as it appears in UIs.\nCan be changed at any time, but should be kept globally unique\nto avoid confusion.",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels are a flexible and lightweight mechanism for organizing cloud\nresources into groups that reflect a customer's organizational needs and\ndeployment strategies. They can be used to filter resources and aggregate\nmetrics.\n\n* Label keys must be between 1 and 63 characters long and must conform to\n  the regular expression: `\\p{Ll}\\p{Lo}{0,62}`.\n* Label values must be between 0 and 63 characters long and must conform to\n  the regular expression: `[\\p{Ll}\\p{Lo}\\p{N}_-]{0,63}`.\n* No more than 64 labels can be associated with a given resource.\n* Keys and values must both be under 128 bytes.",
+          "type": "object"
+        },
+        "name": {
+          "description": "(`OutputOnly`)\nThe unique name of the instance. Values are of the form\n`projects/\u003cproject\u003e/instances/a-z+[a-z0-9]`.",
+          "type": "string"
+        },
+        "state": {
+          "description": "(`OutputOnly`)\nThe current state of the instance.",
+          "enum": [
+            "STATE_NOT_KNOWN",
+            "READY",
+            "CREATING"
+          ],
+          "enumDescriptions": [
+            "The state of the instance could not be determined.",
+            "The instance has been successfully created and can serve requests\nto its tables.",
+            "The instance is currently being created, and may be destroyed\nif the creation process encounters an error."
+          ],
+          "type": "string"
+        },
+        "type": {
+          "description": "The type of the instance. Defaults to `PRODUCTION`.",
+          "enum": [
+            "TYPE_UNSPECIFIED",
+            "PRODUCTION",
+            "DEVELOPMENT"
+          ],
+          "enumDescriptions": [
+            "The type of the instance is unspecified. If set when creating an\ninstance, a `PRODUCTION` instance will be created. If set when updating\nan instance, the type will be left unchanged.",
+            "An instance meant for production use. `serve_nodes` must be set\non the cluster.",
+            "The instance is meant for development and testing purposes only; it has\nno performance or uptime guarantees and is not covered by SLA.\nAfter a development instance is created, it can be upgraded by\nupdating the instance to type `PRODUCTION`. An instance created\nas a production instance cannot be changed to a development instance.\nWhen creating a development instance, `serve_nodes` on the cluster must\nnot be set."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Intersection": {
+      "description": "A GcRule which deletes cells matching all of the given rules.",
+      "id": "Intersection",
+      "properties": {
+        "rules": {
+          "description": "Only delete cells which would be deleted by every element of `rules`.",
+          "items": {
+            "$ref": "GcRule"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListAppProfilesResponse": {
+      "description": "Response message for BigtableInstanceAdmin.ListAppProfiles.",
+      "id": "ListAppProfilesResponse",
+      "properties": {
+        "appProfiles": {
+          "description": "The list of requested app profiles.",
+          "items": {
+            "$ref": "AppProfile"
+          },
+          "type": "array"
+        },
+        "failedLocations": {
+          "description": "Locations from which AppProfile information could not be retrieved,\ndue to an outage or some other transient condition.\nAppProfiles from these locations may be missing from `app_profiles`.\nValues are of the form `projects/\u003cproject\u003e/locations/\u003czone_id\u003e`",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "Set if not all app profiles could be returned in a single response.\nPass this value to `page_token` in another request to get the next\npage of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListClustersResponse": {
+      "description": "Response message for BigtableInstanceAdmin.ListClusters.",
+      "id": "ListClustersResponse",
+      "properties": {
+        "clusters": {
+          "description": "The list of requested clusters.",
+          "items": {
+            "$ref": "Cluster"
+          },
+          "type": "array"
+        },
+        "failedLocations": {
+          "description": "Locations from which Cluster information could not be retrieved,\ndue to an outage or some other transient condition.\nClusters from these locations may be missing from `clusters`,\nor may only have partial information returned.\nValues are of the form `projects/\u003cproject\u003e/locations/\u003czone_id\u003e`",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "DEPRECATED: This field is unused and ignored.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListInstancesResponse": {
+      "description": "Response message for BigtableInstanceAdmin.ListInstances.",
+      "id": "ListInstancesResponse",
+      "properties": {
+        "failedLocations": {
+          "description": "Locations from which Instance information could not be retrieved,\ndue to an outage or some other transient condition.\nInstances whose Clusters are all in one of the failed locations\nmay be missing from `instances`, and Instances with at least one\nCluster in a failed location may only have partial information returned.\nValues are of the form `projects/\u003cproject\u003e/locations/\u003czone_id\u003e`",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "instances": {
+          "description": "The list of requested instances.",
+          "items": {
+            "$ref": "Instance"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "DEPRECATED: This field is unused and ignored.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListLocationsResponse": {
+      "description": "The response message for Locations.ListLocations.",
+      "id": "ListLocationsResponse",
+      "properties": {
+        "locations": {
+          "description": "A list of locations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Location"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ListOperationsResponse": {
+      "description": "The response message for Operations.ListOperations.",
+      "id": "ListOperationsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "The standard List next-page token.",
+          "type": "string"
+        },
+        "operations": {
+          "description": "A list of operations that matches the specified filter in the request.",
+          "items": {
+            "$ref": "Operation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListTablesResponse": {
+      "description": "Response message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.ListTables",
+      "id": "ListTablesResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Set if not all tables could be returned in a single response.\nPass this value to `page_token` in another request to get the next\npage of results.",
+          "type": "string"
+        },
+        "tables": {
+          "description": "The tables present in the requested instance.",
+          "items": {
+            "$ref": "Table"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Location": {
+      "description": "A resource that represents Google Cloud Platform location.",
+      "id": "Location",
+      "properties": {
+        "displayName": {
+          "description": "The friendly name for this location, typically a nearby city name.\nFor example, \"Tokyo\".",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Cross-service attributes for the location. For example\n\n    {\"cloud.googleapis.com/region\": \"us-east1\"}",
+          "type": "object"
+        },
+        "locationId": {
+          "description": "The canonical id for this location. For example: `\"us-east1\"`.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata. For example the available capacity at the given\nlocation.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Resource name for the location, which may vary between implementations.\nFor example: `\"projects/example-project/locations/us-east1\"`",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Modification": {
+      "description": "A create, update, or delete of a particular column family.",
+      "id": "Modification",
+      "properties": {
+        "create": {
+          "$ref": "ColumnFamily",
+          "description": "Create a new column family with the specified schema, or fail if\none already exists with the given ID."
+        },
+        "drop": {
+          "description": "Drop (delete) the column family with the given ID, or fail if no such\nfamily exists.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "The ID of the column family to be modified.",
+          "type": "string"
+        },
+        "update": {
+          "$ref": "ColumnFamily",
+          "description": "Update an existing column family to the specified schema, or fail\nif no column family exists with the given ID."
+        }
+      },
+      "type": "object"
+    },
+    "ModifyColumnFamiliesRequest": {
+      "description": "Request message for\ngoogle.bigtable.admin.v2.BigtableTableAdmin.ModifyColumnFamilies",
+      "id": "ModifyColumnFamiliesRequest",
+      "properties": {
+        "modifications": {
+          "description": "Modifications to be atomically applied to the specified table's families.\nEntries are applied in order, meaning that earlier modifications can be\nmasked by later ones (in the case of repeated updates to the same family,\nfor example).",
+          "items": {
+            "$ref": "Modification"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "MultiClusterRoutingUseAny": {
+      "description": "Read/write requests are routed to the nearest cluster in the instance, and\nwill fail over to the nearest cluster that is available in the event of\ntransient errors or delays. Clusters in a region are considered\nequidistant. Choosing this option sacrifices read-your-writes consistency\nto improve availability.",
+      "id": "MultiClusterRoutingUseAny",
+      "properties": {},
+      "type": "object"
+    },
+    "Operation": {
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call.",
+      "id": "Operation",
+      "properties": {
+        "done": {
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable.",
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`.",
+          "type": "string"
+        },
+        "response": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The normal response of the operation in case of success.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "PartialUpdateInstanceRequest": {
+      "description": "Request message for BigtableInstanceAdmin.PartialUpdateInstance.",
+      "id": "PartialUpdateInstanceRequest",
+      "properties": {
+        "instance": {
+          "$ref": "Instance",
+          "description": "The Instance which will (partially) replace the current value."
+        },
+        "updateMask": {
+          "description": "The subset of Instance fields which should be replaced.\nMust be explicitly set.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Policy": {
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Google Cloud resources.\n\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members` to a single `role`. Members can be user accounts, service accounts,\nGoogle groups, and domains (such as G Suite). A `role` is a named list of\npermissions; each `role` can be an IAM predefined role or a user-created\ncustom role.\n\nOptionally, a `binding` can specify a `condition`, which is a logical\nexpression that allows access to a resource only if the expression evaluates\nto `true`. A condition can add constraints based on attributes of the\nrequest, the resource, or both.\n\n**JSON example:**\n\n    {\n      \"bindings\": [\n        {\n          \"role\": \"roles/resourcemanager.organizationAdmin\",\n          \"members\": [\n            \"user:mike@example.com\",\n            \"group:admins@example.com\",\n            \"domain:google.com\",\n            \"serviceAccount:my-project-id@appspot.gserviceaccount.com\"\n          ]\n        },\n        {\n          \"role\": \"roles/resourcemanager.organizationViewer\",\n          \"members\": [\"user:eve@example.com\"],\n          \"condition\": {\n            \"title\": \"expirable access\",\n            \"description\": \"Does not grant access after Sep 2020\",\n            \"expression\": \"request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\",\n          }\n        }\n      ],\n      \"etag\": \"BwWWja0YfJA=\",\n      \"version\": 3\n    }\n\n**YAML example:**\n\n    bindings:\n    - members:\n      - user:mike@example.com\n      - group:admins@example.com\n      - domain:google.com\n      - serviceAccount:my-project-id@appspot.gserviceaccount.com\n      role: roles/resourcemanager.organizationAdmin\n    - members:\n      - user:eve@example.com\n      role: roles/resourcemanager.organizationViewer\n      condition:\n        title: expirable access\n        description: Does not grant access after Sep 2020\n        expression: request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\n    - etag: BwWWja0YfJA=\n    - version: 3\n\nFor a description of IAM and its features, see the\n[IAM documentation](https://cloud.google.com/iam/docs/).",
+      "id": "Policy",
+      "properties": {
+        "auditConfigs": {
+          "description": "Specifies cloud audit logging configuration for this policy.",
+          "items": {
+            "$ref": "AuditConfig"
+          },
+          "type": "array"
+        },
+        "bindings": {
+          "description": "Associates a list of `members` to a `role`. Optionally, may specify a\n`condition` that determines how and when the `bindings` are applied. Each\nof the `bindings` must contain at least one member.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy.\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.",
+          "format": "byte",
+          "type": "string"
+        },
+        "version": {
+          "description": "Specifies the format of the policy.\n\nValid values are `0`, `1`, and `3`. Requests that specify an invalid value\nare rejected.\n\nAny operation that affects conditional role bindings must specify version\n`3`. This requirement applies to the following operations:\n\n* Getting a policy that includes a conditional role binding\n* Adding a conditional role binding to a policy\n* Changing a conditional role binding in a policy\n* Removing any role binding, with or without a condition, from a policy\n  that includes conditions\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.\n\nIf a policy does not include any conditions, operations on that policy may\nspecify any valid version or leave the field unset.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "SetIamPolicyRequest": {
+      "description": "Request message for `SetIamPolicy` method.",
+      "id": "SetIamPolicyRequest",
+      "properties": {
+        "policy": {
+          "$ref": "Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Cloud Platform services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "description": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:\npaths: \"bindings, etag\"\nThis field is only used by Cloud IAM.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SingleClusterRouting": {
+      "description": "Unconditionally routes all read/write requests to a specific cluster.\nThis option preserves read-your-writes consistency but does not improve\navailability.",
+      "id": "SingleClusterRouting",
+      "properties": {
+        "allowTransactionalWrites": {
+          "description": "Whether or not `CheckAndMutateRow` and `ReadModifyWriteRow` requests are\nallowed by this app profile. It is unsafe to send these requests to\nthe same table/row/column in multiple clusters.",
+          "type": "boolean"
+        },
+        "clusterId": {
+          "description": "The cluster to which read/write requests should be routed.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Split": {
+      "description": "An initial split point for a newly created table.",
+      "id": "Split",
+      "properties": {
+        "key": {
+          "description": "Row key to use as an initial tablet boundary.",
+          "format": "byte",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors).",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use.",
+          "items": {
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\ngoogle.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Table": {
+      "description": "A collection of user data indexed by row, column, and timestamp.\nEach table is served using the resources of its parent cluster.",
+      "id": "Table",
+      "properties": {
+        "clusterStates": {
+          "additionalProperties": {
+            "$ref": "ClusterState"
+          },
+          "description": "Output only. Map from cluster ID to per-cluster table state.\nIf it could not be determined whether or not the table has data in a\nparticular cluster (for example, if its zone is unavailable), then\nthere will be an entry for the cluster with UNKNOWN `replication_status`.\nViews: `REPLICATION_VIEW`, `FULL`",
+          "type": "object"
+        },
+        "columnFamilies": {
+          "additionalProperties": {
+            "$ref": "ColumnFamily"
+          },
+          "description": "(`CreationOnly`)\nThe column families configured for this table, mapped by column family ID.\nViews: `SCHEMA_VIEW`, `FULL`",
+          "type": "object"
+        },
+        "granularity": {
+          "description": "(`CreationOnly`)\nThe granularity (i.e. `MILLIS`) at which timestamps are stored in\nthis table. Timestamps not matching the granularity will be rejected.\nIf unspecified at creation time, the value will be set to `MILLIS`.\nViews: `SCHEMA_VIEW`, `FULL`.",
+          "enum": [
+            "TIMESTAMP_GRANULARITY_UNSPECIFIED",
+            "MILLIS"
+          ],
+          "enumDescriptions": [
+            "The user did not specify a granularity. Should not be returned.\nWhen specified during table creation, MILLIS will be used.",
+            "The table keeps data versioned at a granularity of 1ms."
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "Output only. The unique name of the table. Values are of the form\n`projects/\u003cproject\u003e/instances/\u003cinstance\u003e/tables/_a-zA-Z0-9*`.\nViews: `NAME_ONLY`, `SCHEMA_VIEW`, `REPLICATION_VIEW`, `FULL`",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TableProgress": {
+      "description": "Progress info for copying a table's data to the new cluster.",
+      "id": "TableProgress",
+      "properties": {
+        "estimatedCopiedBytes": {
+          "description": "Estimate of the number of bytes copied so far for this table.\nThis will eventually reach 'estimated_size_bytes' unless the table copy\nis CANCELLED.",
+          "format": "int64",
+          "type": "string"
+        },
+        "estimatedSizeBytes": {
+          "description": "Estimate of the size of the table to be copied.",
+          "format": "int64",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "PENDING",
+            "COPYING",
+            "COMPLETED",
+            "CANCELLED"
+          ],
+          "enumDescriptions": [
+            "",
+            "The table has not yet begun copying to the new cluster.",
+            "The table is actively being copied to the new cluster.",
+            "The table has been fully copied to the new cluster.",
+            "The table was deleted before it finished copying to the new cluster.\nNote that tables deleted after completion will stay marked as\nCOMPLETED, not CANCELLED."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsRequest": {
+      "description": "Request message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsRequest",
+      "properties": {
+        "permissions": {
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsResponse": {
+      "description": "Response message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsResponse",
+      "properties": {
+        "permissions": {
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Union": {
+      "description": "A GcRule which deletes cells matching any of the given rules.",
+      "id": "Union",
+      "properties": {
+        "rules": {
+          "description": "Delete cells which would be deleted by any element of `rules`.",
+          "items": {
+            "$ref": "GcRule"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "UpdateAppProfileMetadata": {
+      "description": "The metadata for the Operation returned by UpdateAppProfile.",
+      "id": "UpdateAppProfileMetadata",
+      "properties": {},
+      "type": "object"
+    },
+    "UpdateClusterMetadata": {
+      "description": "The metadata for the Operation returned by UpdateCluster.",
+      "id": "UpdateClusterMetadata",
+      "properties": {
+        "finishTime": {
+          "description": "The time at which the operation failed or was completed successfully.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "originalRequest": {
+          "$ref": "Cluster",
+          "description": "The request that prompted the initiation of this UpdateCluster operation."
+        },
+        "requestTime": {
+          "description": "The time at which the original request was received.",
+          "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UpdateInstanceMetadata": {
+      "description": "The metadata for the Operation returned by UpdateInstance.",
+      "id": "UpdateInstanceMetadata",
+      "properties": {
+        "finishTime": {
+          "description": "The time at which the operation failed or was completed successfully.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "originalRequest": {
+          "$ref": "PartialUpdateInstanceRequest",
+          "description": "The request that prompted the initiation of this UpdateInstance operation."
+        },
+        "requestTime": {
+          "description": "The time at which the original request was received.",
+          "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Bigtable Admin API",
+  "version": "v2",
+  "version_module": true
+}

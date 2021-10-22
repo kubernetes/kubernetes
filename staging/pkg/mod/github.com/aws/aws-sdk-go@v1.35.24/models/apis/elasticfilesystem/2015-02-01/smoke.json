@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeFileSystems",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DeleteFileSystem",
+            "input": {
+                "FileSystemId": "fs-c5a1446c"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

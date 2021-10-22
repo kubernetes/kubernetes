@@ -1,0 +1,477 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/activity": {
+          "description": "View the activity history of your Google apps"
+        }
+      }
+    }
+  },
+  "basePath": "/appsactivity/v1/",
+  "baseUrl": "https://www.googleapis.com/appsactivity/v1/",
+  "batchPath": "batch/appsactivity/v1",
+  "description": "Provides a historical view of activity.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/google-apps/activity/",
+  "etag": "\"u9GIe6H63LSGq-9_t39K2Zx_EAc/EPm-mIaUlffEieKph-AEYsz0i8Y\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "appsactivity:v1",
+  "kind": "discovery#restDescription",
+  "name": "appsactivity",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "activities": {
+      "methods": {
+        "list": {
+          "description": "Returns a list of activities visible to the current logged in user. Visible activities are determined by the visibility settings of the object that was acted on, e.g. Drive files a user can see. An activity is a record of past events. Multiple events may be merged if they are similar. A request is scoped to activities from a given Google service using the source parameter.",
+          "httpMethod": "GET",
+          "id": "appsactivity.activities.list",
+          "parameters": {
+            "drive.ancestorId": {
+              "description": "Identifies the Drive folder containing the items for which to return activities.",
+              "location": "query",
+              "type": "string"
+            },
+            "drive.fileId": {
+              "description": "Identifies the Drive item to return activities for.",
+              "location": "query",
+              "type": "string"
+            },
+            "groupingStrategy": {
+              "default": "driveUi",
+              "description": "Indicates the strategy to use when grouping singleEvents items in the associated combinedEvent object.",
+              "enum": [
+                "driveUi",
+                "none"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "pageSize": {
+              "default": "50",
+              "description": "The maximum number of events to return on a page. The response includes a continuation token if there are more events.",
+              "format": "int32",
+              "location": "query",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "A token to retrieve a specific page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "source": {
+              "description": "The Google service from which to return activities. Possible values of source are: \n- drive.google.com",
+              "location": "query",
+              "type": "string"
+            },
+            "userId": {
+              "default": "me",
+              "description": "The ID used for ACL checks (does not filter the resulting event list by the assigned value). Use the special value me to indicate the currently authenticated user.",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "activities",
+          "response": {
+            "$ref": "ListActivitiesResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/activity"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20200128",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "Activity": {
+      "description": "An Activity resource is a combined view of multiple events. An activity has a list of individual events and a combined view of the common fields among all events.",
+      "id": "Activity",
+      "properties": {
+        "combinedEvent": {
+          "$ref": "Event",
+          "description": "The fields common to all of the singleEvents that make up the Activity."
+        },
+        "singleEvents": {
+          "description": "A list of all the Events that make up the Activity.",
+          "items": {
+            "$ref": "Event"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Event": {
+      "description": "Represents the changes associated with an action taken by a user.",
+      "id": "Event",
+      "properties": {
+        "additionalEventTypes": {
+          "description": "Additional event types. Some events may have multiple types when multiple actions are part of a single event. For example, creating a document, renaming it, and sharing it may be part of a single file-creation event.",
+          "items": {
+            "enum": [
+              "comment",
+              "create",
+              "edit",
+              "emptyTrash",
+              "move",
+              "permissionChange",
+              "rename",
+              "trash",
+              "unknown",
+              "untrash",
+              "upload"
+            ],
+            "enumDescriptions": [
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              ""
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "eventTimeMillis": {
+          "description": "The time at which the event occurred formatted as Unix time in milliseconds.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "fromUserDeletion": {
+          "description": "Whether this event is caused by a user being deleted.",
+          "type": "boolean"
+        },
+        "move": {
+          "$ref": "Move",
+          "description": "Extra information for move type events, such as changes in an object's parents."
+        },
+        "permissionChanges": {
+          "description": "Extra information for permissionChange type events, such as the user or group the new permission applies to.",
+          "items": {
+            "$ref": "PermissionChange"
+          },
+          "type": "array"
+        },
+        "primaryEventType": {
+          "description": "The main type of event that occurred.",
+          "enum": [
+            "comment",
+            "create",
+            "edit",
+            "emptyTrash",
+            "move",
+            "permissionChange",
+            "rename",
+            "trash",
+            "unknown",
+            "untrash",
+            "upload"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        },
+        "rename": {
+          "$ref": "Rename",
+          "description": "Extra information for rename type events, such as the old and new names."
+        },
+        "target": {
+          "$ref": "Target",
+          "description": "Information specific to the Target object modified by the event."
+        },
+        "user": {
+          "$ref": "User",
+          "description": "Represents the user responsible for the event."
+        }
+      },
+      "type": "object"
+    },
+    "ListActivitiesResponse": {
+      "description": "The response from the list request. Contains a list of activities and a token to retrieve the next page of results.",
+      "id": "ListActivitiesResponse",
+      "properties": {
+        "activities": {
+          "description": "List of activities.",
+          "items": {
+            "$ref": "Activity"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "Token for the next page of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Move": {
+      "description": "Contains information about changes in an object's parents as a result of a move type event.",
+      "id": "Move",
+      "properties": {
+        "addedParents": {
+          "description": "The added parent(s).",
+          "items": {
+            "$ref": "Parent"
+          },
+          "type": "array"
+        },
+        "removedParents": {
+          "description": "The removed parent(s).",
+          "items": {
+            "$ref": "Parent"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Parent": {
+      "description": "Contains information about a parent object. For example, a folder in Drive is a parent for all files within it.",
+      "id": "Parent",
+      "properties": {
+        "id": {
+          "description": "The parent's ID.",
+          "type": "string"
+        },
+        "isRoot": {
+          "description": "Whether this is the root folder.",
+          "type": "boolean"
+        },
+        "title": {
+          "description": "The parent's title.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Permission": {
+      "description": "Contains information about the permissions and type of access allowed with regards to a Google Drive object. This is a subset of the fields contained in a corresponding Drive Permissions object.",
+      "id": "Permission",
+      "properties": {
+        "name": {
+          "description": "The name of the user or group the permission applies to.",
+          "type": "string"
+        },
+        "permissionId": {
+          "description": "The ID for this permission. Corresponds to the Drive API's permission ID returned as part of the Drive Permissions resource.",
+          "type": "string"
+        },
+        "role": {
+          "description": "Indicates the Google Drive permissions role. The role determines a user's ability to read, write, or comment on the file.",
+          "enum": [
+            "commenter",
+            "fileOrganizer",
+            "owner",
+            "publishedReader",
+            "reader",
+            "writer"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        },
+        "type": {
+          "description": "Indicates how widely permissions are granted.",
+          "enum": [
+            "anyone",
+            "domain",
+            "group",
+            "user"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        },
+        "user": {
+          "$ref": "User",
+          "description": "The user's information if the type is USER."
+        },
+        "withLink": {
+          "description": "Whether the permission requires a link to the file.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "PermissionChange": {
+      "description": "Contains information about a Drive object's permissions that changed as a result of a permissionChange type event.",
+      "id": "PermissionChange",
+      "properties": {
+        "addedPermissions": {
+          "description": "Lists all Permission objects added.",
+          "items": {
+            "$ref": "Permission"
+          },
+          "type": "array"
+        },
+        "removedPermissions": {
+          "description": "Lists all Permission objects removed.",
+          "items": {
+            "$ref": "Permission"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Photo": {
+      "description": "Photo information for a user.",
+      "id": "Photo",
+      "properties": {
+        "url": {
+          "description": "The URL of the photo.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Rename": {
+      "description": "Contains information about a renametype event.",
+      "id": "Rename",
+      "properties": {
+        "newTitle": {
+          "description": "The new title.",
+          "type": "string"
+        },
+        "oldTitle": {
+          "description": "The old title.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Target": {
+      "description": "Information about the object modified by the event.",
+      "id": "Target",
+      "properties": {
+        "id": {
+          "description": "The ID of the target. For example, in Google Drive, this is the file or folder ID.",
+          "type": "string"
+        },
+        "mimeType": {
+          "description": "The MIME type of the target.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the target. For example, in Google Drive, this is the title of the file.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "User": {
+      "description": "A representation of a user.",
+      "id": "User",
+      "properties": {
+        "isDeleted": {
+          "description": "A boolean which indicates whether the specified User was deleted. If true, name, photo and permission_id will be omitted.",
+          "type": "boolean"
+        },
+        "isMe": {
+          "description": "Whether the user is the authenticated user.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The displayable name of the user.",
+          "type": "string"
+        },
+        "permissionId": {
+          "description": "The permission ID associated with this user. Equivalent to the Drive API's permission ID for this user, returned as part of the Drive Permissions resource.",
+          "type": "string"
+        },
+        "photo": {
+          "$ref": "Photo",
+          "description": "The profile photo of the user. Not present if the user has no profile photo."
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "appsactivity/v1/",
+  "title": "Drive Activity API",
+  "version": "v1"
+}

@@ -1,0 +1,29 @@
+{
+  "pagination": {
+    "GetInstancesHealthStatus": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListInstances": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListNamespaces": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListOperations": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListServices": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

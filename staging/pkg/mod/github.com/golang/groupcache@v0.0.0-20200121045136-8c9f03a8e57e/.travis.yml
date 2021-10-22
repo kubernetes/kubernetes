@@ -1,0 +1,19 @@
+language: go
+go_import_path: github.com/golang/groupcache
+
+os: linux
+dist: trusty
+sudo: false
+
+script:
+  - go test ./...
+
+go:
+  - 1.9.x
+  - 1.10.x
+  - 1.11.x
+  - master
+
+cache:
+  directories:
+    - $GOPATH/pkg

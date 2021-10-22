@@ -1,0 +1,17 @@
+rebaseMergeAllowed: true
+squashMergeAllowed: true
+mergeCommitAllowed: false
+branchProtectionRules:
+- pattern: master
+  isAdminEnforced: true
+  requiredStatusCheckContexts:
+    - 'continuous-integration/travis-ci'
+    - 'cla/google'
+  requiredApprovingReviewCount: 1
+  requiresCodeOwnerReviews: true
+  requiresStrictStatusChecks: true
+permissionRules:
+  - team: actools
+    permission: admin
+  - team: gnostic
+    permission: admin

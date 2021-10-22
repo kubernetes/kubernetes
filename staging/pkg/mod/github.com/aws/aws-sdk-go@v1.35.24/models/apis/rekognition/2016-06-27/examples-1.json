@@ -1,0 +1,651 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CompareFaces": [
+      {
+        "input": {
+          "SimilarityThreshold": 90,
+          "SourceImage": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "mysourceimage"
+            }
+          },
+          "TargetImage": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "mytargetimage"
+            }
+          }
+        },
+        "output": {
+          "FaceMatches": [
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.33481481671333313,
+                  "Left": 0.31888890266418457,
+                  "Top": 0.4933333396911621,
+                  "Width": 0.25
+                },
+                "Confidence": 99.9991226196289
+              },
+              "Similarity": 100
+            }
+          ],
+          "SourceImageFace": {
+            "BoundingBox": {
+              "Height": 0.33481481671333313,
+              "Left": 0.31888890266418457,
+              "Top": 0.4933333396911621,
+              "Width": 0.25
+            },
+            "Confidence": 99.9991226196289
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation compares the largest face detected in the source image with each face detected in the target image.",
+        "id": "to-compare-two-images-1482181985581",
+        "title": "To compare two images"
+      }
+    ],
+    "CreateCollection": [
+      {
+        "input": {
+          "CollectionId": "myphotos"
+        },
+        "output": {
+          "CollectionArn": "aws:rekognition:us-west-2:123456789012:collection/myphotos",
+          "StatusCode": 200
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation creates a Rekognition collection for storing image data.",
+        "id": "to-create-a-collection-1481833313674",
+        "title": "To create a collection"
+      }
+    ],
+    "DeleteCollection": [
+      {
+        "input": {
+          "CollectionId": "myphotos"
+        },
+        "output": {
+          "StatusCode": 200
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes a Rekognition collection.",
+        "id": "to-delete-a-collection-1481838179973",
+        "title": "To delete a collection"
+      }
+    ],
+    "DeleteFaces": [
+      {
+        "input": {
+          "CollectionId": "myphotos",
+          "FaceIds": [
+            "ff43d742-0c13-5d16-a3e8-03d3f58e980b"
+          ]
+        },
+        "output": {
+          "DeletedFaces": [
+            "ff43d742-0c13-5d16-a3e8-03d3f58e980b"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes one or more faces from a Rekognition collection.",
+        "id": "to-delete-a-face-1482182799377",
+        "title": "To delete a face"
+      }
+    ],
+    "DetectFaces": [
+      {
+        "input": {
+          "Image": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "myphoto"
+            }
+          }
+        },
+        "output": {
+          "FaceDetails": [
+            {
+              "BoundingBox": {
+                "Height": 0.18000000715255737,
+                "Left": 0.5555555820465088,
+                "Top": 0.33666667342185974,
+                "Width": 0.23999999463558197
+              },
+              "Confidence": 100,
+              "Landmarks": [
+                {
+                  "Type": "eyeLeft",
+                  "X": 0.6394737362861633,
+                  "Y": 0.40819624066352844
+                },
+                {
+                  "Type": "eyeRight",
+                  "X": 0.7266660928726196,
+                  "Y": 0.41039225459098816
+                },
+                {
+                  "Type": "eyeRight",
+                  "X": 0.6912462115287781,
+                  "Y": 0.44240960478782654
+                },
+                {
+                  "Type": "mouthDown",
+                  "X": 0.6306198239326477,
+                  "Y": 0.46700039505958557
+                },
+                {
+                  "Type": "mouthUp",
+                  "X": 0.7215608954429626,
+                  "Y": 0.47114261984825134
+                }
+              ],
+              "Pose": {
+                "Pitch": 4.050806522369385,
+                "Roll": 0.9950747489929199,
+                "Yaw": 13.693790435791016
+              },
+              "Quality": {
+                "Brightness": 37.60169982910156,
+                "Sharpness": 80
+              }
+            }
+          ],
+          "OrientationCorrection": "ROTATE_0"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation detects faces in an image stored in an AWS S3 bucket.",
+        "id": "to-detect-faces-in-an-image-1481841782793",
+        "title": "To detect faces in an image"
+      }
+    ],
+    "DetectLabels": [
+      {
+        "input": {
+          "Image": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "myphoto"
+            }
+          },
+          "MaxLabels": 123,
+          "MinConfidence": 70
+        },
+        "output": {
+          "Labels": [
+            {
+              "Confidence": 99.25072479248047,
+              "Name": "People"
+            },
+            {
+              "Confidence": 99.25074005126953,
+              "Name": "Person"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation detects labels in the supplied image",
+        "id": "to-detect-labels-1481834255770",
+        "title": "To detect labels"
+      }
+    ],
+    "IndexFaces": [
+      {
+        "input": {
+          "CollectionId": "myphotos",
+          "DetectionAttributes": [
+
+          ],
+          "ExternalImageId": "myphotoid",
+          "Image": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "myphoto"
+            }
+          }
+        },
+        "output": {
+          "FaceRecords": [
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.33481481671333313,
+                  "Left": 0.31888890266418457,
+                  "Top": 0.4933333396911621,
+                  "Width": 0.25
+                },
+                "Confidence": 99.9991226196289,
+                "FaceId": "ff43d742-0c13-5d16-a3e8-03d3f58e980b",
+                "ImageId": "465f4e93-763e-51d0-b030-b9667a2d94b1"
+              },
+              "FaceDetail": {
+                "BoundingBox": {
+                  "Height": 0.33481481671333313,
+                  "Left": 0.31888890266418457,
+                  "Top": 0.4933333396911621,
+                  "Width": 0.25
+                },
+                "Confidence": 99.9991226196289,
+                "Landmarks": [
+                  {
+                    "Type": "eyeLeft",
+                    "X": 0.3976764678955078,
+                    "Y": 0.6248345971107483
+                  },
+                  {
+                    "Type": "eyeRight",
+                    "X": 0.4810936450958252,
+                    "Y": 0.6317117214202881
+                  },
+                  {
+                    "Type": "noseLeft",
+                    "X": 0.41986238956451416,
+                    "Y": 0.7111940383911133
+                  },
+                  {
+                    "Type": "mouthDown",
+                    "X": 0.40525302290916443,
+                    "Y": 0.7497701048851013
+                  },
+                  {
+                    "Type": "mouthUp",
+                    "X": 0.4753248989582062,
+                    "Y": 0.7558549642562866
+                  }
+                ],
+                "Pose": {
+                  "Pitch": -9.713645935058594,
+                  "Roll": 4.707281112670898,
+                  "Yaw": -24.438663482666016
+                },
+                "Quality": {
+                  "Brightness": 29.23358917236328,
+                  "Sharpness": 80
+                }
+              }
+            },
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.32592591643333435,
+                  "Left": 0.5144444704055786,
+                  "Top": 0.15111111104488373,
+                  "Width": 0.24444444477558136
+                },
+                "Confidence": 99.99950408935547,
+                "FaceId": "8be04dba-4e58-520d-850e-9eae4af70eb2",
+                "ImageId": "465f4e93-763e-51d0-b030-b9667a2d94b1"
+              },
+              "FaceDetail": {
+                "BoundingBox": {
+                  "Height": 0.32592591643333435,
+                  "Left": 0.5144444704055786,
+                  "Top": 0.15111111104488373,
+                  "Width": 0.24444444477558136
+                },
+                "Confidence": 99.99950408935547,
+                "Landmarks": [
+                  {
+                    "Type": "eyeLeft",
+                    "X": 0.6006892323493958,
+                    "Y": 0.290842205286026
+                  },
+                  {
+                    "Type": "eyeRight",
+                    "X": 0.6808141469955444,
+                    "Y": 0.29609042406082153
+                  },
+                  {
+                    "Type": "noseLeft",
+                    "X": 0.6395332217216492,
+                    "Y": 0.3522595763206482
+                  },
+                  {
+                    "Type": "mouthDown",
+                    "X": 0.5892083048820496,
+                    "Y": 0.38689887523651123
+                  },
+                  {
+                    "Type": "mouthUp",
+                    "X": 0.674560010433197,
+                    "Y": 0.394125759601593
+                  }
+                ],
+                "Pose": {
+                  "Pitch": -4.683138370513916,
+                  "Roll": 2.1029529571533203,
+                  "Yaw": 6.716655254364014
+                },
+                "Quality": {
+                  "Brightness": 34.951698303222656,
+                  "Sharpness": 160
+                }
+              }
+            }
+          ],
+          "OrientationCorrection": "ROTATE_0"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation detects faces in an image and adds them to the specified Rekognition collection.",
+        "id": "to-add-a-face-to-a-collection-1482179542923",
+        "title": "To add a face to a collection"
+      }
+    ],
+    "ListCollections": [
+      {
+        "input": {
+        },
+        "output": {
+          "CollectionIds": [
+            "myphotos"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation returns a list of Rekognition collections.",
+        "id": "to-list-the-collections-1482179199088",
+        "title": "To list the collections"
+      }
+    ],
+    "ListFaces": [
+      {
+        "input": {
+          "CollectionId": "myphotos",
+          "MaxResults": 20
+        },
+        "output": {
+          "Faces": [
+            {
+              "BoundingBox": {
+                "Height": 0.18000000715255737,
+                "Left": 0.5555559992790222,
+                "Top": 0.336667001247406,
+                "Width": 0.23999999463558197
+              },
+              "Confidence": 100,
+              "FaceId": "1c62e8b5-69a7-5b7d-b3cd-db4338a8a7e7",
+              "ImageId": "147fdf82-7a71-52cf-819b-e786c7b9746e"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.16555599868297577,
+                "Left": 0.30963000655174255,
+                "Top": 0.7066670060157776,
+                "Width": 0.22074100375175476
+              },
+              "Confidence": 100,
+              "FaceId": "29a75abe-397b-5101-ba4f-706783b2246c",
+              "ImageId": "147fdf82-7a71-52cf-819b-e786c7b9746e"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.3234420120716095,
+                "Left": 0.3233329951763153,
+                "Top": 0.5,
+                "Width": 0.24222199618816376
+              },
+              "Confidence": 99.99829864501953,
+              "FaceId": "38271d79-7bc2-5efb-b752-398a8d575b85",
+              "ImageId": "d5631190-d039-54e4-b267-abd22c8647c5"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.03555560111999512,
+                "Left": 0.37388700246810913,
+                "Top": 0.2477779984474182,
+                "Width": 0.04747769981622696
+              },
+              "Confidence": 99.99210357666016,
+              "FaceId": "3b01bef0-c883-5654-ba42-d5ad28b720b3",
+              "ImageId": "812d9f04-86f9-54fc-9275-8d0dcbcb6784"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.05333330109715462,
+                "Left": 0.2937690019607544,
+                "Top": 0.35666701197624207,
+                "Width": 0.07121659815311432
+              },
+              "Confidence": 99.99919891357422,
+              "FaceId": "4839a608-49d0-566c-8301-509d71b534d1",
+              "ImageId": "812d9f04-86f9-54fc-9275-8d0dcbcb6784"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.3249259889125824,
+                "Left": 0.5155559778213501,
+                "Top": 0.1513350009918213,
+                "Width": 0.24333299696445465
+              },
+              "Confidence": 99.99949645996094,
+              "FaceId": "70008e50-75e4-55d0-8e80-363fb73b3a14",
+              "ImageId": "d5631190-d039-54e4-b267-abd22c8647c5"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.03777780011296272,
+                "Left": 0.7002969980239868,
+                "Top": 0.18777799606323242,
+                "Width": 0.05044509842991829
+              },
+              "Confidence": 99.92639923095703,
+              "FaceId": "7f5f88ed-d684-5a88-b0df-01e4a521552b",
+              "ImageId": "812d9f04-86f9-54fc-9275-8d0dcbcb6784"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.05555560067296028,
+                "Left": 0.13946600258350372,
+                "Top": 0.46333301067352295,
+                "Width": 0.07270029932260513
+              },
+              "Confidence": 99.99469757080078,
+              "FaceId": "895b4e2c-81de-5902-a4bd-d1792bda00b2",
+              "ImageId": "812d9f04-86f9-54fc-9275-8d0dcbcb6784"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.3259260058403015,
+                "Left": 0.5144439935684204,
+                "Top": 0.15111100673675537,
+                "Width": 0.24444399774074554
+              },
+              "Confidence": 99.99949645996094,
+              "FaceId": "8be04dba-4e58-520d-850e-9eae4af70eb2",
+              "ImageId": "465f4e93-763e-51d0-b030-b9667a2d94b1"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.18888899683952332,
+                "Left": 0.3783380091190338,
+                "Top": 0.2355560064315796,
+                "Width": 0.25222599506378174
+              },
+              "Confidence": 99.9999008178711,
+              "FaceId": "908544ad-edc3-59df-8faf-6a87cc256cf5",
+              "ImageId": "3c731605-d772-541a-a5e7-0375dbc68a07"
+            },
+            {
+              "BoundingBox": {
+                "Height": 0.33481499552726746,
+                "Left": 0.31888899207115173,
+                "Top": 0.49333301186561584,
+                "Width": 0.25
+              },
+              "Confidence": 99.99909973144531,
+              "FaceId": "ff43d742-0c13-5d16-a3e8-03d3f58e980b",
+              "ImageId": "465f4e93-763e-51d0-b030-b9667a2d94b1"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation lists the faces in a Rekognition collection.",
+        "id": "to-list-the-faces-in-a-collection-1482181416530",
+        "title": "To list the faces in a collection"
+      }
+    ],
+    "SearchFaces": [
+      {
+        "input": {
+          "CollectionId": "myphotos",
+          "FaceId": "70008e50-75e4-55d0-8e80-363fb73b3a14",
+          "FaceMatchThreshold": 90,
+          "MaxFaces": 10
+        },
+        "output": {
+          "FaceMatches": [
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.3259260058403015,
+                  "Left": 0.5144439935684204,
+                  "Top": 0.15111100673675537,
+                  "Width": 0.24444399774074554
+                },
+                "Confidence": 99.99949645996094,
+                "FaceId": "8be04dba-4e58-520d-850e-9eae4af70eb2",
+                "ImageId": "465f4e93-763e-51d0-b030-b9667a2d94b1"
+              },
+              "Similarity": 99.97222137451172
+            },
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.16555599868297577,
+                  "Left": 0.30963000655174255,
+                  "Top": 0.7066670060157776,
+                  "Width": 0.22074100375175476
+                },
+                "Confidence": 100,
+                "FaceId": "29a75abe-397b-5101-ba4f-706783b2246c",
+                "ImageId": "147fdf82-7a71-52cf-819b-e786c7b9746e"
+              },
+              "Similarity": 97.04154968261719
+            },
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.18888899683952332,
+                  "Left": 0.3783380091190338,
+                  "Top": 0.2355560064315796,
+                  "Width": 0.25222599506378174
+                },
+                "Confidence": 99.9999008178711,
+                "FaceId": "908544ad-edc3-59df-8faf-6a87cc256cf5",
+                "ImageId": "3c731605-d772-541a-a5e7-0375dbc68a07"
+              },
+              "Similarity": 95.94520568847656
+            }
+          ],
+          "SearchedFaceId": "70008e50-75e4-55d0-8e80-363fb73b3a14"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation searches for matching faces in the collection the supplied face belongs to.",
+        "id": "to-delete-a-face-1482182799377",
+        "title": "To delete a face"
+      }
+    ],
+    "SearchFacesByImage": [
+      {
+        "input": {
+          "CollectionId": "myphotos",
+          "FaceMatchThreshold": 95,
+          "Image": {
+            "S3Object": {
+              "Bucket": "mybucket",
+              "Name": "myphoto"
+            }
+          },
+          "MaxFaces": 5
+        },
+        "output": {
+          "FaceMatches": [
+            {
+              "Face": {
+                "BoundingBox": {
+                  "Height": 0.3234420120716095,
+                  "Left": 0.3233329951763153,
+                  "Top": 0.5,
+                  "Width": 0.24222199618816376
+                },
+                "Confidence": 99.99829864501953,
+                "FaceId": "38271d79-7bc2-5efb-b752-398a8d575b85",
+                "ImageId": "d5631190-d039-54e4-b267-abd22c8647c5"
+              },
+              "Similarity": 99.97036743164062
+            }
+          ],
+          "SearchedFaceBoundingBox": {
+            "Height": 0.33481481671333313,
+            "Left": 0.31888890266418457,
+            "Top": 0.4933333396911621,
+            "Width": 0.25
+          },
+          "SearchedFaceConfidence": 99.9991226196289
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation searches for faces in a Rekognition collection that match the largest face in an S3 bucket stored image.",
+        "id": "to-search-for-faces-matching-a-supplied-image-1482175994491",
+        "title": "To search for faces matching a supplied image"
+      }
+    ]
+  }
+}

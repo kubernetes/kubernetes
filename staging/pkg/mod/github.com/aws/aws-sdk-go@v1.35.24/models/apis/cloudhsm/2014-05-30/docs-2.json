@@ -1,0 +1,543 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS CloudHSM Service</fullname> <p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p>",
+  "operations": {
+    "AddTagsToResource": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Adds or overwrites one or more tags for the specified AWS CloudHSM resource.</p> <p>Each tag consists of a key and a value. Tag keys must be unique to each resource.</p>",
+    "CreateHapg": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Creates a high-availability partition group. A high-availability partition group is a group of partitions that spans multiple physical HSMs.</p>",
+    "CreateHsm": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Creates an uninitialized HSM instance.</p> <p>There is an upfront fee charged for each HSM instance that you create with the <code>CreateHsm</code> operation. If you accidentally provision an HSM and want to request a refund, delete the instance using the <a>DeleteHsm</a> operation, go to the <a href=\"https://console.aws.amazon.com/support/home\">AWS Support Center</a>, create a new case, and select <b>Account and Billing Support</b>.</p> <important> <p>It can take up to 20 minutes to create and provision an HSM. You can monitor the status of the HSM with the <a>DescribeHsm</a> operation. The HSM is ready to be initialized when the status changes to <code>RUNNING</code>.</p> </important>",
+    "CreateLunaClient": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Creates an HSM client.</p>",
+    "DeleteHapg": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Deletes a high-availability partition group.</p>",
+    "DeleteHsm": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Deletes an HSM. After completion, this operation cannot be undone and your key material cannot be recovered.</p>",
+    "DeleteLunaClient": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Deletes a client.</p>",
+    "DescribeHapg": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Retrieves information about a high-availability partition group.</p>",
+    "DescribeHsm": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Retrieves information about an HSM. You can identify the HSM by its ARN or its serial number.</p>",
+    "DescribeLunaClient": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Retrieves information about an HSM client.</p>",
+    "GetConfig": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Gets the configuration files necessary to connect to all high availability partition groups the client is associated with.</p>",
+    "ListAvailableZones": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Lists the Availability Zones that have available AWS CloudHSM capacity.</p>",
+    "ListHapgs": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Lists the high-availability partition groups for the account.</p> <p>This operation supports pagination with the use of the <code>NextToken</code> member. If more results are available, the <code>NextToken</code> member of the response contains a token that you pass in the next call to <code>ListHapgs</code> to retrieve the next set of items.</p>",
+    "ListHsms": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Retrieves the identifiers of all of the HSMs provisioned for the current customer.</p> <p>This operation supports pagination with the use of the <code>NextToken</code> member. If more results are available, the <code>NextToken</code> member of the response contains a token that you pass in the next call to <code>ListHsms</code> to retrieve the next set of items.</p>",
+    "ListLunaClients": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Lists all of the clients.</p> <p>This operation supports pagination with the use of the <code>NextToken</code> member. If more results are available, the <code>NextToken</code> member of the response contains a token that you pass in the next call to <code>ListLunaClients</code> to retrieve the next set of items.</p>",
+    "ListTagsForResource": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Returns a list of all tags for the specified AWS CloudHSM resource.</p>",
+    "ModifyHapg": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Modifies an existing high-availability partition group.</p>",
+    "ModifyHsm": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Modifies an HSM.</p> <important> <p>This operation can result in the HSM being offline for up to 15 minutes while the AWS CloudHSM service is reconfigured. If you are modifying a production HSM, you should ensure that your AWS CloudHSM service is configured for high availability, and consider executing this operation during a maintenance window.</p> </important>",
+    "ModifyLunaClient": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Modifies the certificate used by the client.</p> <p>This action can potentially start a workflow to install the new certificate on the client's HSMs.</p>",
+    "RemoveTagsFromResource": "<p>This is documentation for <b>AWS CloudHSM Classic</b>. For more information, see <a href=\"http://aws.amazon.com/cloudhsm/faqs-classic/\">AWS CloudHSM Classic FAQs</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/userguide/\">AWS CloudHSM Classic User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/classic/APIReference/\">AWS CloudHSM Classic API Reference</a>.</p> <p> <b>For information about the current version of AWS CloudHSM</b>, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a>, the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>, and the <a href=\"http://docs.aws.amazon.com/cloudhsm/latest/APIReference/\">AWS CloudHSM API Reference</a>.</p> <p>Removes one or more tags from the specified AWS CloudHSM resource.</p> <p>To remove a tag, specify only the tag key to remove (not the value). To overwrite the value for an existing tag, use <a>AddTagsToResource</a>.</p>"
+  },
+  "shapes": {
+    "AZ": {
+      "base": null,
+      "refs": {
+        "AZList$member": null,
+        "DescribeHsmResponse$AvailabilityZone": "<p>The Availability Zone that the HSM is in.</p>"
+      }
+    },
+    "AZList": {
+      "base": null,
+      "refs": {
+        "ListAvailableZonesResponse$AZList": "<p>The list of Availability Zones that have available AWS CloudHSM capacity.</p>"
+      }
+    },
+    "AddTagsToResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddTagsToResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CloudHsmServiceException$retryable": "<p>Indicates if the action can be retried.</p>"
+      }
+    },
+    "Certificate": {
+      "base": null,
+      "refs": {
+        "CreateLunaClientRequest$Certificate": "<p>The contents of a Base64-Encoded X.509 v3 certificate to be installed on the HSMs used by this client.</p>",
+        "DescribeLunaClientResponse$Certificate": "<p>The certificate installed on the HSMs used by this client.</p>",
+        "ModifyLunaClientRequest$Certificate": "<p>The new certificate for the client.</p>"
+      }
+    },
+    "CertificateFingerprint": {
+      "base": null,
+      "refs": {
+        "DescribeLunaClientRequest$CertificateFingerprint": "<p>The certificate fingerprint.</p>",
+        "DescribeLunaClientResponse$CertificateFingerprint": "<p>The certificate fingerprint.</p>"
+      }
+    },
+    "ClientArn": {
+      "base": null,
+      "refs": {
+        "ClientList$member": null,
+        "CreateLunaClientResponse$ClientArn": "<p>The ARN of the client.</p>",
+        "DeleteLunaClientRequest$ClientArn": "<p>The ARN of the client to delete.</p>",
+        "DescribeLunaClientRequest$ClientArn": "<p>The ARN of the client.</p>",
+        "DescribeLunaClientResponse$ClientArn": "<p>The ARN of the client.</p>",
+        "GetConfigRequest$ClientArn": "<p>The ARN of the client.</p>",
+        "ModifyLunaClientRequest$ClientArn": "<p>The ARN of the client.</p>",
+        "ModifyLunaClientResponse$ClientArn": "<p>The ARN of the client.</p>"
+      }
+    },
+    "ClientLabel": {
+      "base": null,
+      "refs": {
+        "CreateLunaClientRequest$Label": "<p>The label for the client.</p>"
+      }
+    },
+    "ClientList": {
+      "base": null,
+      "refs": {
+        "ListLunaClientsResponse$ClientList": "<p>The list of clients.</p>"
+      }
+    },
+    "ClientToken": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$ClientToken": "<p>A user-defined token to ensure idempotence. Subsequent calls to this operation with the same token will be ignored.</p>"
+      }
+    },
+    "ClientVersion": {
+      "base": null,
+      "refs": {
+        "GetConfigRequest$ClientVersion": "<p>The client version.</p>"
+      }
+    },
+    "CloudHsmInternalException": {
+      "base": "<p>Indicates that an internal error occurred.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmObjectState": {
+      "base": null,
+      "refs": {
+        "DescribeHapgResponse$State": "<p>The state of the high-availability partition group.</p>"
+      }
+    },
+    "CloudHsmServiceException": {
+      "base": "<p>Indicates that an exception occurred in the AWS CloudHSM service.</p>",
+      "refs": {
+      }
+    },
+    "CreateHapgRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateHapgRequest</a> action.</p>",
+      "refs": {
+      }
+    },
+    "CreateHapgResponse": {
+      "base": "<p>Contains the output of the <a>CreateHAPartitionGroup</a> action.</p>",
+      "refs": {
+      }
+    },
+    "CreateHsmRequest": {
+      "base": "<p>Contains the inputs for the <code>CreateHsm</code> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateHsmResponse": {
+      "base": "<p>Contains the output of the <code>CreateHsm</code> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateLunaClientRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateLunaClient</a> action.</p>",
+      "refs": {
+      }
+    },
+    "CreateLunaClientResponse": {
+      "base": "<p>Contains the output of the <a>CreateLunaClient</a> action.</p>",
+      "refs": {
+      }
+    },
+    "DeleteHapgRequest": {
+      "base": "<p>Contains the inputs for the <a>DeleteHapg</a> action.</p>",
+      "refs": {
+      }
+    },
+    "DeleteHapgResponse": {
+      "base": "<p>Contains the output of the <a>DeleteHapg</a> action.</p>",
+      "refs": {
+      }
+    },
+    "DeleteHsmRequest": {
+      "base": "<p>Contains the inputs for the <a>DeleteHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteHsmResponse": {
+      "base": "<p>Contains the output of the <a>DeleteHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteLunaClientRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLunaClientResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeHapgRequest": {
+      "base": "<p>Contains the inputs for the <a>DescribeHapg</a> action.</p>",
+      "refs": {
+      }
+    },
+    "DescribeHapgResponse": {
+      "base": "<p>Contains the output of the <a>DescribeHapg</a> action.</p>",
+      "refs": {
+      }
+    },
+    "DescribeHsmRequest": {
+      "base": "<p>Contains the inputs for the <a>DescribeHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeHsmResponse": {
+      "base": "<p>Contains the output of the <a>DescribeHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeLunaClientRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLunaClientResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EniId": {
+      "base": null,
+      "refs": {
+        "DescribeHsmResponse$EniId": "<p>The identifier of the elastic network interface (ENI) attached to the HSM.</p>"
+      }
+    },
+    "ExternalId": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$ExternalId": "<p>The external ID from <code>IamRoleArn</code>, if present.</p>",
+        "ModifyHsmRequest$ExternalId": "<p>The new external ID.</p>"
+      }
+    },
+    "GetConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HapgArn": {
+      "base": null,
+      "refs": {
+        "CreateHapgResponse$HapgArn": "<p>The ARN of the high-availability partition group.</p>",
+        "DeleteHapgRequest$HapgArn": "<p>The ARN of the high-availability partition group to delete.</p>",
+        "DescribeHapgRequest$HapgArn": "<p>The ARN of the high-availability partition group to describe.</p>",
+        "DescribeHapgResponse$HapgArn": "<p>The ARN of the high-availability partition group.</p>",
+        "HapgList$member": null,
+        "ModifyHapgRequest$HapgArn": "<p>The ARN of the high-availability partition group to modify.</p>",
+        "ModifyHapgResponse$HapgArn": "<p>The ARN of the high-availability partition group.</p>"
+      }
+    },
+    "HapgList": {
+      "base": null,
+      "refs": {
+        "GetConfigRequest$HapgList": "<p>A list of ARNs that identify the high-availability partition groups that are associated with the client.</p>",
+        "ListHapgsResponse$HapgList": "<p>The list of high-availability partition groups.</p>"
+      }
+    },
+    "HsmArn": {
+      "base": "<p>An ARN that identifies an HSM.</p>",
+      "refs": {
+        "CreateHsmResponse$HsmArn": "<p>The ARN of the HSM.</p>",
+        "DeleteHsmRequest$HsmArn": "<p>The ARN of the HSM to delete.</p>",
+        "DescribeHsmRequest$HsmArn": "<p>The ARN of the HSM. Either the <code>HsmArn</code> or the <code>SerialNumber</code> parameter must be specified.</p>",
+        "DescribeHsmResponse$HsmArn": "<p>The ARN of the HSM.</p>",
+        "HsmList$member": null,
+        "ModifyHsmRequest$HsmArn": "<p>The ARN of the HSM to modify.</p>",
+        "ModifyHsmResponse$HsmArn": "<p>The ARN of the HSM.</p>"
+      }
+    },
+    "HsmList": {
+      "base": "<p>Contains a list of ARNs that identify the HSMs.</p>",
+      "refs": {
+        "DescribeHapgResponse$HsmsLastActionFailed": "<p/>",
+        "DescribeHapgResponse$HsmsPendingDeletion": "<p/>",
+        "DescribeHapgResponse$HsmsPendingRegistration": "<p/>",
+        "ListHsmsResponse$HsmList": "<p>The list of ARNs that identify the HSMs.</p>"
+      }
+    },
+    "HsmSerialNumber": {
+      "base": null,
+      "refs": {
+        "DescribeHsmRequest$HsmSerialNumber": "<p>The serial number of the HSM. Either the <code>HsmArn</code> or the <code>HsmSerialNumber</code> parameter must be specified.</p>",
+        "DescribeHsmResponse$SerialNumber": "<p>The serial number of the HSM.</p>"
+      }
+    },
+    "HsmStatus": {
+      "base": null,
+      "refs": {
+        "DescribeHsmResponse$Status": "<p>The status of the HSM.</p>"
+      }
+    },
+    "IamRoleArn": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$IamRoleArn": "<p>The ARN of an IAM role to enable the AWS CloudHSM service to allocate an ENI on your behalf.</p>",
+        "DescribeHsmResponse$IamRoleArn": "<p>The ARN of the IAM role assigned to the HSM.</p>",
+        "ModifyHsmRequest$IamRoleArn": "<p>The new IAM role ARN.</p>"
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>Indicates that one or more of the request parameters are not valid.</p>",
+      "refs": {
+      }
+    },
+    "IpAddress": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$EniIp": "<p>The IP address to assign to the HSM's ENI.</p> <p>If an IP address is not specified, an IP address will be randomly chosen from the CIDR range of the subnet.</p>",
+        "CreateHsmRequest$SyslogIp": "<p>The IP address for the syslog monitoring server. The AWS CloudHSM service only supports one syslog monitoring server.</p>",
+        "DescribeHsmResponse$EniIp": "<p>The IP address assigned to the HSM's ENI.</p>",
+        "ModifyHsmRequest$EniIp": "<p>The new IP address for the elastic network interface (ENI) attached to the HSM.</p> <p>If the HSM is moved to a different subnet, and an IP address is not specified, an IP address will be randomly chosen from the CIDR range of the new subnet.</p>",
+        "ModifyHsmRequest$SyslogIp": "<p>The new IP address for the syslog monitoring server. The AWS CloudHSM service only supports one syslog monitoring server.</p>"
+      }
+    },
+    "Label": {
+      "base": null,
+      "refs": {
+        "CreateHapgRequest$Label": "<p>The label of the new high-availability partition group.</p>",
+        "DescribeHapgResponse$Label": "<p>The label for the high-availability partition group.</p>",
+        "DescribeLunaClientResponse$Label": "<p>The label of the client.</p>",
+        "ModifyHapgRequest$Label": "<p>The new label for the high-availability partition group.</p>"
+      }
+    },
+    "ListAvailableZonesRequest": {
+      "base": "<p>Contains the inputs for the <a>ListAvailableZones</a> action.</p>",
+      "refs": {
+      }
+    },
+    "ListAvailableZonesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHapgsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHapgsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHsmsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHsmsResponse": {
+      "base": "<p>Contains the output of the <code>ListHsms</code> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListLunaClientsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLunaClientsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyHapgRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyHapgResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyHsmRequest": {
+      "base": "<p>Contains the inputs for the <a>ModifyHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ModifyHsmResponse": {
+      "base": "<p>Contains the output of the <a>ModifyHsm</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ModifyLunaClientRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyLunaClientResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListHapgsRequest$NextToken": "<p>The <code>NextToken</code> value from a previous call to <code>ListHapgs</code>. Pass null if this is the first call.</p>",
+        "ListHapgsResponse$NextToken": "<p>If not null, more results are available. Pass this value to <code>ListHapgs</code> to retrieve the next set of items.</p>",
+        "ListHsmsRequest$NextToken": "<p>The <code>NextToken</code> value from a previous call to <code>ListHsms</code>. Pass null if this is the first call.</p>",
+        "ListHsmsResponse$NextToken": "<p>If not null, more results are available. Pass this value to <code>ListHsms</code> to retrieve the next set of items.</p>",
+        "ListLunaClientsRequest$NextToken": "<p>The <code>NextToken</code> value from a previous call to <code>ListLunaClients</code>. Pass null if this is the first call.</p>",
+        "ListLunaClientsResponse$NextToken": "<p>If not null, more results are available. Pass this to <code>ListLunaClients</code> to retrieve the next set of items.</p>"
+      }
+    },
+    "PartitionArn": {
+      "base": null,
+      "refs": {
+        "PartitionList$member": null
+      }
+    },
+    "PartitionList": {
+      "base": null,
+      "refs": {
+        "DescribeHsmResponse$Partitions": "<p>The list of partitions on the HSM.</p>"
+      }
+    },
+    "PartitionSerial": {
+      "base": null,
+      "refs": {
+        "PartitionSerialList$member": null
+      }
+    },
+    "PartitionSerialList": {
+      "base": null,
+      "refs": {
+        "DescribeHapgResponse$PartitionSerialList": "<p>The list of partition serial numbers that belong to the high-availability partition group.</p>",
+        "ModifyHapgRequest$PartitionSerialList": "<p>The list of partition serial numbers to make members of the high-availability partition group.</p>"
+      }
+    },
+    "RemoveTagsFromResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SshKey": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$SshKey": "<p>The SSH public key to install on the HSM.</p>",
+        "DescribeHsmResponse$SshPublicKey": "<p>The public SSH key.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the AWS CloudHSM resource to tag.</p>",
+        "AddTagsToResourceResponse$Status": "<p>The status of the operation.</p>",
+        "CloudHsmServiceException$message": "<p>Additional information about the error.</p>",
+        "DeleteHapgResponse$Status": "<p>The status of the action.</p>",
+        "DeleteHsmResponse$Status": "<p>The status of the operation.</p>",
+        "DeleteLunaClientResponse$Status": "<p>The status of the action.</p>",
+        "DescribeHapgResponse$HapgSerial": "<p>The serial number of the high-availability partition group.</p>",
+        "DescribeHsmResponse$StatusDetails": "<p>Contains additional information about the status of the HSM.</p>",
+        "DescribeHsmResponse$VendorName": "<p>The name of the HSM vendor.</p>",
+        "DescribeHsmResponse$HsmType": "<p>The HSM model type.</p>",
+        "DescribeHsmResponse$SoftwareVersion": "<p>The HSM software version.</p>",
+        "DescribeHsmResponse$ServerCertUri": "<p>The URI of the certificate server.</p>",
+        "GetConfigResponse$ConfigType": "<p>The type of credentials.</p>",
+        "GetConfigResponse$ConfigFile": "<p>The chrystoki.conf configuration file.</p>",
+        "GetConfigResponse$ConfigCred": "<p>The certificate file containing the server.pem files of the HSMs.</p>",
+        "ListTagsForResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the AWS CloudHSM resource.</p>",
+        "RemoveTagsFromResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the AWS CloudHSM resource.</p>",
+        "RemoveTagsFromResourceResponse$Status": "<p>The status of the operation.</p>"
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$SubnetId": "<p>The identifier of the subnet in your VPC in which to place the HSM.</p>",
+        "DescribeHsmResponse$SubnetId": "<p>The identifier of the subnet that the HSM is in.</p>",
+        "ModifyHsmRequest$SubnetId": "<p>The new identifier of the subnet that the HSM is in. The new subnet must be in the same Availability Zone as the current subnet.</p>"
+      }
+    },
+    "SubscriptionType": {
+      "base": "<p>Specifies the type of subscription for the HSM.</p> <ul> <li> <p> <b>PRODUCTION</b> - The HSM is being used in a production environment.</p> </li> <li> <p> <b>TRIAL</b> - The HSM is being used in a product trial.</p> </li> </ul>",
+      "refs": {
+        "CreateHsmRequest$SubscriptionType": null,
+        "DescribeHsmResponse$SubscriptionType": null
+      }
+    },
+    "Tag": {
+      "base": "<p>A key-value pair that identifies or specifies metadata about an AWS CloudHSM resource.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "RemoveTagsFromResourceRequest$TagKeyList": "<p>The tag key or keys to remove.</p> <p>Specify only the tag key to remove (not the value). To overwrite the value for an existing tag, use <a>AddTagsToResource</a>.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceRequest$TagList": "<p>One or more tags.</p>",
+        "ListTagsForResourceResponse$TagList": "<p>One or more tags.</p>"
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "DescribeHapgResponse$LastModifiedTimestamp": "<p>The date and time the high-availability partition group was last modified.</p>",
+        "DescribeHsmResponse$SubscriptionStartDate": "<p>The subscription start date.</p>",
+        "DescribeHsmResponse$SubscriptionEndDate": "<p>The subscription end date.</p>",
+        "DescribeHsmResponse$SshKeyLastUpdated": "<p>The date and time that the SSH key was last updated.</p>",
+        "DescribeHsmResponse$ServerCertLastUpdated": "<p>The date and time that the server certificate was last updated.</p>",
+        "DescribeLunaClientResponse$LastModifiedTimestamp": "<p>The date and time the client was last modified.</p>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "DescribeHsmResponse$VpcId": "<p>The identifier of the VPC that the HSM is in.</p>"
+      }
+    }
+  }
+}

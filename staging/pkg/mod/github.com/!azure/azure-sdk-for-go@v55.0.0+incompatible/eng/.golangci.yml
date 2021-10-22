@@ -1,0 +1,5 @@
+#reference https://github.com/golangci/golangci-lint#config-file for more options
+run:
+  # default is true. Enables skipping of directories:
+  #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
+  skip-dirs-use-default: true

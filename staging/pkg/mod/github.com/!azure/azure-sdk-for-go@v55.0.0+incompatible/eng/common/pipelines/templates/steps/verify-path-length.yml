@@ -1,0 +1,50 @@
+# Template for all Python Scripts in this repository
+parameters: 
+  SourceDirectory: ''
+  BasePathLength: 49
+
+steps:
+  - task: PythonScript@0
+    displayName: Analyze Path Lengths
+    inputs:
+      scriptSource: inline
+      script: |
+        # Verifies Length of file path for all files in the SourceDirectory.
+        # File paths and directory paths must be less than 260 and 248 characters respectively on windows OS
+        # Repo users get a limited number of characters for the repo clone path. As Specified by the BasePathLength parameter.
+        # Script makes sure that paths in the repo are less than 260 and 248 for files and directories respectively after adding the BasePathLength.
+        import os
+        import sys
+
+        source_directory = r'${{ parameters.SourceDirectory }}'
+        break_switch = False
+        long_file_paths = []
+        long_dir_paths = []
+
+        def pluralize(string, plural_string, count):
+            return plural_string if count > 1 else string
+
+        print('Analyzing length of paths...')
+        for root, dirs, files in os.walk('{0}'.format(source_directory)):
+            for file in files:
+                file_path = os.path.relpath(os.path.join(root, file), source_directory)
+                if ((len(file_path) + ${{ parameters.BasePathLength }}) > 260):
+                    long_file_paths.append(file_path)
+
+                dir_path = os.path.relpath(root, source_directory)
+                if ((len(dir_path) + ${{ parameters.BasePathLength }}) > 248):
+                    long_dir_paths.append(dir_path)
+
+        if (len(long_file_paths) > 0):
+            print('With a base path length of {0} the following file path{1} exceed the allow path length of 260 characters'.format(${{ parameters.BasePathLength }}, pluralize('', 's', len(long_file_paths))))
+            print(*long_file_paths, sep = "\n")
+            break_switch = True
+
+        if (len(long_dir_paths) > 0):
+            print('With a base path length of {0} the following directory path{1} exceed the allow path length of 248 characters'.format(${{ parameters.BasePathLength }}, pluralize('', 's', len(long_dir_paths))))
+            print(*long_dir_paths, sep = "\n")
+            break_switch = True
+
+        if break_switch == True:
+            print("Some file paths are too long. Please reduce path lengths")
+            exit(1)

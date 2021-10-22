@@ -1,0 +1,378 @@
+{
+  "schemas":  [
+    {
+      "word":  "DirectoryList",
+      "count":  1
+    },
+    {
+      "word":  "JsonSchema",
+      "count":  1
+    },
+    {
+      "word":  "RestDescription",
+      "count":  1
+    },
+    {
+      "word":  "RestMethod",
+      "count":  1
+    },
+    {
+      "word":  "RestResource",
+      "count":  1
+    }
+  ],
+  "properties":  [
+    {
+      "word":  "$ref",
+      "count":  3
+    },
+    {
+      "word":  "accept",
+      "count":  1
+    },
+    {
+      "word":  "additionalProperties",
+      "count":  1
+    },
+    {
+      "word":  "annotations",
+      "count":  1
+    },
+    {
+      "word":  "auth",
+      "count":  1
+    },
+    {
+      "word":  "basePath",
+      "count":  1
+    },
+    {
+      "word":  "baseUrl",
+      "count":  1
+    },
+    {
+      "word":  "batchPath",
+      "count":  1
+    },
+    {
+      "word":  "canonicalName",
+      "count":  1
+    },
+    {
+      "word":  "default",
+      "count":  1
+    },
+    {
+      "word":  "description",
+      "count":  3
+    },
+    {
+      "word":  "discoveryVersion",
+      "count":  2
+    },
+    {
+      "word":  "discriminant",
+      "count":  1
+    },
+    {
+      "word":  "documentationLink",
+      "count":  1
+    },
+    {
+      "word":  "enum",
+      "count":  1
+    },
+    {
+      "word":  "enumDescriptions",
+      "count":  1
+    },
+    {
+      "word":  "etag",
+      "count":  1
+    },
+    {
+      "word":  "etagRequired",
+      "count":  1
+    },
+    {
+      "word":  "exponentialBackoffDefault",
+      "count":  1
+    },
+    {
+      "word":  "features",
+      "count":  1
+    },
+    {
+      "word":  "format",
+      "count":  1
+    },
+    {
+      "word":  "getRest",
+      "count":  1
+    },
+    {
+      "word":  "httpMethod",
+      "count":  1
+    },
+    {
+      "word":  "icons",
+      "count":  1
+    },
+    {
+      "word":  "id",
+      "count":  3
+    },
+    {
+      "word":  "items",
+      "count":  2
+    },
+    {
+      "word":  "kind",
+      "count":  2
+    },
+    {
+      "word":  "labels",
+      "count":  1
+    },
+    {
+      "word":  "list",
+      "count":  1
+    },
+    {
+      "word":  "location",
+      "count":  1
+    },
+    {
+      "word":  "map",
+      "count":  1
+    },
+    {
+      "word":  "maxSize",
+      "count":  1
+    },
+    {
+      "word":  "maximum",
+      "count":  1
+    },
+    {
+      "word":  "mediaUpload",
+      "count":  1
+    },
+    {
+      "word":  "methods",
+      "count":  2
+    },
+    {
+      "word":  "minimum",
+      "count":  1
+    },
+    {
+      "word":  "multipart",
+      "count":  2
+    },
+    {
+      "word":  "name",
+      "count":  1
+    },
+    {
+      "word":  "oauth2",
+      "count":  1
+    },
+    {
+      "word":  "ownerDomain",
+      "count":  1
+    },
+    {
+      "word":  "ownerName",
+      "count":  1
+    },
+    {
+      "word":  "packagePath",
+      "count":  1
+    },
+    {
+      "word":  "parameterName",
+      "count":  1
+    },
+    {
+      "word":  "parameterOrder",
+      "count":  1
+    },
+    {
+      "word":  "parameters",
+      "count":  2
+    },
+    {
+      "word":  "path",
+      "count":  3
+    },
+    {
+      "word":  "pattern",
+      "count":  1
+    },
+    {
+      "word":  "properties",
+      "count":  1
+    },
+    {
+      "word":  "protocol",
+      "count":  1
+    },
+    {
+      "word":  "protocols",
+      "count":  1
+    },
+    {
+      "word":  "readOnly",
+      "count":  1
+    },
+    {
+      "word":  "repeated",
+      "count":  1
+    },
+    {
+      "word":  "request",
+      "count":  1
+    },
+    {
+      "word":  "required",
+      "count":  2
+    },
+    {
+      "word":  "resources",
+      "count":  2
+    },
+    {
+      "word":  "response",
+      "count":  1
+    },
+    {
+      "word":  "resumable",
+      "count":  1
+    },
+    {
+      "word":  "revision",
+      "count":  1
+    },
+    {
+      "word":  "rootUrl",
+      "count":  1
+    },
+    {
+      "word":  "schemas",
+      "count":  1
+    },
+    {
+      "word":  "scopes",
+      "count":  2
+    },
+    {
+      "word":  "servicePath",
+      "count":  1
+    },
+    {
+      "word":  "simple",
+      "count":  1
+    },
+    {
+      "word":  "supportsMediaDownload",
+      "count":  1
+    },
+    {
+      "word":  "supportsMediaUpload",
+      "count":  1
+    },
+    {
+      "word":  "supportsSubscription",
+      "count":  1
+    },
+    {
+      "word":  "title",
+      "count":  1
+    },
+    {
+      "word":  "type",
+      "count":  1
+    },
+    {
+      "word":  "useMediaDownloadService",
+      "count":  1
+    },
+    {
+      "word":  "variant",
+      "count":  1
+    },
+    {
+      "word":  "version",
+      "count":  1
+    },
+    {
+      "word":  "version_module",
+      "count":  1
+    },
+    {
+      "word":  "x16",
+      "count":  1
+    },
+    {
+      "word":  "x32",
+      "count":  1
+    }
+  ],
+  "operations":  [
+    {
+      "word":  "discovery.apis.getRest",
+      "count":  1
+    },
+    {
+      "word":  "discovery.apis.list",
+      "count":  1
+    }
+  ],
+  "parameters":  [
+    {
+      "word":  "alt",
+      "count":  1
+    },
+    {
+      "word":  "api",
+      "count":  1
+    },
+    {
+      "word":  "fields",
+      "count":  1
+    },
+    {
+      "word":  "key",
+      "count":  1
+    },
+    {
+      "word":  "name",
+      "count":  1
+    },
+    {
+      "word":  "oauth_token",
+      "count":  1
+    },
+    {
+      "word":  "preferred",
+      "count":  1
+    },
+    {
+      "word":  "prettyPrint",
+      "count":  1
+    },
+    {
+      "word":  "quotaUser",
+      "count":  1
+    },
+    {
+      "word":  "userIp",
+      "count":  1
+    },
+    {
+      "word":  "version",
+      "count":  1
+    }
+  ]
+}

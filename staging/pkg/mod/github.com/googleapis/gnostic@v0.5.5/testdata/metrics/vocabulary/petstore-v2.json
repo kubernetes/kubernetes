@@ -1,0 +1,62 @@
+{
+  "schemas": [
+    {
+      "word": "Error",
+      "count": 1
+    },
+    {
+      "word": "Pet",
+      "count": 1
+    },
+    {
+      "word": "Pets",
+      "count": 1
+    }
+  ],
+  "properties": [
+    {
+      "word": "code",
+      "count": 1
+    },
+    {
+      "word": "id",
+      "count": 1
+    },
+    {
+      "word": "message",
+      "count": 1
+    },
+    {
+      "word": "name",
+      "count": 1
+    },
+    {
+      "word": "tag",
+      "count": 1
+    }
+  ],
+  "operations": [
+    {
+      "word": "createPets",
+      "count": 1
+    },
+    {
+      "word": "listPets",
+      "count": 1
+    },
+    {
+      "word": "showPetById",
+      "count": 1
+    }
+  ],
+  "parameters": [
+    {
+      "word": "limit",
+      "count": 1
+    },
+    {
+      "word": "petId",
+      "count": 1
+    }
+  ]
+}

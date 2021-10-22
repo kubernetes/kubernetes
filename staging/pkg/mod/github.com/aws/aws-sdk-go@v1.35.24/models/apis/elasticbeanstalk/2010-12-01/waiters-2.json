@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "waiters": {
+    "EnvironmentExists": {
+      "delay": 20,
+      "maxAttempts": 20,
+      "operation": "DescribeEnvironments",
+      "acceptors": [
+        {
+          "state": "success",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Ready"
+        },
+        {
+          "state": "retry",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Launching"
+        }
+      ]
+    },
+    "EnvironmentUpdated": {
+      "delay": 20,
+      "maxAttempts": 20,
+      "operation": "DescribeEnvironments",
+      "acceptors": [
+        {
+          "state": "success",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Ready"
+        },
+        {
+          "state": "retry",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Updating"
+        }
+      ]
+    },
+    "EnvironmentTerminated": {
+      "delay": 20,
+      "maxAttempts": 20,
+      "operation": "DescribeEnvironments",
+      "acceptors": [
+        {
+          "state": "success",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Terminated"
+        },
+        {
+          "state": "retry",
+          "matcher": "pathAll",
+          "argument": "Environments[].Status",
+          "expected": "Terminating"
+        }
+      ]
+    }
+  }
+}
+

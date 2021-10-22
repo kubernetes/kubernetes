@@ -1,0 +1,1 @@
+reservations[*].instances[?bar==`1`]

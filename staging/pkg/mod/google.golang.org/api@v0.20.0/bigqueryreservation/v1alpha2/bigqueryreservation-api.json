@@ -1,0 +1,900 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/bigquery": {
+          "description": "View and manage your data in Google BigQuery"
+        },
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://bigqueryreservation.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "BigQuery Reservation",
+  "description": "A service to modify your BigQuery flat-rate reservations.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/bigquery/",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "bigqueryreservation:v1alpha2",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://bigqueryreservation.mtls.googleapis.com/",
+  "name": "bigqueryreservation",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "projects": {
+      "resources": {
+        "locations": {
+          "methods": {
+            "searchReservationGrants": {
+              "description": "Look up grants for a specified resource for a particular region.\nIf the request is about a project:\n  1) Grants created on the project will be returned if they exist.\n  2) Otherwise grants created on the closest ancestor will be returned.\n  3) Grants for different JobTypes will all be returned.\nSame logic applies if the request is about a folder.\nIf the request is about an organization, then grants created on the\norganization will be returned (organization doesn't have ancestors).\nComparing to ListReservationGrants, there are two behavior\ndifferences:\n  1) permission on the grantee will be verified in this API.\n  2) Hierarchy lookup (project-\u003efolder-\u003eorganization) happens in this API.",
+              "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}:SearchReservationGrants",
+              "httpMethod": "GET",
+              "id": "bigqueryreservation.projects.locations.searchReservationGrants",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "pageSize": {
+                  "description": "The maximum number of items to return.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "The next_page_token value returned from a previous List request, if any.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "parent": {
+                  "description": "The parent resource name (containing project and location), which owns the\ngrants. e.g.:\n  \"projects/myproject/locations/us-central1\".",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/locations/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "query": {
+                  "description": "Please specify resource name as grantee in the query.\ne.g., \"grantee=projects/myproject\"\n      \"grantee=folders/123\"\n      \"grantee=organizations/456\"",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v1alpha2/{+parent}:SearchReservationGrants",
+              "response": {
+                "$ref": "SearchReservationGrantsResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/bigquery",
+                "https://www.googleapis.com/auth/cloud-platform"
+              ]
+            }
+          },
+          "resources": {
+            "operations": {
+              "methods": {
+                "cancel": {
+                  "description": "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\nOperations.GetOperation or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan Operation.error value with a google.rpc.Status.code of 1,\ncorresponding to `Code.CANCELLED`.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}:cancel",
+                  "httpMethod": "POST",
+                  "id": "bigqueryreservation.projects.locations.operations.cancel",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the operation resource to be cancelled.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/operations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}:cancel",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}",
+                  "httpMethod": "GET",
+                  "id": "bigqueryreservation.projects.locations.operations.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name of the operation resource.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/operations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}",
+                  "response": {
+                    "$ref": "Operation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "reservationGrants": {
+              "methods": {
+                "create": {
+                  "description": "Returns `google.rpc.Code.PERMISSION_DENIED` if user does not have\n'bigquery.admin' permissions on the project using the reservation\nand the project that owns this reservation.\nReturns `google.rpc.Code.INVALID_ARGUMENT` when location of the grant\ndoes not match location of the reservation.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservationGrants",
+                  "httpMethod": "POST",
+                  "id": "bigqueryreservation.projects.locations.reservationGrants.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "The parent resource name of the reservation grant\nE.g.: projects/myproject/location/eu.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+parent}/reservationGrants",
+                  "request": {
+                    "$ref": "ReservationGrant"
+                  },
+                  "response": {
+                    "$ref": "ReservationGrant"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Deletes a reservation grant. No expansion will happen.\nE.g:\norganizationA contains project1 and project2. Reservation res1 exists.\nCreateReservationGrant was invoked previously and following grants were\ncreated explicitly:\n  \u003corganizationA, res1\u003e\n  \u003cproject1, res1\u003e\nThen deletion of \u003corganizationA, res1\u003e won't affect \u003cproject1, res1\u003e. After\ndeletion of \u003corganizationA, res1\u003e, queries from project1 will still use\nres1, while queries from project2 will use on-demand mode.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservationGrants/{reservationGrantsId}",
+                  "httpMethod": "DELETE",
+                  "id": "bigqueryreservation.projects.locations.reservationGrants.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "Name of the resource, e.g.:\n  projects/myproject/locations/eu/reservationGrants/123",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/reservationGrants/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "Lists reservation grants.\nOnly explicitly created grants will be returned. E.g:\norganizationA contains project1 and project2. Reservation res1 exists.\nCreateReservationGrant was invoked previously and following grants were\ncreated explicitly:\n  \u003corganizationA, res1\u003e\n  \u003cproject1, res1\u003e\nThen this API will just return the above two grants for reservation res1,\nand no expansion/merge will happen.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservationGrants",
+                  "httpMethod": "GET",
+                  "id": "bigqueryreservation.projects.locations.reservationGrants.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "pageSize": {
+                      "description": "The maximum number of items to return.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "The next_page_token value returned from a previous List request, if any.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The parent resource name e.g.: projects/myproject/location/eu.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+parent}/reservationGrants",
+                  "response": {
+                    "$ref": "ListReservationGrantsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              }
+            },
+            "reservations": {
+              "methods": {
+                "create": {
+                  "description": "Creates a new reservation resource. Multiple reservations are created if\nthe ancestor reservations do not exist.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations",
+                  "httpMethod": "POST",
+                  "id": "bigqueryreservation.projects.locations.reservations.create",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "Project, location, and (optionally) reservation name. E.g.,\n   projects/myproject/locations/us-central1/reservations/parent",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "reservationId": {
+                      "description": "The reservation ID relative to the parent, e.g., \"dev\". This field must\nonly contain alphanumeric characters.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+parent}/reservations",
+                  "request": {
+                    "$ref": "Reservation"
+                  },
+                  "response": {
+                    "$ref": "Reservation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "createReservation": {
+                  "description": "Creates a new reservation resource. Multiple reservations are created if\nthe ancestor reservations do not exist.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}",
+                  "httpMethod": "POST",
+                  "id": "bigqueryreservation.projects.locations.reservations.createReservation",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "parent": {
+                      "description": "Project, location, and (optionally) reservation name. E.g.,\n   projects/myproject/locations/us-central1/reservations/parent",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/reservations/.*$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "reservationId": {
+                      "description": "The reservation ID relative to the parent, e.g., \"dev\". This field must\nonly contain alphanumeric characters.",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+parent}",
+                  "request": {
+                    "$ref": "Reservation"
+                  },
+                  "response": {
+                    "$ref": "Reservation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "delete": {
+                  "description": "Deletes a reservation.\nReturns `google.rpc.Code.FAILED_PRECONDITION` in the following cases:\n  1. When reservation has child reservations. This check can be bypassed by\n     setting DeleteReservationRequest.force flag to true.\n  2. When top-level reservation with slot pools is being deleted.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}",
+                  "httpMethod": "DELETE",
+                  "id": "bigqueryreservation.projects.locations.reservations.delete",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "force": {
+                      "description": "If true, deletes all the child reservations of the given reservation.\nOtherwise, attempting to delete a reservation that has child\nreservations will fail with error code\n`google.rpc.Code.FAILED_PRECONDITION`.",
+                      "location": "query",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Resource name of the reservation to retrieve. E.g.,\n   projects/myproject/locations/us-central1/reservations/my_reservation",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/reservations/.*$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}",
+                  "response": {
+                    "$ref": "Empty"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "get": {
+                  "description": "Returns information about the reservation.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}",
+                  "httpMethod": "GET",
+                  "id": "bigqueryreservation.projects.locations.reservations.get",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "Resource name of the reservation to retrieve. E.g.,\n   projects/myproject/locations/us-central1/reservations/path/to/reserv",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/reservations/.*$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}",
+                  "response": {
+                    "$ref": "Reservation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "list": {
+                  "description": "Lists all the reservations for the project in the specified location.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations",
+                  "httpMethod": "GET",
+                  "id": "bigqueryreservation.projects.locations.reservations.list",
+                  "parameterOrder": [
+                    "parent"
+                  ],
+                  "parameters": {
+                    "filter": {
+                      "description": "Can be used to filter out reservations based on names, capacity, etc, e.g.:\nfilter=\"reservation.slot_capacity \u003e 200\"\nfilter=\"reservation.name = \\\"*dev/*\\\"\"\nAdvanced filtering syntax can be\n[here](https://cloud.google.com/logging/docs/view/advanced-filters).",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "pageSize": {
+                      "description": "The maximum number of items to return.",
+                      "format": "int32",
+                      "location": "query",
+                      "type": "integer"
+                    },
+                    "pageToken": {
+                      "description": "The next_page_token value returned from a previous List request, if any.",
+                      "location": "query",
+                      "type": "string"
+                    },
+                    "parent": {
+                      "description": "The parent resource name containing project and location, e.g.:\n  \"projects/myproject/locations/us-central1\"",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+parent}/reservations",
+                  "response": {
+                    "$ref": "ListReservationsResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
+                "patch": {
+                  "description": "Updates an existing reservation resource. Applicable only for child\nreservations.",
+                  "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}/{reservationsId1}",
+                  "httpMethod": "PATCH",
+                  "id": "bigqueryreservation.projects.locations.reservations.patch",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The resource name of the reservation, e.g.,\n\"projects/*/locations/*/reservations/dev/team/product\". Reservation names\n(e.g., \"dev/team/product\") exceeding a depth of six will fail with\n`google.rpc.Code.INVALID_ARGUMENT`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/reservations/[^/]+/.*$",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "updateMask": {
+                      "description": "Standard field mask for the set of fields to be updated.",
+                      "format": "google-fieldmask",
+                      "location": "query",
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1alpha2/{+name}",
+                  "request": {
+                    "$ref": "Reservation"
+                  },
+                  "response": {
+                    "$ref": "Reservation"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/bigquery",
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                }
+              },
+              "resources": {
+                "slotPools": {
+                  "methods": {
+                    "delete": {
+                      "description": "Deletes a slot pool. Attempting to delete slot pool before its\ncommitment_end_time will fail with the error code\n`google.rpc.Code.FAILED_PRECONDITION`.",
+                      "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}/slotPools/{slotPoolsId}",
+                      "httpMethod": "DELETE",
+                      "id": "bigqueryreservation.projects.locations.reservations.slotPools.delete",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "name": {
+                          "description": "Resource name of the slot pool to delete. E.g.,\n   projects/myproject/locations/us-central1/reservations/my_reservation/slotPools/123",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/reservations/[^/]+/slotPools/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha2/{+name}",
+                      "response": {
+                        "$ref": "Empty"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/bigquery",
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "get": {
+                      "description": "Returns information about the slot pool.",
+                      "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}/slotPools/{slotPoolsId}",
+                      "httpMethod": "GET",
+                      "id": "bigqueryreservation.projects.locations.reservations.slotPools.get",
+                      "parameterOrder": [
+                        "name"
+                      ],
+                      "parameters": {
+                        "name": {
+                          "description": "Resource name of the slot pool to retrieve. E.g.,\n   projects/myproject/locations/us-central1/reservations/my_reservation/slotPools/123",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/reservations/[^/]+/slotPools/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha2/{+name}",
+                      "response": {
+                        "$ref": "SlotPool"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/bigquery",
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    },
+                    "list": {
+                      "description": "Lists all the slot pools for the reservation.",
+                      "flatPath": "v1alpha2/projects/{projectsId}/locations/{locationsId}/reservations/{reservationsId}/slotPools",
+                      "httpMethod": "GET",
+                      "id": "bigqueryreservation.projects.locations.reservations.slotPools.list",
+                      "parameterOrder": [
+                        "parent"
+                      ],
+                      "parameters": {
+                        "pageSize": {
+                          "description": "The maximum number of items to return.",
+                          "format": "int32",
+                          "location": "query",
+                          "type": "integer"
+                        },
+                        "pageToken": {
+                          "description": "The next_page_token value returned from a previous List request, if any.",
+                          "location": "query",
+                          "type": "string"
+                        },
+                        "parent": {
+                          "description": "Resource name of the parent reservation. Only top-level reservations can\nhave slot pools. E.g.,\n   projects/myproject/locations/us-central1/reservations/my_reservation",
+                          "location": "path",
+                          "pattern": "^projects/[^/]+/locations/[^/]+/reservations/[^/]+$",
+                          "required": true,
+                          "type": "string"
+                        }
+                      },
+                      "path": "v1alpha2/{+parent}/slotPools",
+                      "response": {
+                        "$ref": "ListSlotPoolsResponse"
+                      },
+                      "scopes": [
+                        "https://www.googleapis.com/auth/bigquery",
+                        "https://www.googleapis.com/auth/cloud-platform"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20200220",
+  "rootUrl": "https://bigqueryreservation.googleapis.com/",
+  "schemas": {
+    "CreateSlotPoolMetadata": {
+      "description": "The metadata for operation returned from\nReservationService.CreateSlotPool.",
+      "id": "CreateSlotPoolMetadata",
+      "properties": {
+        "slotPool": {
+          "description": "Resource name of the slot pool that is being created. E.g.,\nprojects/myproject/locations/us-central1/reservations/foo/slotPools/123",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Empty": {
+      "description": "A generic empty message that you can re-use to avoid defining duplicated\nempty messages in your APIs. A typical example is to use it as the request\nor the response type of an API method. For instance:\n\n    service Foo {\n      rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n    }\n\nThe JSON representation for `Empty` is empty JSON object `{}`.",
+      "id": "Empty",
+      "properties": {},
+      "type": "object"
+    },
+    "ListReservationGrantsResponse": {
+      "description": "The response for ReservationService.ListReservationGrants.",
+      "id": "ListReservationGrantsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Token to retrieve the next page of results, or empty if there are no\nmore results in the list.",
+          "type": "string"
+        },
+        "reservationGrants": {
+          "description": "List of reservation grants visible to the user.",
+          "items": {
+            "$ref": "ReservationGrant"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListReservationsResponse": {
+      "description": "The response for ReservationService.ListReservations.",
+      "id": "ListReservationsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Token to retrieve the next page of results, or empty if there are no\nmore results in the list.",
+          "type": "string"
+        },
+        "reservations": {
+          "description": "List of reservations visible to the user.",
+          "items": {
+            "$ref": "Reservation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListSlotPoolsResponse": {
+      "description": "The response for ReservationService.ListSlotPools.",
+      "id": "ListSlotPoolsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Token to retrieve the next page of results, or empty if there are no\nmore results in the list.",
+          "type": "string"
+        },
+        "slotPools": {
+          "description": "List of slot pools visible to the user.",
+          "items": {
+            "$ref": "SlotPool"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call.",
+      "id": "Operation",
+      "properties": {
+        "done": {
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable.",
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`.",
+          "type": "string"
+        },
+        "response": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The normal response of the operation in case of success.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Reservation": {
+      "description": "A reservation is a mechanism used to guarantee slots to users.",
+      "id": "Reservation",
+      "properties": {
+        "name": {
+          "description": "The resource name of the reservation, e.g.,\n\"projects/*/locations/*/reservations/dev/team/product\". Reservation names\n(e.g., \"dev/team/product\") exceeding a depth of six will fail with\n`google.rpc.Code.INVALID_ARGUMENT`.",
+          "type": "string"
+        },
+        "slotCapacity": {
+          "description": "Maximum slots available to this reservation and its children. A slot is a\nunit of computational power in BigQuery, and serves as the unit of\nparallelism. In a scan of a multi-partitioned table, a single slot operates\non a single partition of the table.\n\nIf the new reservation's slot capacity exceed the parent's slot capacity or\nif total slot capacity of the new reservation and its siblings exceeds the\nparent's slot capacity, the request will fail with\n`google.rpc.Code.RESOURCE_EXHAUSTED`.",
+          "format": "int64",
+          "type": "string"
+        },
+        "useParentReservation": {
+          "description": "If true, any query using this reservation will also be submitted to the\nparent reservation. This allows the query to share the additional slot\ncapacity of the parent with other queries in the parent reservation. If the\nparent also has this field set to true, then this process will continue\nuntil it encounters a reservation for which this is false.\nIf false, a query using this reservation will\nexecute with the maximum slot capacity as specified above.\nIf not specified, default value is true.\nIgnored for top-level reservation.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ReservationGrant": {
+      "description": "A ReservationGrant allows a project to submit jobs\nof a certain type using slots from the specified reservation.",
+      "id": "ReservationGrant",
+      "properties": {
+        "grantee": {
+          "description": "The resource which will use the reservation. E.g.\nprojects/myproject, folders/123, organizations/456.",
+          "type": "string"
+        },
+        "jobType": {
+          "description": "Which type of jobs will use the reservation.",
+          "enum": [
+            "JOB_TYPE_UNSPECIFIED",
+            "PIPELINE",
+            "QUERY"
+          ],
+          "enumDescriptions": [
+            "Invalid type. Requests with this value will be rejected with\nerror code `google.rpc.Code.INVALID_ARGUMENT`.",
+            "Pipeline (load/export) jobs from the project will use the reservation.",
+            "Query jobs from the project will use the reservation."
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "Output only. Name of the resource. E.g.:\nprojects/myproject/locations/eu/reservationGrants/123.",
+          "type": "string"
+        },
+        "reservation": {
+          "description": "Resource name of the reservation.\nE.g., projects/myproject/locations/eu/reservations/my_reservation.\nThis reservation must be in the same location as the grant.\nThis reservation should belong to the same parent project.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Output only. State of the ReservationGrant.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "PENDING",
+            "ACTIVE"
+          ],
+          "enumDescriptions": [
+            "Invalid state value.",
+            "Queries from grantee will be executed as on-demand, if related\nReservationGrant is pending.",
+            "ReservationGrant is ready."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SearchReservationGrantsResponse": {
+      "description": "The response for ReservationService.SearchReservationGrants.",
+      "id": "SearchReservationGrantsResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Token to retrieve the next page of results, or empty if there are no\nmore results in the list.",
+          "type": "string"
+        },
+        "reservationGrants": {
+          "description": "List of reservation grants visible to the user.",
+          "items": {
+            "$ref": "ReservationGrant"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "SlotPool": {
+      "description": "Slot pool is a way to purchase slots with some minimum committed period of\nusage. Slot pool is immutable and cannot be deleted until the end of the\ncommitment period. After the end of the commitment period, slots are still\navailable but can be freely removed any time. Annual commitments will\nautomatically be downgraded to monthly after the commitment ends.\n\nA slot pool resource exists as a child resource of a top-level reservation.\nSum of all the ACTIVE pools slot_count is always equal to the reservation\nslot_capacity.",
+      "id": "SlotPool",
+      "properties": {
+        "commitmentEndTime": {
+          "description": "Output only. The end of the commitment period. Slot pool cannot be\nremoved before commitment_end_time. It is applicable only for ACTIVE slot\npools and is computed as a combination of the plan and the time when the\nslot pool became ACTIVE.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "failureStatus": {
+          "$ref": "Status",
+          "description": "Output only. For FAILED slot pool, provides the reason of failure."
+        },
+        "name": {
+          "description": "Output only. The resource name of the slot pool, e.g.,\n   projects/myproject/locations/us-central1/reservations/myreservation/slotPools/123",
+          "type": "string"
+        },
+        "plan": {
+          "description": "Slot pool commitment plan.",
+          "enum": [
+            "COMMITMENT_PLAN_UNSPECIFIED",
+            "FLEX",
+            "MONTHLY",
+            "ANNUAL"
+          ],
+          "enumDescriptions": [
+            "Invalid plan value. Requests with this value will be rejected with\nerror code `google.rpc.Code.INVALID_ARGUMENT`.",
+            "Slot pool can be removed at any point, even after becoming ACTIVE.",
+            "Slot pool cannot be removed for 30 days after becoming ACTIVE.",
+            "Slot pool cannot be removed for 365 days after becoming ACTIVE.\nNote: annual commitments are automatically downgraded to monthly after\n365 days."
+          ],
+          "type": "string"
+        },
+        "slotCount": {
+          "description": "Number of slots in this pool.",
+          "format": "int64",
+          "type": "string"
+        },
+        "state": {
+          "description": "Output only.",
+          "enum": [
+            "STATE_UNSPECIFIED",
+            "PENDING",
+            "ACTIVE",
+            "FAILED"
+          ],
+          "enumDescriptions": [
+            "Invalid state value.",
+            "Slot pool is pending provisioning. Pending slot pool does not\ncontribute to the parent's slot_capacity.",
+            "Once slots are provisioned, slot pool becomes active. slot_count is\nadded to the parent's slot_capacity.",
+            "Slot pool is failed to be activated by the backend."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors).",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use.",
+          "items": {
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\ngoogle.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "BigQuery Reservation API",
+  "version": "v1alpha2",
+  "version_module": true
+}

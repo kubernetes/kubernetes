@@ -1,0 +1,533 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Lake Formation</fullname> <p>Defines the public endpoint for the AWS Lake Formation service.</p>",
+  "operations": {
+    "BatchGrantPermissions": "<p>Batch operation to grant permissions to the principal.</p>",
+    "BatchRevokePermissions": "<p>Batch operation to revoke permissions from the principal.</p>",
+    "DeregisterResource": "<p>Deregisters the resource as managed by the Data Catalog.</p> <p>When you deregister a path, Lake Formation removes the path from the inline policy attached to your service-linked role.</p>",
+    "DescribeResource": "<p>Retrieves the current data access role for the given resource registered in AWS Lake Formation.</p>",
+    "GetDataLakeSettings": "<p>Retrieves the list of the data lake administrators of a Lake Formation-managed data lake. </p>",
+    "GetEffectivePermissionsForPath": "<p>Returns the Lake Formation permissions for a specified table or database resource located at a path in Amazon S3. <code>GetEffectivePermissionsForPath</code> will not return databases and tables if the catalog is encrypted.</p>",
+    "GrantPermissions": "<p>Grants permissions to the principal to access metadata in the Data Catalog and data organized in underlying data storage such as Amazon S3.</p> <p>For information about permissions, see <a href=\"https://docs-aws.amazon.com/lake-formation/latest/dg/security-data-access.html\">Security and Access Control to Metadata and Data</a>.</p>",
+    "ListPermissions": "<p>Returns a list of the principal permissions on the resource, filtered by the permissions of the caller. For example, if you are granted an ALTER permission, you are able to see only the principal permissions for ALTER.</p> <p>This operation returns only those permissions that have been explicitly granted.</p> <p>For information about permissions, see <a href=\"https://docs-aws.amazon.com/lake-formation/latest/dg/security-data-access.html\">Security and Access Control to Metadata and Data</a>.</p>",
+    "ListResources": "<p>Lists the resources registered to be managed by the Data Catalog.</p>",
+    "PutDataLakeSettings": "<p>Sets the list of data lake administrators who have admin privileges on all resources managed by Lake Formation. For more information on admin privileges, see <a href=\"https://docs.aws.amazon.com/lake-formation/latest/dg/lake-formation-permissions.html\">Granting Lake Formation Permissions</a>.</p> <p>This API replaces the current list of data lake admins with the new list being passed. To add an admin, fetch the current list and add the new admin to that list and pass that list in this API.</p>",
+    "RegisterResource": "<p>Registers the resource as managed by the Data Catalog.</p> <p>To add or update data, Lake Formation needs read/write access to the chosen Amazon S3 path. Choose a role that you know has permission to do this, or choose the AWSServiceRoleForLakeFormationDataAccess service-linked role. When you register the first Amazon S3 path, the service-linked role and a new inline policy are created on your behalf. Lake Formation adds the first path to the inline policy and attaches it to the service-linked role. When you register subsequent paths, Lake Formation adds the path to the existing policy.</p> <p>The following request registers a new location and gives AWS Lake Formation permission to use the service-linked role to access that location.</p> <p> <code>ResourceArn = arn:aws:s3:::my-bucket UseServiceLinkedRole = true</code> </p> <p>If <code>UseServiceLinkedRole</code> is not set to true, you must provide or set the <code>RoleArn</code>:</p> <p> <code>arn:aws:iam::12345:role/my-data-access-role</code> </p>",
+    "RevokePermissions": "<p>Revokes permissions to the principal to access metadata in the Data Catalog and data organized in underlying data storage such as Amazon S3.</p>",
+    "UpdateResource": "<p>Updates the data access role used for vending access to the given (registered) resource in AWS Lake Formation. </p>"
+  },
+  "shapes": {
+    "AlreadyExistsException": {
+      "base": "<p>A resource to be created or added already exists.</p>",
+      "refs": {
+      }
+    },
+    "BatchGrantPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGrantPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPermissionsFailureEntry": {
+      "base": "<p>A list of failures when performing a batch grant or batch revoke operation.</p>",
+      "refs": {
+        "BatchPermissionsFailureList$member": null
+      }
+    },
+    "BatchPermissionsFailureList": {
+      "base": null,
+      "refs": {
+        "BatchGrantPermissionsResponse$Failures": "<p>A list of failures to grant permissions to the resources.</p>",
+        "BatchRevokePermissionsResponse$Failures": "<p>A list of failures to revoke permissions to the resources.</p>"
+      }
+    },
+    "BatchPermissionsRequestEntry": {
+      "base": "<p>A permission to a resource granted by batch operation to the principal.</p>",
+      "refs": {
+        "BatchPermissionsFailureEntry$RequestEntry": "<p>An identifier for an entry of the batch request.</p>",
+        "BatchPermissionsRequestEntryList$member": null
+      }
+    },
+    "BatchPermissionsRequestEntryList": {
+      "base": null,
+      "refs": {
+        "BatchGrantPermissionsRequest$Entries": "<p>A list of up to 20 entries for resource permissions to be granted by batch operation to the principal.</p>",
+        "BatchRevokePermissionsRequest$Entries": "<p>A list of up to 20 entries for resource permissions to be revoked by batch operation to the principal.</p>"
+      }
+    },
+    "BatchRevokePermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchRevokePermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CatalogIdString": {
+      "base": null,
+      "refs": {
+        "BatchGrantPermissionsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "BatchRevokePermissionsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "DataLocationResource$CatalogId": "<p>The identifier for the Data Catalog where the location is registered with AWS Lake Formation. By default, it is the account ID of the caller.</p>",
+        "DatabaseResource$CatalogId": "<p>The identifier for the Data Catalog. By default, it is the account ID of the caller.</p>",
+        "GetDataLakeSettingsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "GetEffectivePermissionsForPathRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "GrantPermissionsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "ListPermissionsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "PutDataLakeSettingsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "RevokePermissionsRequest$CatalogId": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>",
+        "TableResource$CatalogId": "<p>The identifier for the Data Catalog. By default, it is the account ID of the caller.</p>",
+        "TableWithColumnsResource$CatalogId": "<p>The identifier for the Data Catalog. By default, it is the account ID of the caller.</p>",
+        "TrustedResourceOwners$member": null
+      }
+    },
+    "CatalogResource": {
+      "base": "<p>A structure for the catalog object.</p>",
+      "refs": {
+        "Resource$Catalog": "<p>The identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your AWS Lake Formation environment. </p>"
+      }
+    },
+    "ColumnNames": {
+      "base": null,
+      "refs": {
+        "ColumnWildcard$ExcludedColumnNames": "<p>Excludes column names. Any column with this name will be excluded.</p>",
+        "TableWithColumnsResource$ColumnNames": "<p>The list of column names for the table. At least one of <code>ColumnNames</code> or <code>ColumnWildcard</code> is required.</p>"
+      }
+    },
+    "ColumnWildcard": {
+      "base": "<p>A wildcard object, consisting of an optional list of excluded column names or indexes.</p>",
+      "refs": {
+        "TableWithColumnsResource$ColumnWildcard": "<p>A wildcard specified by a <code>ColumnWildcard</code> object. At least one of <code>ColumnNames</code> or <code>ColumnWildcard</code> is required.</p>"
+      }
+    },
+    "ComparisonOperator": {
+      "base": null,
+      "refs": {
+        "FilterCondition$ComparisonOperator": "<p>The comparison operator used in the filter condition.</p>"
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p>Two processes are trying to modify a resource simultaneously.</p>",
+      "refs": {
+      }
+    },
+    "DataLakePrincipal": {
+      "base": "<p>The AWS Lake Formation principal. Supported principals are IAM users or IAM roles.</p>",
+      "refs": {
+        "BatchPermissionsRequestEntry$Principal": "<p>The principal to be granted a permission.</p>",
+        "DataLakePrincipalList$member": null,
+        "GrantPermissionsRequest$Principal": "<p>The principal to be granted the permissions on the resource. Supported principals are IAM users or IAM roles, and they are defined by their principal type and their ARN.</p> <p>Note that if you define a resource with a particular ARN, then later delete, and recreate a resource with that same ARN, the resource maintains the permissions already granted. </p>",
+        "ListPermissionsRequest$Principal": "<p>Specifies a principal to filter the permissions returned.</p>",
+        "PrincipalPermissions$Principal": "<p>The principal who is granted permissions.</p>",
+        "PrincipalResourcePermissions$Principal": "<p>The Data Lake principal to be granted or revoked permissions.</p>",
+        "RevokePermissionsRequest$Principal": "<p>The principal to be revoked permissions on the resource.</p>"
+      }
+    },
+    "DataLakePrincipalList": {
+      "base": null,
+      "refs": {
+        "DataLakeSettings$DataLakeAdmins": "<p>A list of AWS Lake Formation principals. Supported principals are IAM users or IAM roles.</p>"
+      }
+    },
+    "DataLakePrincipalString": {
+      "base": null,
+      "refs": {
+        "DataLakePrincipal$DataLakePrincipalIdentifier": "<p>An identifier for the AWS Lake Formation principal.</p>"
+      }
+    },
+    "DataLakeResourceType": {
+      "base": null,
+      "refs": {
+        "ListPermissionsRequest$ResourceType": "<p>Specifies a resource type to filter the permissions returned.</p>"
+      }
+    },
+    "DataLakeSettings": {
+      "base": "<p>A structure representing a list of AWS Lake Formation principals designated as data lake administrators and lists of principal permission entries for default create database and default create table permissions.</p>",
+      "refs": {
+        "GetDataLakeSettingsResponse$DataLakeSettings": "<p>A structure representing a list of AWS Lake Formation principals designated as data lake administrators.</p>",
+        "PutDataLakeSettingsRequest$DataLakeSettings": "<p>A structure representing a list of AWS Lake Formation principals designated as data lake administrators.</p>"
+      }
+    },
+    "DataLocationResource": {
+      "base": "<p>A structure for a data location object where permissions are granted or revoked. </p>",
+      "refs": {
+        "Resource$DataLocation": "<p>The location of an Amazon S3 path where permissions are granted or revoked. </p>"
+      }
+    },
+    "DatabaseResource": {
+      "base": "<p>A structure for the database object.</p>",
+      "refs": {
+        "Resource$Database": "<p>The database for the resource. Unique to the Data Catalog. A database is a set of associated table definitions organized into a logical group. You can Grant and Revoke database permissions to a principal. </p>"
+      }
+    },
+    "DeregisterResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescriptionString": {
+      "base": null,
+      "refs": {
+        "ErrorDetail$ErrorMessage": "<p>A message describing the error.</p>"
+      }
+    },
+    "DetailsMap": {
+      "base": "<p>A structure containing the additional details to be returned in the <code>AdditionalDetails</code> attribute of <code>PrincipalResourcePermissions</code>.</p> <p>If a catalog resource is shared through AWS Resource Access Manager (AWS RAM), then there will exist a corresponding RAM share resource ARN.</p>",
+      "refs": {
+        "PrincipalResourcePermissions$AdditionalDetails": "<p>This attribute can be used to return any additional details of <code>PrincipalResourcePermissions</code>. Currently returns only as a RAM share resource ARN.</p>"
+      }
+    },
+    "EntityNotFoundException": {
+      "base": "<p>A specified entity does not exist</p>",
+      "refs": {
+      }
+    },
+    "ErrorDetail": {
+      "base": "<p>Contains details about an error.</p>",
+      "refs": {
+        "BatchPermissionsFailureEntry$Error": "<p>An error message that applies to the failure of the entry.</p>"
+      }
+    },
+    "FieldNameString": {
+      "base": null,
+      "refs": {
+        "FilterCondition$Field": "<p>The field to filter in the filter condition.</p>"
+      }
+    },
+    "FilterCondition": {
+      "base": "<p>This structure describes the filtering of columns in a table based on a filter condition.</p>",
+      "refs": {
+        "FilterConditionList$member": null
+      }
+    },
+    "FilterConditionList": {
+      "base": null,
+      "refs": {
+        "ListResourcesRequest$FilterConditionList": "<p>Any applicable row-level and/or column-level filtering conditions for the resources.</p>"
+      }
+    },
+    "GetDataLakeSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDataLakeSettingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEffectivePermissionsForPathRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEffectivePermissionsForPathResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GrantPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GrantPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IAMRoleArn": {
+      "base": null,
+      "refs": {
+        "RegisterResourceRequest$RoleArn": "<p>The identifier for the role that registers the resource.</p>",
+        "ResourceInfo$RoleArn": "<p>The IAM role that registered a resource.</p>",
+        "UpdateResourceRequest$RoleArn": "<p>The new role to use for the given resource registered in AWS Lake Formation.</p>"
+      }
+    },
+    "Identifier": {
+      "base": null,
+      "refs": {
+        "BatchPermissionsRequestEntry$Id": "<p>A unique identifier for the batch permissions request entry.</p>"
+      }
+    },
+    "InternalServiceException": {
+      "base": "<p>An internal service error occurred.</p>",
+      "refs": {
+      }
+    },
+    "InvalidInputException": {
+      "base": "<p>The input provided was not valid.</p>",
+      "refs": {
+      }
+    },
+    "LastModifiedTimestamp": {
+      "base": null,
+      "refs": {
+        "ResourceInfo$LastModified": "<p>The date and time the resource was last modified.</p>"
+      }
+    },
+    "ListPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MessageString": {
+      "base": null,
+      "refs": {
+        "AlreadyExistsException$Message": "<p>A message describing the problem.</p>",
+        "ConcurrentModificationException$Message": "<p>A message describing the problem.</p>",
+        "EntityNotFoundException$Message": "<p>A message describing the problem.</p>",
+        "InternalServiceException$Message": "<p>A message describing the problem.</p>",
+        "InvalidInputException$Message": "<p>A message describing the problem.</p>",
+        "OperationTimeoutException$Message": "<p>A message describing the problem.</p>"
+      }
+    },
+    "NameString": {
+      "base": null,
+      "refs": {
+        "ColumnNames$member": null,
+        "DatabaseResource$Name": "<p>The name of the database resource. Unique to the Data Catalog.</p>",
+        "ErrorDetail$ErrorCode": "<p>The code associated with this error.</p>",
+        "TableResource$DatabaseName": "<p>The name of the database for the table. Unique to a Data Catalog. A database is a set of associated table definitions organized into a logical group. You can Grant and Revoke database privileges to a principal. </p>",
+        "TableResource$Name": "<p>The name of the table.</p>",
+        "TableWithColumnsResource$DatabaseName": "<p>The name of the database for the table with columns resource. Unique to the Data Catalog. A database is a set of associated table definitions organized into a logical group. You can Grant and Revoke database privileges to a principal. </p>",
+        "TableWithColumnsResource$Name": "<p>The name of the table resource. A table is a metadata definition that represents your data. You can Grant and Revoke table privileges to a principal. </p>"
+      }
+    },
+    "NullableBoolean": {
+      "base": null,
+      "refs": {
+        "RegisterResourceRequest$UseServiceLinkedRole": "<p>Designates an AWS Identity and Access Management (IAM) service-linked role by registering this role with the Data Catalog. A service-linked role is a unique type of IAM role that is linked directly to Lake Formation.</p> <p>For more information, see <a href=\"https://docs-aws.amazon.com/lake-formation/latest/dg/service-linked-roles.html\">Using Service-Linked Roles for Lake Formation</a>.</p>"
+      }
+    },
+    "OperationTimeoutException": {
+      "base": "<p>The operation timed out.</p>",
+      "refs": {
+      }
+    },
+    "PageSize": {
+      "base": null,
+      "refs": {
+        "GetEffectivePermissionsForPathRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "ListPermissionsRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "ListResourcesRequest$MaxResults": "<p>The maximum number of resource results.</p>"
+      }
+    },
+    "Permission": {
+      "base": null,
+      "refs": {
+        "PermissionList$member": null
+      }
+    },
+    "PermissionList": {
+      "base": null,
+      "refs": {
+        "BatchPermissionsRequestEntry$Permissions": "<p>The permissions to be granted.</p>",
+        "BatchPermissionsRequestEntry$PermissionsWithGrantOption": "<p>Indicates if the option to pass permissions is granted.</p>",
+        "GrantPermissionsRequest$Permissions": "<p>The permissions granted to the principal on the resource. AWS Lake Formation defines privileges to grant and revoke access to metadata in the Data Catalog and data organized in underlying data storage such as Amazon S3. AWS Lake Formation requires that each principal be authorized to perform a specific task on AWS Lake Formation resources. </p>",
+        "GrantPermissionsRequest$PermissionsWithGrantOption": "<p>Indicates a list of the granted permissions that the principal may pass to other users. These permissions may only be a subset of the permissions granted in the <code>Privileges</code>.</p>",
+        "PrincipalPermissions$Permissions": "<p>The permissions that are granted to the principal.</p>",
+        "PrincipalResourcePermissions$Permissions": "<p>The permissions to be granted or revoked on the resource.</p>",
+        "PrincipalResourcePermissions$PermissionsWithGrantOption": "<p>Indicates whether to grant the ability to grant permissions (as a subset of permissions granted).</p>",
+        "RevokePermissionsRequest$Permissions": "<p>The permissions revoked to the principal on the resource. For information about permissions, see <a href=\"https://docs-aws.amazon.com/lake-formation/latest/dg/security-data-access.html\">Security and Access Control to Metadata and Data</a>.</p>",
+        "RevokePermissionsRequest$PermissionsWithGrantOption": "<p>Indicates a list of permissions for which to revoke the grant option allowing the principal to pass permissions to other principals.</p>"
+      }
+    },
+    "PrincipalPermissions": {
+      "base": "<p>Permissions granted to a principal.</p>",
+      "refs": {
+        "PrincipalPermissionsList$member": null
+      }
+    },
+    "PrincipalPermissionsList": {
+      "base": null,
+      "refs": {
+        "DataLakeSettings$CreateDatabaseDefaultPermissions": "<p>A structure representing a list of up to three principal permissions entries for default create database permissions.</p>",
+        "DataLakeSettings$CreateTableDefaultPermissions": "<p>A structure representing a list of up to three principal permissions entries for default create table permissions.</p>"
+      }
+    },
+    "PrincipalResourcePermissions": {
+      "base": "<p>The permissions granted or revoked on a resource.</p>",
+      "refs": {
+        "PrincipalResourcePermissionsList$member": null
+      }
+    },
+    "PrincipalResourcePermissionsList": {
+      "base": null,
+      "refs": {
+        "GetEffectivePermissionsForPathResponse$Permissions": "<p>A list of the permissions for the specified table or database resource located at the path in Amazon S3.</p>",
+        "ListPermissionsResponse$PrincipalResourcePermissions": "<p>A list of principals and their permissions on the resource for the specified principal and resource types.</p>"
+      }
+    },
+    "PutDataLakeSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutDataLakeSettingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RAMResourceShareArn": {
+      "base": null,
+      "refs": {
+        "ResourceShareList$member": null
+      }
+    },
+    "RegisterResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Resource": {
+      "base": "<p>A structure for the resource.</p>",
+      "refs": {
+        "BatchPermissionsRequestEntry$Resource": "<p>The resource to which the principal is to be granted a permission.</p>",
+        "GrantPermissionsRequest$Resource": "<p>The resource to which permissions are to be granted. Resources in AWS Lake Formation are the Data Catalog, databases, and tables.</p>",
+        "ListPermissionsRequest$Resource": "<p>A resource where you will get a list of the principal permissions.</p> <p>This operation does not support getting privileges on a table with columns. Instead, call this operation on the table, and the operation returns the table and the table w columns.</p>",
+        "PrincipalResourcePermissions$Resource": "<p>The resource where permissions are to be granted or revoked.</p>",
+        "RevokePermissionsRequest$Resource": "<p>The resource to which permissions are to be revoked.</p>"
+      }
+    },
+    "ResourceArnString": {
+      "base": null,
+      "refs": {
+        "DataLocationResource$ResourceArn": "<p>The Amazon Resource Name (ARN) that uniquely identifies the data location resource.</p>",
+        "DeregisterResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource that you want to deregister.</p>",
+        "DescribeResourceRequest$ResourceArn": "<p>The resource ARN.</p>",
+        "GetEffectivePermissionsForPathRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource for which you want to get permissions.</p>",
+        "RegisterResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource that you want to register.</p>",
+        "ResourceInfo$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "UpdateResourceRequest$ResourceArn": "<p>The resource ARN.</p>"
+      }
+    },
+    "ResourceInfo": {
+      "base": "<p>A structure containing information about an AWS Lake Formation resource.</p>",
+      "refs": {
+        "DescribeResourceResponse$ResourceInfo": "<p>A structure containing information about an AWS Lake Formation resource.</p>",
+        "ResourceInfoList$member": null
+      }
+    },
+    "ResourceInfoList": {
+      "base": null,
+      "refs": {
+        "ListResourcesResponse$ResourceInfoList": "<p>A summary of the data lake resources.</p>"
+      }
+    },
+    "ResourceShareList": {
+      "base": null,
+      "refs": {
+        "DetailsMap$ResourceShare": "<p>A share resource ARN for a catalog resource shared through AWS Resource Access Manager (AWS RAM).</p>"
+      }
+    },
+    "RevokePermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokePermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StringValue": {
+      "base": null,
+      "refs": {
+        "StringValueList$member": null
+      }
+    },
+    "StringValueList": {
+      "base": null,
+      "refs": {
+        "FilterCondition$StringValueList": "<p>A string with values used in evaluating the filter condition.</p>"
+      }
+    },
+    "TableResource": {
+      "base": "<p>A structure for the table object. A table is a metadata definition that represents your data. You can Grant and Revoke table privileges to a principal. </p>",
+      "refs": {
+        "Resource$Table": "<p>The table for the resource. A table is a metadata definition that represents your data. You can Grant and Revoke table privileges to a principal. </p>"
+      }
+    },
+    "TableWildcard": {
+      "base": "<p>A wildcard object representing every table under a database.</p>",
+      "refs": {
+        "TableResource$TableWildcard": "<p>A wildcard object representing every table under a database.</p> <p>At least one of <code>TableResource$Name</code> or <code>TableResource$TableWildcard</code> is required.</p>"
+      }
+    },
+    "TableWithColumnsResource": {
+      "base": "<p>A structure for a table with columns object. This object is only used when granting a SELECT permission.</p> <p>This object must take a value for at least one of <code>ColumnsNames</code>, <code>ColumnsIndexes</code>, or <code>ColumnsWildcard</code>.</p>",
+      "refs": {
+        "Resource$TableWithColumns": "<p>The table with columns for the resource. A principal with permissions to this resource can select metadata from the columns of a table in the Data Catalog and the underlying data in Amazon S3.</p>"
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "GetEffectivePermissionsForPathRequest$NextToken": "<p>A continuation token, if this is not the first call to retrieve this list.</p>",
+        "GetEffectivePermissionsForPathResponse$NextToken": "<p>A continuation token, if this is not the first call to retrieve this list.</p>",
+        "ListPermissionsRequest$NextToken": "<p>A continuation token, if this is not the first call to retrieve this list.</p>",
+        "ListPermissionsResponse$NextToken": "<p>A continuation token, if this is not the first call to retrieve this list.</p>",
+        "ListResourcesRequest$NextToken": "<p>A continuation token, if this is not the first call to retrieve these resources.</p>",
+        "ListResourcesResponse$NextToken": "<p>A continuation token, if this is not the first call to retrieve these resources.</p>"
+      }
+    },
+    "TrustedResourceOwners": {
+      "base": null,
+      "refs": {
+        "DataLakeSettings$TrustedResourceOwners": "<p>A list of the resource-owning account IDs that the caller's account can use to share their user access details (user ARNs). The user ARNs can be logged in the resource owner's AWS CloudTrail log.</p> <p>You may want to specify this property when you are in a high-trust boundary, such as the same team or company. </p>"
+      }
+    },
+    "UpdateResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

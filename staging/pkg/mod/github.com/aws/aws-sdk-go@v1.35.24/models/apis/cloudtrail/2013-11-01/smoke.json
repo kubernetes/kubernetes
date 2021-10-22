@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeTrails",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DeleteTrail",
+            "input": {
+                "Name": "faketrail"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

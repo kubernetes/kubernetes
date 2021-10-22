@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListEventTypes": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "EventTypes"
+    },
+    "ListNotificationRules": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "NotificationRules"
+    },
+    "ListTargets": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Targets"
+    }
+  }
+}

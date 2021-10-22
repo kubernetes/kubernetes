@@ -1,0 +1,19 @@
+{
+  "include": [
+    "../../services/storage/mgmt/2016-01-01/storage",
+    "../../services/network/mgmt/2015-06-15/network",
+    "../../services/compute/mgmt/2016-03-30/compute",
+    "../../services/keyvault/2016-10-01/keyvault",
+    "../../services/keyvault/mgmt/2016-10-01/keyvault",
+    "../../services/resources/mgmt/2015-12-01/features",
+    "../../services/resources/mgmt/2016-09-01/links",
+    "../../services/resources/mgmt/2015-01-01/locks",
+    "../../services/preview/resources/mgmt/2015-10-01-preview/policy",
+    "../../services/resources/mgmt/2016-02-01/resources",
+    "../../services/resources/mgmt/2016-06-01/subscriptions"
+  ],
+  "pathOverride": {
+    "github.com/Azure/azure-sdk-for-go/services/preview/resources/mgmt/2015-10-01-preview/policy": "resources/mgmt/policy",
+    "github.com/Azure/azure-sdk-for-go/services/preview/resources/mgmt/2015-10-01-preview/policy/policyapi": "resources/mgmt/policy/policyapi"
+  }
+}

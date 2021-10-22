@@ -1,0 +1,102 @@
+{
+  "version": "1.0",
+  "examples": {
+    "DeleteReportDefinition": [
+      {
+        "input": {
+          "ReportName": "ExampleReport"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example deletes the AWS Cost and Usage report named ExampleReport.",
+        "id": "to-delete-a-report",
+        "title": "To delete the AWS Cost and Usage report named ExampleReport."
+      }
+    ],
+    "DescribeReportDefinitions": [
+      {
+        "input": {
+          "MaxResults": 5
+        },
+        "output": {
+          "ReportDefinitions": [
+            {
+              "AdditionalArtifacts": [
+                "QUICKSIGHT"
+              ],
+              "AdditionalSchemaElements": [
+                "RESOURCES"
+              ],
+              "Compression": "GZIP",
+              "Format": "textORcsv",
+              "ReportName": "ExampleReport",
+              "S3Bucket": "example-s3-bucket",
+              "S3Prefix": "exampleprefix",
+              "S3Region": "us-east-1",
+              "TimeUnit": "HOURLY"
+            },
+            {
+              "AdditionalArtifacts": [
+                "QUICKSIGHT"
+              ],
+              "AdditionalSchemaElements": [
+                "RESOURCES"
+              ],
+              "Compression": "GZIP",
+              "Format": "textORcsv",
+              "ReportName": "ExampleReport2",
+              "S3Bucket": "example-s3-bucket",
+              "S3Prefix": "exampleprefix",
+              "S3Region": "us-east-1",
+              "TimeUnit": "HOURLY"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists the AWS Cost and Usage reports for the account.",
+        "id": "to-retrieve-report-definitions",
+        "title": "To list the AWS Cost and Usage reports for the account."
+      }
+    ],
+    "PutReportDefinition": [
+      {
+        "input": {
+          "ReportDefinition": {
+            "AdditionalArtifacts": [
+              "REDSHIFT",
+              "QUICKSIGHT"
+            ],
+            "AdditionalSchemaElements": [
+              "RESOURCES"
+            ],
+            "Compression": "ZIP",
+            "Format": "textORcsv",
+            "ReportName": "ExampleReport",
+            "S3Bucket": "example-s3-bucket",
+            "S3Prefix": "exampleprefix",
+            "S3Region": "us-east-1",
+            "TimeUnit": "DAILY"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates a AWS Cost and Usage report named ExampleReport.",
+        "id": "to-create-a-report-definitions",
+        "title": "To create a report named ExampleReport."
+      }
+    ]
+  }
+}

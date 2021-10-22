@@ -1,0 +1,363 @@
+{
+  "version" : "2.0",
+  "service" : "<p>The AWS Serverless Application Repository makes it easy for developers and enterprises to quickly find\n and deploy serverless applications in the AWS Cloud. For more information about serverless applications,\n see Serverless Computing and Applications on the AWS website.</p><p>The AWS Serverless Application Repository is deeply integrated with the AWS Lambda console, so that developers of \n all levels can get started with serverless computing without needing to learn anything new. You can use category \n keywords to browse for applications such as web and mobile backends, data processing applications, or chatbots. \n You can also search for applications by name, publisher, or event source. To use an application, you simply choose it, \n configure any required fields, and deploy it with a few clicks. </p><p>You can also easily publish applications, sharing them publicly with the community at large, or privately\n within your team or across your organization. To publish a serverless application (or app), you can use the\n AWS Management Console, AWS Command Line Interface (AWS CLI), or AWS SDKs to upload the code. Along with the\n code, you upload a simple manifest file, also known as the AWS Serverless Application Model (AWS SAM) template.\n For more information about AWS SAM, see AWS Serverless Application Model (AWS SAM) on the AWS Labs\n GitHub repository.</p><p>The AWS Serverless Application Repository Developer Guide contains more information about the two developer\n experiences available:</p><ul>\n <li>\n <p>Consuming Applications – Browse for applications and view information about them, including\n source code and readme files. Also install, configure, and deploy applications of your choosing. </p>\n <p>Publishing Applications – Configure and upload applications to make them available to other\n developers, and publish new versions of applications. </p>\n </li>\n </ul>",
+  "operations" : {
+    "CreateApplication" : "<p>Creates an application, optionally including an AWS SAM file to create the first application version in the same call.</p>",
+    "CreateApplicationVersion" : "<p>Creates an application version.</p>",
+    "CreateCloudFormationChangeSet" : "<p>Creates an AWS CloudFormation change set for the given application.</p>",
+    "CreateCloudFormationTemplate" : "<p>Creates an AWS CloudFormation template.</p>",
+    "DeleteApplication" : "<p>Deletes the specified application.</p>",
+    "GetApplication" : "<p>Gets the specified application.</p>",
+    "GetApplicationPolicy" : "<p>Retrieves the policy for the application.</p>",
+    "GetCloudFormationTemplate" : "<p>Gets the specified AWS CloudFormation template.</p>",
+    "ListApplicationDependencies" : "<p>Retrieves the list of applications nested in the containing application.</p>",
+    "ListApplicationVersions" : "<p>Lists versions for the specified application.</p>",
+    "ListApplications" : "<p>Lists applications owned by the requester.</p>",
+    "PutApplicationPolicy" : "<p>Sets the permission policy for an application. For the list of actions supported for this operation, see\n <a href=\"https://docs.aws.amazon.com/serverlessrepo/latest/devguide/access-control-resource-based.html#application-permissions\">Application \n Permissions</a>\n .</p>",
+    "UnshareApplication" : "<p>Unshares an application from an AWS Organization.</p><p>This operation can be called only from the organization's master account.</p>",
+    "UpdateApplication" : "<p>Updates the specified application.</p>"
+  },
+  "shapes" : {
+    "Application" : {
+      "base" : "<p>Details about the application.</p>",
+      "refs" : { }
+    },
+    "ApplicationDependencyPage" : {
+      "base" : "<p>A list of application summaries nested in the application.</p>",
+      "refs" : { }
+    },
+    "ApplicationDependencySummary" : {
+      "base" : "<p>A nested application summary.</p>",
+      "refs" : {
+        "__listOfApplicationDependencySummary$member" : null
+      }
+    },
+    "ApplicationPage" : {
+      "base" : "<p>A list of application details.</p>",
+      "refs" : { }
+    },
+    "ApplicationPolicy" : {
+      "base" : "<p>Policy statements applied to the application.</p>",
+      "refs" : { }
+    },
+    "ApplicationPolicyStatement" : {
+      "base" : "<p>Policy statement applied to the application.</p>",
+      "refs" : {
+        "__listOfApplicationPolicyStatement$member" : null
+      }
+    },
+    "ApplicationSummary" : {
+      "base" : "<p>Summary of details about the application.</p>",
+      "refs" : {
+        "__listOfApplicationSummary$member" : null
+      }
+    },
+    "ApplicationVersionPage" : {
+      "base" : "<p>A list of version summaries for the application.</p>",
+      "refs" : { }
+    },
+    "BadRequestException" : {
+      "base" : "<p>One of the parameters in the request is invalid.</p>",
+      "refs" : { }
+    },
+    "Capability" : {
+      "base" : "<p>Values that must be specified in order to deploy some applications.</p>",
+      "refs" : {
+        "__listOfCapability$member" : null
+      }
+    },
+    "ChangeSetDetails" : {
+      "base" : "<p>Details of the change set.</p>",
+      "refs" : { }
+    },
+    "ConflictException" : {
+      "base" : "<p>The resource already exists.</p>",
+      "refs" : { }
+    },
+    "CreateApplicationInput" : {
+      "base" : "<p>Create an application request.</p>",
+      "refs" : { }
+    },
+    "CreateApplicationVersionInput" : {
+      "base" : "<p>Create a version request.</p>",
+      "refs" : { }
+    },
+    "CreateCloudFormationChangeSetInput" : {
+      "base" : "<p>Create an application change set request.</p>",
+      "refs" : { }
+    },
+    "CreateCloudFormationTemplateInput" : {
+      "base" : "<p>Create a template request.</p>",
+      "refs" : { }
+    },
+    "ForbiddenException" : {
+      "base" : "<p>The client is not authenticated.</p>",
+      "refs" : { }
+    },
+    "InternalServerErrorException" : {
+      "base" : "<p>The AWS Serverless Application Repository service encountered an internal error.</p>",
+      "refs" : { }
+    },
+    "NotFoundException" : {
+      "base" : "<p>The resource (for example, an access policy statement) specified in the request doesn't exist.</p>",
+      "refs" : { }
+    },
+    "ParameterDefinition" : {
+      "base" : "<p>Parameters supported by the application.</p>",
+      "refs" : {
+        "__listOfParameterDefinition$member" : null
+      }
+    },
+    "ParameterValue" : {
+      "base" : "<p>Parameter value of the application.</p>",
+      "refs" : {
+        "__listOfParameterValue$member" : null
+      }
+    },
+    "RollbackConfiguration" : {
+      "base" : "<p>This property corresponds to the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackConfiguration\">RollbackConfiguration</a>\n </i> Data Type.</p>",
+      "refs" : {
+        "CreateCloudFormationChangeSetInput$RollbackConfiguration" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>"
+      }
+    },
+    "RollbackTrigger" : {
+      "base" : "<p>This property corresponds to the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackTrigger\">RollbackTrigger</a>\n </i> Data Type.</p>",
+      "refs" : {
+        "__listOfRollbackTrigger$member" : null
+      }
+    },
+    "Status" : {
+      "base" : null,
+      "refs" : {
+        "TemplateDetails$Status" : "<p>Status of the template creation workflow.</p><p>Possible values: PREPARING | ACTIVE | EXPIRED\n </p>"
+      }
+    },
+    "Tag" : {
+      "base" : "<p>This property corresponds to the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/Tag\">Tag</a>\n </i> Data Type.</p>",
+      "refs" : {
+        "__listOfTag$member" : null
+      }
+    },
+    "TemplateDetails" : {
+      "base" : "<p>Details of the template.</p>",
+      "refs" : { }
+    },
+    "TooManyRequestsException" : {
+      "base" : "<p>The client is sending more than the allowed number of requests per unit of time.</p>",
+      "refs" : { }
+    },
+    "UnshareApplicationInput" : {
+      "base" : "<p>Unshare application request.</p>",
+      "refs" : { }
+    },
+    "UpdateApplicationInput" : {
+      "base" : "<p>Update the application request.</p>",
+      "refs" : { }
+    },
+    "Version" : {
+      "base" : "<p>Application version details.</p>",
+      "refs" : {
+        "Application$Version" : "<p>Version information about the application.</p>"
+      }
+    },
+    "VersionSummary" : {
+      "base" : "<p>An application version summary.</p>",
+      "refs" : {
+        "__listOfVersionSummary$member" : null
+      }
+    },
+    "__boolean" : {
+      "base" : null,
+      "refs" : {
+        "Application$IsVerifiedAuthor" : "<p>Whether the author of this application has been verified. This means means that AWS has made a good faith review, as a reasonable and prudent service provider, of the information provided by the requester and has confirmed that the requester's identity is as claimed.</p>",
+        "ParameterDefinition$NoEcho" : "<p>Whether to mask the parameter value whenever anyone makes a call that describes the stack. If you set the\n value to true, the parameter value is masked with asterisks (*****).</p>",
+        "Version$ResourcesSupported" : "<p>Whether all of the AWS resources contained in this application are supported in the region\n in which it is being retrieved.</p>"
+      }
+    },
+    "__integer" : {
+      "base" : null,
+      "refs" : {
+        "ParameterDefinition$MaxLength" : "<p>An integer value that determines the largest number of characters that you want to allow for String types.</p>",
+        "ParameterDefinition$MaxValue" : "<p>A numeric value that determines the largest numeric value that you want to allow for Number types.</p>",
+        "ParameterDefinition$MinLength" : "<p>An integer value that determines the smallest number of characters that you want to allow for String types.</p>",
+        "ParameterDefinition$MinValue" : "<p>A numeric value that determines the smallest numeric value that you want to allow for Number types.</p>",
+        "RollbackConfiguration$MonitoringTimeInMinutes" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackConfiguration\">RollbackConfiguration</a>\n </i> Data Type.</p>"
+      }
+    },
+    "__listOfApplicationDependencySummary" : {
+      "base" : null,
+      "refs" : {
+        "ApplicationDependencyPage$Dependencies" : "<p>An array of application summaries nested in the application.</p>"
+      }
+    },
+    "__listOfApplicationPolicyStatement" : {
+      "base" : null,
+      "refs" : {
+        "ApplicationPolicy$Statements" : "<p>An array of policy statements applied to the application.</p>"
+      }
+    },
+    "__listOfApplicationSummary" : {
+      "base" : null,
+      "refs" : {
+        "ApplicationPage$Applications" : "<p>An array of application summaries.</p>"
+      }
+    },
+    "__listOfCapability" : {
+      "base" : null,
+      "refs" : {
+        "Version$RequiredCapabilities" : "<p>A list of values that you must specify before you can deploy certain applications.\n Some applications might include resources that can affect permissions in your AWS\n account, for example, by creating new AWS Identity and Access Management (IAM) users.\n For those applications, you must explicitly acknowledge their capabilities by\n specifying this parameter.</p><p>The only valid values are CAPABILITY_IAM, CAPABILITY_NAMED_IAM,\n CAPABILITY_RESOURCE_POLICY, and CAPABILITY_AUTO_EXPAND.</p><p>The following resources require you to specify CAPABILITY_IAM or\n CAPABILITY_NAMED_IAM:\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-iam-group.html\">AWS::IAM::Group</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html\">AWS::IAM::InstanceProfile</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html\">AWS::IAM::Policy</a>, and\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html\">AWS::IAM::Role</a>.\n If the application contains IAM resources, you can specify either CAPABILITY_IAM\n or CAPABILITY_NAMED_IAM. If the application contains IAM resources\n with custom names, you must specify CAPABILITY_NAMED_IAM.</p><p>The following resources require you to specify CAPABILITY_RESOURCE_POLICY:\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html\">AWS::Lambda::Permission</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html\">AWS::IAM:Policy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-applicationautoscaling-scalingpolicy.html\">AWS::ApplicationAutoScaling::ScalingPolicy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-policy.html\">AWS::S3::BucketPolicy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-policy.html\">AWS::SQS::QueuePolicy</a>, and\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sns-policy.html\">AWS::SNS::TopicPolicy</a>.</p><p>Applications that contain one or more nested applications require you to specify\n CAPABILITY_AUTO_EXPAND.</p><p>If your application template contains any of the above resources, we recommend that you review\n all permissions associated with the application before deploying. If you don't specify\n this parameter for an application that requires capabilities, the call will fail.</p>"
+      }
+    },
+    "__listOfParameterDefinition" : {
+      "base" : null,
+      "refs" : {
+        "Version$ParameterDefinitions" : "<p>An array of parameter types supported by the application.</p>"
+      }
+    },
+    "__listOfParameterValue" : {
+      "base" : null,
+      "refs" : {
+        "CreateCloudFormationChangeSetInput$ParameterOverrides" : "<p>A list of parameter values for the parameters of the application.</p>"
+      }
+    },
+    "__listOfRollbackTrigger" : {
+      "base" : null,
+      "refs" : {
+        "RollbackConfiguration$RollbackTriggers" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackConfiguration\">RollbackConfiguration</a>\n </i> Data Type.</p>"
+      }
+    },
+    "__listOfTag" : {
+      "base" : null,
+      "refs" : {
+        "CreateCloudFormationChangeSetInput$Tags" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>"
+      }
+    },
+    "__listOfVersionSummary" : {
+      "base" : null,
+      "refs" : {
+        "ApplicationVersionPage$Versions" : "<p>An array of version summaries for the application.</p>"
+      }
+    },
+    "__listOf__string" : {
+      "base" : null,
+      "refs" : {
+        "Application$Labels" : "<p>Labels to improve discovery of apps in search results.</p><p>Minimum length=1. Maximum length=127. Maximum number of labels: 10</p><p>Pattern: \"^[a-zA-Z0-9+\\\\-_:\\\\/@]+$\";</p>",
+        "ApplicationPolicyStatement$Actions" : "<p>For the list of actions supported for this operation, see <a href=\"https://docs.aws.amazon.com/serverlessrepo/latest/devguide/access-control-resource-based.html#application-permissions\">Application \n Permissions</a>.</p>",
+        "ApplicationPolicyStatement$PrincipalOrgIDs" : "<p>An array of PrinciplalOrgIDs, which corresponds to AWS IAM <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#principal-org-id\">aws:PrincipalOrgID</a> global condition key.</p>",
+        "ApplicationPolicyStatement$Principals" : "<p>An array of AWS account IDs, or * to make the application public.</p>",
+        "ApplicationSummary$Labels" : "<p>Labels to improve discovery of apps in search results.</p><p>Minimum length=1. Maximum length=127. Maximum number of labels: 10</p><p>Pattern: \"^[a-zA-Z0-9+\\\\-_:\\\\/@]+$\";</p>",
+        "CreateApplicationInput$Labels" : "<p>Labels to improve discovery of apps in search results.</p><p>Minimum length=1. Maximum length=127. Maximum number of labels: 10</p><p>Pattern: \"^[a-zA-Z0-9+\\\\-_:\\\\/@]+$\";</p>",
+        "CreateCloudFormationChangeSetInput$Capabilities" : "<p>A list of values that you must specify before you can deploy certain applications.\n Some applications might include resources that can affect permissions in your AWS\n account, for example, by creating new AWS Identity and Access Management (IAM) users.\n For those applications, you must explicitly acknowledge their capabilities by\n specifying this parameter.</p><p>The only valid values are CAPABILITY_IAM, CAPABILITY_NAMED_IAM,\n CAPABILITY_RESOURCE_POLICY, and CAPABILITY_AUTO_EXPAND.</p><p>The following resources require you to specify CAPABILITY_IAM or\n CAPABILITY_NAMED_IAM:\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-iam-group.html\">AWS::IAM::Group</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html\">AWS::IAM::InstanceProfile</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html\">AWS::IAM::Policy</a>, and\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html\">AWS::IAM::Role</a>.\n If the application contains IAM resources, you can specify either CAPABILITY_IAM\n or CAPABILITY_NAMED_IAM. If the application contains IAM resources\n with custom names, you must specify CAPABILITY_NAMED_IAM.</p><p>The following resources require you to specify CAPABILITY_RESOURCE_POLICY:\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html\">AWS::Lambda::Permission</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html\">AWS::IAM:Policy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-applicationautoscaling-scalingpolicy.html\">AWS::ApplicationAutoScaling::ScalingPolicy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-policy.html\">AWS::S3::BucketPolicy</a>,\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-policy.html\">AWS::SQS::QueuePolicy</a>, and\n <a href=\"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sns-policy.html\">AWS::SNS:TopicPolicy</a>.</p><p>Applications that contain one or more nested applications require you to specify\n CAPABILITY_AUTO_EXPAND.</p><p>If your application template contains any of the above resources, we recommend that you review\n all permissions associated with the application before deploying. If you don't specify\n this parameter for an application that requires capabilities, the call will fail.</p>",
+        "CreateCloudFormationChangeSetInput$NotificationArns" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "CreateCloudFormationChangeSetInput$ResourceTypes" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "ParameterDefinition$AllowedValues" : "<p>An array containing the list of values allowed for the parameter.</p>",
+        "ParameterDefinition$ReferencedByResources" : "<p>A list of AWS SAM resources that use this parameter.</p>",
+        "UpdateApplicationInput$Labels" : "<p>Labels to improve discovery of apps in search results.</p><p>Minimum length=1. Maximum length=127. Maximum number of labels: 10</p><p>Pattern: \"^[a-zA-Z0-9+\\\\-_:\\\\/@]+$\";</p>"
+      }
+    },
+    "__string" : {
+      "base" : null,
+      "refs" : {
+        "Application$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "Application$Author" : "<p>The name of the author publishing the app.</p><p>Minimum length=1. Maximum length=127.</p><p>Pattern \"^[a-z0-9](([a-z0-9]|-(?!-))*[a-z0-9])?$\";</p>",
+        "Application$CreationTime" : "<p>The date and time this resource was created.</p>",
+        "Application$Description" : "<p>The description of the application.</p><p>Minimum length=1. Maximum length=256</p>",
+        "Application$HomePageUrl" : "<p>A URL with more information about the application, for example the location of your GitHub repository for the application.</p>",
+        "Application$LicenseUrl" : "<p>A link to a license file of the app that matches the spdxLicenseID value of your application.</p><p>Maximum size 5 MB</p>",
+        "Application$Name" : "<p>The name of the application.</p><p>Minimum length=1. Maximum length=140</p><p>Pattern: \"[a-zA-Z0-9\\\\-]+\";</p>",
+        "Application$ReadmeUrl" : "<p>A link to the readme file in Markdown language that contains a more detailed description of the application and how it works.</p><p>Maximum size 5 MB</p>",
+        "Application$SpdxLicenseId" : "<p>A valid identifier from https://spdx.org/licenses/.</p>",
+        "Application$VerifiedAuthorUrl" : "<p>The URL to the public profile of a verified author. This URL is submitted by the author.</p>",
+        "ApplicationDependencyPage$NextToken" : "<p>The token to request the next page of results.</p>",
+        "ApplicationDependencySummary$ApplicationId" : "<p>The Amazon Resource Name (ARN) of the nested application.</p>",
+        "ApplicationDependencySummary$SemanticVersion" : "<p>The semantic version of the nested application.</p>",
+        "ApplicationPage$NextToken" : "<p>The token to request the next page of results.</p>",
+        "ApplicationPolicyStatement$StatementId" : "<p>A unique ID for the statement.</p>",
+        "ApplicationSummary$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "ApplicationSummary$Author" : "<p>The name of the author publishing the app.</p><p>Minimum length=1. Maximum length=127.</p><p>Pattern \"^[a-z0-9](([a-z0-9]|-(?!-))*[a-z0-9])?$\";</p>",
+        "ApplicationSummary$CreationTime" : "<p>The date and time this resource was created.</p>",
+        "ApplicationSummary$Description" : "<p>The description of the application.</p><p>Minimum length=1. Maximum length=256</p>",
+        "ApplicationSummary$HomePageUrl" : "<p>A URL with more information about the application, for example the location of your GitHub repository for the application.</p>",
+        "ApplicationSummary$Name" : "<p>The name of the application.</p><p>Minimum length=1. Maximum length=140</p><p>Pattern: \"[a-zA-Z0-9\\\\-]+\";</p>",
+        "ApplicationSummary$SpdxLicenseId" : "<p>A valid identifier from <a href=\"https://spdx.org/licenses/\">https://spdx.org/licenses/</a>.</p>",
+        "ApplicationVersionPage$NextToken" : "<p>The token to request the next page of results.</p>",
+        "BadRequestException$ErrorCode" : "<p>400</p>",
+        "BadRequestException$Message" : "<p>One of the parameters in the request is invalid.</p>",
+        "ChangeSetDetails$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "ChangeSetDetails$ChangeSetId" : "<p>The Amazon Resource Name (ARN) of the change set.</p><p>Length constraints: Minimum length of 1.</p><p>Pattern: ARN:[-a-zA-Z0-9:/]*</p>",
+        "ChangeSetDetails$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "ChangeSetDetails$StackId" : "<p>The unique ID of the stack.</p>",
+        "ConflictException$ErrorCode" : "<p>409</p>",
+        "ConflictException$Message" : "<p>The resource already exists.</p>",
+        "CreateApplicationInput$Author" : "<p>The name of the author publishing the app.</p><p>Minimum length=1. Maximum length=127.</p><p>Pattern \"^[a-z0-9](([a-z0-9]|-(?!-))*[a-z0-9])?$\";</p>",
+        "CreateApplicationInput$Description" : "<p>The description of the application.</p><p>Minimum length=1. Maximum length=256</p>",
+        "CreateApplicationInput$HomePageUrl" : "<p>A URL with more information about the application, for example the location of your GitHub repository for the application.</p>",
+        "CreateApplicationInput$LicenseBody" : "<p>A local text file that contains the license of the app that matches the spdxLicenseID value of your application.\n The file has the format file://&lt;path>/&lt;filename>.</p><p>Maximum size 5 MB</p><p>You can specify only one of licenseBody and licenseUrl; otherwise, an error results.</p>",
+        "CreateApplicationInput$LicenseUrl" : "<p>A link to the S3 object that contains the license of the app that matches the spdxLicenseID value of your application.</p><p>Maximum size 5 MB</p><p>You can specify only one of licenseBody and licenseUrl; otherwise, an error results.</p>",
+        "CreateApplicationInput$Name" : "<p>The name of the application that you want to publish.</p><p>Minimum length=1. Maximum length=140</p><p>Pattern: \"[a-zA-Z0-9\\\\-]+\";</p>",
+        "CreateApplicationInput$ReadmeBody" : "<p>A local text readme file in Markdown language that contains a more detailed description of the application and how it works.\n The file has the format file://&lt;path>/&lt;filename>.</p><p>Maximum size 5 MB</p><p>You can specify only one of readmeBody and readmeUrl; otherwise, an error results.</p>",
+        "CreateApplicationInput$ReadmeUrl" : "<p>A link to the S3 object in Markdown language that contains a more detailed description of the application and how it works.</p><p>Maximum size 5 MB</p><p>You can specify only one of readmeBody and readmeUrl; otherwise, an error results.</p>",
+        "CreateApplicationInput$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "CreateApplicationInput$SourceCodeArchiveUrl" : "<p>A link to the S3 object that contains the ZIP archive of the source code for this version of your application.</p><p>Maximum size 50 MB</p>",
+        "CreateApplicationInput$SourceCodeUrl" : "<p>A link to a public repository for the source code of your application, for example the URL of a specific GitHub commit.</p>",
+        "CreateApplicationInput$SpdxLicenseId" : "<p>A valid identifier from <a href=\"https://spdx.org/licenses/\">https://spdx.org/licenses/</a>.</p>",
+        "CreateApplicationInput$TemplateBody" : "<p>The local raw packaged AWS SAM template file of your application.\n The file has the format file://&lt;path>/&lt;filename>.</p><p>You can specify only one of templateBody and templateUrl; otherwise an error results.</p>",
+        "CreateApplicationInput$TemplateUrl" : "<p>A link to the S3 object containing the packaged AWS SAM template of your application.</p><p>You can specify only one of templateBody and templateUrl; otherwise an error results.</p>",
+        "CreateApplicationVersionInput$SourceCodeArchiveUrl" : "<p>A link to the S3 object that contains the ZIP archive of the source code for this version of your application.</p><p>Maximum size 50 MB</p>",
+        "CreateApplicationVersionInput$SourceCodeUrl" : "<p>A link to a public repository for the source code of your application, for example the URL of a specific GitHub commit.</p>",
+        "CreateApplicationVersionInput$TemplateBody" : "<p>The raw packaged AWS SAM template of your application.</p>",
+        "CreateApplicationVersionInput$TemplateUrl" : "<p>A link to the packaged AWS SAM template of your application.</p>",
+        "CreateCloudFormationChangeSetInput$ChangeSetName" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "CreateCloudFormationChangeSetInput$ClientToken" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "CreateCloudFormationChangeSetInput$Description" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "CreateCloudFormationChangeSetInput$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "CreateCloudFormationChangeSetInput$StackName" : "<p>This property corresponds to the parameter of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/CreateChangeSet\">CreateChangeSet</a>\n </i> API.</p>",
+        "CreateCloudFormationChangeSetInput$TemplateId" : "<p>The UUID returned by CreateCloudFormationTemplate.</p><p>Pattern: [0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{12}</p>",
+        "CreateCloudFormationTemplateInput$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "ForbiddenException$ErrorCode" : "<p>403</p>",
+        "ForbiddenException$Message" : "<p>The client is not authenticated.</p>",
+        "InternalServerErrorException$ErrorCode" : "<p>500</p>",
+        "InternalServerErrorException$Message" : "<p>The AWS Serverless Application Repository service encountered an internal error.</p>",
+        "NotFoundException$ErrorCode" : "<p>404</p>",
+        "NotFoundException$Message" : "<p>The resource (for example, an access policy statement) specified in the request doesn't exist.</p>",
+        "ParameterDefinition$AllowedPattern" : "<p>A regular expression that represents the patterns to allow for String types.</p>",
+        "ParameterDefinition$ConstraintDescription" : "<p>A string that explains a constraint when the constraint is violated. For example, without a constraint description,\n a parameter that has an allowed pattern of [A-Za-z0-9]+ displays the following error message when the user\n specifies an invalid value:</p><p>\n Malformed input-Parameter MyParameter must match pattern [A-Za-z0-9]+\n </p><p>By adding a constraint description, such as \"must contain only uppercase and lowercase letters and numbers,\" you can display\n the following customized error message:</p><p>\n Malformed input-Parameter MyParameter must contain only uppercase and lowercase letters and numbers.\n </p>",
+        "ParameterDefinition$DefaultValue" : "<p>A value of the appropriate type for the template to use if no value is specified when a stack is created.\n If you define constraints for the parameter, you must specify a value that adheres to those constraints.</p>",
+        "ParameterDefinition$Description" : "<p>A string of up to 4,000 characters that describes the parameter.</p>",
+        "ParameterDefinition$Name" : "<p>The name of the parameter.</p>",
+        "ParameterDefinition$Type" : "<p>The type of the parameter.</p><p>Valid values: String | Number | List&lt;Number> | CommaDelimitedList\n </p><p>\n String: A literal string.</p><p>For example, users can specify \"MyUserName\".</p><p>\n Number: An integer or float. AWS CloudFormation validates the parameter value as a number. However, when you use the\n parameter elsewhere in your template (for example, by using the Ref intrinsic function), the parameter value becomes a string.</p><p>For example, users might specify \"8888\".</p><p>\n List&lt;Number>: An array of integers or floats that are separated by commas. AWS CloudFormation validates the parameter value as numbers. However, when\n you use the parameter elsewhere in your template (for example, by using the Ref intrinsic function), the parameter value becomes a list of strings.</p><p>For example, users might specify \"80,20\", and then Ref results in [\"80\",\"20\"].</p><p>\n CommaDelimitedList: An array of literal strings that are separated by commas. The total number of strings should be one more than the total number of commas.\n Also, each member string is space-trimmed.</p><p>For example, users might specify \"test,dev,prod\", and then Ref results in [\"test\",\"dev\",\"prod\"].</p>",
+        "ParameterValue$Name" : "<p>The key associated with the parameter. If you don't specify a key and value for a particular parameter, AWS CloudFormation\n uses the default value that is specified in your template.</p>",
+        "ParameterValue$Value" : "<p>The input value associated with the parameter.</p>",
+        "RollbackTrigger$Arn" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackTrigger\">RollbackTrigger</a>\n </i> Data Type.</p>",
+        "RollbackTrigger$Type" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/RollbackTrigger\">RollbackTrigger</a>\n </i> Data Type.</p>",
+        "Tag$Key" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/Tag\">Tag</a>\n </i> Data Type.</p>",
+        "Tag$Value" : "<p>This property corresponds to the content of the same name for the <i>AWS CloudFormation <a href=\"https://docs.aws.amazon.com/goto/WebAPI/cloudformation-2010-05-15/Tag\">\n Tag</a>\n </i>\n Data Type.</p>",
+        "TemplateDetails$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "TemplateDetails$CreationTime" : "<p>The date and time this resource was created.</p>",
+        "TemplateDetails$ExpirationTime" : "<p>The date and time this template expires. Templates\n expire 1 hour after creation.</p>",
+        "TemplateDetails$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "TemplateDetails$TemplateId" : "<p>The UUID returned by CreateCloudFormationTemplate.</p><p>Pattern: [0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{12}</p>",
+        "TemplateDetails$TemplateUrl" : "<p>A link to the template that can be used to deploy the application using\n AWS CloudFormation.</p>",
+        "TooManyRequestsException$ErrorCode" : "<p>429</p>",
+        "TooManyRequestsException$Message" : "<p>The client is sending more than the allowed number of requests per unit of time.</p>",
+        "UnshareApplicationInput$OrganizationId" : "<p>The AWS Organization ID to unshare the application from.</p>",
+        "UpdateApplicationInput$Author" : "<p>The name of the author publishing the app.</p><p>Minimum length=1. Maximum length=127.</p><p>Pattern \"^[a-z0-9](([a-z0-9]|-(?!-))*[a-z0-9])?$\";</p>",
+        "UpdateApplicationInput$Description" : "<p>The description of the application.</p><p>Minimum length=1. Maximum length=256</p>",
+        "UpdateApplicationInput$HomePageUrl" : "<p>A URL with more information about the application, for example the location of your GitHub repository for the application.</p>",
+        "UpdateApplicationInput$ReadmeBody" : "<p>A text readme file in Markdown language that contains a more detailed description of the application and how it works.</p><p>Maximum size 5 MB</p>",
+        "UpdateApplicationInput$ReadmeUrl" : "<p>A link to the readme file in Markdown language that contains a more detailed description of the application and how it works.</p><p>Maximum size 5 MB</p>",
+        "Version$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "Version$CreationTime" : "<p>The date and time this resource was created.</p>",
+        "Version$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "Version$SourceCodeArchiveUrl" : "<p>A link to the S3 object that contains the ZIP archive of the source code for this version of your application.</p><p>Maximum size 50 MB</p>",
+        "Version$SourceCodeUrl" : "<p>A link to a public repository for the source code of your application, for example the URL of a specific GitHub commit.</p>",
+        "Version$TemplateUrl" : "<p>A link to the packaged AWS SAM template of your application.</p>",
+        "VersionSummary$ApplicationId" : "<p>The application Amazon Resource Name (ARN).</p>",
+        "VersionSummary$CreationTime" : "<p>The date and time this resource was created.</p>",
+        "VersionSummary$SemanticVersion" : "<p>The semantic version of the application:</p><p>\n <a href=\"https://semver.org/\">https://semver.org/</a>\n </p>",
+        "VersionSummary$SourceCodeUrl" : "<p>A link to a public repository for the source code of your application, for example the URL of a specific GitHub commit.</p>",
+        "__listOf__string$member" : null
+      }
+    }
+  }
+}

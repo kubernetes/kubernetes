@@ -1,0 +1,49 @@
+{
+  "pagination": {
+    "ListComponentBuildVersions": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListComponents": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListDistributionConfigurations": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListImageBuildVersions": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListImagePipelineImages": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListImagePipelines": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListImageRecipes": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListImages": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListInfrastructureConfigurations": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

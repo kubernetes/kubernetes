@@ -1,0 +1,142 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/apps.groups.migration": {
+          "description": "Manage messages in groups on your domain"
+        }
+      }
+    }
+  },
+  "basePath": "/groups/v1/groups/",
+  "baseUrl": "https://www.googleapis.com/groups/v1/groups/",
+  "batchPath": "batch/groupsmigration/v1",
+  "canonicalName": "Groups Migration",
+  "description": "Groups Migration Api.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/google-apps/groups-migration/",
+  "etag": "\"J3WqvAcMk4eQjJXvfSI4Yr8VouA/MOGYwDZygaAxxBpZQlpaQ5H_PW4\"",
+  "icons": {
+    "x16": "https://www.google.com/images/icons/product/discussions-16.gif",
+    "x32": "https://www.google.com/images/icons/product/discussions-32.gif"
+  },
+  "id": "groupsmigration:v1",
+  "kind": "discovery#restDescription",
+  "name": "groupsmigration",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "archive": {
+      "methods": {
+        "insert": {
+          "description": "Inserts a new mail into the archive of the Google group.",
+          "httpMethod": "POST",
+          "id": "groupsmigration.archive.insert",
+          "mediaUpload": {
+            "accept": [
+              "message/rfc822"
+            ],
+            "maxSize": "25MB",
+            "protocols": {
+              "resumable": {
+                "multipart": true,
+                "path": "/resumable/upload/groups/v1/groups/{groupId}/archive"
+              },
+              "simple": {
+                "multipart": true,
+                "path": "/upload/groups/v1/groups/{groupId}/archive"
+              }
+            }
+          },
+          "parameterOrder": [
+            "groupId"
+          ],
+          "parameters": {
+            "groupId": {
+              "description": "The group ID",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{groupId}/archive",
+          "response": {
+            "$ref": "Groups"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/apps.groups.migration"
+          ],
+          "supportsMediaUpload": true
+        }
+      }
+    }
+  },
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "Groups": {
+      "description": "JSON response template for groups migration API.",
+      "id": "Groups",
+      "properties": {
+        "kind": {
+          "default": "groupsmigration#groups",
+          "description": "The kind of insert resource this is.",
+          "type": "string"
+        },
+        "responseCode": {
+          "description": "The status of the insert request.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "groups/v1/groups/",
+  "title": "Groups Migration API",
+  "version": "v1"
+}

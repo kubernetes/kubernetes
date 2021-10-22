@@ -1,0 +1,472 @@
+#data
+<!DOCTYPE html><math></math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+
+#data
+<!DOCTYPE html><body><math></math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+
+#data
+<!DOCTYPE html><math><mi>
+#errors
+(1,25) expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+
+#data
+<!DOCTYPE html><math><annotation-xml><svg><u>
+#errors
+(1,45) unexpected-html-element-in-foreign-content
+(1,45) expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math annotation-xml>
+|         <svg svg>
+|     <u>
+
+#data
+<!DOCTYPE html><body><select><math></math></select>
+#errors
+(1,35) unexpected-start-tag-in-select
+(1,42) unexpected-end-tag-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+
+#data
+<!DOCTYPE html><body><select><option><math></math></option></select>
+#errors
+(1,43) unexpected-start-tag-in-select
+(1,50) unexpected-end-tag-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+
+#data
+<!DOCTYPE html><body><table><math></math></table>
+#errors
+(1,34) unexpected-start-tag-implies-table-voodoo
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|     <table>
+
+#data
+<!DOCTYPE html><body><table><math><mi>foo</mi></math></table>
+#errors
+(1,34) foster-parenting-start-token
+(1,39) foster-parenting-character
+(1,40) foster-parenting-character
+(1,41) foster-parenting-character
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|     <table>
+
+#data
+<!DOCTYPE html><body><table><math><mi>foo</mi><mi>bar</mi></math></table>
+#errors
+(1,34) foster-parenting-start-tag
+(1,39) foster-parenting-character
+(1,40) foster-parenting-character
+(1,41) foster-parenting-character
+(1,51) foster-parenting-character
+(1,52) foster-parenting-character
+(1,53) foster-parenting-character
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <table>
+
+#data
+<!DOCTYPE html><body><table><tbody><math><mi>foo</mi><mi>bar</mi></math></tbody></table>
+#errors
+(1,41) foster-parenting-start-tag
+(1,46) foster-parenting-character
+(1,47) foster-parenting-character
+(1,48) foster-parenting-character
+(1,58) foster-parenting-character
+(1,59) foster-parenting-character
+(1,60) foster-parenting-character
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <table>
+|       <tbody>
+
+#data
+<!DOCTYPE html><body><table><tbody><tr><math><mi>foo</mi><mi>bar</mi></math></tr></tbody></table>
+#errors
+(1,45) foster-parenting-start-tag
+(1,50) foster-parenting-character
+(1,51) foster-parenting-character
+(1,52) foster-parenting-character
+(1,62) foster-parenting-character
+(1,63) foster-parenting-character
+(1,64) foster-parenting-character
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <table>
+|       <tbody>
+|         <tr>
+
+#data
+<!DOCTYPE html><body><table><tbody><tr><td><math><mi>foo</mi><mi>bar</mi></math></td></tr></tbody></table>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <math math>
+|               <math mi>
+|                 "foo"
+|               <math mi>
+|                 "bar"
+
+#data
+<!DOCTYPE html><body><table><tbody><tr><td><math><mi>foo</mi><mi>bar</mi></math><p>baz</td></tr></tbody></table>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <math math>
+|               <math mi>
+|                 "foo"
+|               <math mi>
+|                 "bar"
+|             <p>
+|               "baz"
+
+#data
+<!DOCTYPE html><body><table><caption><math><mi>foo</mi><mi>bar</mi></math><p>baz</caption></table>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <math math>
+|           <math mi>
+|             "foo"
+|           <math mi>
+|             "bar"
+|         <p>
+|           "baz"
+
+#data
+<!DOCTYPE html><body><table><caption><math><mi>foo</mi><mi>bar</mi><p>baz</table><p>quux
+#errors
+(1,70) unexpected-html-element-in-foreign-content
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <math math>
+|           <math mi>
+|             "foo"
+|           <math mi>
+|             "bar"
+|         <p>
+|           "baz"
+|     <p>
+|       "quux"
+
+#data
+<!DOCTYPE html><body><table><caption><math><mi>foo</mi><mi>bar</mi>baz</table><p>quux
+#errors
+(1,78) unexpected-end-tag
+(1,78) expected-one-end-tag-but-got-another
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <math math>
+|           <math mi>
+|             "foo"
+|           <math mi>
+|             "bar"
+|           "baz"
+|     <p>
+|       "quux"
+
+#data
+<!DOCTYPE html><body><table><colgroup><math><mi>foo</mi><mi>bar</mi><p>baz</table><p>quux
+#errors
+(1,44) foster-parenting-start-tag
+(1,49) foster-parenting-character
+(1,50) foster-parenting-character
+(1,51) foster-parenting-character
+(1,61) foster-parenting-character
+(1,62) foster-parenting-character
+(1,63) foster-parenting-character
+(1,71) unexpected-html-element-in-foreign-content
+(1,71) foster-parenting-start-tag
+(1,63) foster-parenting-character
+(1,63) foster-parenting-character
+(1,63) foster-parenting-character
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <p>
+|       "baz"
+|     <table>
+|       <colgroup>
+|     <p>
+|       "quux"
+
+#data
+<!DOCTYPE html><body><table><tr><td><select><math><mi>foo</mi><mi>bar</mi><p>baz</table><p>quux
+#errors
+(1,50) unexpected-start-tag-in-select
+(1,54) unexpected-start-tag-in-select
+(1,62) unexpected-end-tag-in-select
+(1,66) unexpected-start-tag-in-select
+(1,74) unexpected-end-tag-in-select
+(1,77) unexpected-start-tag-in-select
+(1,88) unexpected-table-element-end-tag-in-select-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <select>
+|               "foobarbaz"
+|     <p>
+|       "quux"
+
+#data
+<!DOCTYPE html><body><table><select><math><mi>foo</mi><mi>bar</mi><p>baz</table><p>quux
+#errors
+(1,36) unexpected-start-tag-implies-table-voodoo
+(1,42) unexpected-start-tag-in-select
+(1,46) unexpected-start-tag-in-select
+(1,54) unexpected-end-tag-in-select
+(1,58) unexpected-start-tag-in-select
+(1,66) unexpected-end-tag-in-select
+(1,69) unexpected-start-tag-in-select
+(1,80) unexpected-table-element-end-tag-in-select-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "foobarbaz"
+|     <table>
+|     <p>
+|       "quux"
+
+#data
+<!DOCTYPE html><body></body></html><math><mi>foo</mi><mi>bar</mi><p>baz
+#errors
+(1,41) expected-eof-but-got-start-tag
+(1,68) unexpected-html-element-in-foreign-content
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <p>
+|       "baz"
+
+#data
+<!DOCTYPE html><body></body><math><mi>foo</mi><mi>bar</mi><p>baz
+#errors
+(1,34) unexpected-start-tag-after-body
+(1,61) unexpected-html-element-in-foreign-content
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mi>
+|         "foo"
+|       <math mi>
+|         "bar"
+|     <p>
+|       "baz"
+
+#data
+<!DOCTYPE html><frameset><math><mi></mi><mi></mi><p><span>
+#errors
+(1,31) unexpected-start-tag-in-frameset
+(1,35) unexpected-start-tag-in-frameset
+(1,40) unexpected-end-tag-in-frameset
+(1,44) unexpected-start-tag-in-frameset
+(1,49) unexpected-end-tag-in-frameset
+(1,52) unexpected-start-tag-in-frameset
+(1,58) unexpected-start-tag-in-frameset
+(1,58) eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!DOCTYPE html><frameset></frameset><math><mi></mi><mi></mi><p><span>
+#errors
+(1,42) unexpected-start-tag-after-frameset
+(1,46) unexpected-start-tag-after-frameset
+(1,51) unexpected-end-tag-after-frameset
+(1,55) unexpected-start-tag-after-frameset
+(1,60) unexpected-end-tag-after-frameset
+(1,63) unexpected-start-tag-after-frameset
+(1,69) unexpected-start-tag-after-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!DOCTYPE html><body xlink:href=foo><math xlink:href=foo></math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     <math math>
+|       xlink href="foo"
+
+#data
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo></mi></math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+
+#data
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo /></math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+
+#data
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo />bar</math>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+|       "bar"

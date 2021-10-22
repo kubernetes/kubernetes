@@ -1,0 +1,26 @@
+- hosts: all
+  become: yes
+  roles:
+    - config-golang
+    - clone-devstack-gate-to-workspace
+    - role: create-devstack-local-conf
+      enable_services:
+        - 'ironic'
+    - role: install-devstack
+      environment:
+        OVERRIDE_ENABLED_SERVICES: 'g-api,g-reg,q-agt,q-dhcp,q-l3,q-svc,key,mysql,rabbit,ir-api,ir-cond,s-account,s-container,s-object,s-proxy,tempest'
+        PROJECTS: 'openstack/ironic'
+  tasks:
+    - name: Run ironic acceptance tests with gophercloud
+      shell:
+        cmd: |
+          set -e
+          set -o pipefail
+          set -x
+          echo $(export |grep OS_BRANCH)
+
+          go get ./... || true
+          ./script/acceptancetest-ironic -v 2>&1 | tee $TEST_RESULTS_TXT
+        executable: /bin/bash
+        chdir: '{{ zuul.project.src_dir }}'
+      environment: '{{ global_env }}'

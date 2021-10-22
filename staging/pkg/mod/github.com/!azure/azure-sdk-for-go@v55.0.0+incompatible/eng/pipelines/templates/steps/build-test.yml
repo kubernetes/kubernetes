@@ -1,0 +1,89 @@
+parameters:
+  ServiceDirectory: ''
+  GoWorkspace: ''
+  Scope: 'sdk/...'
+  Image: ''
+  GoVersion: ''
+
+steps:
+
+  - pwsh: |
+      go get github.com/jstemmer/go-junit-report
+      go get github.com/axw/gocov/gocov
+      go get github.com/AlekSi/gocov-xml
+      go get github.com/matm/gocov-html
+      go get -u github.com/wadey/gocovmerge
+    displayName: "Install Coverage and Junit Dependencies"
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      $modDirs = (./eng/scripts/get_module_dirs.ps1 -serviceDir $(SCOPE))
+      foreach ($md in $modDirs) {
+        pushd $md
+        Write-Host "##[command]Executing go build -v ./... in $md"
+        go build -v ./...
+      }
+    displayName: 'Build'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+    env:
+      GO111MODULE: 'on'
+
+  - pwsh: |
+      $modDirs = (./eng/scripts/get_module_dirs.ps1 -serviceDir $(SCOPE))
+      foreach ($md in $modDirs) {
+        pushd $md
+        Write-Host "##[command]Executing go vet ./... in $md"
+        go vet ./...
+      }
+    displayName: 'Vet'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+    env:
+      GO111MODULE: 'on'
+
+  - pwsh: |
+      $testDirs = (./eng/scripts/get_test_dirs.ps1 -serviceDir $(SCOPE))
+      foreach ($td in $testDirs) {
+        pushd $td
+        Write-Host "##[command]Executing go test -run "^Test" -race -v -coverprofile coverage.txt -covermode atomic $td | go-junit-report -set-exit-code > report.xml"
+        go test -run "^Test" -race -v -coverprofile coverage.txt -covermode atomic . | go-junit-report -set-exit-code > report.xml
+        # if no tests were actually run (e.g. examples) delete the coverage file so it's omitted from the coverage report
+        if (Select-String -path ./report.xml -pattern '<testsuites></testsuites>' -simplematch -quiet) {
+          Write-Host "##[command]Deleting empty coverage file"
+          rm coverage.txt
+        }
+      }
+    displayName: 'Run Tests'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+    env:
+      GO111MODULE: 'on'
+
+  - pwsh: |
+      $coverageFiles = [Collections.Generic.List[String]]@()
+      Get-Childitem -recurse -path $(SCOPE) -filter coverage.txt | foreach-object {
+        $covFile = $_.FullName
+        Write-Host "Adding $covFile to the list of code coverage files"
+        $coverageFiles.Add($covFile)
+      }
+      gocovmerge $coverageFiles > mergedCoverage.txt
+      gocov convert ./mergedCoverage.txt > ./coverage.json
+      # gocov converts rely on standard input
+      Get-Content ./coverage.json | gocov-xml > ./coverage.xml
+      Get-Content ./coverage.json | gocov-html > ./coverage.html
+    displayName: 'Generate Coverage XML'
+    workingDirectory: '${{parameters.GoWorkspace}}sdk'
+
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      testResultsFiles: '${{parameters.GoWorkspace}}sdk/**/report.xml'
+      testRunTitle: 'Go ${{ parameters.GoVersion }} on ${{ parameters.Image }}'
+      failTaskOnFailedTests: true
+
+  - task: PublishCodeCoverageResults@1
+    condition: succeededOrFailed()
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: '${{parameters.GoWorkspace}}sdk/coverage.xml'
+      additionalCodeCoverageFiles: '${{parameters.GoWorkspace}}sdk/coverage.html'
+      failIfCoverageEmpty: true

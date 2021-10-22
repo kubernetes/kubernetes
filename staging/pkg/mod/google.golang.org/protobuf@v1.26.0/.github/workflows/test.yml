@@ -1,0 +1,26 @@
+on: [push]
+name: Test
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: [1.16.x]
+        os: [ubuntu-latest] # TODO: Add [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: sudo apt-get -y install autoconf automake libtool curl make g++ unzip
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Cache dependencies
+      uses: actions/cache@v2
+      with:
+        path: .cache
+        key: ${{ runner.os }}-${{ hashFiles('integration_test.go') }}
+    - name: Test
+      run: go test -v -mod=vendor -timeout=60m -count=1 integration_test.go -failfast

@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListChannels": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Channels"
+    },
+    "ListOriginEndpoints": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "OriginEndpoints"
+    },
+    "ListHarvestJobs": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "HarvestJobs"
+    }
+  }
+}

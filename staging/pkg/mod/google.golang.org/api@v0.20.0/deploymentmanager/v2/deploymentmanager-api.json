@@ -1,0 +1,1952 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/cloud-platform.read-only": {
+          "description": "View your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/ndev.cloudman": {
+          "description": "View and manage your Google Cloud Platform management resources and deployment status information"
+        },
+        "https://www.googleapis.com/auth/ndev.cloudman.readonly": {
+          "description": "View your Google Cloud Platform management resources and deployment status information"
+        }
+      }
+    }
+  },
+  "basePath": "/deploymentmanager/v2/projects/",
+  "baseUrl": "https://www.googleapis.com/deploymentmanager/v2/projects/",
+  "batchPath": "batch/deploymentmanager/v2",
+  "canonicalName": "Deployment Manager",
+  "description": "Declares, configures, and deploys complex solutions on Google Cloud Platform.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/deployment-manager/",
+  "etag": "\"J3WqvAcMk4eQjJXvfSI4Yr8VouA/Uh4_xQr7E3ofvWrY-A4225srDLM\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "deploymentmanager:v2",
+  "kind": "discovery#restDescription",
+  "name": "deploymentmanager",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "deployments": {
+      "methods": {
+        "cancelPreview": {
+          "description": "Cancels and removes the preview currently associated with the deployment.",
+          "httpMethod": "POST",
+          "id": "deploymentmanager.deployments.cancelPreview",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/cancelPreview",
+          "request": {
+            "$ref": "DeploymentsCancelPreviewRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "delete": {
+          "description": "Deletes a deployment and all of the resources in the deployment.",
+          "httpMethod": "DELETE",
+          "id": "deploymentmanager.deployments.delete",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deletePolicy": {
+              "default": "DELETE",
+              "description": "Sets the policy to use for deleting resources.",
+              "enum": [
+                "ABANDON",
+                "DELETE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "get": {
+          "description": "Gets information about a specific deployment.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.deployments.get",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}",
+          "response": {
+            "$ref": "Deployment"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        },
+        "getIamPolicy": {
+          "description": "Gets the access control policy for a resource. May be empty if no such policy or resource exists.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.deployments.getIamPolicy",
+          "parameterOrder": [
+            "project",
+            "resource"
+          ],
+          "parameters": {
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "resource": {
+              "description": "Name or id of the resource for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9_]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{resource}/getIamPolicy",
+          "response": {
+            "$ref": "Policy"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "insert": {
+          "description": "Creates a deployment and all of the resources described by the deployment manifest.",
+          "httpMethod": "POST",
+          "id": "deploymentmanager.deployments.insert",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "createPolicy": {
+              "default": "CREATE_OR_ACQUIRE",
+              "description": "Sets the policy to use for creating new resources.",
+              "enum": [
+                "ACQUIRE",
+                "CREATE_OR_ACQUIRE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "preview": {
+              "description": "If set to true, creates a deployment and creates \"shell\" resources but does not actually instantiate these resources. This allows you to preview what your deployment looks like. After previewing a deployment, you can deploy your resources by making a request with the update() method or you can use the cancelPreview() method to cancel the preview altogether. Note that the deployment will still exist after you cancel the preview and you must separately delete this deployment if you want to remove it.",
+              "location": "query",
+              "type": "boolean"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments",
+          "request": {
+            "$ref": "Deployment"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "list": {
+          "description": "Lists all deployments for a given project.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.deployments.list",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments",
+          "response": {
+            "$ref": "DeploymentsListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        },
+        "patch": {
+          "description": "Updates a deployment and all of the resources described by the deployment manifest. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "deploymentmanager.deployments.patch",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "createPolicy": {
+              "default": "CREATE_OR_ACQUIRE",
+              "description": "Sets the policy to use for creating new resources.",
+              "enum": [
+                "ACQUIRE",
+                "CREATE_OR_ACQUIRE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "deletePolicy": {
+              "default": "DELETE",
+              "description": "Sets the policy to use for deleting resources.",
+              "enum": [
+                "ABANDON",
+                "DELETE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "preview": {
+              "default": "false",
+              "description": "If set to true, updates the deployment and creates and updates the \"shell\" resources but does not actually alter or instantiate these resources. This allows you to preview what your deployment will look like. You can use this intent to preview how an update would affect your deployment. You must provide a target.config with a configuration if this is set to true. After previewing a deployment, you can deploy your resources by making a request with the update() or you can cancelPreview() to remove the preview altogether. Note that the deployment will still exist after you cancel the preview and you must separately delete this deployment if you want to remove it.",
+              "location": "query",
+              "type": "boolean"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}",
+          "request": {
+            "$ref": "Deployment"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "setIamPolicy": {
+          "description": "Sets the access control policy on the specified resource. Replaces any existing policy.",
+          "httpMethod": "POST",
+          "id": "deploymentmanager.deployments.setIamPolicy",
+          "parameterOrder": [
+            "project",
+            "resource"
+          ],
+          "parameters": {
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "resource": {
+              "description": "Name or id of the resource for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9_]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{resource}/setIamPolicy",
+          "request": {
+            "$ref": "GlobalSetPolicyRequest"
+          },
+          "response": {
+            "$ref": "Policy"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "stop": {
+          "description": "Stops an ongoing operation. This does not roll back any work that has already been completed, but prevents any new work from being started.",
+          "httpMethod": "POST",
+          "id": "deploymentmanager.deployments.stop",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/stop",
+          "request": {
+            "$ref": "DeploymentsStopRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "testIamPermissions": {
+          "description": "Returns permissions that a caller has on the specified resource.",
+          "httpMethod": "POST",
+          "id": "deploymentmanager.deployments.testIamPermissions",
+          "parameterOrder": [
+            "project",
+            "resource"
+          ],
+          "parameters": {
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "resource": {
+              "description": "Name or id of the resource for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9_]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{resource}/testIamPermissions",
+          "request": {
+            "$ref": "TestPermissionsRequest"
+          },
+          "response": {
+            "$ref": "TestPermissionsResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        },
+        "update": {
+          "description": "Updates a deployment and all of the resources described by the deployment manifest.",
+          "httpMethod": "PUT",
+          "id": "deploymentmanager.deployments.update",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "createPolicy": {
+              "default": "CREATE_OR_ACQUIRE",
+              "description": "Sets the policy to use for creating new resources.",
+              "enum": [
+                "ACQUIRE",
+                "CREATE_OR_ACQUIRE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "deletePolicy": {
+              "default": "DELETE",
+              "description": "Sets the policy to use for deleting resources.",
+              "enum": [
+                "ABANDON",
+                "DELETE"
+              ],
+              "enumDescriptions": [
+                "",
+                ""
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "preview": {
+              "default": "false",
+              "description": "If set to true, updates the deployment and creates and updates the \"shell\" resources but does not actually alter or instantiate these resources. This allows you to preview what your deployment will look like. You can use this intent to preview how an update would affect your deployment. You must provide a target.config with a configuration if this is set to true. After previewing a deployment, you can deploy your resources by making a request with the update() or you can cancelPreview() to remove the preview altogether. Note that the deployment will still exist after you cancel the preview and you must separately delete this deployment if you want to remove it.",
+              "location": "query",
+              "type": "boolean"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}",
+          "request": {
+            "$ref": "Deployment"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman"
+          ]
+        }
+      }
+    },
+    "manifests": {
+      "methods": {
+        "get": {
+          "description": "Gets information about a specific manifest.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.manifests.get",
+          "parameterOrder": [
+            "project",
+            "deployment",
+            "manifest"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "manifest": {
+              "description": "The name of the manifest for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/manifests/{manifest}",
+          "response": {
+            "$ref": "Manifest"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        },
+        "list": {
+          "description": "Lists all manifests for a given deployment.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.manifests.list",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/manifests",
+          "response": {
+            "$ref": "ManifestsListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        }
+      }
+    },
+    "operations": {
+      "methods": {
+        "get": {
+          "description": "Gets information about a specific operation.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.operations.get",
+          "parameterOrder": [
+            "project",
+            "operation"
+          ],
+          "parameters": {
+            "operation": {
+              "description": "The name of the operation for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/operations/{operation}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        },
+        "list": {
+          "description": "Lists all operations for a project.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.operations.list",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/operations",
+          "response": {
+            "$ref": "OperationsListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        }
+      }
+    },
+    "resources": {
+      "methods": {
+        "get": {
+          "description": "Gets information about a single resource.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.resources.get",
+          "parameterOrder": [
+            "project",
+            "deployment",
+            "resource"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "resource": {
+              "description": "The name of the resource for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/resources/{resource}",
+          "response": {
+            "$ref": "Resource"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        },
+        "list": {
+          "description": "Lists all resources in a given deployment.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.resources.list",
+          "parameterOrder": [
+            "project",
+            "deployment"
+          ],
+          "parameters": {
+            "deployment": {
+              "description": "The name of the deployment for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/deployments/{deployment}/resources",
+          "response": {
+            "$ref": "ResourcesListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        }
+      }
+    },
+    "types": {
+      "methods": {
+        "list": {
+          "description": "Lists all resource types for Deployment Manager.",
+          "httpMethod": "GET",
+          "id": "deploymentmanager.types.list",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/types",
+          "response": {
+            "$ref": "TypesListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20181207",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "AuditConfig": {
+      "description": "Specifies the audit configuration for a service. The configuration determines which permission types are logged, and what identities, if any, are exempted from logging. An AuditConfig must have one or more AuditLogConfigs.\n\nIf there are AuditConfigs for both `allServices` and a specific service, the union of the two AuditConfigs is used for that service: the log_types specified in each AuditConfig are enabled, and the exempted_members in each AuditLogConfig are exempted.\n\nExample Policy with multiple AuditConfigs:\n\n{ \"audit_configs\": [ { \"service\": \"allServices\" \"audit_log_configs\": [ { \"log_type\": \"DATA_READ\", \"exempted_members\": [ \"user:foo@gmail.com\" ] }, { \"log_type\": \"DATA_WRITE\", }, { \"log_type\": \"ADMIN_READ\", } ] }, { \"service\": \"fooservice.googleapis.com\" \"audit_log_configs\": [ { \"log_type\": \"DATA_READ\", }, { \"log_type\": \"DATA_WRITE\", \"exempted_members\": [ \"user:bar@gmail.com\" ] } ] } ] }\n\nFor fooservice, this policy enables DATA_READ, DATA_WRITE and ADMIN_READ logging. It also exempts foo@gmail.com from DATA_READ logging, and bar@gmail.com from DATA_WRITE logging.",
+      "id": "AuditConfig",
+      "properties": {
+        "auditLogConfigs": {
+          "description": "The configuration for logging of each type of permission.",
+          "items": {
+            "$ref": "AuditLogConfig"
+          },
+          "type": "array"
+        },
+        "exemptedMembers": {
+          "description": "",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "Specifies a service that will be enabled for audit logging. For example, `storage.googleapis.com`, `cloudsql.googleapis.com`. `allServices` is a special value that covers all services.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditLogConfig": {
+      "description": "Provides the configuration for logging a type of permissions. Example:\n\n{ \"audit_log_configs\": [ { \"log_type\": \"DATA_READ\", \"exempted_members\": [ \"user:foo@gmail.com\" ] }, { \"log_type\": \"DATA_WRITE\", } ] }\n\nThis enables 'DATA_READ' and 'DATA_WRITE' logging, while exempting foo@gmail.com from DATA_READ logging.",
+      "id": "AuditLogConfig",
+      "properties": {
+        "exemptedMembers": {
+          "description": "Specifies the identities that do not cause logging for this type of permission. Follows the same format of [Binding.members][].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logType": {
+          "description": "The log type that this config enables.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizationLoggingOptions": {
+      "description": "Authorization-related information used by Cloud Audit Logging.",
+      "id": "AuthorizationLoggingOptions",
+      "properties": {
+        "permissionType": {
+          "description": "The type of the permission that was checked.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "description": "Associates `members` with a `role`.",
+      "id": "Binding",
+      "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "Unimplemented. The condition that is associated with this binding. NOTE: an unsatisfied condition will not allow user access via current binding. Different bindings, including their conditions, are examined independently."
+        },
+        "members": {
+          "description": "Specifies the identities requesting access for a Cloud Platform resource. `members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google account. For example, `alice@gmail.com` .\n\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group. For example, `admins@example.com`.\n\n\n\n* `domain:{domain}`: A Google Apps domain name that represents all the users of that domain. For example, `google.com` or `example.com`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "role": {
+          "description": "Role that is assigned to `members`. For example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Condition": {
+      "description": "A condition to be met.",
+      "id": "Condition",
+      "properties": {
+        "iam": {
+          "description": "Trusted attributes supplied by the IAM system.",
+          "type": "string"
+        },
+        "op": {
+          "description": "An operator to apply the subject with.",
+          "type": "string"
+        },
+        "svc": {
+          "description": "Trusted attributes discharged by the service.",
+          "type": "string"
+        },
+        "sys": {
+          "description": "Trusted attributes supplied by any service that owns resources and uses the IAM system for access control.",
+          "type": "string"
+        },
+        "value": {
+          "description": "DEPRECATED. Use 'values' instead.",
+          "type": "string"
+        },
+        "values": {
+          "description": "The objects of the condition. This is mutually exclusive with 'value'.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ConfigFile": {
+      "description": "",
+      "id": "ConfigFile",
+      "properties": {
+        "content": {
+          "description": "The contents of the file.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Deployment": {
+      "description": "",
+      "id": "Deployment",
+      "properties": {
+        "description": {
+          "description": "An optional user-provided description of the deployment.",
+          "type": "string"
+        },
+        "fingerprint": {
+          "description": "Provides a fingerprint to use in requests to modify a deployment, such as update(), stop(), and cancelPreview() requests. A fingerprint is a randomly generated value that must be provided with update(), stop(), and cancelPreview() requests to perform optimistic locking. This ensures optimistic concurrency so that only one request happens at a time.\n\nThe fingerprint is initially generated by Deployment Manager and changes after every request to modify data. To get the latest fingerprint value, perform a get() request to a deployment.",
+          "format": "byte",
+          "type": "string"
+        },
+        "id": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "insertTime": {
+          "description": "Output only. Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Map of labels; provided by the client when the resource is created or updated. Specifically: Label keys must be between 1 and 63 characters long and must conform to the following regular expression: [a-z]([-a-z0-9]*[a-z0-9])? Label values must be between 0 and 63 characters long and must conform to the regular expression ([a-z]([-a-z0-9]*[a-z0-9])?)?",
+          "items": {
+            "$ref": "DeploymentLabelEntry"
+          },
+          "type": "array"
+        },
+        "manifest": {
+          "description": "Output only. URL of the manifest representing the last manifest that was successfully deployed.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the resource; provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035. Specifically, the name must be 1-63 characters long and match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means the first character must be a lowercase letter, and all following characters must be a dash, lowercase letter, or digit, except the last character, which cannot be a dash.",
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "Operation",
+          "description": "Output only. The Operation that most recently ran, or is currently running, on this deployment."
+        },
+        "selfLink": {
+          "description": "Output only. Server defined URL for the resource.",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "TargetConfiguration",
+          "description": "[Input Only] The parameters that define your deployment, including the deployment configuration and relevant templates."
+        },
+        "update": {
+          "$ref": "DeploymentUpdate",
+          "description": "Output only. If Deployment Manager is currently updating or previewing an update to this deployment, the updated configuration appears here."
+        },
+        "updateTime": {
+          "description": "Output only. Update timestamp in RFC3339 text format.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentLabelEntry": {
+      "id": "DeploymentLabelEntry",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentUpdate": {
+      "description": "",
+      "id": "DeploymentUpdate",
+      "properties": {
+        "description": {
+          "description": "Output only. An optional user-provided description of the deployment after the current update has been applied.",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Output only. Map of labels; provided by the client when the resource is created or updated. Specifically: Label keys must be between 1 and 63 characters long and must conform to the following regular expression: [a-z]([-a-z0-9]*[a-z0-9])? Label values must be between 0 and 63 characters long and must conform to the regular expression ([a-z]([-a-z0-9]*[a-z0-9])?)?",
+          "items": {
+            "$ref": "DeploymentUpdateLabelEntry"
+          },
+          "type": "array"
+        },
+        "manifest": {
+          "description": "Output only. URL of the manifest representing the update configuration of this deployment.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentUpdateLabelEntry": {
+      "id": "DeploymentUpdateLabelEntry",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentsCancelPreviewRequest": {
+      "description": "",
+      "id": "DeploymentsCancelPreviewRequest",
+      "properties": {
+        "fingerprint": {
+          "description": "Specifies a fingerprint for cancelPreview() requests. A fingerprint is a randomly generated value that must be provided in cancelPreview() requests to perform optimistic locking. This ensures optimistic concurrency so that the deployment does not have conflicting requests (e.g. if someone attempts to make a new update request while another user attempts to cancel a preview, this would prevent one of the requests).\n\nThe fingerprint is initially generated by Deployment Manager and changes after every request to modify a deployment. To get the latest fingerprint value, perform a get() request on the deployment.",
+          "format": "byte",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentsListResponse": {
+      "description": "A response containing a partial list of deployments and a page token used to build the next request if the request has been truncated.",
+      "id": "DeploymentsListResponse",
+      "properties": {
+        "deployments": {
+          "description": "Output only. The deployments contained in this response.",
+          "items": {
+            "$ref": "Deployment"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "Output only. A token used to continue a truncated list request.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DeploymentsStopRequest": {
+      "description": "",
+      "id": "DeploymentsStopRequest",
+      "properties": {
+        "fingerprint": {
+          "description": "Specifies a fingerprint for stop() requests. A fingerprint is a randomly generated value that must be provided in stop() requests to perform optimistic locking. This ensures optimistic concurrency so that the deployment does not have conflicting requests (e.g. if someone attempts to make a new update request while another user attempts to stop an ongoing update request, this would prevent a collision).\n\nThe fingerprint is initially generated by Deployment Manager and changes after every request to modify a deployment. To get the latest fingerprint value, perform a get() request on the deployment.",
+          "format": "byte",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents an expression text. Example:\n\ntitle: \"User account presence\" description: \"Determines whether the request has a user account\" expression: \"size(request.user) \u003e 0\"",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "An optional description of the expression. This is a longer text which describes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in Common Expression Language syntax.\n\nThe application context of the containing message determines which well-known feature set of CEL is supported.",
+          "type": "string"
+        },
+        "location": {
+          "description": "An optional string indicating the location of the expression for error reporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "An optional title for the expression, i.e. a short string describing its purpose. This can be used e.g. in UIs which allow to enter the expression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GlobalSetPolicyRequest": {
+      "id": "GlobalSetPolicyRequest",
+      "properties": {
+        "bindings": {
+          "description": "Flatten Policy to create a backward compatible wire-format. Deprecated. Use 'policy' to specify bindings.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "Flatten Policy to create a backward compatible wire-format. Deprecated. Use 'policy' to specify the etag.",
+          "format": "byte",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "Policy",
+          "description": "REQUIRED: The complete policy to be applied to the 'resource'. The size of the policy is limited to a few 10s of KB. An empty policy is in general a valid policy but certain services (like Projects) might reject them."
+        }
+      },
+      "type": "object"
+    },
+    "ImportFile": {
+      "description": "",
+      "id": "ImportFile",
+      "properties": {
+        "content": {
+          "description": "The contents of the file.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the file.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LogConfig": {
+      "description": "Specifies what kind of log the caller must write",
+      "id": "LogConfig",
+      "properties": {
+        "cloudAudit": {
+          "$ref": "LogConfigCloudAuditOptions",
+          "description": "Cloud audit options."
+        },
+        "counter": {
+          "$ref": "LogConfigCounterOptions",
+          "description": "Counter options."
+        },
+        "dataAccess": {
+          "$ref": "LogConfigDataAccessOptions",
+          "description": "Data access options."
+        }
+      },
+      "type": "object"
+    },
+    "LogConfigCloudAuditOptions": {
+      "description": "Write a Cloud Audit log",
+      "id": "LogConfigCloudAuditOptions",
+      "properties": {
+        "authorizationLoggingOptions": {
+          "$ref": "AuthorizationLoggingOptions",
+          "description": "Information used by the Cloud Audit Logging pipeline."
+        },
+        "logName": {
+          "description": "The log_name to populate in the Cloud Audit Record.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LogConfigCounterOptions": {
+      "description": "Increment a streamz counter with the specified metric and field names.\n\nMetric names should start with a '/', generally be lowercase-only, and end in \"_count\". Field names should not contain an initial slash. The actual exported metric names will have \"/iam/policy\" prepended.\n\nField names correspond to IAM request parameters and field values are their respective values.\n\nSupported field names: - \"authority\", which is \"[token]\" if IAMContext.token is present, otherwise the value of IAMContext.authority_selector if present, and otherwise a representation of IAMContext.principal; or - \"iam_principal\", a representation of IAMContext.principal even if a token or authority selector is present; or - \"\" (empty string), resulting in a counter with no fields.\n\nExamples: counter { metric: \"/debug_access_count\" field: \"iam_principal\" } ==\u003e increment counter /iam/policy/backend_debug_access_count {iam_principal=[value of IAMContext.principal]}\n\nAt this time we do not support multiple field names (though this may be supported in the future).",
+      "id": "LogConfigCounterOptions",
+      "properties": {
+        "field": {
+          "description": "The field value to attribute.",
+          "type": "string"
+        },
+        "metric": {
+          "description": "The metric to update.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LogConfigDataAccessOptions": {
+      "description": "Write a Data Access (Gin) log",
+      "id": "LogConfigDataAccessOptions",
+      "properties": {
+        "logMode": {
+          "description": "Whether Gin logging should happen in a fail-closed manner at the caller. This is relevant only in the LocalIAM implementation, for now.\n\nNOTE: Logging to Gin in a fail-closed manner is currently unsupported while work is being done to satisfy the requirements of go/345. Currently, setting LOG_FAIL_CLOSED mode will have no effect, but still exists because there is active work being done to support it (b/115874152).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Manifest": {
+      "description": "",
+      "id": "Manifest",
+      "properties": {
+        "config": {
+          "$ref": "ConfigFile",
+          "description": "Output only. The YAML configuration for this manifest."
+        },
+        "expandedConfig": {
+          "description": "Output only. The fully-expanded configuration file, including any templates and references.",
+          "type": "string"
+        },
+        "id": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "imports": {
+          "description": "Output only. The imported files for this manifest.",
+          "items": {
+            "$ref": "ImportFile"
+          },
+          "type": "array"
+        },
+        "insertTime": {
+          "description": "Output only. Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "layout": {
+          "description": "Output only. The YAML layout for this manifest.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Output only.\n\nThe name of the manifest.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "Output only. Self link for the manifest.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ManifestsListResponse": {
+      "description": "A response containing a partial list of manifests and a page token used to build the next request if the request has been truncated.",
+      "id": "ManifestsListResponse",
+      "properties": {
+        "manifests": {
+          "description": "Output only. Manifests contained in this list response.",
+          "items": {
+            "$ref": "Manifest"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "Output only. A token used to continue a truncated list request.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "An Operation resource, used to manage asynchronous API requests. (== resource_for v1.globalOperations ==) (== resource_for beta.globalOperations ==) (== resource_for v1.regionOperations ==) (== resource_for beta.regionOperations ==) (== resource_for v1.zoneOperations ==) (== resource_for beta.zoneOperations ==)",
+      "id": "Operation",
+      "properties": {
+        "clientOperationId": {
+          "description": "[Output Only] The value of `requestId` if you provided it in the request. Not present otherwise.",
+          "type": "string"
+        },
+        "creationTimestamp": {
+          "description": "[Deprecated] This field is deprecated.",
+          "type": "string"
+        },
+        "description": {
+          "description": "[Output Only] A textual description of the operation, which is set when the operation is created.",
+          "type": "string"
+        },
+        "endTime": {
+          "description": "[Output Only] The time that this operation was completed. This value is in RFC3339 text format.",
+          "type": "string"
+        },
+        "error": {
+          "description": "[Output Only] If errors are generated during processing of the operation, this field will be populated.",
+          "properties": {
+            "errors": {
+              "description": "[Output Only] The array of errors encountered while processing this operation.",
+              "items": {
+                "properties": {
+                  "code": {
+                    "description": "[Output Only] The error type identifier for this error.",
+                    "type": "string"
+                  },
+                  "location": {
+                    "description": "[Output Only] Indicates the field in the request that caused the error. This property is optional.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "[Output Only] An optional, human-readable error message.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "httpErrorMessage": {
+          "description": "[Output Only] If the operation fails, this field contains the HTTP error message that was returned, such as NOT FOUND.",
+          "type": "string"
+        },
+        "httpErrorStatusCode": {
+          "description": "[Output Only] If the operation fails, this field contains the HTTP error status code that was returned. For example, a 404 means the resource was not found.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "id": {
+          "description": "[Output Only] The unique identifier for the resource. This identifier is defined by the server.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "insertTime": {
+          "description": "[Output Only] The time that this operation was requested. This value is in RFC3339 text format.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "deploymentmanager#operation",
+          "description": "[Output Only] Type of the resource. Always compute#operation for Operation resources.",
+          "type": "string"
+        },
+        "name": {
+          "description": "[Output Only] Name of the resource.",
+          "type": "string"
+        },
+        "operationType": {
+          "description": "[Output Only] The type of operation, such as insert, update, or delete, and so on.",
+          "type": "string"
+        },
+        "progress": {
+          "description": "[Output Only] An optional progress indicator that ranges from 0 to 100. There is no requirement that this be linear or support any granularity of operations. This should not be used to guess when the operation will be complete. This number should monotonically increase as the operation progresses.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "region": {
+          "description": "[Output Only] The URL of the region where the operation resides. Only available when performing regional operations. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] Server-defined URL for the resource.",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "[Output Only] The time that this operation was started by the server. This value is in RFC3339 text format.",
+          "type": "string"
+        },
+        "status": {
+          "description": "[Output Only] The status of the operation, which can be one of the following: PENDING, RUNNING, or DONE.",
+          "type": "string"
+        },
+        "statusMessage": {
+          "description": "[Output Only] An optional textual description of the current status of the operation.",
+          "type": "string"
+        },
+        "targetId": {
+          "description": "[Output Only] The unique target ID, which identifies a specific incarnation of the target resource.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "targetLink": {
+          "description": "[Output Only] The URL of the resource that the operation modifies. For operations related to creating a snapshot, this points to the persistent disk that the snapshot was created from.",
+          "type": "string"
+        },
+        "user": {
+          "description": "[Output Only] User who requested the operation, for example: user@example.com.",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "[Output Only] If warning messages are generated during processing of the operation, this field will be populated.",
+          "items": {
+            "properties": {
+              "code": {
+                "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+                "type": "string"
+              },
+              "data": {
+                "description": "[Output Only] Metadata about this warning in key: value format. For example:\n\"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" }",
+                "items": {
+                  "properties": {
+                    "key": {
+                      "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding).",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "[Output Only] A warning data value corresponding to the key.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "message": {
+                "description": "[Output Only] A human-readable description of the warning code.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "zone": {
+          "description": "[Output Only] The URL of the zone where the operation resides. Only available when performing per-zone operations. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "OperationsListResponse": {
+      "description": "A response containing a partial list of operations and a page token used to build the next request if the request has been truncated.",
+      "id": "OperationsListResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Output only. A token used to continue a truncated list request.",
+          "type": "string"
+        },
+        "operations": {
+          "description": "Output only. Operations contained in this list response.",
+          "items": {
+            "$ref": "Operation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Policy": {
+      "description": "Defines an Identity and Access Management (IAM) policy. It is used to specify access control policies for Cloud Platform resources.\n\n\n\nA `Policy` consists of a list of `bindings`. A `binding` binds a list of `members` to a `role`, where the members can be user accounts, Google groups, Google domains, and service accounts. A `role` is a named list of permissions defined by IAM.\n\n**JSON Example**\n\n{ \"bindings\": [ { \"role\": \"roles/owner\", \"members\": [ \"user:mike@example.com\", \"group:admins@example.com\", \"domain:google.com\", \"serviceAccount:my-other-app@appspot.gserviceaccount.com\" ] }, { \"role\": \"roles/viewer\", \"members\": [\"user:sean@example.com\"] } ] }\n\n**YAML Example**\n\nbindings: - members: - user:mike@example.com - group:admins@example.com - domain:google.com - serviceAccount:my-other-app@appspot.gserviceaccount.com role: roles/owner - members: - user:sean@example.com role: roles/viewer\n\n\n\nFor a description of IAM and its features, see the [IAM developer's guide](https://cloud.google.com/iam/docs).",
+      "id": "Policy",
+      "properties": {
+        "auditConfigs": {
+          "description": "Specifies cloud audit logging configuration for this policy.",
+          "items": {
+            "$ref": "AuditConfig"
+          },
+          "type": "array"
+        },
+        "bindings": {
+          "description": "Associates a list of `members` to a `role`. `bindings` with no members will result in an error.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "`etag` is used for optimistic concurrency control as a way to help prevent simultaneous updates of a policy from overwriting each other. It is strongly suggested that systems make use of the `etag` in the read-modify-write cycle to perform policy updates in order to avoid race conditions: An `etag` is returned in the response to `getIamPolicy`, and systems are expected to put that etag in the request to `setIamPolicy` to ensure that their change will be applied to the same version of the policy.\n\nIf no `etag` is provided in the call to `setIamPolicy`, then the existing policy is overwritten blindly.",
+          "format": "byte",
+          "type": "string"
+        },
+        "iamOwned": {
+          "description": "",
+          "type": "boolean"
+        },
+        "rules": {
+          "description": "If more than one rule is specified, the rules are applied in the following manner: - All matching LOG rules are always applied. - If any DENY/DENY_WITH_LOG rule matches, permission is denied. Logging will be applied if one or more matching rule requires logging. - Otherwise, if any ALLOW/ALLOW_WITH_LOG rule matches, permission is granted. Logging will be applied if one or more matching rule requires logging. - Otherwise, if no rule applies, permission is denied.",
+          "items": {
+            "$ref": "Rule"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "Deprecated.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Resource": {
+      "description": "",
+      "id": "Resource",
+      "properties": {
+        "accessControl": {
+          "$ref": "ResourceAccessControl",
+          "description": "The Access Control Policy set on this resource."
+        },
+        "finalProperties": {
+          "description": "Output only. The evaluated properties of the resource with references expanded. Returned as serialized YAML.",
+          "type": "string"
+        },
+        "id": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "insertTime": {
+          "description": "Output only. Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "manifest": {
+          "description": "Output only. URL of the manifest representing the current configuration of this resource.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Output only. The name of the resource as it appears in the YAML config.",
+          "type": "string"
+        },
+        "properties": {
+          "description": "Output only. The current properties of the resource before any references have been filled in. Returned as serialized YAML.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Output only. The type of the resource, for example compute.v1.instance, or cloudfunctions.v1beta1.function.",
+          "type": "string"
+        },
+        "update": {
+          "$ref": "ResourceUpdate",
+          "description": "Output only. If Deployment Manager is currently updating or previewing an update to this resource, the updated configuration appears here."
+        },
+        "updateTime": {
+          "description": "Output only. Update timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Output only. The URL of the actual resource.",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "Output only. If warning messages are generated during processing of this resource, this field will be populated.",
+          "items": {
+            "properties": {
+              "code": {
+                "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+                "type": "string"
+              },
+              "data": {
+                "description": "[Output Only] Metadata about this warning in key: value format. For example:\n\"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" }",
+                "items": {
+                  "properties": {
+                    "key": {
+                      "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding).",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "[Output Only] A warning data value corresponding to the key.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "message": {
+                "description": "[Output Only] A human-readable description of the warning code.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceAccessControl": {
+      "description": "The access controls set on the resource.",
+      "id": "ResourceAccessControl",
+      "properties": {
+        "gcpIamPolicy": {
+          "description": "The GCP IAM Policy to set on the resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceUpdate": {
+      "description": "",
+      "id": "ResourceUpdate",
+      "properties": {
+        "accessControl": {
+          "$ref": "ResourceAccessControl",
+          "description": "The Access Control Policy to set on this resource after updating the resource itself."
+        },
+        "error": {
+          "description": "Output only. If errors are generated during update of the resource, this field will be populated.",
+          "properties": {
+            "errors": {
+              "description": "[Output Only] The array of errors encountered while processing this operation.",
+              "items": {
+                "properties": {
+                  "code": {
+                    "description": "[Output Only] The error type identifier for this error.",
+                    "type": "string"
+                  },
+                  "location": {
+                    "description": "[Output Only] Indicates the field in the request that caused the error. This property is optional.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "[Output Only] An optional, human-readable error message.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "finalProperties": {
+          "description": "Output only. The expanded properties of the resource with reference values expanded. Returned as serialized YAML.",
+          "type": "string"
+        },
+        "intent": {
+          "description": "Output only. The intent of the resource: PREVIEW, UPDATE, or CANCEL.",
+          "type": "string"
+        },
+        "manifest": {
+          "description": "Output only. URL of the manifest representing the update configuration of this resource.",
+          "type": "string"
+        },
+        "properties": {
+          "description": "Output only. The set of updated properties for this resource, before references are expanded. Returned as serialized YAML.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Output only. The state of the resource.",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "Output only. If warning messages are generated during processing of this resource, this field will be populated.",
+          "items": {
+            "properties": {
+              "code": {
+                "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+                "type": "string"
+              },
+              "data": {
+                "description": "[Output Only] Metadata about this warning in key: value format. For example:\n\"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" }",
+                "items": {
+                  "properties": {
+                    "key": {
+                      "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding).",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "[Output Only] A warning data value corresponding to the key.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "message": {
+                "description": "[Output Only] A human-readable description of the warning code.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ResourcesListResponse": {
+      "description": "A response containing a partial list of resources and a page token used to build the next request if the request has been truncated.",
+      "id": "ResourcesListResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "A token used to continue a truncated list request.",
+          "type": "string"
+        },
+        "resources": {
+          "description": "Resources contained in this list response.",
+          "items": {
+            "$ref": "Resource"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Rule": {
+      "description": "A rule to be applied in a Policy.",
+      "id": "Rule",
+      "properties": {
+        "action": {
+          "description": "Required",
+          "type": "string"
+        },
+        "conditions": {
+          "description": "Additional restrictions that must be met. All conditions must pass for the rule to match.",
+          "items": {
+            "$ref": "Condition"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "Human-readable description of the rule.",
+          "type": "string"
+        },
+        "ins": {
+          "description": "If one or more 'in' clauses are specified, the rule matches if the PRINCIPAL/AUTHORITY_SELECTOR is in at least one of these entries.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logConfigs": {
+          "description": "The config returned to callers of tech.iam.IAM.CheckPolicy for any entries that match the LOG action.",
+          "items": {
+            "$ref": "LogConfig"
+          },
+          "type": "array"
+        },
+        "notIns": {
+          "description": "If one or more 'not_in' clauses are specified, the rule matches if the PRINCIPAL/AUTHORITY_SELECTOR is in none of the entries.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "permissions": {
+          "description": "A permission is a string of form '..' (e.g., 'storage.buckets.list'). A value of '*' matches all permissions, and a verb part of '*' (e.g., 'storage.buckets.*') matches all verbs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TargetConfiguration": {
+      "description": "",
+      "id": "TargetConfiguration",
+      "properties": {
+        "config": {
+          "$ref": "ConfigFile",
+          "description": "The configuration to use for this deployment."
+        },
+        "imports": {
+          "description": "Specifies any files to import for this configuration. This can be used to import templates or other files. For example, you might import a text file in order to use the file in a template.",
+          "items": {
+            "$ref": "ImportFile"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestPermissionsRequest": {
+      "id": "TestPermissionsRequest",
+      "properties": {
+        "permissions": {
+          "description": "The set of permissions to check for the 'resource'. Permissions with wildcards (such as '*' or 'storage.*') are not allowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestPermissionsResponse": {
+      "id": "TestPermissionsResponse",
+      "properties": {
+        "permissions": {
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is allowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Type": {
+      "description": "A resource type supported by Deployment Manager.",
+      "id": "Type",
+      "properties": {
+        "id": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "insertTime": {
+          "description": "Output only. Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the type.",
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "Operation",
+          "description": "Output only. The Operation that most recently ran, or is currently running, on this type."
+        },
+        "selfLink": {
+          "description": "Output only. Server defined URL for the resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TypesListResponse": {
+      "description": "A response that returns all Types supported by Deployment Manager",
+      "id": "TypesListResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "A token used to continue a truncated list request.",
+          "type": "string"
+        },
+        "types": {
+          "description": "Output only. A list of resource types supported by Deployment Manager.",
+          "items": {
+            "$ref": "Type"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "deploymentmanager/v2/projects/",
+  "title": "Google Cloud Deployment Manager API",
+  "version": "v2"
+}

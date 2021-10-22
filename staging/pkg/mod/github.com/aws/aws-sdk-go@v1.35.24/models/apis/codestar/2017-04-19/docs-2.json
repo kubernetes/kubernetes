@@ -1,0 +1,693 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS CodeStar</fullname> <p>This is the API reference for AWS CodeStar. This reference provides descriptions of the operations and data types for the AWS CodeStar API along with usage examples.</p> <p>You can use the AWS CodeStar API to work with:</p> <p>Projects and their resources, by calling the following:</p> <ul> <li> <p> <code>DeleteProject</code>, which deletes a project.</p> </li> <li> <p> <code>DescribeProject</code>, which lists the attributes of a project.</p> </li> <li> <p> <code>ListProjects</code>, which lists all projects associated with your AWS account.</p> </li> <li> <p> <code>ListResources</code>, which lists the resources associated with a project.</p> </li> <li> <p> <code>ListTagsForProject</code>, which lists the tags associated with a project.</p> </li> <li> <p> <code>TagProject</code>, which adds tags to a project.</p> </li> <li> <p> <code>UntagProject</code>, which removes tags from a project.</p> </li> <li> <p> <code>UpdateProject</code>, which updates the attributes of a project.</p> </li> </ul> <p>Teams and team members, by calling the following:</p> <ul> <li> <p> <code>AssociateTeamMember</code>, which adds an IAM user to the team for a project.</p> </li> <li> <p> <code>DisassociateTeamMember</code>, which removes an IAM user from the team for a project.</p> </li> <li> <p> <code>ListTeamMembers</code>, which lists all the IAM users in the team for a project, including their roles and attributes.</p> </li> <li> <p> <code>UpdateTeamMember</code>, which updates a team member's attributes in a project.</p> </li> </ul> <p>Users, by calling the following:</p> <ul> <li> <p> <code>CreateUserProfile</code>, which creates a user profile that contains data associated with the user across all projects.</p> </li> <li> <p> <code>DeleteUserProfile</code>, which deletes all user profile information across all projects.</p> </li> <li> <p> <code>DescribeUserProfile</code>, which describes the profile of a user.</p> </li> <li> <p> <code>ListUserProfiles</code>, which lists all user profiles.</p> </li> <li> <p> <code>UpdateUserProfile</code>, which updates the profile for a user.</p> </li> </ul>",
+  "operations": {
+    "AssociateTeamMember": "<p>Adds an IAM user to the team for an AWS CodeStar project.</p>",
+    "CreateProject": "<p>Creates a project, including project resources. This action creates a project based on a submitted project request. A set of source code files and a toolchain template file can be included with the project request. If these are not provided, an empty project is created.</p>",
+    "CreateUserProfile": "<p>Creates a profile for a user that includes user preferences, such as the display name and email address assocciated with the user, in AWS CodeStar. The user profile is not project-specific. Information in the user profile is displayed wherever the user's information appears to other users in AWS CodeStar.</p>",
+    "DeleteProject": "<p>Deletes a project, including project resources. Does not delete users associated with the project, but does delete the IAM roles that allowed access to the project.</p>",
+    "DeleteUserProfile": "<p>Deletes a user profile in AWS CodeStar, including all personal preference data associated with that profile, such as display name and email address. It does not delete the history of that user, for example the history of commits made by that user.</p>",
+    "DescribeProject": "<p>Describes a project and its resources.</p>",
+    "DescribeUserProfile": "<p>Describes a user in AWS CodeStar and the user attributes across all projects.</p>",
+    "DisassociateTeamMember": "<p>Removes a user from a project. Removing a user from a project also removes the IAM policies from that user that allowed access to the project and its resources. Disassociating a team member does not remove that user's profile from AWS CodeStar. It does not remove the user from IAM.</p>",
+    "ListProjects": "<p>Lists all projects in AWS CodeStar associated with your AWS account.</p>",
+    "ListResources": "<p>Lists resources associated with a project in AWS CodeStar.</p>",
+    "ListTagsForProject": "<p>Gets the tags for a project.</p>",
+    "ListTeamMembers": "<p>Lists all team members associated with a project.</p>",
+    "ListUserProfiles": "<p>Lists all the user profiles configured for your AWS account in AWS CodeStar.</p>",
+    "TagProject": "<p>Adds tags to a project.</p>",
+    "UntagProject": "<p>Removes tags from a project.</p>",
+    "UpdateProject": "<p>Updates a project in AWS CodeStar.</p>",
+    "UpdateTeamMember": "<p>Updates a team member's attributes in an AWS CodeStar project. For example, you can change a team member's role in the project, or change whether they have remote access to project resources.</p>",
+    "UpdateUserProfile": "<p>Updates a user's profile in AWS CodeStar. The user profile is not project-specific. Information in the user profile is displayed wherever the user's information appears to other users in AWS CodeStar. </p>"
+  },
+  "shapes": {
+    "AssociateTeamMemberRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateTeamMemberResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BucketKey": {
+      "base": null,
+      "refs": {
+        "S3Location$bucketKey": "<p>The Amazon S3 object key where the source code files provided with the project request are stored.</p>"
+      }
+    },
+    "BucketName": {
+      "base": null,
+      "refs": {
+        "S3Location$bucketName": "<p>The Amazon S3 bucket name where the source code files provided with the project request are stored.</p>"
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "AssociateTeamMemberRequest$clientRequestToken": "<p>A user- or system-generated token that identifies the entity that requested the team member association to the project. This token can be used to repeat the request.</p>",
+        "AssociateTeamMemberResult$clientRequestToken": "<p>The user- or system-generated token from the initial request that can be used to repeat the request.</p>",
+        "CreateProjectRequest$clientRequestToken": "<p>A user- or system-generated token that identifies the entity that requested project creation. This token can be used to repeat the request.</p>",
+        "CreateProjectResult$clientRequestToken": "<p>A user- or system-generated token that identifies the entity that requested project creation.</p>",
+        "DeleteProjectRequest$clientRequestToken": "<p>A user- or system-generated token that identifies the entity that requested project deletion. This token can be used to repeat the request. </p>",
+        "DescribeProjectResult$clientRequestToken": "<p>A user- or system-generated token that identifies the entity that requested project creation. </p>"
+      }
+    },
+    "Code": {
+      "base": "<p>Location and destination information about the source code files provided with the project request. The source code is uploaded to the new project source repository after project creation.</p>",
+      "refs": {
+        "SourceCode$member": null
+      }
+    },
+    "CodeCommitCodeDestination": {
+      "base": "<p>Information about the AWS CodeCommit repository to be created in AWS CodeStar. This is where the source code files provided with the project request will be uploaded after project creation.</p>",
+      "refs": {
+        "CodeDestination$codeCommit": "<p>Information about the AWS CodeCommit repository to be created in AWS CodeStar. This is where the source code files provided with the project request will be uploaded after project creation.</p>"
+      }
+    },
+    "CodeDestination": {
+      "base": "<p>The repository to be created in AWS CodeStar. Valid values are AWS CodeCommit or GitHub. After AWS CodeStar provisions the new repository, the source code files provided with the project request are placed in the repository.</p>",
+      "refs": {
+        "Code$destination": "<p>The repository to be created in AWS CodeStar. Valid values are AWS CodeCommit or GitHub. After AWS CodeStar provisions the new repository, the source code files provided with the project request are placed in the repository.</p>"
+      }
+    },
+    "CodeSource": {
+      "base": "<p>The location where the source code files provided with the project request are stored. AWS CodeStar retrieves the files during project creation.</p>",
+      "refs": {
+        "Code$source": "<p>The location where the source code files provided with the project request are stored. AWS CodeStar retrieves the files during project creation.</p>"
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p>Another modification is being made. That modification must complete before you can make your change.</p>",
+      "refs": {
+      }
+    },
+    "CreateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatedTimestamp": {
+      "base": null,
+      "refs": {
+        "CreateUserProfileResult$createdTimestamp": "<p>The date the user profile was created, in timestamp format.</p>",
+        "DescribeProjectResult$createdTimeStamp": "<p>The date and time the project was created, in timestamp format.</p>",
+        "DescribeUserProfileResult$createdTimestamp": "<p>The date and time when the user profile was created in AWS CodeStar, in timestamp format.</p>",
+        "UpdateUserProfileResult$createdTimestamp": "<p>The date the user profile was created, in timestamp format.</p>"
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteStack": {
+      "base": null,
+      "refs": {
+        "DeleteProjectRequest$deleteStack": "<p>Whether to send a delete request for the primary stack in AWS CloudFormation originally used to generate the project and its resources. This option will delete all AWS resources for the project (except for any buckets in Amazon S3) as well as deleting the project itself. Recommended for most use cases.</p>"
+      }
+    },
+    "DeleteUserProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteUserProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateTeamMemberRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateTeamMemberResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Email": {
+      "base": null,
+      "refs": {
+        "CreateUserProfileRequest$emailAddress": "<p>The email address that will be displayed as part of the user's profile in AWS CodeStar.</p>",
+        "CreateUserProfileResult$emailAddress": "<p>The email address that is displayed as part of the user's profile in AWS CodeStar.</p>",
+        "DescribeUserProfileResult$emailAddress": "<p>The email address for the user. Optional.</p>",
+        "UpdateUserProfileRequest$emailAddress": "<p>The email address that is displayed as part of the user's profile in AWS CodeStar.</p>",
+        "UpdateUserProfileResult$emailAddress": "<p>The email address that is displayed as part of the user's profile in AWS CodeStar.</p>",
+        "UserProfileSummary$emailAddress": "<p>The email address associated with the user.</p>"
+      }
+    },
+    "GitHubCodeDestination": {
+      "base": "<p>Information about the GitHub repository to be created in AWS CodeStar. This is where the source code files provided with the project request will be uploaded after project creation.</p>",
+      "refs": {
+        "CodeDestination$gitHub": "<p>Information about the GitHub repository to be created in AWS CodeStar. This is where the source code files provided with the project request will be uploaded after project creation.</p>"
+      }
+    },
+    "GitHubPersonalToken": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$token": "<p>The GitHub user's personal access token for the GitHub repository.</p>"
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The next token is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidServiceRoleException": {
+      "base": "<p>The service role is not valid.</p>",
+      "refs": {
+      }
+    },
+    "LastModifiedTimestamp": {
+      "base": null,
+      "refs": {
+        "CreateUserProfileResult$lastModifiedTimestamp": "<p>The date the user profile was last modified, in timestamp format.</p>",
+        "DescribeUserProfileResult$lastModifiedTimestamp": "<p>The date and time when the user profile was last modified, in timestamp format.</p>",
+        "UpdateUserProfileResult$lastModifiedTimestamp": "<p>The date the user profile was last modified, in timestamp format.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>A resource limit has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTeamMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTeamMembersResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUserProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUserProfilesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListProjectsRequest$maxResults": "<p>The maximum amount of data that can be contained in a single set of results.</p>",
+        "ListResourcesRequest$maxResults": "<p>The maximum amount of data that can be contained in a single set of results.</p>",
+        "ListTagsForProjectRequest$maxResults": "<p>Reserved for future use.</p>",
+        "ListTeamMembersRequest$maxResults": "<p>The maximum number of team members you want returned in a response.</p>",
+        "ListUserProfilesRequest$maxResults": "<p>The maximum number of results to return in a response.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListProjectsRequest$nextToken": "<p>The continuation token to be used to return the next set of results, if the results cannot be returned in one response.</p>",
+        "ListProjectsResult$nextToken": "<p>The continuation token to use when requesting the next set of results, if there are more results to be returned.</p>",
+        "ListResourcesRequest$nextToken": "<p>The continuation token for the next set of results, if the results cannot be returned in one response.</p>",
+        "ListResourcesResult$nextToken": "<p>The continuation token to use when requesting the next set of results, if there are more results to be returned.</p>",
+        "ListTagsForProjectRequest$nextToken": "<p>Reserved for future use.</p>",
+        "ListTagsForProjectResult$nextToken": "<p>Reserved for future use.</p>",
+        "ListTeamMembersRequest$nextToken": "<p>The continuation token for the next set of results, if the results cannot be returned in one response.</p>",
+        "ListTeamMembersResult$nextToken": "<p>The continuation token to use when requesting the next set of results, if there are more results to be returned.</p>",
+        "ListUserProfilesRequest$nextToken": "<p>The continuation token for the next set of results, if the results cannot be returned in one response.</p>",
+        "ListUserProfilesResult$nextToken": "<p>The continuation token to use when requesting the next set of results, if there are more results to be returned.</p>"
+      }
+    },
+    "ProjectAlreadyExistsException": {
+      "base": "<p>An AWS CodeStar project with the same ID already exists in this region for the AWS account. AWS CodeStar project IDs must be unique within a region for the AWS account.</p>",
+      "refs": {
+      }
+    },
+    "ProjectArn": {
+      "base": null,
+      "refs": {
+        "CreateProjectResult$arn": "<p>The Amazon Resource Name (ARN) of the created project.</p>",
+        "DeleteProjectResult$projectArn": "<p>The Amazon Resource Name (ARN) of the deleted project.</p>",
+        "DescribeProjectResult$arn": "<p>The Amazon Resource Name (ARN) for the project.</p>",
+        "ProjectSummary$projectArn": "<p>The Amazon Resource Name (ARN) of the project.</p>"
+      }
+    },
+    "ProjectConfigurationException": {
+      "base": "<p>Project configuration information is required but not specified.</p>",
+      "refs": {
+      }
+    },
+    "ProjectCreationFailedException": {
+      "base": "<p>The project creation request was valid, but a nonspecific exception or error occurred during project creation. The project could not be created in AWS CodeStar.</p>",
+      "refs": {
+      }
+    },
+    "ProjectDescription": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$description": "<p>The description of the project, if any.</p>",
+        "DescribeProjectResult$description": "<p>The description of the project, if any.</p>",
+        "UpdateProjectRequest$description": "<p>The description of the project, if any.</p>"
+      }
+    },
+    "ProjectId": {
+      "base": null,
+      "refs": {
+        "AssociateTeamMemberRequest$projectId": "<p>The ID of the project to which you will add the IAM user.</p>",
+        "CreateProjectRequest$id": "<p>The ID of the project to be created in AWS CodeStar.</p>",
+        "CreateProjectResult$id": "<p>The ID of the project.</p>",
+        "DeleteProjectRequest$id": "<p>The ID of the project to be deleted in AWS CodeStar.</p>",
+        "DescribeProjectRequest$id": "<p>The ID of the project.</p>",
+        "DescribeProjectResult$id": "<p>The ID of the project.</p>",
+        "DisassociateTeamMemberRequest$projectId": "<p>The ID of the AWS CodeStar project from which you want to remove a team member.</p>",
+        "ListResourcesRequest$projectId": "<p>The ID of the project.</p>",
+        "ListTagsForProjectRequest$id": "<p>The ID of the project to get tags for.</p>",
+        "ListTeamMembersRequest$projectId": "<p>The ID of the project for which you want to list team members.</p>",
+        "ProjectSummary$projectId": "<p>The ID of the project.</p>",
+        "TagProjectRequest$id": "<p>The ID of the project you want to add a tag to.</p>",
+        "UntagProjectRequest$id": "<p>The ID of the project to remove tags from.</p>",
+        "UpdateProjectRequest$id": "<p>The ID of the project you want to update.</p>",
+        "UpdateTeamMemberRequest$projectId": "<p>The ID of the project.</p>"
+      }
+    },
+    "ProjectName": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$name": "<p>The display name for the project to be created in AWS CodeStar.</p>",
+        "DescribeProjectResult$name": "<p>The display name for the project.</p>",
+        "UpdateProjectRequest$name": "<p>The name of the project you want to update.</p>"
+      }
+    },
+    "ProjectNotFoundException": {
+      "base": "<p>The specified AWS CodeStar project was not found.</p>",
+      "refs": {
+      }
+    },
+    "ProjectStatus": {
+      "base": "<p>An indication of whether a project creation or deletion is failed or successful.</p>",
+      "refs": {
+        "DescribeProjectResult$status": "<p>The project creation or deletion status.</p>"
+      }
+    },
+    "ProjectSummary": {
+      "base": "<p>Information about the metadata for a project.</p>",
+      "refs": {
+        "ProjectsList$member": null
+      }
+    },
+    "ProjectTemplateId": {
+      "base": null,
+      "refs": {
+        "CreateProjectResult$projectTemplateId": "<p>Reserved for future use.</p>",
+        "DescribeProjectResult$projectTemplateId": "<p>The ID for the AWS CodeStar project template used to create the project.</p>"
+      }
+    },
+    "ProjectsList": {
+      "base": null,
+      "refs": {
+        "ListProjectsResult$projects": "<p>A list of projects.</p>"
+      }
+    },
+    "Reason": {
+      "base": null,
+      "refs": {
+        "ProjectStatus$reason": "<p>In the case of a project creation or deletion failure, a reason for the failure.</p>"
+      }
+    },
+    "RemoteAccessAllowed": {
+      "base": null,
+      "refs": {
+        "AssociateTeamMemberRequest$remoteAccessAllowed": "<p>Whether the team member is allowed to use an SSH public/private key pair to remotely access project resources, for example Amazon EC2 instances.</p>",
+        "TeamMember$remoteAccessAllowed": "<p>Whether the user is allowed to remotely access project resources using an SSH public/private key pair.</p>",
+        "UpdateTeamMemberRequest$remoteAccessAllowed": "<p>Whether a team member is allowed to remotely access project resources using the SSH public key associated with the user's profile. Even if this is set to True, the user must associate a public key with their profile before the user can access resources.</p>",
+        "UpdateTeamMemberResult$remoteAccessAllowed": "<p>Whether a team member is allowed to remotely access project resources using the SSH public key associated with the user's profile.</p>"
+      }
+    },
+    "RepositoryDescription": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$description": "<p>Description for the GitHub repository to be created in AWS CodeStar. This description displays in GitHub after the repository is created.</p>"
+      }
+    },
+    "RepositoryEnableIssues": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$issuesEnabled": "<p>Whether to enable issues for the GitHub repository.</p>"
+      }
+    },
+    "RepositoryIsPrivate": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$privateRepository": "<p>Whether the GitHub repository is to be a private repository.</p>"
+      }
+    },
+    "RepositoryName": {
+      "base": null,
+      "refs": {
+        "CodeCommitCodeDestination$name": "<p>The name of the AWS CodeCommit repository to be created in AWS CodeStar.</p>",
+        "GitHubCodeDestination$name": "<p>Name of the GitHub repository to be created in AWS CodeStar.</p>"
+      }
+    },
+    "RepositoryOwner": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$owner": "<p>The GitHub username for the owner of the GitHub repository to be created in AWS CodeStar. If this repository should be owned by a GitHub organization, provide its name.</p>"
+      }
+    },
+    "RepositoryType": {
+      "base": null,
+      "refs": {
+        "GitHubCodeDestination$type": "<p>The type of GitHub repository to be created in AWS CodeStar. Valid values are User or Organization.</p>"
+      }
+    },
+    "Resource": {
+      "base": "<p>Information about a resource for a project.</p>",
+      "refs": {
+        "ResourcesResult$member": null
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "Resource$id": "<p>The Amazon Resource Name (ARN) of the resource.</p>"
+      }
+    },
+    "ResourcesResult": {
+      "base": null,
+      "refs": {
+        "ListResourcesResult$resources": "<p>An array of resources associated with the project. </p>"
+      }
+    },
+    "Role": {
+      "base": null,
+      "refs": {
+        "AssociateTeamMemberRequest$projectRole": "<p>The AWS CodeStar project role that will apply to this user. This role determines what actions a user can take in an AWS CodeStar project.</p>",
+        "TeamMember$projectRole": "<p>The role assigned to the user in the project. Project roles have different levels of access. For more information, see <a href=\"http://docs.aws.amazon.com/codestar/latest/userguide/working-with-teams.html\">Working with Teams</a> in the <i>AWS CodeStar User Guide</i>. </p>",
+        "UpdateTeamMemberRequest$projectRole": "<p>The role assigned to the user in the project. Project roles have different levels of access. For more information, see <a href=\"http://docs.aws.amazon.com/codestar/latest/userguide/working-with-teams.html\">Working with Teams</a> in the <i>AWS CodeStar User Guide</i>.</p>",
+        "UpdateTeamMemberResult$projectRole": "<p>The project role granted to the user.</p>"
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "Toolchain$roleArn": "<p>The service role ARN for AWS CodeStar to use for the toolchain template during stack provisioning.</p>"
+      }
+    },
+    "S3Location": {
+      "base": "<p>The Amazon S3 location where the source code files provided with the project request are stored.</p>",
+      "refs": {
+        "CodeSource$s3": "<p>Information about the Amazon S3 location where the source code files provided with the project request are stored. </p>",
+        "ToolchainSource$s3": "<p>The Amazon S3 bucket where the toolchain template file provided with the project request is stored.</p>"
+      }
+    },
+    "SourceCode": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$sourceCode": "<p>A list of the Code objects submitted with the project request. If this parameter is specified, the request must also include the toolchain parameter.</p>"
+      }
+    },
+    "SshPublicKey": {
+      "base": null,
+      "refs": {
+        "CreateUserProfileRequest$sshPublicKey": "<p>The SSH public key associated with the user in AWS CodeStar. If a project owner allows the user remote access to project resources, this public key will be used along with the user's private key for SSH access.</p>",
+        "CreateUserProfileResult$sshPublicKey": "<p>The SSH public key associated with the user in AWS CodeStar. This is the public portion of the public/private keypair the user can use to access project resources if a project owner allows the user remote access to those resources.</p>",
+        "DescribeUserProfileResult$sshPublicKey": "<p>The SSH public key associated with the user. This SSH public key is associated with the user profile, and can be used in conjunction with the associated private key for access to project resources, such as Amazon EC2 instances, if a project owner grants remote access to those resources.</p>",
+        "UpdateUserProfileRequest$sshPublicKey": "<p>The SSH public key associated with the user in AWS CodeStar. If a project owner allows the user remote access to project resources, this public key will be used along with the user's private key for SSH access.</p>",
+        "UpdateUserProfileResult$sshPublicKey": "<p>The SSH public key associated with the user in AWS CodeStar. This is the public portion of the public/private keypair the user can use to access project resources if a project owner allows the user remote access to those resources.</p>",
+        "UserProfileSummary$sshPublicKey": "<p>The SSH public key associated with the user in AWS CodeStar. If a project owner allows the user remote access to project resources, this public key will be used along with the user's private key for SSH access.</p>"
+      }
+    },
+    "StackId": {
+      "base": null,
+      "refs": {
+        "DeleteProjectResult$stackId": "<p>The ID of the primary stack in AWS CloudFormation that will be deleted as part of deleting the project and its resources.</p>",
+        "DescribeProjectResult$stackId": "<p>The ID of the primary stack in AWS CloudFormation used to generate resources for the project.</p>"
+      }
+    },
+    "State": {
+      "base": null,
+      "refs": {
+        "ProjectStatus$state": "<p>The phase of completion for a project creation or deletion.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeys$member": null,
+        "Tags$key": null
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "UntagProjectRequest$tags": "<p>The tags to remove from the project.</p>"
+      }
+    },
+    "TagProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tags$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$tags": "<p>The tags created for the project.</p>",
+        "ListTagsForProjectResult$tags": "<p>The tags for the project.</p>",
+        "TagProjectRequest$tags": "<p>The tags you want to add to the project.</p>",
+        "TagProjectResult$tags": "<p>The tags for the project.</p>"
+      }
+    },
+    "TeamMember": {
+      "base": "<p>Information about a team member in a project.</p>",
+      "refs": {
+        "TeamMemberResult$member": null
+      }
+    },
+    "TeamMemberAlreadyAssociatedException": {
+      "base": "<p>The team member is already associated with a role in this project.</p>",
+      "refs": {
+      }
+    },
+    "TeamMemberNotFoundException": {
+      "base": "<p>The specified team member was not found.</p>",
+      "refs": {
+      }
+    },
+    "TeamMemberResult": {
+      "base": null,
+      "refs": {
+        "ListTeamMembersResult$teamMembers": "<p>A list of team member objects for the project.</p>"
+      }
+    },
+    "TemplateParameterKey": {
+      "base": null,
+      "refs": {
+        "TemplateParameterMap$key": null
+      }
+    },
+    "TemplateParameterMap": {
+      "base": null,
+      "refs": {
+        "Toolchain$stackParameters": "<p>The list of parameter overrides to be passed into the toolchain template during stack provisioning, if any.</p>"
+      }
+    },
+    "TemplateParameterValue": {
+      "base": null,
+      "refs": {
+        "TemplateParameterMap$value": null
+      }
+    },
+    "Toolchain": {
+      "base": "<p>The toolchain template file provided with the project request. AWS CodeStar uses the template to provision the toolchain stack in AWS CloudFormation.</p>",
+      "refs": {
+        "CreateProjectRequest$toolchain": "<p>The name of the toolchain template file submitted with the project request. If this parameter is specified, the request must also include the sourceCode parameter.</p>"
+      }
+    },
+    "ToolchainSource": {
+      "base": "<p>The Amazon S3 location where the toolchain template file provided with the project request is stored. AWS CodeStar retrieves the file during project creation.</p>",
+      "refs": {
+        "Toolchain$source": "<p>The Amazon S3 location where the toolchain template file provided with the project request is stored. AWS CodeStar retrieves the file during project creation.</p>"
+      }
+    },
+    "UntagProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTeamMemberRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTeamMemberResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserProfileResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UserArn": {
+      "base": null,
+      "refs": {
+        "AssociateTeamMemberRequest$userArn": "<p>The Amazon Resource Name (ARN) for the IAM user you want to add to the AWS CodeStar project.</p>",
+        "CreateUserProfileRequest$userArn": "<p>The Amazon Resource Name (ARN) of the user in IAM.</p>",
+        "CreateUserProfileResult$userArn": "<p>The Amazon Resource Name (ARN) of the user in IAM.</p>",
+        "DeleteUserProfileRequest$userArn": "<p>The Amazon Resource Name (ARN) of the user to delete from AWS CodeStar.</p>",
+        "DeleteUserProfileResult$userArn": "<p>The Amazon Resource Name (ARN) of the user deleted from AWS CodeStar.</p>",
+        "DescribeUserProfileRequest$userArn": "<p>The Amazon Resource Name (ARN) of the user.</p>",
+        "DescribeUserProfileResult$userArn": "<p>The Amazon Resource Name (ARN) of the user.</p>",
+        "DisassociateTeamMemberRequest$userArn": "<p>The Amazon Resource Name (ARN) of the IAM user or group whom you want to remove from the project.</p>",
+        "TeamMember$userArn": "<p>The Amazon Resource Name (ARN) of the user in IAM.</p>",
+        "UpdateTeamMemberRequest$userArn": "<p>The Amazon Resource Name (ARN) of the user for whom you want to change team membership attributes.</p>",
+        "UpdateTeamMemberResult$userArn": "<p>The Amazon Resource Name (ARN) of the user whose team membership attributes were updated.</p>",
+        "UpdateUserProfileRequest$userArn": "<p>The name that will be displayed as the friendly name for the user in AWS CodeStar.</p>",
+        "UpdateUserProfileResult$userArn": "<p>The Amazon Resource Name (ARN) of the user in IAM.</p>",
+        "UserProfileSummary$userArn": "<p>The Amazon Resource Name (ARN) of the user in IAM.</p>"
+      }
+    },
+    "UserProfileAlreadyExistsException": {
+      "base": "<p>A user profile with that name already exists in this region for the AWS account. AWS CodeStar user profile names must be unique within a region for the AWS account. </p>",
+      "refs": {
+      }
+    },
+    "UserProfileDisplayName": {
+      "base": null,
+      "refs": {
+        "CreateUserProfileRequest$displayName": "<p>The name that will be displayed as the friendly name for the user in AWS CodeStar. </p>",
+        "CreateUserProfileResult$displayName": "<p>The name that is displayed as the friendly name for the user in AWS CodeStar.</p>",
+        "DescribeUserProfileResult$displayName": "<p>The display name shown for the user in AWS CodeStar projects. For example, this could be set to both first and last name (\"Mary Major\") or a single name (\"Mary\"). The display name is also used to generate the initial icon associated with the user in AWS CodeStar projects. If spaces are included in the display name, the first character that appears after the space will be used as the second character in the user initial icon. The initial icon displays a maximum of two characters, so a display name with more than one space (for example \"Mary Jane Major\") would generate an initial icon using the first character and the first character after the space (\"MJ\", not \"MM\").</p>",
+        "UpdateUserProfileRequest$displayName": "<p>The name that is displayed as the friendly name for the user in AWS CodeStar.</p>",
+        "UpdateUserProfileResult$displayName": "<p>The name that is displayed as the friendly name for the user in AWS CodeStar.</p>",
+        "UserProfileSummary$displayName": "<p>The display name of a user in AWS CodeStar. For example, this could be set to both first and last name (\"Mary Major\") or a single name (\"Mary\"). The display name is also used to generate the initial icon associated with the user in AWS CodeStar projects. If spaces are included in the display name, the first character that appears after the space will be used as the second character in the user initial icon. The initial icon displays a maximum of two characters, so a display name with more than one space (for example \"Mary Jane Major\") would generate an initial icon using the first character and the first character after the space (\"MJ\", not \"MM\").</p>"
+      }
+    },
+    "UserProfileNotFoundException": {
+      "base": "<p>The user profile was not found.</p>",
+      "refs": {
+      }
+    },
+    "UserProfileSummary": {
+      "base": "<p>Information about a user's profile in AWS CodeStar.</p>",
+      "refs": {
+        "UserProfilesList$member": null
+      }
+    },
+    "UserProfilesList": {
+      "base": null,
+      "refs": {
+        "ListUserProfilesResult$userProfiles": "<p>All the user profiles configured in AWS CodeStar for an AWS account.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The specified input is either not valid, or it could not be validated.</p>",
+      "refs": {
+      }
+    }
+  }
+}

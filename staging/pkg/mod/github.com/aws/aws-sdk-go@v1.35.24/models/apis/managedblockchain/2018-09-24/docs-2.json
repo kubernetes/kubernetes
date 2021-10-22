@@ -1,0 +1,859 @@
+{
+  "version": "2.0",
+  "service": "<p/> <p>Amazon Managed Blockchain is a fully managed service for creating and managing blockchain networks using open source frameworks. Blockchain allows you to build applications where multiple parties can securely and transparently run transactions and share data without the need for a trusted, central authority. Currently, Managed Blockchain supports the Hyperledger Fabric open source framework. </p>",
+  "operations": {
+    "CreateMember": "<p>Creates a member within a Managed Blockchain network.</p>",
+    "CreateNetwork": "<p>Creates a new blockchain network using Amazon Managed Blockchain.</p>",
+    "CreateNode": "<p>Creates a peer node in a member.</p>",
+    "CreateProposal": "<p>Creates a proposal for a change to the network that other members of the network can vote on, for example, a proposal to add a new member to the network. Any member can create a proposal.</p>",
+    "DeleteMember": "<p>Deletes a member. Deleting a member removes the member and all associated resources from the network. <code>DeleteMember</code> can only be called for a specified <code>MemberId</code> if the principal performing the action is associated with the AWS account that owns the member. In all other cases, the <code>DeleteMember</code> action is carried out as the result of an approved proposal to remove a member. If <code>MemberId</code> is the last member in a network specified by the last AWS account, the network is deleted also.</p>",
+    "DeleteNode": "<p>Deletes a peer node from a member that your AWS account owns. All data on the node is lost and cannot be recovered.</p>",
+    "GetMember": "<p>Returns detailed information about a member.</p>",
+    "GetNetwork": "<p>Returns detailed information about a network.</p>",
+    "GetNode": "<p>Returns detailed information about a peer node.</p>",
+    "GetProposal": "<p>Returns detailed information about a proposal.</p>",
+    "ListInvitations": "<p>Returns a listing of all invitations for the current AWS account.</p>",
+    "ListMembers": "<p>Returns a listing of the members in a network and properties of their configurations.</p>",
+    "ListNetworks": "<p>Returns information about the networks in which the current AWS account has members.</p>",
+    "ListNodes": "<p>Returns information about the nodes within a network.</p>",
+    "ListProposalVotes": "<p>Returns the listing of votes for a specified proposal, including the value of each vote and the unique identifier of the member that cast the vote.</p>",
+    "ListProposals": "<p>Returns a listing of proposals for the network.</p>",
+    "RejectInvitation": "<p>Rejects an invitation to join a network. This action can be called by a principal in an AWS account that has received an invitation to create a member and join a network.</p>",
+    "UpdateMember": "<p>Updates a member configuration with new parameters.</p>",
+    "UpdateNode": "<p>Updates a node configuration with new parameters.</p>",
+    "VoteOnProposal": "<p>Casts a vote for a specified <code>ProposalId</code> on behalf of a member. The member to vote as, specified by <code>VoterMemberId</code>, must be in the same AWS account as the principal that calls the action.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "ApprovalThresholdPolicy": {
+      "base": "<p>A policy type that defines the voting rules for the network. The rules decide if a proposal is approved. Approval may be based on criteria such as the percentage of <code>YES</code> votes and the duration of the proposal. The policy applies to all proposals and is specified when the network is created.</p>",
+      "refs": {
+        "VotingPolicy$ApprovalThresholdPolicy": "<p>Defines the rules for the network for voting on proposals, such as the percentage of <code>YES</code> votes required for the proposal to be approved and the duration of the proposal. The policy applies to all proposals and is specified when the network is created.</p>"
+      }
+    },
+    "AvailabilityZoneString": {
+      "base": null,
+      "refs": {
+        "Node$AvailabilityZone": "<p>The Availability Zone in which the node exists.</p>",
+        "NodeConfiguration$AvailabilityZone": "<p>The Availability Zone in which the node exists.</p>",
+        "NodeSummary$AvailabilityZone": "<p>The Availability Zone in which the node exists.</p>"
+      }
+    },
+    "ClientRequestTokenString": {
+      "base": null,
+      "refs": {
+        "CreateMemberInput$ClientRequestToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the operation. An idempotent operation completes no more than one time. This identifier is required only if you make a service request directly using an HTTP client. It is generated automatically if you use an AWS SDK or the AWS CLI.</p>",
+        "CreateNetworkInput$ClientRequestToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the operation. An idempotent operation completes no more than one time. This identifier is required only if you make a service request directly using an HTTP client. It is generated automatically if you use an AWS SDK or the AWS CLI.</p>",
+        "CreateNodeInput$ClientRequestToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the operation. An idempotent operation completes no more than one time. This identifier is required only if you make a service request directly using an HTTP client. It is generated automatically if you use an AWS SDK or the AWS CLI.</p>",
+        "CreateProposalInput$ClientRequestToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the operation. An idempotent operation completes no more than one time. This identifier is required only if you make a service request directly using an HTTP client. It is generated automatically if you use an AWS SDK or the AWS CLI.</p>"
+      }
+    },
+    "CreateMemberInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMemberOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNetworkInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNetworkOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNodeInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateNodeOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProposalInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProposalOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMemberInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMemberOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNodeInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteNodeOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescriptionString": {
+      "base": null,
+      "refs": {
+        "CreateNetworkInput$Description": "<p>An optional description for the network.</p>",
+        "CreateProposalInput$Description": "<p>A description for the proposal that is visible to voting members, for example, \"Proposal to add Example Corp. as member.\"</p>",
+        "Member$Description": "<p>An optional description for the member.</p>",
+        "MemberConfiguration$Description": "<p>An optional description of the member.</p>",
+        "MemberSummary$Description": "<p>An optional description of the member.</p>",
+        "Network$Description": "<p>Attributes of the blockchain framework for the network.</p>",
+        "NetworkSummary$Description": "<p>An optional description of the network.</p>",
+        "Proposal$Description": "<p>The description of the proposal.</p>",
+        "ProposalSummary$Description": "<p> The description of the proposal. </p>"
+      }
+    },
+    "Edition": {
+      "base": null,
+      "refs": {
+        "NetworkFabricAttributes$Edition": "<p>The edition of Amazon Managed Blockchain that Hyperledger Fabric uses. For more information, see <a href=\"http://aws.amazon.com/managed-blockchain/pricing/\">Amazon Managed Blockchain Pricing</a>.</p>",
+        "NetworkFabricConfiguration$Edition": "<p>The edition of Amazon Managed Blockchain that the network uses. For more information, see <a href=\"http://aws.amazon.com/managed-blockchain/pricing/\">Amazon Managed Blockchain Pricing</a>.</p>"
+      }
+    },
+    "Enabled": {
+      "base": null,
+      "refs": {
+        "LogConfiguration$Enabled": "<p>Indicates whether logging is enabled.</p>"
+      }
+    },
+    "Framework": {
+      "base": null,
+      "refs": {
+        "CreateNetworkInput$Framework": "<p>The blockchain framework that the network uses.</p>",
+        "ListNetworksInput$Framework": "<p>An optional framework specifier. If provided, only networks of this framework type are listed.</p>",
+        "Network$Framework": "<p>The blockchain framework that the network uses.</p>",
+        "NetworkSummary$Framework": "<p>The blockchain framework that the network uses.</p>"
+      }
+    },
+    "FrameworkVersionString": {
+      "base": null,
+      "refs": {
+        "CreateNetworkInput$FrameworkVersion": "<p>The version of the blockchain framework that the network uses.</p>",
+        "Network$FrameworkVersion": "<p>The version of the blockchain framework that the network uses.</p>",
+        "NetworkSummary$FrameworkVersion": "<p>The version of the blockchain framework that the network uses.</p>"
+      }
+    },
+    "GetMemberInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMemberOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNetworkInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNetworkOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNodeInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetNodeOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetProposalInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetProposalOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IllegalActionException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InstanceTypeString": {
+      "base": null,
+      "refs": {
+        "Node$InstanceType": "<p>The instance type of the node.</p>",
+        "NodeConfiguration$InstanceType": "<p>The Amazon Managed Blockchain instance type for the node.</p>",
+        "NodeSummary$InstanceType": "<p>The EC2 instance type for the node.</p>"
+      }
+    },
+    "InternalServiceErrorException": {
+      "base": "<p>The request processing has failed because of an unknown error, exception or failure.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The action or operation requested is invalid. Verify that the action is typed correctly.</p>",
+      "refs": {
+      }
+    },
+    "Invitation": {
+      "base": "<p>An invitation to an AWS account to create a member and join the network.</p>",
+      "refs": {
+        "InvitationList$member": null
+      }
+    },
+    "InvitationList": {
+      "base": null,
+      "refs": {
+        "ListInvitationsOutput$Invitations": "<p>The invitations for the network.</p>"
+      }
+    },
+    "InvitationStatus": {
+      "base": null,
+      "refs": {
+        "Invitation$Status": "<p>The status of the invitation:</p> <ul> <li> <p> <code>PENDING</code> - The invitee has not created a member to join the network, and the invitation has not yet expired.</p> </li> <li> <p> <code>ACCEPTING</code> - The invitee has begun creating a member, and creation has not yet completed.</p> </li> <li> <p> <code>ACCEPTED</code> - The invitee created a member and joined the network using the <code>InvitationID</code>.</p> </li> <li> <p> <code>REJECTED</code> - The invitee rejected the invitation.</p> </li> <li> <p> <code>EXPIRED</code> - The invitee neither created a member nor rejected the invitation before the <code>ExpirationDate</code>.</p> </li> </ul>"
+      }
+    },
+    "InviteAction": {
+      "base": "<p>An action to invite a specific AWS account to create a member and join the network. The <code>InviteAction</code> is carried out when a <code>Proposal</code> is <code>APPROVED</code>.</p>",
+      "refs": {
+        "InviteActionList$member": null
+      }
+    },
+    "InviteActionList": {
+      "base": null,
+      "refs": {
+        "ProposalActions$Invitations": "<p> The actions to perform for an <code>APPROVED</code> proposal to invite an AWS account to create a member and join the network. </p>"
+      }
+    },
+    "IsOwned": {
+      "base": null,
+      "refs": {
+        "ListMembersInput$IsOwned": "<p>An optional Boolean value. If provided, the request is limited either to members that the current AWS account owns (<code>true</code>) or that other AWS accounts own (<code>false</code>). If omitted, all members are listed.</p>",
+        "MemberSummary$IsOwned": "<p>An indicator of whether the member is owned by your AWS account or a different AWS account.</p>"
+      }
+    },
+    "ListInvitationsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInvitationsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNetworksInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNetworksOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNodesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListNodesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProposalVotesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProposalVotesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProposalsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProposalsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogConfiguration": {
+      "base": "<p>A configuration for logging events.</p>",
+      "refs": {
+        "LogConfigurations$Cloudwatch": "<p>Parameters for publishing logs to Amazon CloudWatch Logs.</p>"
+      }
+    },
+    "LogConfigurations": {
+      "base": "<p>A collection of log configurations.</p>",
+      "refs": {
+        "MemberFabricLogPublishingConfiguration$CaLogs": "<p>Configuration properties for logging events associated with a member's Certificate Authority (CA). CA logs help you determine when a member in your account joins the network, or when new peers register with a member CA.</p>",
+        "NodeFabricLogPublishingConfiguration$ChaincodeLogs": "<p>Configuration properties for logging events associated with chaincode execution on a peer node. Chaincode logs contain the results of instantiating, invoking, and querying the chaincode. A peer can run multiple instances of chaincode. When enabled, a log stream is created for all chaincodes, with an individual log stream for each chaincode.</p>",
+        "NodeFabricLogPublishingConfiguration$PeerLogs": "<p>Configuration properties for a peer node log. Peer node logs contain messages generated when your client submits transaction proposals to peer nodes, requests to join channels, enrolls an admin peer, and lists the chaincode instances on a peer node. </p>"
+      }
+    },
+    "Member": {
+      "base": "<p>Member configuration properties.</p>",
+      "refs": {
+        "GetMemberOutput$Member": "<p>The properties of a member.</p>"
+      }
+    },
+    "MemberConfiguration": {
+      "base": "<p>Configuration properties of the member.</p>",
+      "refs": {
+        "CreateMemberInput$MemberConfiguration": "<p>Member configuration parameters.</p>",
+        "CreateNetworkInput$MemberConfiguration": "<p>Configuration properties for the first member within the network.</p>"
+      }
+    },
+    "MemberFabricAttributes": {
+      "base": "<p>Attributes of Hyperledger Fabric for a member in a Managed Blockchain network using the Hyperledger Fabric framework.</p>",
+      "refs": {
+        "MemberFrameworkAttributes$Fabric": "<p>Attributes of Hyperledger Fabric relevant to a member on a Managed Blockchain network that uses Hyperledger Fabric.</p>"
+      }
+    },
+    "MemberFabricConfiguration": {
+      "base": "<p>Configuration properties for Hyperledger Fabric for a member in a Managed Blockchain network using the Hyperledger Fabric framework.</p>",
+      "refs": {
+        "MemberFrameworkConfiguration$Fabric": "<p>Attributes of Hyperledger Fabric for a member on a Managed Blockchain network that uses Hyperledger Fabric.</p>"
+      }
+    },
+    "MemberFabricLogPublishingConfiguration": {
+      "base": "<p>Configuration properties for logging events associated with a member of a Managed Blockchain network using the Hyperledger Fabric framework.</p>",
+      "refs": {
+        "MemberLogPublishingConfiguration$Fabric": "<p>Configuration properties for logging events associated with a member of a Managed Blockchain network using the Hyperledger Fabric framework.</p>"
+      }
+    },
+    "MemberFrameworkAttributes": {
+      "base": "<p>Attributes relevant to a member for the blockchain framework that the Managed Blockchain network uses.</p>",
+      "refs": {
+        "Member$FrameworkAttributes": "<p>Attributes relevant to a member for the blockchain framework that the Managed Blockchain network uses.</p>"
+      }
+    },
+    "MemberFrameworkConfiguration": {
+      "base": "<p>Configuration properties relevant to a member for the blockchain framework that the Managed Blockchain network uses.</p>",
+      "refs": {
+        "MemberConfiguration$FrameworkConfiguration": "<p>Configuration properties of the blockchain framework relevant to the member.</p>"
+      }
+    },
+    "MemberListMaxResults": {
+      "base": null,
+      "refs": {
+        "ListMembersInput$MaxResults": "<p>The maximum number of members to return in the request.</p>"
+      }
+    },
+    "MemberLogPublishingConfiguration": {
+      "base": "<p>Configuration properties for logging events associated with a member of a Managed Blockchain network.</p>",
+      "refs": {
+        "Member$LogPublishingConfiguration": "<p>Configuration properties for logging events associated with a member.</p>",
+        "MemberConfiguration$LogPublishingConfiguration": "<p>Configuration properties for logging events associated with a member of a Managed Blockchain network.</p>",
+        "UpdateMemberInput$LogPublishingConfiguration": "<p>Configuration properties for publishing to Amazon CloudWatch Logs.</p>"
+      }
+    },
+    "MemberStatus": {
+      "base": null,
+      "refs": {
+        "ListMembersInput$Status": "<p>An optional status specifier. If provided, only members currently in this status are listed.</p>",
+        "Member$Status": "<p>The status of a member.</p> <ul> <li> <p> <code>CREATING</code> - The AWS account is in the process of creating a member.</p> </li> <li> <p> <code>AVAILABLE</code> - The member has been created and can participate in the network.</p> </li> <li> <p> <code>CREATE_FAILED</code> - The AWS account attempted to create a member and creation failed.</p> </li> <li> <p> <code>DELETING</code> - The member and all associated resources are in the process of being deleted. Either the AWS account that owns the member deleted it, or the member is being deleted as the result of an <code>APPROVED</code> <code>PROPOSAL</code> to remove the member.</p> </li> <li> <p> <code>DELETED</code> - The member can no longer participate on the network and all associated resources are deleted. Either the AWS account that owns the member deleted it, or the member is being deleted as the result of an <code>APPROVED</code> <code>PROPOSAL</code> to remove the member.</p> </li> </ul>",
+        "MemberSummary$Status": "<p>The status of the member.</p> <ul> <li> <p> <code>CREATING</code> - The AWS account is in the process of creating a member.</p> </li> <li> <p> <code>AVAILABLE</code> - The member has been created and can participate in the network.</p> </li> <li> <p> <code>CREATE_FAILED</code> - The AWS account attempted to create a member and creation failed.</p> </li> <li> <p> <code>DELETING</code> - The member and all associated resources are in the process of being deleted. Either the AWS account that owns the member deleted it, or the member is being deleted as the result of an <code>APPROVED</code> <code>PROPOSAL</code> to remove the member.</p> </li> <li> <p> <code>DELETED</code> - The member can no longer participate on the network and all associated resources are deleted. Either the AWS account that owns the member deleted it, or the member is being deleted as the result of an <code>APPROVED</code> <code>PROPOSAL</code> to remove the member.</p> </li> </ul>"
+      }
+    },
+    "MemberSummary": {
+      "base": "<p>A summary of configuration properties for a member.</p>",
+      "refs": {
+        "MemberSummaryList$member": null
+      }
+    },
+    "MemberSummaryList": {
+      "base": null,
+      "refs": {
+        "ListMembersOutput$Members": "<p>An array of <code>MemberSummary</code> objects. Each object contains details about a network member.</p>"
+      }
+    },
+    "NameString": {
+      "base": null,
+      "refs": {
+        "CreateNetworkInput$Name": "<p>The name of the network.</p>",
+        "Network$Name": "<p>The name of the network.</p>",
+        "NetworkSummary$Name": "<p>The name of the network.</p>"
+      }
+    },
+    "Network": {
+      "base": "<p>Network configuration properties.</p>",
+      "refs": {
+        "GetNetworkOutput$Network": "<p>An object containing network configuration parameters.</p>"
+      }
+    },
+    "NetworkFabricAttributes": {
+      "base": "<p>Attributes of Hyperledger Fabric for a network.</p>",
+      "refs": {
+        "NetworkFrameworkAttributes$Fabric": "<p>Attributes of Hyperledger Fabric for a Managed Blockchain network that uses Hyperledger Fabric.</p>"
+      }
+    },
+    "NetworkFabricConfiguration": {
+      "base": "<p>Hyperledger Fabric configuration properties for the network.</p>",
+      "refs": {
+        "NetworkFrameworkConfiguration$Fabric": "<p> Hyperledger Fabric configuration properties for a Managed Blockchain network that uses Hyperledger Fabric. </p>"
+      }
+    },
+    "NetworkFrameworkAttributes": {
+      "base": "<p>Attributes relevant to the network for the blockchain framework that the network uses.</p>",
+      "refs": {
+        "Network$FrameworkAttributes": "<p>Attributes of the blockchain framework that the network uses.</p>"
+      }
+    },
+    "NetworkFrameworkConfiguration": {
+      "base": "<p> Configuration properties relevant to the network for the blockchain framework that the network uses. </p>",
+      "refs": {
+        "CreateNetworkInput$FrameworkConfiguration": "<p> Configuration properties of the blockchain framework relevant to the network configuration. </p>"
+      }
+    },
+    "NetworkListMaxResults": {
+      "base": null,
+      "refs": {
+        "ListNetworksInput$MaxResults": "<p>The maximum number of networks to list.</p>"
+      }
+    },
+    "NetworkMemberNameString": {
+      "base": null,
+      "refs": {
+        "Member$Name": "<p>The name of the member.</p>",
+        "MemberConfiguration$Name": "<p>The name of the member.</p>",
+        "MemberSummary$Name": "<p>The name of the member.</p>",
+        "Proposal$ProposedByMemberName": "<p>The name of the member that created the proposal.</p>",
+        "ProposalSummary$ProposedByMemberName": "<p> The name of the member that created the proposal. </p>",
+        "VoteSummary$MemberName": "<p> The name of the member that cast the vote. </p>"
+      }
+    },
+    "NetworkStatus": {
+      "base": null,
+      "refs": {
+        "ListNetworksInput$Status": "<p>An optional status specifier. If provided, only networks currently in this status are listed.</p>",
+        "Network$Status": "<p>The current status of the network.</p>",
+        "NetworkSummary$Status": "<p>The current status of the network.</p>"
+      }
+    },
+    "NetworkSummary": {
+      "base": "<p>A summary of network configuration properties.</p>",
+      "refs": {
+        "Invitation$NetworkSummary": null,
+        "NetworkSummaryList$member": null
+      }
+    },
+    "NetworkSummaryList": {
+      "base": null,
+      "refs": {
+        "ListNetworksOutput$Networks": "<p>An array of <code>NetworkSummary</code> objects that contain configuration properties for each network.</p>"
+      }
+    },
+    "Node": {
+      "base": "<p>Configuration properties of a peer node.</p>",
+      "refs": {
+        "GetNodeOutput$Node": "<p>Properties of the node configuration.</p>"
+      }
+    },
+    "NodeConfiguration": {
+      "base": "<p>Configuration properties of a peer node.</p>",
+      "refs": {
+        "CreateNodeInput$NodeConfiguration": "<p>The properties of a node configuration.</p>"
+      }
+    },
+    "NodeFabricAttributes": {
+      "base": "<p>Attributes of Hyperledger Fabric for a peer node on a Managed Blockchain network that uses Hyperledger Fabric.</p>",
+      "refs": {
+        "NodeFrameworkAttributes$Fabric": "<p>Attributes of Hyperledger Fabric for a peer node on a Managed Blockchain network that uses Hyperledger Fabric.</p>"
+      }
+    },
+    "NodeFabricLogPublishingConfiguration": {
+      "base": "<p>Configuration properties for logging events associated with a peer node owned by a member in a Managed Blockchain network.</p>",
+      "refs": {
+        "NodeLogPublishingConfiguration$Fabric": "<p>Configuration properties for logging events associated with a node that is owned by a member of a Managed Blockchain network using the Hyperledger Fabric framework.</p>"
+      }
+    },
+    "NodeFrameworkAttributes": {
+      "base": "<p>Attributes relevant to a peer node on a Managed Blockchain network for the blockchain framework that the network uses.</p>",
+      "refs": {
+        "Node$FrameworkAttributes": "<p>Attributes of the blockchain framework being used.</p>"
+      }
+    },
+    "NodeListMaxResults": {
+      "base": null,
+      "refs": {
+        "ListNodesInput$MaxResults": "<p>The maximum number of nodes to list.</p>"
+      }
+    },
+    "NodeLogPublishingConfiguration": {
+      "base": "<p>Configuration properties for logging events associated with a peer node owned by a member in a Managed Blockchain network.</p>",
+      "refs": {
+        "Node$LogPublishingConfiguration": "<p>Configuration properties for logging events associated with a peer node owned by a member in a Managed Blockchain network.</p>",
+        "NodeConfiguration$LogPublishingConfiguration": "<p>Configuration properties for logging events associated with a peer node owned by a member in a Managed Blockchain network. </p>",
+        "UpdateNodeInput$LogPublishingConfiguration": "<p>Configuration properties for publishing to Amazon CloudWatch Logs.</p>"
+      }
+    },
+    "NodeStatus": {
+      "base": null,
+      "refs": {
+        "ListNodesInput$Status": "<p>An optional status specifier. If provided, only nodes currently in this status are listed.</p>",
+        "Node$Status": "<p>The status of the node.</p>",
+        "NodeSummary$Status": "<p>The status of the node.</p>"
+      }
+    },
+    "NodeSummary": {
+      "base": "<p>A summary of configuration properties for a peer node.</p>",
+      "refs": {
+        "NodeSummaryList$member": null
+      }
+    },
+    "NodeSummaryList": {
+      "base": null,
+      "refs": {
+        "ListNodesOutput$Nodes": "<p>An array of <code>NodeSummary</code> objects that contain configuration properties for each node.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListInvitationsInput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListInvitationsOutput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListMembersInput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListMembersOutput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListNetworksInput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListNetworksOutput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListNodesInput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListNodesOutput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>",
+        "ListProposalVotesInput$NextToken": "<p> The pagination token that indicates the next set of results to retrieve. </p>",
+        "ListProposalVotesOutput$NextToken": "<p> The pagination token that indicates the next set of results to retrieve. </p>",
+        "ListProposalsInput$NextToken": "<p> The pagination token that indicates the next set of results to retrieve. </p>",
+        "ListProposalsOutput$NextToken": "<p>The pagination token that indicates the next set of results to retrieve.</p>"
+      }
+    },
+    "PasswordString": {
+      "base": null,
+      "refs": {
+        "MemberFabricConfiguration$AdminPassword": "<p>The password for the member's initial administrative user. The <code>AdminPassword</code> must be at least eight characters long and no more than 32 characters. It must contain at least one uppercase letter, one lowercase letter, and one digit. It cannot have a single quote(‘), double quote(“), forward slash(/), backward slash(\\), @, or a space.</p>"
+      }
+    },
+    "PrincipalString": {
+      "base": null,
+      "refs": {
+        "InviteAction$Principal": "<p>The AWS account ID to invite.</p>"
+      }
+    },
+    "Proposal": {
+      "base": "<p>Properties of a proposal on a Managed Blockchain network.</p>",
+      "refs": {
+        "GetProposalOutput$Proposal": "<p>Information about a proposal.</p>"
+      }
+    },
+    "ProposalActions": {
+      "base": "<p> The actions to carry out if a proposal is <code>APPROVED</code>. </p>",
+      "refs": {
+        "CreateProposalInput$Actions": "<p>The type of actions proposed, such as inviting a member or removing a member. The types of <code>Actions</code> in a proposal are mutually exclusive. For example, a proposal with <code>Invitations</code> actions cannot also contain <code>Removals</code> actions.</p>",
+        "Proposal$Actions": "<p>The actions to perform on the network if the proposal is <code>APPROVED</code>.</p>"
+      }
+    },
+    "ProposalDurationInt": {
+      "base": null,
+      "refs": {
+        "ApprovalThresholdPolicy$ProposalDurationInHours": "<p>The duration from the time that a proposal is created until it expires. If members cast neither the required number of <code>YES</code> votes to approve the proposal nor the number of <code>NO</code> votes required to reject it before the duration expires, the proposal is <code>EXPIRED</code> and <code>ProposalActions</code> are not carried out.</p>"
+      }
+    },
+    "ProposalListMaxResults": {
+      "base": null,
+      "refs": {
+        "ListInvitationsInput$MaxResults": "<p>The maximum number of invitations to return.</p>",
+        "ListProposalVotesInput$MaxResults": "<p> The maximum number of votes to return. </p>",
+        "ListProposalsInput$MaxResults": "<p> The maximum number of proposals to return. </p>"
+      }
+    },
+    "ProposalStatus": {
+      "base": null,
+      "refs": {
+        "Proposal$Status": "<p>The status of the proposal. Values are as follows:</p> <ul> <li> <p> <code>IN_PROGRESS</code> - The proposal is active and open for member voting.</p> </li> <li> <p> <code>APPROVED</code> - The proposal was approved with sufficient <code>YES</code> votes among members according to the <code>VotingPolicy</code> specified for the <code>Network</code>. The specified proposal actions are carried out.</p> </li> <li> <p> <code>REJECTED</code> - The proposal was rejected with insufficient <code>YES</code> votes among members according to the <code>VotingPolicy</code> specified for the <code>Network</code>. The specified <code>ProposalActions</code> are not carried out.</p> </li> <li> <p> <code>EXPIRED</code> - Members did not cast the number of votes required to determine the proposal outcome before the proposal expired. The specified <code>ProposalActions</code> are not carried out.</p> </li> <li> <p> <code>ACTION_FAILED</code> - One or more of the specified <code>ProposalActions</code> in a proposal that was approved could not be completed because of an error. The <code>ACTION_FAILED</code> status occurs even if only one ProposalAction fails and other actions are successful.</p> </li> </ul>",
+        "ProposalSummary$Status": "<p>The status of the proposal. Values are as follows:</p> <ul> <li> <p> <code>IN_PROGRESS</code> - The proposal is active and open for member voting.</p> </li> <li> <p> <code>APPROVED</code> - The proposal was approved with sufficient <code>YES</code> votes among members according to the <code>VotingPolicy</code> specified for the <code>Network</code>. The specified proposal actions are carried out.</p> </li> <li> <p> <code>REJECTED</code> - The proposal was rejected with insufficient <code>YES</code> votes among members according to the <code>VotingPolicy</code> specified for the <code>Network</code>. The specified <code>ProposalActions</code> are not carried out.</p> </li> <li> <p> <code>EXPIRED</code> - Members did not cast the number of votes required to determine the proposal outcome before the proposal expired. The specified <code>ProposalActions</code> are not carried out.</p> </li> <li> <p> <code>ACTION_FAILED</code> - One or more of the specified <code>ProposalActions</code> in a proposal that was approved could not be completed because of an error.</p> </li> </ul>"
+      }
+    },
+    "ProposalSummary": {
+      "base": "<p>Properties of a proposal.</p>",
+      "refs": {
+        "ProposalSummaryList$member": null
+      }
+    },
+    "ProposalSummaryList": {
+      "base": null,
+      "refs": {
+        "ListProposalsOutput$Proposals": "<p>The summary of each proposal made on the network.</p>"
+      }
+    },
+    "ProposalVoteList": {
+      "base": null,
+      "refs": {
+        "ListProposalVotesOutput$ProposalVotes": "<p> The listing of votes. </p>"
+      }
+    },
+    "RejectInvitationInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RejectInvitationOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveAction": {
+      "base": "<p>An action to remove a member from a Managed Blockchain network as the result of a removal proposal that is <code>APPROVED</code>. The member and all associated resources are deleted from the network.</p>",
+      "refs": {
+        "RemoveActionList$member": null
+      }
+    },
+    "RemoveActionList": {
+      "base": null,
+      "refs": {
+        "ProposalActions$Removals": "<p> The actions to perform for an <code>APPROVED</code> proposal to remove a member from the network, which deletes the member and all associated member resources from the network. </p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>A resource request is issued for a resource that already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceIdString": {
+      "base": null,
+      "refs": {
+        "CreateMemberInput$InvitationId": "<p>The unique identifier of the invitation that is sent to the member to join the network.</p>",
+        "CreateMemberInput$NetworkId": "<p>The unique identifier of the network in which the member is created.</p>",
+        "CreateMemberOutput$MemberId": "<p>The unique identifier of the member.</p>",
+        "CreateNetworkOutput$NetworkId": "<p>The unique identifier for the network.</p>",
+        "CreateNetworkOutput$MemberId": "<p>The unique identifier for the first member within the network.</p>",
+        "CreateNodeInput$NetworkId": "<p>The unique identifier of the network in which this node runs.</p>",
+        "CreateNodeInput$MemberId": "<p>The unique identifier of the member that owns this node.</p>",
+        "CreateNodeOutput$NodeId": "<p>The unique identifier of the node.</p>",
+        "CreateProposalInput$NetworkId": "<p> The unique identifier of the network for which the proposal is made.</p>",
+        "CreateProposalInput$MemberId": "<p>The unique identifier of the member that is creating the proposal. This identifier is especially useful for identifying the member making the proposal when multiple members exist in a single AWS account.</p>",
+        "CreateProposalOutput$ProposalId": "<p>The unique identifier of the proposal.</p>",
+        "DeleteMemberInput$NetworkId": "<p>The unique identifier of the network from which the member is removed.</p>",
+        "DeleteMemberInput$MemberId": "<p>The unique identifier of the member to remove.</p>",
+        "DeleteNodeInput$NetworkId": "<p>The unique identifier of the network that the node belongs to.</p>",
+        "DeleteNodeInput$MemberId": "<p>The unique identifier of the member that owns this node.</p>",
+        "DeleteNodeInput$NodeId": "<p>The unique identifier of the node.</p>",
+        "GetMemberInput$NetworkId": "<p>The unique identifier of the network to which the member belongs.</p>",
+        "GetMemberInput$MemberId": "<p>The unique identifier of the member.</p>",
+        "GetNetworkInput$NetworkId": "<p>The unique identifier of the network to get information about.</p>",
+        "GetNodeInput$NetworkId": "<p>The unique identifier of the network to which the node belongs.</p>",
+        "GetNodeInput$MemberId": "<p>The unique identifier of the member that owns the node.</p>",
+        "GetNodeInput$NodeId": "<p>The unique identifier of the node.</p>",
+        "GetProposalInput$NetworkId": "<p>The unique identifier of the network for which the proposal is made.</p>",
+        "GetProposalInput$ProposalId": "<p>The unique identifier of the proposal.</p>",
+        "Invitation$InvitationId": "<p>The unique identifier for the invitation.</p>",
+        "ListMembersInput$NetworkId": "<p>The unique identifier of the network for which to list members.</p>",
+        "ListNodesInput$NetworkId": "<p>The unique identifier of the network for which to list nodes.</p>",
+        "ListNodesInput$MemberId": "<p>The unique identifier of the member who owns the nodes to list.</p>",
+        "ListProposalVotesInput$NetworkId": "<p> The unique identifier of the network. </p>",
+        "ListProposalVotesInput$ProposalId": "<p> The unique identifier of the proposal. </p>",
+        "ListProposalsInput$NetworkId": "<p> The unique identifier of the network. </p>",
+        "Member$NetworkId": "<p>The unique identifier of the network to which the member belongs.</p>",
+        "Member$Id": "<p>The unique identifier of the member.</p>",
+        "MemberSummary$Id": "<p>The unique identifier of the member.</p>",
+        "Network$Id": "<p>The unique identifier of the network.</p>",
+        "NetworkSummary$Id": "<p>The unique identifier of the network.</p>",
+        "Node$NetworkId": "<p>The unique identifier of the network that the node is in.</p>",
+        "Node$MemberId": "<p>The unique identifier of the member to which the node belongs.</p>",
+        "Node$Id": "<p>The unique identifier of the node.</p>",
+        "NodeSummary$Id": "<p>The unique identifier of the node.</p>",
+        "Proposal$ProposalId": "<p>The unique identifier of the proposal.</p>",
+        "Proposal$NetworkId": "<p>The unique identifier of the network for which the proposal is made.</p>",
+        "Proposal$ProposedByMemberId": "<p>The unique identifier of the member that created the proposal.</p>",
+        "ProposalSummary$ProposalId": "<p> The unique identifier of the proposal. </p>",
+        "ProposalSummary$ProposedByMemberId": "<p> The unique identifier of the member that created the proposal. </p>",
+        "RejectInvitationInput$InvitationId": "<p>The unique identifier of the invitation to reject.</p>",
+        "RemoveAction$MemberId": "<p>The unique identifier of the member to remove.</p>",
+        "UpdateMemberInput$NetworkId": "<p>The unique ID of the Managed Blockchain network to which the member belongs.</p>",
+        "UpdateMemberInput$MemberId": "<p>The unique ID of the member.</p>",
+        "UpdateNodeInput$NetworkId": "<p>The unique ID of the Managed Blockchain network to which the node belongs.</p>",
+        "UpdateNodeInput$MemberId": "<p>The unique ID of the member that owns the node.</p>",
+        "UpdateNodeInput$NodeId": "<p>The unique ID of the node.</p>",
+        "VoteOnProposalInput$NetworkId": "<p> The unique identifier of the network. </p>",
+        "VoteOnProposalInput$ProposalId": "<p> The unique identifier of the proposal. </p>",
+        "VoteOnProposalInput$VoterMemberId": "<p>The unique identifier of the member casting the vote. </p>",
+        "VoteSummary$MemberId": "<p> The unique identifier of the member that cast the vote. </p>"
+      }
+    },
+    "ResourceLimitExceededException": {
+      "base": "<p>The maximum number of resources of that type already exist. Ensure the resources requested are within the boundaries of the service edition and your account limits.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>A requested resource does not exist on the network. It may have been deleted or referenced inaccurately.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotReadyException": {
+      "base": "<p>The requested resource exists but is not in a status that can complete the operation.</p>",
+      "refs": {
+      }
+    },
+    "StateDBType": {
+      "base": null,
+      "refs": {
+        "Node$StateDB": "<p>The state database that the node uses. Values are <code>LevelDB</code> or <code>CouchDB</code>.</p>",
+        "NodeConfiguration$StateDB": "<p>The state database that the node uses. Values are <code>LevelDB</code> or <code>CouchDB</code>. When using an Amazon Managed Blockchain network with Hyperledger Fabric version 1.4 or later, the default is <code>CouchDB</code>.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "IllegalActionException$Message": null,
+        "InvalidRequestException$Message": null,
+        "ListMembersInput$Name": "<p>The optional name of the member to list.</p>",
+        "ListNetworksInput$Name": "<p>The name of the network.</p>",
+        "MemberFabricAttributes$CaEndpoint": "<p>The endpoint used to access the member's certificate authority.</p>",
+        "Network$VpcEndpointServiceName": "<p>The VPC endpoint service name of the VPC endpoint service of the network. Members use the VPC endpoint service name to create a VPC endpoint to access network resources.</p>",
+        "NetworkFabricAttributes$OrderingServiceEndpoint": "<p>The endpoint of the ordering service for the network.</p>",
+        "NodeFabricAttributes$PeerEndpoint": "<p>The endpoint that identifies the peer node for all services except peer channel-based event services.</p>",
+        "NodeFabricAttributes$PeerEventEndpoint": "<p>The endpoint that identifies the peer node for peer channel-based event services.</p>",
+        "ResourceAlreadyExistsException$Message": null,
+        "ResourceLimitExceededException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ResourceNotReadyException$Message": null
+      }
+    },
+    "ThresholdComparator": {
+      "base": null,
+      "refs": {
+        "ApprovalThresholdPolicy$ThresholdComparator": "<p>Determines whether the vote percentage must be greater than the <code>ThresholdPercentage</code> or must be greater than or equal to the <code>ThreholdPercentage</code> to be approved.</p>"
+      }
+    },
+    "ThresholdPercentageInt": {
+      "base": null,
+      "refs": {
+        "ApprovalThresholdPolicy$ThresholdPercentage": "<p>The percentage of votes among all members that must be <code>YES</code> for a proposal to be approved. For example, a <code>ThresholdPercentage</code> value of <code>50</code> indicates 50%. The <code>ThresholdComparator</code> determines the precise comparison. If a <code>ThresholdPercentage</code> value of <code>50</code> is specified on a network with 10 members, along with a <code>ThresholdComparator</code> value of <code>GREATER_THAN</code>, this indicates that 6 <code>YES</code> votes are required for the proposal to be approved.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request or operation could not be performed because a service is throttling requests. The most common source of throttling errors is launching EC2 instances such that your service limit for EC2 instances is exceeded. Request a limit increase or delete unused resources if possible.</p>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Invitation$CreationDate": "<p>The date and time that the invitation was created.</p>",
+        "Invitation$ExpirationDate": "<p>The date and time that the invitation expires. This is the <code>CreationDate</code> plus the <code>ProposalDurationInHours</code> that is specified in the <code>ProposalThresholdPolicy</code>. After this date and time, the invitee can no longer create a member and join the network using this <code>InvitationId</code>.</p>",
+        "Member$CreationDate": "<p>The date and time that the member was created.</p>",
+        "MemberSummary$CreationDate": "<p>The date and time that the member was created.</p>",
+        "Network$CreationDate": "<p>The date and time that the network was created.</p>",
+        "NetworkSummary$CreationDate": "<p>The date and time that the network was created.</p>",
+        "Node$CreationDate": "<p>The date and time that the node was created.</p>",
+        "NodeSummary$CreationDate": "<p>The date and time that the node was created.</p>",
+        "Proposal$CreationDate": "<p> The date and time that the proposal was created. </p>",
+        "Proposal$ExpirationDate": "<p> The date and time that the proposal expires. This is the <code>CreationDate</code> plus the <code>ProposalDurationInHours</code> that is specified in the <code>ProposalThresholdPolicy</code>. After this date and time, if members have not cast enough votes to determine the outcome according to the voting policy, the proposal is <code>EXPIRED</code> and <code>Actions</code> are not carried out. </p>",
+        "ProposalSummary$CreationDate": "<p> The date and time that the proposal was created. </p>",
+        "ProposalSummary$ExpirationDate": "<p> The date and time that the proposal expires. This is the <code>CreationDate</code> plus the <code>ProposalDurationInHours</code> that is specified in the <code>ProposalThresholdPolicy</code>. After this date and time, if members have not cast enough votes to determine the outcome according to the voting policy, the proposal is <code>EXPIRED</code> and <code>Actions</code> are not carried out. </p>"
+      }
+    },
+    "UpdateMemberInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMemberOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNodeInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNodeOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UsernameString": {
+      "base": null,
+      "refs": {
+        "MemberFabricAttributes$AdminUsername": "<p>The user name for the initial administrator user for the member.</p>",
+        "MemberFabricConfiguration$AdminUsername": "<p>The user name for the member's initial administrative user.</p>"
+      }
+    },
+    "VoteCount": {
+      "base": null,
+      "refs": {
+        "Proposal$YesVoteCount": "<p> The current total of <code>YES</code> votes cast on the proposal by members. </p>",
+        "Proposal$NoVoteCount": "<p> The current total of <code>NO</code> votes cast on the proposal by members. </p>",
+        "Proposal$OutstandingVoteCount": "<p> The number of votes remaining to be cast on the proposal by members. In other words, the number of members minus the sum of <code>YES</code> votes and <code>NO</code> votes. </p>"
+      }
+    },
+    "VoteOnProposalInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VoteOnProposalOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VoteSummary": {
+      "base": "<p> Properties of an individual vote that a member cast for a proposal. </p>",
+      "refs": {
+        "ProposalVoteList$member": null
+      }
+    },
+    "VoteValue": {
+      "base": null,
+      "refs": {
+        "VoteOnProposalInput$Vote": "<p> The value of the vote. </p>",
+        "VoteSummary$Vote": "<p> The vote value, either <code>YES</code> or <code>NO</code>. </p>"
+      }
+    },
+    "VotingPolicy": {
+      "base": "<p> The voting rules for the network to decide if a proposal is accepted </p>",
+      "refs": {
+        "CreateNetworkInput$VotingPolicy": "<p> The voting rules used by the network to determine if a proposal is approved. </p>",
+        "Network$VotingPolicy": "<p>The voting rules for the network to decide if a proposal is accepted.</p>"
+      }
+    }
+  }
+}

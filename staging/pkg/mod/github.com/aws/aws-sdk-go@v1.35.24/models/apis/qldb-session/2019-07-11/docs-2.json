@@ -1,0 +1,226 @@
+{
+  "version": "2.0",
+  "service": "<p>The transactional data APIs for Amazon QLDB</p> <note> <p>Instead of interacting directly with this API, we recommend that you use the Amazon QLDB Driver or the QLDB Shell to execute data transactions on a ledger.</p> <ul> <li> <p>If you are working with an AWS SDK, use the QLDB Driver. The driver provides a high-level abstraction layer above this <code>qldbsession</code> data plane and manages <code>SendCommand</code> API calls for you. For information and a list of supported programming languages, see <a href=\"https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started-driver.html\">Getting started with the driver</a> in the <i>Amazon QLDB Developer Guide</i>.</p> </li> <li> <p>If you are working with the AWS Command Line Interface (AWS CLI), use the QLDB Shell. The shell is a command line interface that uses the QLDB Driver to interact with a ledger. For information, see <a href=\"https://docs.aws.amazon.com/qldb/latest/developerguide/data-shell.html\">Accessing Amazon QLDB using the QLDB Shell</a>.</p> </li> </ul> </note>",
+  "operations": {
+    "SendCommand": "<p>Sends a command to an Amazon QLDB ledger.</p> <note> <p>Instead of interacting directly with this API, we recommend that you use the Amazon QLDB Driver or the QLDB Shell to execute data transactions on a ledger.</p> <ul> <li> <p>If you are working with an AWS SDK, use the QLDB Driver. The driver provides a high-level abstraction layer above this <code>qldbsession</code> data plane and manages <code>SendCommand</code> API calls for you. For information and a list of supported programming languages, see <a href=\"https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started-driver.html\">Getting started with the driver</a> in the <i>Amazon QLDB Developer Guide</i>.</p> </li> <li> <p>If you are working with the AWS Command Line Interface (AWS CLI), use the QLDB Shell. The shell is a command line interface that uses the QLDB Driver to interact with a ledger. For information, see <a href=\"https://docs.aws.amazon.com/qldb/latest/developerguide/data-shell.html\">Accessing Amazon QLDB using the QLDB Shell</a>.</p> </li> </ul> </note>"
+  },
+  "shapes": {
+    "AbortTransactionRequest": {
+      "base": "<p>Contains the details of the transaction to abort.</p>",
+      "refs": {
+        "SendCommandRequest$AbortTransaction": "<p>Command to abort the current transaction.</p>"
+      }
+    },
+    "AbortTransactionResult": {
+      "base": "<p>Contains the details of the aborted transaction.</p>",
+      "refs": {
+        "SendCommandResult$AbortTransaction": "<p>Contains the details of the aborted transaction.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>Returned if the request is malformed or contains an error such as an invalid parameter value or a missing required parameter.</p>",
+      "refs": {
+      }
+    },
+    "CommitDigest": {
+      "base": null,
+      "refs": {
+        "CommitTransactionRequest$CommitDigest": "<p>Specifies the commit digest for the transaction to commit. For every active transaction, the commit digest must be passed. QLDB validates <code>CommitDigest</code> and rejects the commit with an error if the digest computed on the client does not match the digest computed by QLDB.</p>",
+        "CommitTransactionResult$CommitDigest": "<p>The commit digest of the committed transaction.</p>"
+      }
+    },
+    "CommitTransactionRequest": {
+      "base": "<p>Contains the details of the transaction to commit.</p>",
+      "refs": {
+        "SendCommandRequest$CommitTransaction": "<p>Command to commit the specified transaction.</p>"
+      }
+    },
+    "CommitTransactionResult": {
+      "base": "<p>Contains the details of the committed transaction.</p>",
+      "refs": {
+        "SendCommandResult$CommitTransaction": "<p>Contains the details of the committed transaction.</p>"
+      }
+    },
+    "EndSessionRequest": {
+      "base": "<p>Specifies a request to end the session.</p>",
+      "refs": {
+        "SendCommandRequest$EndSession": "<p>Command to end the current session.</p>"
+      }
+    },
+    "EndSessionResult": {
+      "base": "<p>Contains the details of the ended session.</p>",
+      "refs": {
+        "SendCommandResult$EndSession": "<p>Contains the details of the ended session.</p>"
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "BadRequestException$Code": null,
+        "InvalidSessionException$Code": null
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "BadRequestException$Message": null,
+        "InvalidSessionException$Message": null,
+        "LimitExceededException$Message": null,
+        "OccConflictException$Message": null,
+        "RateExceededException$Message": null
+      }
+    },
+    "ExecuteStatementRequest": {
+      "base": "<p>Specifies a request to execute a statement.</p>",
+      "refs": {
+        "SendCommandRequest$ExecuteStatement": "<p>Command to execute a statement in the specified transaction.</p>"
+      }
+    },
+    "ExecuteStatementResult": {
+      "base": "<p>Contains the details of the executed statement.</p>",
+      "refs": {
+        "SendCommandResult$ExecuteStatement": "<p>Contains the details of the executed statement.</p>"
+      }
+    },
+    "FetchPageRequest": {
+      "base": "<p>Specifies the details of the page to be fetched.</p>",
+      "refs": {
+        "SendCommandRequest$FetchPage": "<p>Command to fetch a page.</p>"
+      }
+    },
+    "FetchPageResult": {
+      "base": "<p>Contains the page that was fetched.</p>",
+      "refs": {
+        "SendCommandResult$FetchPage": "<p>Contains the details of the fetched page.</p>"
+      }
+    },
+    "InvalidSessionException": {
+      "base": "<p>Returned if the session doesn't exist anymore because it timed out or expired.</p>",
+      "refs": {
+      }
+    },
+    "IonBinary": {
+      "base": null,
+      "refs": {
+        "ValueHolder$IonBinary": "<p>An Amazon Ion binary value contained in a <code>ValueHolder</code> structure.</p>"
+      }
+    },
+    "IonText": {
+      "base": null,
+      "refs": {
+        "ValueHolder$IonText": "<p>An Amazon Ion plaintext value contained in a <code>ValueHolder</code> structure.</p>"
+      }
+    },
+    "LedgerName": {
+      "base": null,
+      "refs": {
+        "StartSessionRequest$LedgerName": "<p>The name of the ledger to start a new session against.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>Returned if a resource limit such as number of active sessions is exceeded.</p>",
+      "refs": {
+      }
+    },
+    "OccConflictException": {
+      "base": "<p>Returned when a transaction cannot be written to the journal due to a failure in the verification phase of <i>optimistic concurrency control</i> (OCC).</p>",
+      "refs": {
+      }
+    },
+    "Page": {
+      "base": "<p>Contains details of the fetched page.</p>",
+      "refs": {
+        "ExecuteStatementResult$FirstPage": "<p>Contains the details of the first fetched page.</p>",
+        "FetchPageResult$Page": "<p>Contains details of the fetched page.</p>"
+      }
+    },
+    "PageToken": {
+      "base": null,
+      "refs": {
+        "FetchPageRequest$NextPageToken": "<p>Specifies the next page token of the page to be fetched.</p>",
+        "Page$NextPageToken": "<p>The token of the next page.</p>"
+      }
+    },
+    "RateExceededException": {
+      "base": "<p>Returned when the rate of requests exceeds the allowed throughput.</p>",
+      "refs": {
+      }
+    },
+    "SendCommandRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendCommandResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SessionToken": {
+      "base": null,
+      "refs": {
+        "SendCommandRequest$SessionToken": "<p>Specifies the session token for the current command. A session token is constant throughout the life of the session.</p> <p>To obtain a session token, run the <code>StartSession</code> command. This <code>SessionToken</code> is required for every subsequent command that is issued during the current session.</p>",
+        "StartSessionResult$SessionToken": "<p>Session token of the started session. This <code>SessionToken</code> is required for every subsequent command that is issued during the current session.</p>"
+      }
+    },
+    "StartSessionRequest": {
+      "base": "<p>Specifies a request to start a new session.</p>",
+      "refs": {
+        "SendCommandRequest$StartSession": "<p>Command to start a new session. A session token is obtained as part of the response.</p>"
+      }
+    },
+    "StartSessionResult": {
+      "base": "<p>Contains the details of the started session.</p>",
+      "refs": {
+        "SendCommandResult$StartSession": "<p>Contains the details of the started session that includes a session token. This <code>SessionToken</code> is required for every subsequent command that is issued during the current session.</p>"
+      }
+    },
+    "StartTransactionRequest": {
+      "base": "<p>Specifies a request to start a transaction.</p>",
+      "refs": {
+        "SendCommandRequest$StartTransaction": "<p>Command to start a new transaction.</p>"
+      }
+    },
+    "StartTransactionResult": {
+      "base": "<p>Contains the details of the started transaction.</p>",
+      "refs": {
+        "SendCommandResult$StartTransaction": "<p>Contains the details of the started transaction.</p>"
+      }
+    },
+    "Statement": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementRequest$Statement": "<p>Specifies the statement of the request.</p>"
+      }
+    },
+    "StatementParameters": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementRequest$Parameters": "<p>Specifies the parameters for the parameterized statement in the request.</p>"
+      }
+    },
+    "TransactionId": {
+      "base": null,
+      "refs": {
+        "CommitTransactionRequest$TransactionId": "<p>Specifies the transaction ID of the transaction to commit.</p>",
+        "CommitTransactionResult$TransactionId": "<p>The transaction ID of the committed transaction.</p>",
+        "ExecuteStatementRequest$TransactionId": "<p>Specifies the transaction ID of the request.</p>",
+        "FetchPageRequest$TransactionId": "<p>Specifies the transaction ID of the page to be fetched.</p>",
+        "StartTransactionResult$TransactionId": "<p>The transaction ID of the started transaction.</p>"
+      }
+    },
+    "ValueHolder": {
+      "base": "<p>A structure that can contain an Amazon Ion value in multiple encoding formats.</p>",
+      "refs": {
+        "StatementParameters$member": null,
+        "ValueHolders$member": null
+      }
+    },
+    "ValueHolders": {
+      "base": null,
+      "refs": {
+        "Page$Values": "<p>A structure that contains values in multiple encoding formats.</p>"
+      }
+    }
+  }
+}

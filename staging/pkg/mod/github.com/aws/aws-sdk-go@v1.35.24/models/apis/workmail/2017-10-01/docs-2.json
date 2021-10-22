@@ -1,0 +1,1380 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon WorkMail is a secure, managed business email and calendaring service with support for existing desktop and mobile email clients. You can access your email, contacts, and calendars using Microsoft Outlook, your browser, or other native iOS and Android email applications. You can integrate WorkMail with your existing corporate directory and control both the keys that encrypt your data and the location in which your data is stored.</p> <p>The WorkMail API is designed for the following scenarios:</p> <ul> <li> <p>Listing and describing organizations</p> </li> </ul> <ul> <li> <p>Managing users</p> </li> </ul> <ul> <li> <p>Managing groups</p> </li> </ul> <ul> <li> <p>Managing resources</p> </li> </ul> <p>All WorkMail API operations are Amazon-authenticated and certificate-signed. They not only require the use of the AWS SDK, but also allow for the exclusive use of AWS Identity and Access Management users and roles to help facilitate access, trust, and permission policies. By creating a role and allowing an IAM user to access the WorkMail site, the IAM user gains full administrative visibility into the entire WorkMail organization (or as set in the IAM policy). This includes, but is not limited to, the ability to create, update, and delete users, groups, and resources. This allows developers to perform the scenarios listed above, as well as give users the ability to grant access on a selective basis using the IAM model.</p>",
+  "operations": {
+    "AssociateDelegateToResource": "<p>Adds a member (user or group) to the resource's set of delegates.</p>",
+    "AssociateMemberToGroup": "<p>Adds a member (user or group) to the group's set.</p>",
+    "CancelMailboxExportJob": "<p>Cancels a mailbox export job.</p> <note> <p>If the mailbox export job is near completion, it might not be possible to cancel it.</p> </note>",
+    "CreateAlias": "<p>Adds an alias to the set of a given member (user or group) of Amazon WorkMail.</p>",
+    "CreateGroup": "<p>Creates a group that can be used in Amazon WorkMail by calling the <a>RegisterToWorkMail</a> operation.</p>",
+    "CreateOrganization": "<p>Creates a new Amazon WorkMail organization. Optionally, you can choose to associate an existing AWS Directory Service directory with your organization. If an AWS Directory Service directory ID is specified, the organization alias must match the directory alias. If you choose not to associate an existing directory with your organization, then we create a new Amazon WorkMail directory for you. For more information, see <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/add_new_organization.html\">Adding an organization</a> in the <i>Amazon WorkMail Administrator Guide</i>.</p> <p>You can associate multiple email domains with an organization, then set your default email domain from the Amazon WorkMail console. You can also associate a domain that is managed in an Amazon Route 53 public hosted zone. For more information, see <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/add_domain.html\">Adding a domain</a> and <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/default_domain.html\">Choosing the default domain</a> in the <i>Amazon WorkMail Administrator Guide</i>.</p> <p>Optionally, you can use a customer managed master key from AWS Key Management Service (AWS KMS) to encrypt email for your organization. If you don't associate an AWS KMS key, Amazon WorkMail creates a default AWS managed master key for you.</p>",
+    "CreateResource": "<p>Creates a new Amazon WorkMail resource. </p>",
+    "CreateUser": "<p>Creates a user who can be used in Amazon WorkMail by calling the <a>RegisterToWorkMail</a> operation.</p>",
+    "DeleteAccessControlRule": "<p>Deletes an access control rule for the specified WorkMail organization.</p>",
+    "DeleteAlias": "<p>Remove one or more specified aliases from a set of aliases for a given user.</p>",
+    "DeleteGroup": "<p>Deletes a group from Amazon WorkMail.</p>",
+    "DeleteMailboxPermissions": "<p>Deletes permissions granted to a member (user or group).</p>",
+    "DeleteOrganization": "<p>Deletes an Amazon WorkMail organization and all underlying AWS resources managed by Amazon WorkMail as part of the organization. You can choose whether to delete the associated directory. For more information, see <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/remove_organization.html\">Removing an organization</a> in the <i>Amazon WorkMail Administrator Guide</i>.</p>",
+    "DeleteResource": "<p>Deletes the specified resource. </p>",
+    "DeleteRetentionPolicy": "<p>Deletes the specified retention policy from the specified organization.</p>",
+    "DeleteUser": "<p>Deletes a user from Amazon WorkMail and all subsequent systems. Before you can delete a user, the user state must be <code>DISABLED</code>. Use the <a>DescribeUser</a> action to confirm the user state.</p> <p>Deleting a user is permanent and cannot be undone. WorkMail archives user mailboxes for 30 days before they are permanently removed.</p>",
+    "DeregisterFromWorkMail": "<p>Mark a user, group, or resource as no longer used in Amazon WorkMail. This action disassociates the mailbox and schedules it for clean-up. WorkMail keeps mailboxes for 30 days before they are permanently removed. The functionality in the console is <i>Disable</i>.</p>",
+    "DescribeGroup": "<p>Returns the data available for the group.</p>",
+    "DescribeMailboxExportJob": "<p>Describes the current status of a mailbox export job.</p>",
+    "DescribeOrganization": "<p>Provides more information regarding a given organization based on its identifier.</p>",
+    "DescribeResource": "<p>Returns the data available for the resource.</p>",
+    "DescribeUser": "<p>Provides information regarding the user.</p>",
+    "DisassociateDelegateFromResource": "<p>Removes a member from the resource's set of delegates.</p>",
+    "DisassociateMemberFromGroup": "<p>Removes a member from a group.</p>",
+    "GetAccessControlEffect": "<p>Gets the effects of an organization's access control rules as they apply to a specified IPv4 address, access protocol action, or user ID. </p>",
+    "GetDefaultRetentionPolicy": "<p>Gets the default retention policy details for the specified organization.</p>",
+    "GetMailboxDetails": "<p>Requests a user's mailbox details for a specified organization and user.</p>",
+    "ListAccessControlRules": "<p>Lists the access control rules for the specified organization.</p>",
+    "ListAliases": "<p>Creates a paginated call to list the aliases associated with a given entity.</p>",
+    "ListGroupMembers": "<p>Returns an overview of the members of a group. Users and groups can be members of a group.</p>",
+    "ListGroups": "<p>Returns summaries of the organization's groups.</p>",
+    "ListMailboxExportJobs": "<p>Lists the mailbox export jobs started for the specified organization within the last seven days.</p>",
+    "ListMailboxPermissions": "<p>Lists the mailbox permissions associated with a user, group, or resource mailbox.</p>",
+    "ListOrganizations": "<p>Returns summaries of the customer's organizations.</p>",
+    "ListResourceDelegates": "<p>Lists the delegates associated with a resource. Users and groups can be resource delegates and answer requests on behalf of the resource.</p>",
+    "ListResources": "<p>Returns summaries of the organization's resources.</p>",
+    "ListTagsForResource": "<p>Lists the tags applied to an Amazon WorkMail organization resource.</p>",
+    "ListUsers": "<p>Returns summaries of the organization's users.</p>",
+    "PutAccessControlRule": "<p>Adds a new access control rule for the specified organization. The rule allows or denies access to the organization for the specified IPv4 addresses, access protocol actions, and user IDs. Adding a new rule with the same name as an existing rule replaces the older rule.</p>",
+    "PutMailboxPermissions": "<p>Sets permissions for a user, group, or resource. This replaces any pre-existing permissions.</p>",
+    "PutRetentionPolicy": "<p>Puts a retention policy to the specified organization.</p>",
+    "RegisterToWorkMail": "<p>Registers an existing and disabled user, group, or resource for Amazon WorkMail use by associating a mailbox and calendaring capabilities. It performs no change if the user, group, or resource is enabled and fails if the user, group, or resource is deleted. This operation results in the accumulation of costs. For more information, see <a href=\"https://aws.amazon.com/workmail/pricing\">Pricing</a>. The equivalent console functionality for this operation is <i>Enable</i>. </p> <p>Users can either be created by calling the <a>CreateUser</a> API operation or they can be synchronized from your directory. For more information, see <a>DeregisterFromWorkMail</a>.</p>",
+    "ResetPassword": "<p>Allows the administrator to reset the password for a user.</p>",
+    "StartMailboxExportJob": "<p>Starts a mailbox export job to export MIME-format email messages and calendar items from the specified mailbox to the specified Amazon Simple Storage Service (Amazon S3) bucket. For more information, see <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/mail-export.html\">Exporting mailbox content</a> in the <i>Amazon WorkMail Administrator Guide</i>.</p>",
+    "TagResource": "<p>Applies the specified tags to the specified Amazon WorkMail organization resource.</p>",
+    "UntagResource": "<p>Untags the specified tags from the specified Amazon WorkMail organization resource.</p>",
+    "UpdateMailboxQuota": "<p>Updates a user's current mailbox quota for a specified organization and user.</p>",
+    "UpdatePrimaryEmailAddress": "<p>Updates the primary email for a user, group, or resource. The current email is moved into the list of aliases (or swapped between an existing alias and the current primary email), and the email provided in the input is promoted as the primary.</p>",
+    "UpdateResource": "<p>Updates data for the resource. To have the latest information, it must be preceded by a <a>DescribeResource</a> call. The dataset in the request should be the one expected when performing another <code>DescribeResource</code> call.</p>"
+  },
+  "shapes": {
+    "AccessControlRule": {
+      "base": "<p>A rule that controls access to an Amazon WorkMail organization.</p>",
+      "refs": {
+        "AccessControlRulesList$member": null
+      }
+    },
+    "AccessControlRuleAction": {
+      "base": null,
+      "refs": {
+        "ActionsList$member": null,
+        "GetAccessControlEffectRequest$Action": "<p>The access protocol action. Valid values include <code>ActiveSync</code>, <code>AutoDiscover</code>, <code>EWS</code>, <code>IMAP</code>, <code>SMTP</code>, <code>WindowsOutlook</code>, and <code>WebMail</code>.</p>"
+      }
+    },
+    "AccessControlRuleDescription": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$Description": "<p>The rule description.</p>",
+        "PutAccessControlRuleRequest$Description": "<p>The rule description.</p>"
+      }
+    },
+    "AccessControlRuleEffect": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$Effect": "<p>The rule effect.</p>",
+        "GetAccessControlEffectResponse$Effect": "<p>The rule effect.</p>",
+        "PutAccessControlRuleRequest$Effect": "<p>The rule effect.</p>"
+      }
+    },
+    "AccessControlRuleName": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$Name": "<p>The rule name.</p>",
+        "AccessControlRuleNameList$member": null,
+        "DeleteAccessControlRuleRequest$Name": "<p>The name of the access control rule.</p>",
+        "PutAccessControlRuleRequest$Name": "<p>The rule name.</p>"
+      }
+    },
+    "AccessControlRuleNameList": {
+      "base": null,
+      "refs": {
+        "GetAccessControlEffectResponse$MatchedRules": "<p>The rules that match the given parameters, resulting in an effect.</p>"
+      }
+    },
+    "AccessControlRulesList": {
+      "base": null,
+      "refs": {
+        "ListAccessControlRulesResponse$Rules": "<p>The access control rules.</p>"
+      }
+    },
+    "ActionsList": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$Actions": "<p>Access protocol actions to include in the rule. Valid values include <code>ActiveSync</code>, <code>AutoDiscover</code>, <code>EWS</code>, <code>IMAP</code>, <code>SMTP</code>, <code>WindowsOutlook</code>, and <code>WebMail</code>.</p>",
+        "AccessControlRule$NotActions": "<p>Access protocol actions to exclude from the rule. Valid values include <code>ActiveSync</code>, <code>AutoDiscover</code>, <code>EWS</code>, <code>IMAP</code>, <code>SMTP</code>, <code>WindowsOutlook</code>, and <code>WebMail</code>.</p>",
+        "PutAccessControlRuleRequest$Actions": "<p>Access protocol actions to include in the rule. Valid values include <code>ActiveSync</code>, <code>AutoDiscover</code>, <code>EWS</code>, <code>IMAP</code>, <code>SMTP</code>, <code>WindowsOutlook</code>, and <code>WebMail</code>.</p>",
+        "PutAccessControlRuleRequest$NotActions": "<p>Access protocol actions to exclude from the rule. Valid values include <code>ActiveSync</code>, <code>AutoDiscover</code>, <code>EWS</code>, <code>IMAP</code>, <code>SMTP</code>, <code>WindowsOutlook</code>, and <code>WebMail</code>.</p>"
+      }
+    },
+    "Aliases": {
+      "base": null,
+      "refs": {
+        "ListAliasesResponse$Aliases": "<p>The entity's paginated aliases.</p>"
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "DescribeOrganizationResponse$ARN": "<p>The Amazon Resource Name (ARN) of the organization.</p>",
+        "ListTagsForResourceRequest$ResourceARN": "<p>The resource ARN.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The resource ARN.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The resource ARN.</p>"
+      }
+    },
+    "AssociateDelegateToResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDelegateToResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateMemberToGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateMemberToGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BookingOptions": {
+      "base": "<p>At least one delegate must be associated to the resource to disable automatic replies from the resource.</p>",
+      "refs": {
+        "DescribeResourceResponse$BookingOptions": "<p>The booking options for the described resource.</p>",
+        "UpdateResourceRequest$BookingOptions": "<p>The resource's booking options to be updated.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "BookingOptions$AutoAcceptRequests": "<p>The resource's ability to automatically reply to requests. If disabled, delegates must be associated to the resource.</p>",
+        "BookingOptions$AutoDeclineRecurringRequests": "<p>The resource's ability to automatically decline any recurring requests.</p>",
+        "BookingOptions$AutoDeclineConflictingRequests": "<p>The resource's ability to automatically decline any conflicting requests.</p>",
+        "CreateOrganizationRequest$EnableInteroperability": "<p>When <code>true</code>, allows organization interoperability between Amazon WorkMail and Microsoft Exchange. Can only be set to <code>true</code> if an AD Connector directory ID is included in the request.</p>",
+        "DeleteOrganizationRequest$DeleteDirectory": "<p>If true, deletes the AWS Directory Service directory associated with the organization.</p>"
+      }
+    },
+    "CancelMailboxExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelMailboxExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAliasResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Delegate": {
+      "base": "<p>The name of the attribute, which is one of the values defined in the UserAttribute enumeration.</p>",
+      "refs": {
+        "ResourceDelegates$member": null
+      }
+    },
+    "DeleteAccessControlRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAccessControlRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAliasResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMailboxPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMailboxPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRetentionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRetentionPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterFromWorkMailRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterFromWorkMailResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeMailboxExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeMailboxExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$Description": "<p>The mailbox export job description.</p>",
+        "MailboxExportJob$Description": "<p>The mailbox export job description.</p>",
+        "StartMailboxExportJobRequest$Description": "<p>The mailbox export job description.</p>"
+      }
+    },
+    "DirectoryId": {
+      "base": null,
+      "refs": {
+        "CreateOrganizationRequest$DirectoryId": "<p>The AWS Directory Service directory ID.</p>"
+      }
+    },
+    "DirectoryInUseException": {
+      "base": "<p>The directory is already in use by another WorkMail organization in the same account and Region.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryServiceAuthenticationFailedException": {
+      "base": "<p>The directory service doesn't recognize the credentials supplied by WorkMail.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryUnavailableException": {
+      "base": "<p>The directory is unavailable. It might be located in another Region or deleted.</p>",
+      "refs": {
+      }
+    },
+    "DisassociateDelegateFromResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDelegateFromResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateMemberFromGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateMemberFromGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Domain": {
+      "base": "<p>The domain to associate with an Amazon WorkMail organization.</p> <p>When you configure a domain hosted in Amazon Route 53 (Route 53), all recommended DNS records are added to the organization when you create it. For more information, see <a href=\"https://docs.aws.amazon.com/workmail/latest/adminguide/add_domain.html\">Adding a domain</a> in the <i>Amazon WorkMail Administrator Guide</i>.</p>",
+      "refs": {
+        "Domains$member": null
+      }
+    },
+    "DomainName": {
+      "base": null,
+      "refs": {
+        "Domain$DomainName": "<p>The fully qualified domain name.</p>",
+        "OrganizationSummary$DefaultMailDomain": "<p>The default email domain associated with the organization.</p>"
+      }
+    },
+    "Domains": {
+      "base": null,
+      "refs": {
+        "CreateOrganizationRequest$Domains": "<p>The email domains to associate with the organization.</p>"
+      }
+    },
+    "EmailAddress": {
+      "base": null,
+      "refs": {
+        "Aliases$member": null,
+        "CreateAliasRequest$Alias": "<p>The alias to add to the member set.</p>",
+        "DeleteAliasRequest$Alias": "<p>The aliases to be removed from the user's set of aliases. Duplicate entries in the list are collapsed into single entries (the list is transformed into a set).</p>",
+        "DescribeGroupResponse$Email": "<p>The email of the described group.</p>",
+        "DescribeResourceResponse$Email": "<p>The email of the described resource.</p>",
+        "DescribeUserResponse$Email": "<p>The email of the user.</p>",
+        "Group$Email": "<p>The email of the group.</p>",
+        "RegisterToWorkMailRequest$Email": "<p>The email for the user, group, or resource to be updated.</p>",
+        "Resource$Email": "<p>The email of the resource.</p>",
+        "UpdatePrimaryEmailAddressRequest$Email": "<p>The value of the email to be updated as primary.</p>",
+        "User$Email": "<p>The email of the user.</p>"
+      }
+    },
+    "EmailAddressInUseException": {
+      "base": "<p>The email address that you're trying to assign is already created for a different user, group, or resource.</p>",
+      "refs": {
+      }
+    },
+    "EntityAlreadyRegisteredException": {
+      "base": "<p>The user, group, or resource that you're trying to register is already registered.</p>",
+      "refs": {
+      }
+    },
+    "EntityNotFoundException": {
+      "base": "<p>The identifier supplied for the user, group, or resource does not exist in your organization.</p>",
+      "refs": {
+      }
+    },
+    "EntityState": {
+      "base": null,
+      "refs": {
+        "DescribeGroupResponse$State": "<p>The state of the user: enabled (registered to Amazon WorkMail) or disabled (deregistered or never registered to WorkMail).</p>",
+        "DescribeResourceResponse$State": "<p>The state of the resource: enabled (registered to Amazon WorkMail), disabled (deregistered or never registered to WorkMail), or deleted.</p>",
+        "DescribeUserResponse$State": "<p>The state of a user: enabled (registered to Amazon WorkMail) or disabled (deregistered or never registered to WorkMail).</p>",
+        "Group$State": "<p>The state of the group, which can be ENABLED, DISABLED, or DELETED.</p>",
+        "Member$State": "<p>The state of the member, which can be ENABLED, DISABLED, or DELETED.</p>",
+        "Resource$State": "<p>The state of the resource, which can be ENABLED, DISABLED, or DELETED.</p>",
+        "User$State": "<p>The state of the user, which can be ENABLED, DISABLED, or DELETED.</p>"
+      }
+    },
+    "EntityStateException": {
+      "base": "<p>You are performing an operation on a user, group, or resource that isn't in the expected state, such as trying to delete an active user.</p>",
+      "refs": {
+      }
+    },
+    "FolderConfiguration": {
+      "base": "<p>The configuration applied to an organization's folders by its retention policy.</p>",
+      "refs": {
+        "FolderConfigurations$member": null
+      }
+    },
+    "FolderConfigurations": {
+      "base": null,
+      "refs": {
+        "GetDefaultRetentionPolicyResponse$FolderConfigurations": "<p>The retention policy folder configurations.</p>",
+        "PutRetentionPolicyRequest$FolderConfigurations": "<p>The retention policy folder configurations.</p>"
+      }
+    },
+    "FolderName": {
+      "base": null,
+      "refs": {
+        "FolderConfiguration$Name": "<p>The folder name.</p>"
+      }
+    },
+    "GetAccessControlEffectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccessControlEffectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDefaultRetentionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDefaultRetentionPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMailboxDetailsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMailboxDetailsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Group": {
+      "base": "<p>The representation of an Amazon WorkMail group.</p>",
+      "refs": {
+        "Groups$member": null
+      }
+    },
+    "GroupName": {
+      "base": null,
+      "refs": {
+        "CreateGroupRequest$Name": "<p>The name of the group.</p>",
+        "DescribeGroupResponse$Name": "<p>The name of the described group.</p>",
+        "Group$Name": "<p>The name of the group.</p>"
+      }
+    },
+    "Groups": {
+      "base": null,
+      "refs": {
+        "ListGroupsResponse$Groups": "<p>The overview of groups for an organization.</p>"
+      }
+    },
+    "HostedZoneId": {
+      "base": null,
+      "refs": {
+        "Domain$HostedZoneId": "<p>The hosted zone ID for a domain hosted in Route 53. Required when configuring a domain hosted in Route 53.</p>"
+      }
+    },
+    "IdempotencyClientToken": {
+      "base": null,
+      "refs": {
+        "CancelMailboxExportJobRequest$ClientToken": "<p>The idempotency token for the client request.</p>",
+        "CreateOrganizationRequest$ClientToken": "<p>The idempotency token associated with the request.</p>",
+        "DeleteOrganizationRequest$ClientToken": "<p>The idempotency token associated with the request.</p>",
+        "StartMailboxExportJobRequest$ClientToken": "<p>The idempotency token for the client request.</p>"
+      }
+    },
+    "InvalidConfigurationException": {
+      "base": "<p>The configuration for a resource isn't valid. A resource must either be able to auto-respond to requests or have at least one delegate associated that can do so on its behalf.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>One or more of the input parameters don't match the service's restrictions.</p>",
+      "refs": {
+      }
+    },
+    "InvalidPasswordException": {
+      "base": "<p>The supplied password doesn't match the minimum security constraints, such as length or use of special characters.</p>",
+      "refs": {
+      }
+    },
+    "IpAddress": {
+      "base": null,
+      "refs": {
+        "GetAccessControlEffectRequest$IpAddress": "<p>The IPv4 address.</p>"
+      }
+    },
+    "IpRange": {
+      "base": null,
+      "refs": {
+        "IpRangeList$member": null
+      }
+    },
+    "IpRangeList": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$IpRanges": "<p>IPv4 CIDR ranges to include in the rule.</p>",
+        "AccessControlRule$NotIpRanges": "<p>IPv4 CIDR ranges to exclude from the rule.</p>",
+        "PutAccessControlRuleRequest$IpRanges": "<p>IPv4 CIDR ranges to include in the rule.</p>",
+        "PutAccessControlRuleRequest$NotIpRanges": "<p>IPv4 CIDR ranges to exclude from the rule.</p>"
+      }
+    },
+    "Jobs": {
+      "base": null,
+      "refs": {
+        "ListMailboxExportJobsResponse$Jobs": "<p>The mailbox export job details.</p>"
+      }
+    },
+    "KmsKeyArn": {
+      "base": null,
+      "refs": {
+        "CreateOrganizationRequest$KmsKeyArn": "<p>The Amazon Resource Name (ARN) of a customer managed master key from AWS KMS.</p>",
+        "DescribeMailboxExportJobResponse$KmsKeyArn": "<p>The Amazon Resource Name (ARN) of the symmetric AWS Key Management Service (AWS KMS) key that encrypts the exported mailbox content.</p>",
+        "StartMailboxExportJobRequest$KmsKeyArn": "<p>The Amazon Resource Name (ARN) of the symmetric AWS Key Management Service (AWS KMS) key that encrypts the exported mailbox content.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The request exceeds the limit of the resource.</p>",
+      "refs": {
+      }
+    },
+    "ListAccessControlRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAccessControlRulesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAliasesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAliasesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGroupMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGroupMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGroupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMailboxExportJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMailboxExportJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMailboxPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMailboxPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOrganizationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOrganizationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourceDelegatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourceDelegatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResourcesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MailDomainNotFoundException": {
+      "base": "<p>For an email or alias to be created in Amazon WorkMail, the included domain must be defined in the organization.</p>",
+      "refs": {
+      }
+    },
+    "MailDomainStateException": {
+      "base": "<p>After a domain has been added to the organization, it must be verified. The domain is not yet verified.</p>",
+      "refs": {
+      }
+    },
+    "MailboxExportErrorInfo": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$ErrorInfo": "<p>Error information for failed mailbox export jobs.</p>"
+      }
+    },
+    "MailboxExportJob": {
+      "base": "<p>The details of a mailbox export job, including the user or resource ID associated with the mailbox and the S3 bucket that the mailbox contents are exported to.</p>",
+      "refs": {
+        "Jobs$member": null
+      }
+    },
+    "MailboxExportJobId": {
+      "base": null,
+      "refs": {
+        "CancelMailboxExportJobRequest$JobId": "<p>The job ID.</p>",
+        "DescribeMailboxExportJobRequest$JobId": "<p>The mailbox export job ID.</p>",
+        "MailboxExportJob$JobId": "<p>The identifier of the mailbox export job.</p>",
+        "StartMailboxExportJobResponse$JobId": "<p>The job ID.</p>"
+      }
+    },
+    "MailboxExportJobState": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$State": "<p>The state of the mailbox export job.</p>",
+        "MailboxExportJob$State": "<p>The state of the mailbox export job.</p>"
+      }
+    },
+    "MailboxQuota": {
+      "base": null,
+      "refs": {
+        "GetMailboxDetailsResponse$MailboxQuota": "<p>The maximum allowed mailbox size, in MB, for the specified user.</p>",
+        "UpdateMailboxQuotaRequest$MailboxQuota": "<p>The updated mailbox quota, in MB, for the specified user.</p>"
+      }
+    },
+    "MailboxSize": {
+      "base": null,
+      "refs": {
+        "GetMailboxDetailsResponse$MailboxSize": "<p>The current mailbox size, in MB, for the specified user.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAliasesRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListGroupMembersRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListGroupsRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListMailboxExportJobsRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListMailboxPermissionsRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListOrganizationsRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListResourceDelegatesRequest$MaxResults": "<p>The number of maximum results in a page.</p>",
+        "ListResourcesRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>",
+        "ListUsersRequest$MaxResults": "<p>The maximum number of results to return in a single call.</p>"
+      }
+    },
+    "Member": {
+      "base": "<p>The representation of a user or group.</p>",
+      "refs": {
+        "Members$member": null
+      }
+    },
+    "MemberType": {
+      "base": null,
+      "refs": {
+        "Delegate$Type": "<p>The type of the delegate: user or group.</p>",
+        "Member$Type": "<p>A member can be a user or group.</p>",
+        "Permission$GranteeType": "<p>The type of user, group, or resource referred to in GranteeId.</p>"
+      }
+    },
+    "Members": {
+      "base": null,
+      "refs": {
+        "ListGroupMembersResponse$Members": "<p>The members associated to the group.</p>"
+      }
+    },
+    "NameAvailabilityException": {
+      "base": "<p>The user, group, or resource name isn't unique in Amazon WorkMail.</p>",
+      "refs": {
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListAliasesRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListAliasesResponse$NextToken": "<p>The token to use to retrieve the next page of results. The value is \"null\" when there are no more results to return.</p>",
+        "ListGroupMembersRequest$NextToken": "<p> The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListGroupMembersResponse$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListGroupsRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListGroupsResponse$NextToken": "<p>The token to use to retrieve the next page of results. The value is \"null\" when there are no more results to return.</p>",
+        "ListMailboxExportJobsRequest$NextToken": "<p>The token to use to retrieve the next page of results.</p>",
+        "ListMailboxExportJobsResponse$NextToken": "<p>The token to use to retrieve the next page of results.</p>",
+        "ListMailboxPermissionsRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListMailboxPermissionsResponse$NextToken": "<p>The token to use to retrieve the next page of results. The value is \"null\" when there are no more results to return.</p>",
+        "ListOrganizationsRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListOrganizationsResponse$NextToken": "<p>The token to use to retrieve the next page of results. The value is \"null\" when there are no more results to return.</p>",
+        "ListResourceDelegatesRequest$NextToken": "<p>The token used to paginate through the delegates associated with a resource.</p>",
+        "ListResourceDelegatesResponse$NextToken": "<p>The token used to paginate through the delegates associated with a resource. While results are still available, it has an associated value. When the last page is reached, the token is empty. </p>",
+        "ListResourcesRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListResourcesResponse$NextToken": "<p> The token used to paginate through all the organization's resources. While results are still available, it has an associated value. When the last page is reached, the token is empty.</p>",
+        "ListUsersRequest$NextToken": "<p>The token to use to retrieve the next page of results. The first call does not contain any tokens.</p>",
+        "ListUsersResponse$NextToken": "<p> The token to use to retrieve the next page of results. This value is `null` when there are no more results to return.</p>"
+      }
+    },
+    "OrganizationId": {
+      "base": null,
+      "refs": {
+        "AssociateDelegateToResourceRequest$OrganizationId": "<p>The organization under which the resource exists.</p>",
+        "AssociateMemberToGroupRequest$OrganizationId": "<p>The organization under which the group exists.</p>",
+        "CancelMailboxExportJobRequest$OrganizationId": "<p>The organization ID.</p>",
+        "CreateAliasRequest$OrganizationId": "<p>The organization under which the member (user or group) exists.</p>",
+        "CreateGroupRequest$OrganizationId": "<p>The organization under which the group is to be created.</p>",
+        "CreateOrganizationResponse$OrganizationId": "<p>The organization ID.</p>",
+        "CreateResourceRequest$OrganizationId": "<p>The identifier associated with the organization for which the resource is created.</p>",
+        "CreateUserRequest$OrganizationId": "<p>The identifier of the organization for which the user is created.</p>",
+        "DeleteAccessControlRuleRequest$OrganizationId": "<p>The identifier for the organization.</p>",
+        "DeleteAliasRequest$OrganizationId": "<p>The identifier for the organization under which the user exists.</p>",
+        "DeleteGroupRequest$OrganizationId": "<p>The organization that contains the group.</p>",
+        "DeleteMailboxPermissionsRequest$OrganizationId": "<p>The identifier of the organization under which the member (user or group) exists.</p>",
+        "DeleteOrganizationRequest$OrganizationId": "<p>The organization ID.</p>",
+        "DeleteOrganizationResponse$OrganizationId": "<p>The organization ID.</p>",
+        "DeleteResourceRequest$OrganizationId": "<p>The identifier associated with the organization from which the resource is deleted.</p>",
+        "DeleteRetentionPolicyRequest$OrganizationId": "<p>The organization ID.</p>",
+        "DeleteUserRequest$OrganizationId": "<p>The organization that contains the user to be deleted.</p>",
+        "DeregisterFromWorkMailRequest$OrganizationId": "<p>The identifier for the organization under which the Amazon WorkMail entity exists.</p>",
+        "DescribeGroupRequest$OrganizationId": "<p>The identifier for the organization under which the group exists.</p>",
+        "DescribeMailboxExportJobRequest$OrganizationId": "<p>The organization ID.</p>",
+        "DescribeOrganizationRequest$OrganizationId": "<p>The identifier for the organization to be described.</p>",
+        "DescribeOrganizationResponse$OrganizationId": "<p>The identifier of an organization.</p>",
+        "DescribeResourceRequest$OrganizationId": "<p>The identifier associated with the organization for which the resource is described.</p>",
+        "DescribeUserRequest$OrganizationId": "<p>The identifier for the organization under which the user exists.</p>",
+        "DisassociateDelegateFromResourceRequest$OrganizationId": "<p>The identifier for the organization under which the resource exists.</p>",
+        "DisassociateMemberFromGroupRequest$OrganizationId": "<p>The identifier for the organization under which the group exists.</p>",
+        "GetAccessControlEffectRequest$OrganizationId": "<p>The identifier for the organization.</p>",
+        "GetDefaultRetentionPolicyRequest$OrganizationId": "<p>The organization ID.</p>",
+        "GetMailboxDetailsRequest$OrganizationId": "<p>The identifier for the organization that contains the user whose mailbox details are being requested.</p>",
+        "ListAccessControlRulesRequest$OrganizationId": "<p>The identifier for the organization.</p>",
+        "ListAliasesRequest$OrganizationId": "<p>The identifier for the organization under which the entity exists.</p>",
+        "ListGroupMembersRequest$OrganizationId": "<p>The identifier for the organization under which the group exists.</p>",
+        "ListGroupsRequest$OrganizationId": "<p>The identifier for the organization under which the groups exist.</p>",
+        "ListMailboxExportJobsRequest$OrganizationId": "<p>The organization ID.</p>",
+        "ListMailboxPermissionsRequest$OrganizationId": "<p>The identifier of the organization under which the user, group, or resource exists.</p>",
+        "ListResourceDelegatesRequest$OrganizationId": "<p>The identifier for the organization that contains the resource for which delegates are listed.</p>",
+        "ListResourcesRequest$OrganizationId": "<p>The identifier for the organization under which the resources exist.</p>",
+        "ListUsersRequest$OrganizationId": "<p>The identifier for the organization under which the users exist.</p>",
+        "OrganizationSummary$OrganizationId": "<p>The identifier associated with the organization.</p>",
+        "PutAccessControlRuleRequest$OrganizationId": "<p>The identifier of the organization.</p>",
+        "PutMailboxPermissionsRequest$OrganizationId": "<p>The identifier of the organization under which the user, group, or resource exists.</p>",
+        "PutRetentionPolicyRequest$OrganizationId": "<p>The organization ID.</p>",
+        "RegisterToWorkMailRequest$OrganizationId": "<p>The identifier for the organization under which the user, group, or resource exists.</p>",
+        "ResetPasswordRequest$OrganizationId": "<p>The identifier of the organization that contains the user for which the password is reset.</p>",
+        "StartMailboxExportJobRequest$OrganizationId": "<p>The identifier associated with the organization.</p>",
+        "UpdateMailboxQuotaRequest$OrganizationId": "<p>The identifier for the organization that contains the user for whom to update the mailbox quota.</p>",
+        "UpdatePrimaryEmailAddressRequest$OrganizationId": "<p>The organization that contains the user, group, or resource to update.</p>",
+        "UpdateResourceRequest$OrganizationId": "<p>The identifier associated with the organization for which the resource is updated.</p>"
+      }
+    },
+    "OrganizationName": {
+      "base": null,
+      "refs": {
+        "CreateOrganizationRequest$Alias": "<p>The organization alias.</p>",
+        "DescribeOrganizationResponse$Alias": "<p>The alias for an organization.</p>",
+        "OrganizationSummary$Alias": "<p>The alias associated with the organization.</p>"
+      }
+    },
+    "OrganizationNotFoundException": {
+      "base": "<p>An operation received a valid organization identifier that either doesn't belong or exist in the system.</p>",
+      "refs": {
+      }
+    },
+    "OrganizationStateException": {
+      "base": "<p>The organization must have a valid state to perform certain operations on the organization or its members.</p>",
+      "refs": {
+      }
+    },
+    "OrganizationSummaries": {
+      "base": null,
+      "refs": {
+        "ListOrganizationsResponse$OrganizationSummaries": "<p>The overview of owned organizations presented as a list of organization summaries.</p>"
+      }
+    },
+    "OrganizationSummary": {
+      "base": "<p>The representation of an organization.</p>",
+      "refs": {
+        "OrganizationSummaries$member": null
+      }
+    },
+    "Password": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$Password": "<p>The password for the new user.</p>",
+        "ResetPasswordRequest$Password": "<p>The new password for the user.</p>"
+      }
+    },
+    "Percentage": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$EstimatedProgress": "<p>The estimated progress of the mailbox export job, in percentage points.</p>",
+        "MailboxExportJob$EstimatedProgress": "<p>The estimated progress of the mailbox export job, in percentage points.</p>"
+      }
+    },
+    "Permission": {
+      "base": "<p>Permission granted to a user, group, or resource to access a certain aspect of another user, group, or resource mailbox.</p>",
+      "refs": {
+        "Permissions$member": null
+      }
+    },
+    "PermissionType": {
+      "base": null,
+      "refs": {
+        "PermissionValues$member": null
+      }
+    },
+    "PermissionValues": {
+      "base": null,
+      "refs": {
+        "Permission$PermissionValues": "<p>The permissions granted to the grantee. SEND_AS allows the grantee to send email as the owner of the mailbox (the grantee is not mentioned on these emails). SEND_ON_BEHALF allows the grantee to send email on behalf of the owner of the mailbox (the grantee is not mentioned as the physical sender of these emails). FULL_ACCESS allows the grantee full access to the mailbox, irrespective of other folder-level permissions set on the mailbox.</p>",
+        "PutMailboxPermissionsRequest$PermissionValues": "<p>The permissions granted to the grantee. SEND_AS allows the grantee to send email as the owner of the mailbox (the grantee is not mentioned on these emails). SEND_ON_BEHALF allows the grantee to send email on behalf of the owner of the mailbox (the grantee is not mentioned as the physical sender of these emails). FULL_ACCESS allows the grantee full access to the mailbox, irrespective of other folder-level permissions set on the mailbox.</p>"
+      }
+    },
+    "Permissions": {
+      "base": null,
+      "refs": {
+        "ListMailboxPermissionsResponse$Permissions": "<p>One page of the user, group, or resource mailbox permissions.</p>"
+      }
+    },
+    "PolicyDescription": {
+      "base": null,
+      "refs": {
+        "PutRetentionPolicyRequest$Description": "<p>The retention policy description.</p>"
+      }
+    },
+    "PutAccessControlRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutAccessControlRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutMailboxPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutMailboxPermissionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRetentionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRetentionPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterToWorkMailRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterToWorkMailResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReservedNameException": {
+      "base": "<p>This user, group, or resource name is not allowed in Amazon WorkMail.</p>",
+      "refs": {
+      }
+    },
+    "ResetPasswordRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResetPasswordResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Resource": {
+      "base": "<p>The representation of a resource.</p>",
+      "refs": {
+        "Resources$member": null
+      }
+    },
+    "ResourceDelegates": {
+      "base": null,
+      "refs": {
+        "ListResourceDelegatesResponse$Delegates": "<p>One page of the resource's delegates.</p>"
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "AssociateDelegateToResourceRequest$ResourceId": "<p>The resource for which members (users or groups) are associated.</p>",
+        "CreateResourceResponse$ResourceId": "<p>The identifier of the new resource.</p>",
+        "DeleteResourceRequest$ResourceId": "<p>The identifier of the resource to be deleted.</p>",
+        "DescribeResourceRequest$ResourceId": "<p>The identifier of the resource to be described.</p>",
+        "DescribeResourceResponse$ResourceId": "<p>The identifier of the described resource.</p>",
+        "DisassociateDelegateFromResourceRequest$ResourceId": "<p>The identifier of the resource from which delegates' set members are removed. </p>",
+        "UpdateResourceRequest$ResourceId": "<p>The identifier of the resource to be updated.</p>"
+      }
+    },
+    "ResourceName": {
+      "base": null,
+      "refs": {
+        "CreateResourceRequest$Name": "<p>The name of the new resource.</p>",
+        "DescribeResourceResponse$Name": "<p>The name of the described resource.</p>",
+        "Resource$Name": "<p>The name of the resource.</p>",
+        "UpdateResourceRequest$Name": "<p>The name of the resource to be updated.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource cannot be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "CreateResourceRequest$Type": "<p>The type of the new resource. The available types are <code>equipment</code> and <code>room</code>.</p>",
+        "DescribeResourceResponse$Type": "<p>The type of the described resource.</p>",
+        "Resource$Type": "<p>The type of the resource: equipment or room.</p>"
+      }
+    },
+    "Resources": {
+      "base": null,
+      "refs": {
+        "ListResourcesResponse$Resources": "<p>One page of the organization's resource representation.</p>"
+      }
+    },
+    "RetentionAction": {
+      "base": null,
+      "refs": {
+        "FolderConfiguration$Action": "<p>The action to take on the folder contents at the end of the folder configuration period.</p>"
+      }
+    },
+    "RetentionPeriod": {
+      "base": null,
+      "refs": {
+        "FolderConfiguration$Period": "<p>The period of time at which the folder configuration action is applied.</p>"
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$RoleArn": "<p>The ARN of the AWS Identity and Access Management (IAM) role that grants write permission to the Amazon Simple Storage Service (Amazon S3) bucket.</p>",
+        "StartMailboxExportJobRequest$RoleArn": "<p>The ARN of the AWS Identity and Access Management (IAM) role that grants write permission to the S3 bucket.</p>"
+      }
+    },
+    "S3BucketName": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$S3BucketName": "<p>The name of the S3 bucket.</p>",
+        "MailboxExportJob$S3BucketName": "<p>The name of the S3 bucket.</p>",
+        "StartMailboxExportJobRequest$S3BucketName": "<p>The name of the S3 bucket.</p>"
+      }
+    },
+    "S3ObjectKey": {
+      "base": null,
+      "refs": {
+        "DescribeMailboxExportJobResponse$S3Prefix": "<p>The S3 bucket prefix.</p>",
+        "DescribeMailboxExportJobResponse$S3Path": "<p>The path to the S3 bucket and file that the mailbox export job is exporting to.</p>",
+        "MailboxExportJob$S3Path": "<p>The path to the S3 bucket and file that the mailbox export job exports to.</p>",
+        "StartMailboxExportJobRequest$S3Prefix": "<p>The S3 bucket prefix.</p>"
+      }
+    },
+    "ShortString": {
+      "base": null,
+      "refs": {
+        "DeleteRetentionPolicyRequest$Id": "<p>The retention policy ID.</p>",
+        "GetDefaultRetentionPolicyResponse$Id": "<p>The retention policy ID.</p>",
+        "GetDefaultRetentionPolicyResponse$Name": "<p>The retention policy name.</p>",
+        "PutRetentionPolicyRequest$Id": "<p>The retention policy ID.</p>",
+        "PutRetentionPolicyRequest$Name": "<p>The retention policy name.</p>"
+      }
+    },
+    "StartMailboxExportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartMailboxExportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$DisplayName": "<p>The display name for the new user.</p>",
+        "Delegate$Id": "<p>The identifier for the user or group associated as the resource's delegate.</p>",
+        "DeleteOrganizationResponse$State": "<p>The state of the organization.</p>",
+        "DescribeOrganizationResponse$State": "<p>The state of an organization.</p>",
+        "DescribeOrganizationResponse$DirectoryId": "<p>The identifier for the directory associated with an Amazon WorkMail organization.</p>",
+        "DescribeOrganizationResponse$DirectoryType": "<p>The type of directory associated with the WorkMail organization.</p>",
+        "DescribeOrganizationResponse$DefaultMailDomain": "<p>The default mail domain associated with the organization.</p>",
+        "DescribeOrganizationResponse$ErrorMessage": "<p>(Optional) The error message indicating if unexpected behavior was encountered with regards to the organization.</p>",
+        "DescribeUserResponse$DisplayName": "<p>The display name of the user.</p>",
+        "DirectoryInUseException$Message": null,
+        "DirectoryServiceAuthenticationFailedException$Message": null,
+        "DirectoryUnavailableException$Message": null,
+        "EmailAddressInUseException$Message": null,
+        "EntityAlreadyRegisteredException$Message": null,
+        "EntityNotFoundException$Message": null,
+        "EntityStateException$Message": null,
+        "GetDefaultRetentionPolicyResponse$Description": "<p>The retention policy description.</p>",
+        "InvalidConfigurationException$Message": null,
+        "InvalidParameterException$Message": null,
+        "InvalidPasswordException$Message": null,
+        "LimitExceededException$Message": null,
+        "MailDomainNotFoundException$Message": null,
+        "MailDomainStateException$Message": null,
+        "Member$Id": "<p>The identifier of the member.</p>",
+        "Member$Name": "<p>The name of the member.</p>",
+        "NameAvailabilityException$Message": null,
+        "OrganizationNotFoundException$Message": null,
+        "OrganizationStateException$Message": null,
+        "OrganizationSummary$ErrorMessage": "<p>The error message associated with the organization. It is only present if unexpected behavior has occurred with regards to the organization. It provides insight or solutions regarding unexpected behavior.</p>",
+        "OrganizationSummary$State": "<p>The state associated with the organization.</p>",
+        "ReservedNameException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "TooManyTagsException$Message": null,
+        "UnsupportedOperationException$Message": null,
+        "User$DisplayName": "<p>The display name of the user.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Describes a tag applied to a resource.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tag keys.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceResponse$Tags": "<p>A list of tag key-value pairs.</p>",
+        "TagResourceRequest$Tags": "<p>The tag key-value pairs.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$DateCreated": "<p>The date that the rule was created.</p>",
+        "AccessControlRule$DateModified": "<p>The date that the rule was modified.</p>",
+        "DescribeGroupResponse$EnabledDate": "<p>The date and time when a user was registered to WorkMail, in UNIX epoch time format.</p>",
+        "DescribeGroupResponse$DisabledDate": "<p>The date and time when a user was deregistered from WorkMail, in UNIX epoch time format.</p>",
+        "DescribeMailboxExportJobResponse$StartTime": "<p>The mailbox export job start timestamp.</p>",
+        "DescribeMailboxExportJobResponse$EndTime": "<p>The mailbox export job end timestamp.</p>",
+        "DescribeOrganizationResponse$CompletedDate": "<p>The date at which the organization became usable in the WorkMail context, in UNIX epoch time format.</p>",
+        "DescribeResourceResponse$EnabledDate": "<p>The date and time when a resource was enabled for WorkMail, in UNIX epoch time format.</p>",
+        "DescribeResourceResponse$DisabledDate": "<p>The date and time when a resource was disabled from WorkMail, in UNIX epoch time format.</p>",
+        "DescribeUserResponse$EnabledDate": "<p>The date and time at which the user was enabled for Amazon WorkMail usage, in UNIX epoch time format.</p>",
+        "DescribeUserResponse$DisabledDate": "<p>The date and time at which the user was disabled for Amazon WorkMail usage, in UNIX epoch time format.</p>",
+        "Group$EnabledDate": "<p>The date indicating when the group was enabled for Amazon WorkMail use.</p>",
+        "Group$DisabledDate": "<p>The date indicating when the group was disabled from Amazon WorkMail use.</p>",
+        "MailboxExportJob$StartTime": "<p>The mailbox export job start timestamp.</p>",
+        "MailboxExportJob$EndTime": "<p>The mailbox export job end timestamp.</p>",
+        "Member$EnabledDate": "<p>The date indicating when the member was enabled for Amazon WorkMail use.</p>",
+        "Member$DisabledDate": "<p>The date indicating when the member was disabled from Amazon WorkMail use.</p>",
+        "Resource$EnabledDate": "<p>The date indicating when the resource was enabled for Amazon WorkMail use.</p>",
+        "Resource$DisabledDate": "<p>The date indicating when the resource was disabled from Amazon WorkMail use.</p>",
+        "User$EnabledDate": "<p>The date indicating when the user was enabled for Amazon WorkMail use.</p>",
+        "User$DisabledDate": "<p>The date indicating when the user was disabled from Amazon WorkMail use.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>The resource can have up to 50 user-applied tags.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedOperationException": {
+      "base": "<p>You can't perform a write operation against a read-only directory.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMailboxQuotaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMailboxQuotaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePrimaryEmailAddressRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePrimaryEmailAddressResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "User": {
+      "base": "<p>The representation of an Amazon WorkMail user.</p>",
+      "refs": {
+        "Users$member": null
+      }
+    },
+    "UserIdList": {
+      "base": null,
+      "refs": {
+        "AccessControlRule$UserIds": "<p>User IDs to include in the rule.</p>",
+        "AccessControlRule$NotUserIds": "<p>User IDs to exclude from the rule.</p>",
+        "PutAccessControlRuleRequest$UserIds": "<p>User IDs to include in the rule.</p>",
+        "PutAccessControlRuleRequest$NotUserIds": "<p>User IDs to exclude from the rule.</p>"
+      }
+    },
+    "UserName": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$Name": "<p>The name for the new user. WorkMail directory user names have a maximum length of 64. All others have a maximum length of 20.</p>",
+        "DescribeUserResponse$Name": "<p>The name for the user.</p>",
+        "User$Name": "<p>The name of the user.</p>"
+      }
+    },
+    "UserRole": {
+      "base": null,
+      "refs": {
+        "DescribeUserResponse$UserRole": "<p>In certain cases, other entities are modeled as users. If interoperability is enabled, resources are imported into Amazon WorkMail as users. Because different WorkMail organizations rely on different directory types, administrators can distinguish between an unregistered user (account is disabled and has a user role) and the directory administrators. The values are USER, RESOURCE, and SYSTEM_USER.</p>",
+        "User$UserRole": "<p>The role of the user.</p>"
+      }
+    },
+    "Users": {
+      "base": null,
+      "refs": {
+        "ListUsersResponse$Users": "<p>The overview of users for an organization.</p>"
+      }
+    },
+    "WorkMailIdentifier": {
+      "base": null,
+      "refs": {
+        "AssociateDelegateToResourceRequest$EntityId": "<p>The member (user or group) to associate to the resource.</p>",
+        "AssociateMemberToGroupRequest$GroupId": "<p>The group to which the member (user or group) is associated.</p>",
+        "AssociateMemberToGroupRequest$MemberId": "<p>The member (user or group) to associate to the group.</p>",
+        "CreateAliasRequest$EntityId": "<p>The member (user or group) to which this alias is added.</p>",
+        "CreateGroupResponse$GroupId": "<p>The identifier of the group.</p>",
+        "CreateUserResponse$UserId": "<p>The identifier for the new user.</p>",
+        "DeleteAliasRequest$EntityId": "<p>The identifier for the member (user or group) from which to have the aliases removed.</p>",
+        "DeleteGroupRequest$GroupId": "<p>The identifier of the group to be deleted.</p>",
+        "DeleteMailboxPermissionsRequest$EntityId": "<p>The identifier of the member (user or group) that owns the mailbox.</p>",
+        "DeleteMailboxPermissionsRequest$GranteeId": "<p>The identifier of the member (user or group) for which to delete granted permissions.</p>",
+        "DeleteUserRequest$UserId": "<p>The identifier of the user to be deleted.</p>",
+        "DeregisterFromWorkMailRequest$EntityId": "<p>The identifier for the member (user or group) to be updated.</p>",
+        "DescribeGroupRequest$GroupId": "<p>The identifier for the group to be described.</p>",
+        "DescribeGroupResponse$GroupId": "<p>The identifier of the described group.</p>",
+        "DescribeMailboxExportJobResponse$EntityId": "<p>The identifier of the user or resource associated with the mailbox.</p>",
+        "DescribeUserRequest$UserId": "<p>The identifier for the user to be described.</p>",
+        "DescribeUserResponse$UserId": "<p>The identifier for the described user.</p>",
+        "DisassociateDelegateFromResourceRequest$EntityId": "<p>The identifier for the member (user, group) to be removed from the resource's delegates.</p>",
+        "DisassociateMemberFromGroupRequest$GroupId": "<p>The identifier for the group from which members are removed.</p>",
+        "DisassociateMemberFromGroupRequest$MemberId": "<p>The identifier for the member to be removed to the group.</p>",
+        "GetAccessControlEffectRequest$UserId": "<p>The user ID.</p>",
+        "GetMailboxDetailsRequest$UserId": "<p>The identifier for the user whose mailbox details are being requested.</p>",
+        "Group$Id": "<p>The identifier of the group.</p>",
+        "ListAliasesRequest$EntityId": "<p>The identifier for the entity for which to list the aliases.</p>",
+        "ListGroupMembersRequest$GroupId": "<p>The identifier for the group to which the members (users or groups) are associated.</p>",
+        "ListMailboxPermissionsRequest$EntityId": "<p>The identifier of the user, group, or resource for which to list mailbox permissions.</p>",
+        "ListResourceDelegatesRequest$ResourceId": "<p>The identifier for the resource whose delegates are listed.</p>",
+        "MailboxExportJob$EntityId": "<p>The identifier of the user or resource associated with the mailbox.</p>",
+        "Permission$GranteeId": "<p>The identifier of the user, group, or resource to which the permissions are granted.</p>",
+        "PutMailboxPermissionsRequest$EntityId": "<p>The identifier of the user, group, or resource for which to update mailbox permissions.</p>",
+        "PutMailboxPermissionsRequest$GranteeId": "<p>The identifier of the user, group, or resource to which to grant the permissions.</p>",
+        "RegisterToWorkMailRequest$EntityId": "<p>The identifier for the user, group, or resource to be updated.</p>",
+        "ResetPasswordRequest$UserId": "<p>The identifier of the user for whom the password is reset.</p>",
+        "Resource$Id": "<p>The identifier of the resource.</p>",
+        "StartMailboxExportJobRequest$EntityId": "<p>The identifier of the user or resource associated with the mailbox.</p>",
+        "UpdateMailboxQuotaRequest$UserId": "<p>The identifer for the user for whom to update the mailbox quota.</p>",
+        "UpdatePrimaryEmailAddressRequest$EntityId": "<p>The user, group, or resource to update.</p>",
+        "User$Id": "<p>The identifier of the user.</p>",
+        "UserIdList$member": null
+      }
+    }
+  }
+}

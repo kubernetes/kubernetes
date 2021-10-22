@@ -1,0 +1,81 @@
+#data
+<math><tr><td><mo><tr>
+#errors
+#document-fragment
+td
+#document
+| <math math>
+|   <math tr>
+|     <math td>
+|       <math mo>
+
+#data
+<math><tr><td><mo><tr>
+#errors
+#document-fragment
+tr
+#document
+| <math math>
+|   <math tr>
+|     <math td>
+|       <math mo>
+
+#data
+<math><thead><mo><tbody>
+#errors
+#document-fragment
+thead
+#document
+| <math math>
+|   <math thead>
+|     <math mo>
+
+#data
+<math><tfoot><mo><tbody>
+#errors
+#document-fragment
+tfoot
+#document
+| <math math>
+|   <math tfoot>
+|     <math mo>
+
+#data
+<math><tbody><mo><tfoot>
+#errors
+#document-fragment
+tbody
+#document
+| <math math>
+|   <math tbody>
+|     <math mo>
+
+#data
+<math><tbody><mo></table>
+#errors
+#document-fragment
+tbody
+#document
+| <math math>
+|   <math tbody>
+|     <math mo>
+
+#data
+<math><thead><mo></table>
+#errors
+#document-fragment
+tbody
+#document
+| <math math>
+|   <math thead>
+|     <math mo>
+
+#data
+<math><tfoot><mo></table>
+#errors
+#document-fragment
+tbody
+#document
+| <math math>
+|   <math tfoot>
+|     <math mo>

@@ -1,0 +1,7 @@
+[foo-profile]
+aws_access_key_id        = accesskey
+aws_secret_access_key    = secret
+aws_session_token        = token
+aws_security_token       = sectoken
+x_principal_arn          = arn:aws:sts::myarn
+x_security_token_expires = time

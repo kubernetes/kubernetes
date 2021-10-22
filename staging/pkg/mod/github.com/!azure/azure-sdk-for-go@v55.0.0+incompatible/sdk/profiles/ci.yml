@@ -1,0 +1,15 @@
+# NOTE: Please refer to https://aka.ms/azsdk/engsys/ci-yaml before editing this file.
+trigger:
+  paths:
+    include:
+    - sdk/profiles/
+
+pr:
+  paths:
+    include:
+    - sdk/profiles/
+
+stages:
+- template: ../../eng/pipelines/templates/jobs/archetype-sdk-client-samples.yml
+  parameters:
+    ServiceDirectory: 'sdk/profiles'

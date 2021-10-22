@@ -1,0 +1,1052 @@
+kind: "discovery#restDescription"
+discovery_version: "v1"
+id: "discovery:v1"
+name: "discovery"
+version: "v1"
+revision: "20200709"
+title: "API Discovery Service"
+description: "Provides information about other Google APIs, such as what APIs are available, the resource, and method details for each API."
+icons: <
+  x16: "http://www.google.com/images/icons/feature/filing_cabinet_search-g16.png"
+  x32: "http://www.google.com/images/icons/feature/filing_cabinet_search-g32.png"
+>
+documentation_link: "https://developers.google.com/discovery/"
+protocol: "rest"
+base_url: "https://www.googleapis.com/discovery/v1/"
+base_path: "/discovery/v1/"
+root_url: "https://www.googleapis.com/"
+service_path: "discovery/v1/"
+batch_path: "batch/discovery/v1"
+parameters: <
+  additional_properties: <
+    name: "alt"
+    value: <
+      type: "string"
+      description: "Data format for the response."
+      default: "json"
+      enum: "json"
+      enum_descriptions: "Responses with Content-Type of application/json"
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "fields"
+    value: <
+      type: "string"
+      description: "Selector specifying which fields to include in a partial response."
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "key"
+    value: <
+      type: "string"
+      description: "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token."
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "oauth_token"
+    value: <
+      type: "string"
+      description: "OAuth 2.0 token for the current user."
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "prettyPrint"
+    value: <
+      type: "boolean"
+      description: "Returns response with indentations and line breaks."
+      default: "true"
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "quotaUser"
+    value: <
+      type: "string"
+      description: "An opaque string that represents a user for quota purposes. Must not exceed 40 characters."
+      location: "query"
+    >
+  >
+  additional_properties: <
+    name: "userIp"
+    value: <
+      type: "string"
+      description: "Deprecated. Please use quotaUser instead."
+      location: "query"
+    >
+  >
+>
+schemas: <
+  additional_properties: <
+    name: "DirectoryList"
+    value: <
+      id: "DirectoryList"
+      type: "object"
+      properties: <
+        additional_properties: <
+          name: "discoveryVersion"
+          value: <
+            type: "string"
+            description: "Indicate the version of the Discovery API used to generate this doc."
+            default: "v1"
+          >
+        >
+        additional_properties: <
+          name: "items"
+          value: <
+            type: "array"
+            description: "The individual directory entries. One entry per api/version pair."
+            items: <
+              type: "object"
+              properties: <
+                additional_properties: <
+                  name: "description"
+                  value: <
+                    type: "string"
+                    description: "The description of this API."
+                  >
+                >
+                additional_properties: <
+                  name: "discoveryLink"
+                  value: <
+                    type: "string"
+                    description: "A link to the discovery document."
+                  >
+                >
+                additional_properties: <
+                  name: "discoveryRestUrl"
+                  value: <
+                    type: "string"
+                    description: "The URL for the discovery REST document."
+                  >
+                >
+                additional_properties: <
+                  name: "documentationLink"
+                  value: <
+                    type: "string"
+                    description: "A link to human readable documentation for the API."
+                  >
+                >
+                additional_properties: <
+                  name: "icons"
+                  value: <
+                    type: "object"
+                    description: "Links to 16x16 and 32x32 icons representing the API."
+                    properties: <
+                      additional_properties: <
+                        name: "x16"
+                        value: <
+                          type: "string"
+                          description: "The URL of the 16x16 icon."
+                        >
+                      >
+                      additional_properties: <
+                        name: "x32"
+                        value: <
+                          type: "string"
+                          description: "The URL of the 32x32 icon."
+                        >
+                      >
+                    >
+                  >
+                >
+                additional_properties: <
+                  name: "id"
+                  value: <
+                    type: "string"
+                    description: "The id of this API."
+                  >
+                >
+                additional_properties: <
+                  name: "kind"
+                  value: <
+                    type: "string"
+                    description: "The kind for this response."
+                    default: "discovery#directoryItem"
+                  >
+                >
+                additional_properties: <
+                  name: "labels"
+                  value: <
+                    type: "array"
+                    description: "Labels for the status of this API, such as labs or deprecated."
+                    items: <
+                      type: "string"
+                    >
+                  >
+                >
+                additional_properties: <
+                  name: "name"
+                  value: <
+                    type: "string"
+                    description: "The name of the API."
+                  >
+                >
+                additional_properties: <
+                  name: "preferred"
+                  value: <
+                    type: "boolean"
+                    description: "True if this version is the preferred version to use."
+                  >
+                >
+                additional_properties: <
+                  name: "title"
+                  value: <
+                    type: "string"
+                    description: "The title of this API."
+                  >
+                >
+                additional_properties: <
+                  name: "version"
+                  value: <
+                    type: "string"
+                    description: "The version of the API."
+                  >
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "kind"
+          value: <
+            type: "string"
+            description: "The kind for this response."
+            default: "discovery#directoryList"
+          >
+        >
+      >
+    >
+  >
+  additional_properties: <
+    name: "JsonSchema"
+    value: <
+      id: "JsonSchema"
+      type: "object"
+      properties: <
+        additional_properties: <
+          name: "$ref"
+          value: <
+            type: "string"
+            description: "A reference to another schema. The value of this property is the \"id\" of another schema."
+          >
+        >
+        additional_properties: <
+          name: "additionalProperties"
+          value: <
+            description: "If this is a schema for an object, this property is the schema for any additional properties with dynamic keys on this object."
+            _ref: "JsonSchema"
+          >
+        >
+        additional_properties: <
+          name: "annotations"
+          value: <
+            type: "object"
+            description: "Additional information about this property."
+            properties: <
+              additional_properties: <
+                name: "required"
+                value: <
+                  type: "array"
+                  description: "A list of methods for which this property is required on requests."
+                  items: <
+                    type: "string"
+                  >
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "default"
+          value: <
+            type: "string"
+            description: "The default value of this property (if one exists)."
+          >
+        >
+        additional_properties: <
+          name: "description"
+          value: <
+            type: "string"
+            description: "A description of this object."
+          >
+        >
+        additional_properties: <
+          name: "enum"
+          value: <
+            type: "array"
+            description: "Values this parameter may take (if it is an enum)."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "enumDescriptions"
+          value: <
+            type: "array"
+            description: "The descriptions for the enums. Each position maps to the corresponding value in the \"enum\" array."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "format"
+          value: <
+            type: "string"
+            description: "An additional regular expression or key that helps constrain the value. For more details see: http://tools.ietf.org/html/draft-zyp-json-schema-03#section-5.23"
+          >
+        >
+        additional_properties: <
+          name: "id"
+          value: <
+            type: "string"
+            description: "Unique identifier for this schema."
+          >
+        >
+        additional_properties: <
+          name: "items"
+          value: <
+            description: "If this is a schema for an array, this property is the schema for each element in the array."
+            _ref: "JsonSchema"
+          >
+        >
+        additional_properties: <
+          name: "location"
+          value: <
+            type: "string"
+            description: "Whether this parameter goes in the query or the path for REST requests."
+          >
+        >
+        additional_properties: <
+          name: "maximum"
+          value: <
+            type: "string"
+            description: "The maximum value of this parameter."
+          >
+        >
+        additional_properties: <
+          name: "minimum"
+          value: <
+            type: "string"
+            description: "The minimum value of this parameter."
+          >
+        >
+        additional_properties: <
+          name: "pattern"
+          value: <
+            type: "string"
+            description: "The regular expression this parameter must conform to. Uses Java 6 regex format: http://docs.oracle.com/javase/6/docs/api/java/util/regex/Pattern.html"
+          >
+        >
+        additional_properties: <
+          name: "properties"
+          value: <
+            type: "object"
+            description: "If this is a schema for an object, list the schema for each property of this object."
+            additional_properties: <
+              description: "A single property of this object. The value is itself a JSON Schema object describing this property."
+              _ref: "JsonSchema"
+            >
+          >
+        >
+        additional_properties: <
+          name: "readOnly"
+          value: <
+            type: "boolean"
+            description: "The value is read-only, generated by the service. The value cannot be modified by the client. If the value is included in a POST, PUT, or PATCH request, it is ignored by the service."
+          >
+        >
+        additional_properties: <
+          name: "repeated"
+          value: <
+            type: "boolean"
+            description: "Whether this parameter may appear multiple times."
+          >
+        >
+        additional_properties: <
+          name: "required"
+          value: <
+            type: "boolean"
+            description: "Whether the parameter is required."
+          >
+        >
+        additional_properties: <
+          name: "type"
+          value: <
+            type: "string"
+            description: "The value type for this schema. A list of values can be found here: http://tools.ietf.org/html/draft-zyp-json-schema-03#section-5.1"
+          >
+        >
+        additional_properties: <
+          name: "variant"
+          value: <
+            type: "object"
+            description: "In a variant data type, the value of one property is used to determine how to interpret the entire entity. Its value must exist in a map of descriminant values to schema names."
+            properties: <
+              additional_properties: <
+                name: "discriminant"
+                value: <
+                  type: "string"
+                  description: "The name of the type discriminant property."
+                >
+              >
+              additional_properties: <
+                name: "map"
+                value: <
+                  type: "array"
+                  description: "The map of discriminant value to schema to use for parsing.."
+                  items: <
+                    type: "object"
+                    properties: <
+                      additional_properties: <
+                        name: "$ref"
+                        value: <
+                          type: "string"
+                        >
+                      >
+                      additional_properties: <
+                        name: "type_value"
+                        value: <
+                          type: "string"
+                        >
+                      >
+                    >
+                  >
+                >
+              >
+            >
+          >
+        >
+      >
+    >
+  >
+  additional_properties: <
+    name: "RestDescription"
+    value: <
+      id: "RestDescription"
+      type: "object"
+      properties: <
+        additional_properties: <
+          name: "auth"
+          value: <
+            type: "object"
+            description: "Authentication information."
+            properties: <
+              additional_properties: <
+                name: "oauth2"
+                value: <
+                  type: "object"
+                  description: "OAuth 2.0 authentication information."
+                  properties: <
+                    additional_properties: <
+                      name: "scopes"
+                      value: <
+                        type: "object"
+                        description: "Available OAuth 2.0 scopes."
+                        additional_properties: <
+                          type: "object"
+                          description: "The scope value."
+                          properties: <
+                            additional_properties: <
+                              name: "description"
+                              value: <
+                                type: "string"
+                                description: "Description of scope."
+                              >
+                            >
+                          >
+                        >
+                      >
+                    >
+                  >
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "basePath"
+          value: <
+            type: "string"
+            description: "[DEPRECATED] The base path for REST requests."
+          >
+        >
+        additional_properties: <
+          name: "baseUrl"
+          value: <
+            type: "string"
+            description: "[DEPRECATED] The base URL for REST requests."
+          >
+        >
+        additional_properties: <
+          name: "batchPath"
+          value: <
+            type: "string"
+            description: "The path for REST batch requests."
+          >
+        >
+        additional_properties: <
+          name: "canonicalName"
+          value: <
+            type: "string"
+            description: "Indicates how the API name should be capitalized and split into various parts. Useful for generating pretty class names."
+          >
+        >
+        additional_properties: <
+          name: "description"
+          value: <
+            type: "string"
+            description: "The description of this API."
+          >
+        >
+        additional_properties: <
+          name: "discoveryVersion"
+          value: <
+            type: "string"
+            description: "Indicate the version of the Discovery API used to generate this doc."
+            default: "v1"
+          >
+        >
+        additional_properties: <
+          name: "documentationLink"
+          value: <
+            type: "string"
+            description: "A link to human readable documentation for the API."
+          >
+        >
+        additional_properties: <
+          name: "etag"
+          value: <
+            type: "string"
+            description: "The ETag for this response."
+            read_only: true
+          >
+        >
+        additional_properties: <
+          name: "exponentialBackoffDefault"
+          value: <
+            type: "boolean"
+            description: "Enable exponential backoff for suitable methods in the generated clients."
+          >
+        >
+        additional_properties: <
+          name: "features"
+          value: <
+            type: "array"
+            description: "A list of supported features for this API."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "icons"
+          value: <
+            type: "object"
+            description: "Links to 16x16 and 32x32 icons representing the API."
+            properties: <
+              additional_properties: <
+                name: "x16"
+                value: <
+                  type: "string"
+                  description: "The URL of the 16x16 icon."
+                >
+              >
+              additional_properties: <
+                name: "x32"
+                value: <
+                  type: "string"
+                  description: "The URL of the 32x32 icon."
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "id"
+          value: <
+            type: "string"
+            description: "The ID of this API."
+          >
+        >
+        additional_properties: <
+          name: "kind"
+          value: <
+            type: "string"
+            description: "The kind for this response."
+            default: "discovery#restDescription"
+          >
+        >
+        additional_properties: <
+          name: "labels"
+          value: <
+            type: "array"
+            description: "Labels for the status of this API, such as labs or deprecated."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "methods"
+          value: <
+            type: "object"
+            description: "API-level methods for this API."
+            additional_properties: <
+              description: "An individual method description."
+              _ref: "RestMethod"
+            >
+          >
+        >
+        additional_properties: <
+          name: "name"
+          value: <
+            type: "string"
+            description: "The name of this API."
+          >
+        >
+        additional_properties: <
+          name: "ownerDomain"
+          value: <
+            type: "string"
+            description: "The domain of the owner of this API. Together with the ownerName and a packagePath values, this can be used to generate a library for this API which would have a unique fully qualified name."
+          >
+        >
+        additional_properties: <
+          name: "ownerName"
+          value: <
+            type: "string"
+            description: "The name of the owner of this API. See ownerDomain."
+          >
+        >
+        additional_properties: <
+          name: "packagePath"
+          value: <
+            type: "string"
+            description: "The package of the owner of this API. See ownerDomain."
+          >
+        >
+        additional_properties: <
+          name: "parameters"
+          value: <
+            type: "object"
+            description: "Common parameters that apply across all apis."
+            additional_properties: <
+              description: "Description of a single parameter."
+              _ref: "JsonSchema"
+            >
+          >
+        >
+        additional_properties: <
+          name: "protocol"
+          value: <
+            type: "string"
+            description: "The protocol described by this document."
+            default: "rest"
+          >
+        >
+        additional_properties: <
+          name: "resources"
+          value: <
+            type: "object"
+            description: "The resources in this API."
+            additional_properties: <
+              description: "An individual resource description. Contains methods and sub-resources related to this resource."
+              _ref: "RestResource"
+            >
+          >
+        >
+        additional_properties: <
+          name: "revision"
+          value: <
+            type: "string"
+            description: "The version of this API."
+          >
+        >
+        additional_properties: <
+          name: "rootUrl"
+          value: <
+            type: "string"
+            description: "The root URL under which all API services live."
+          >
+        >
+        additional_properties: <
+          name: "schemas"
+          value: <
+            type: "object"
+            description: "The schemas for this API."
+            additional_properties: <
+              description: "An individual schema description."
+              _ref: "JsonSchema"
+            >
+          >
+        >
+        additional_properties: <
+          name: "servicePath"
+          value: <
+            type: "string"
+            description: "The base path for all REST requests."
+          >
+        >
+        additional_properties: <
+          name: "title"
+          value: <
+            type: "string"
+            description: "The title of this API."
+          >
+        >
+        additional_properties: <
+          name: "version"
+          value: <
+            type: "string"
+            description: "The version of this API."
+          >
+        >
+        additional_properties: <
+          name: "version_module"
+          value: <
+            type: "boolean"
+          >
+        >
+      >
+    >
+  >
+  additional_properties: <
+    name: "RestMethod"
+    value: <
+      id: "RestMethod"
+      type: "object"
+      properties: <
+        additional_properties: <
+          name: "description"
+          value: <
+            type: "string"
+            description: "Description of this method."
+          >
+        >
+        additional_properties: <
+          name: "etagRequired"
+          value: <
+            type: "boolean"
+            description: "Whether this method requires an ETag to be specified. The ETag is sent as an HTTP If-Match or If-None-Match header."
+          >
+        >
+        additional_properties: <
+          name: "httpMethod"
+          value: <
+            type: "string"
+            description: "HTTP method used by this method."
+          >
+        >
+        additional_properties: <
+          name: "id"
+          value: <
+            type: "string"
+            description: "A unique ID for this method. This property can be used to match methods between different versions of Discovery."
+          >
+        >
+        additional_properties: <
+          name: "mediaUpload"
+          value: <
+            type: "object"
+            description: "Media upload parameters."
+            properties: <
+              additional_properties: <
+                name: "accept"
+                value: <
+                  type: "array"
+                  description: "MIME Media Ranges for acceptable media uploads to this method."
+                  items: <
+                    type: "string"
+                  >
+                >
+              >
+              additional_properties: <
+                name: "maxSize"
+                value: <
+                  type: "string"
+                  description: "Maximum size of a media upload, such as \"1MB\", \"2GB\" or \"3TB\"."
+                >
+              >
+              additional_properties: <
+                name: "protocols"
+                value: <
+                  type: "object"
+                  description: "Supported upload protocols."
+                  properties: <
+                    additional_properties: <
+                      name: "resumable"
+                      value: <
+                        type: "object"
+                        description: "Supports the Resumable Media Upload protocol."
+                        properties: <
+                          additional_properties: <
+                            name: "multipart"
+                            value: <
+                              type: "boolean"
+                              description: "True if this endpoint supports uploading multipart media."
+                              default: "true"
+                            >
+                          >
+                          additional_properties: <
+                            name: "path"
+                            value: <
+                              type: "string"
+                              description: "The URI path to be used for upload. Should be used in conjunction with the basePath property at the api-level."
+                            >
+                          >
+                        >
+                      >
+                    >
+                    additional_properties: <
+                      name: "simple"
+                      value: <
+                        type: "object"
+                        description: "Supports uploading as a single HTTP request."
+                        properties: <
+                          additional_properties: <
+                            name: "multipart"
+                            value: <
+                              type: "boolean"
+                              description: "True if this endpoint supports upload multipart media."
+                              default: "true"
+                            >
+                          >
+                          additional_properties: <
+                            name: "path"
+                            value: <
+                              type: "string"
+                              description: "The URI path to be used for upload. Should be used in conjunction with the basePath property at the api-level."
+                            >
+                          >
+                        >
+                      >
+                    >
+                  >
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "parameterOrder"
+          value: <
+            type: "array"
+            description: "Ordered list of required parameters, serves as a hint to clients on how to structure their method signatures. The array is ordered such that the \"most-significant\" parameter appears first."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "parameters"
+          value: <
+            type: "object"
+            description: "Details for all parameters in this method."
+            additional_properties: <
+              description: "Details for a single parameter in this method."
+              _ref: "JsonSchema"
+            >
+          >
+        >
+        additional_properties: <
+          name: "path"
+          value: <
+            type: "string"
+            description: "The URI path of this REST method. Should be used in conjunction with the basePath property at the api-level."
+          >
+        >
+        additional_properties: <
+          name: "request"
+          value: <
+            type: "object"
+            description: "The schema for the request."
+            properties: <
+              additional_properties: <
+                name: "$ref"
+                value: <
+                  type: "string"
+                  description: "Schema ID for the request schema."
+                >
+              >
+              additional_properties: <
+                name: "parameterName"
+                value: <
+                  type: "string"
+                  description: "parameter name."
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "response"
+          value: <
+            type: "object"
+            description: "The schema for the response."
+            properties: <
+              additional_properties: <
+                name: "$ref"
+                value: <
+                  type: "string"
+                  description: "Schema ID for the response schema."
+                >
+              >
+            >
+          >
+        >
+        additional_properties: <
+          name: "scopes"
+          value: <
+            type: "array"
+            description: "OAuth 2.0 scopes applicable to this method."
+            items: <
+              type: "string"
+            >
+          >
+        >
+        additional_properties: <
+          name: "supportsMediaDownload"
+          value: <
+            type: "boolean"
+            description: "Whether this method supports media downloads."
+          >
+        >
+        additional_properties: <
+          name: "supportsMediaUpload"
+          value: <
+            type: "boolean"
+            description: "Whether this method supports media uploads."
+          >
+        >
+        additional_properties: <
+          name: "supportsSubscription"
+          value: <
+            type: "boolean"
+            description: "Whether this method supports subscriptions."
+          >
+        >
+        additional_properties: <
+          name: "useMediaDownloadService"
+          value: <
+            type: "boolean"
+            description: "Indicates that downloads from this method should use the download service URL (i.e. \"/download\"). Only applies if the method supports media download."
+          >
+        >
+      >
+    >
+  >
+  additional_properties: <
+    name: "RestResource"
+    value: <
+      id: "RestResource"
+      type: "object"
+      properties: <
+        additional_properties: <
+          name: "methods"
+          value: <
+            type: "object"
+            description: "Methods on this resource."
+            additional_properties: <
+              description: "Description for any methods on this resource."
+              _ref: "RestMethod"
+            >
+          >
+        >
+        additional_properties: <
+          name: "resources"
+          value: <
+            type: "object"
+            description: "Sub-resources on this resource."
+            additional_properties: <
+              description: "Description for any sub-resources on this resource."
+              _ref: "RestResource"
+            >
+          >
+        >
+      >
+    >
+  >
+>
+resources: <
+  additional_properties: <
+    name: "apis"
+    value: <
+      methods: <
+        additional_properties: <
+          name: "getRest"
+          value: <
+            id: "discovery.apis.getRest"
+            path: "apis/{api}/{version}/rest"
+            http_method: "GET"
+            description: "Retrieve the description of a particular version of an api."
+            parameters: <
+              additional_properties: <
+                name: "api"
+                value: <
+                  type: "string"
+                  description: "The name of the API."
+                  required: true
+                  location: "path"
+                >
+              >
+              additional_properties: <
+                name: "version"
+                value: <
+                  type: "string"
+                  description: "The version of the API."
+                  required: true
+                  location: "path"
+                >
+              >
+            >
+            parameter_order: "api"
+            parameter_order: "version"
+            response: <
+              _ref: "RestDescription"
+            >
+          >
+        >
+        additional_properties: <
+          name: "list"
+          value: <
+            id: "discovery.apis.list"
+            path: "apis"
+            http_method: "GET"
+            description: "Retrieve the list of APIs supported at this endpoint."
+            parameters: <
+              additional_properties: <
+                name: "name"
+                value: <
+                  type: "string"
+                  description: "Only include APIs with the given name."
+                  location: "query"
+                >
+              >
+              additional_properties: <
+                name: "preferred"
+                value: <
+                  type: "boolean"
+                  description: "Return only the preferred version of an API."
+                  default: "false"
+                  location: "query"
+                >
+              >
+            >
+            response: <
+              _ref: "DirectoryList"
+            >
+          >
+        >
+      >
+    >
+  >
+>
+etag: "\"-2NioU2H8y8siEzrBOV_qzRI6kQ/MBAr0D2S71PqQ6bqEdQrIWW12ac\""
+owner_domain: "google.com"
+owner_name: "Google"

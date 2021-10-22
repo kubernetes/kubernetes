@@ -1,0 +1,774 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/androidpublisher": {
+          "description": "View and manage your Google Play Developer account"
+        }
+      }
+    }
+  },
+  "basePath": "/games/v1configuration/",
+  "baseUrl": "https://www.googleapis.com/games/v1configuration/",
+  "batchPath": "batch/gamesConfiguration/v1configuration",
+  "canonicalName": "Games Configuration",
+  "description": "The Publishing API for Google Play Game Services.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/games/services",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/-wG50aJN_MtA3NWoZMJDduPkNjQ\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "gamesConfiguration:v1configuration",
+  "kind": "discovery#restDescription",
+  "name": "gamesConfiguration",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "achievementConfigurations": {
+      "methods": {
+        "delete": {
+          "description": "Delete the achievement configuration with the given ID.",
+          "httpMethod": "DELETE",
+          "id": "gamesConfiguration.achievementConfigurations.delete",
+          "parameterOrder": [
+            "achievementId"
+          ],
+          "parameters": {
+            "achievementId": {
+              "description": "The ID of the achievement used by this method.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "achievements/{achievementId}",
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "get": {
+          "description": "Retrieves the metadata of the achievement configuration with the given ID.",
+          "httpMethod": "GET",
+          "id": "gamesConfiguration.achievementConfigurations.get",
+          "parameterOrder": [
+            "achievementId"
+          ],
+          "parameters": {
+            "achievementId": {
+              "description": "The ID of the achievement used by this method.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "achievements/{achievementId}",
+          "response": {
+            "$ref": "AchievementConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "insert": {
+          "description": "Insert a new achievement configuration in this application.",
+          "httpMethod": "POST",
+          "id": "gamesConfiguration.achievementConfigurations.insert",
+          "parameterOrder": [
+            "applicationId"
+          ],
+          "parameters": {
+            "applicationId": {
+              "description": "The application ID from the Google Play developer console.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "applications/{applicationId}/achievements",
+          "request": {
+            "$ref": "AchievementConfiguration"
+          },
+          "response": {
+            "$ref": "AchievementConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "list": {
+          "description": "Returns a list of the achievement configurations in this application.",
+          "httpMethod": "GET",
+          "id": "gamesConfiguration.achievementConfigurations.list",
+          "parameterOrder": [
+            "applicationId"
+          ],
+          "parameters": {
+            "applicationId": {
+              "description": "The application ID from the Google Play developer console.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "maxResults": {
+              "description": "The maximum number of resource configurations to return in the response, used for paging. For any response, the actual number of resources returned may be less than the specified maxResults.",
+              "format": "int32",
+              "location": "query",
+              "maximum": "200",
+              "minimum": "1",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "The token returned by the previous request.",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "applications/{applicationId}/achievements",
+          "response": {
+            "$ref": "AchievementConfigurationListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "patch": {
+          "description": "Update the metadata of the achievement configuration with the given ID. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "gamesConfiguration.achievementConfigurations.patch",
+          "parameterOrder": [
+            "achievementId"
+          ],
+          "parameters": {
+            "achievementId": {
+              "description": "The ID of the achievement used by this method.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "achievements/{achievementId}",
+          "request": {
+            "$ref": "AchievementConfiguration"
+          },
+          "response": {
+            "$ref": "AchievementConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "update": {
+          "description": "Update the metadata of the achievement configuration with the given ID.",
+          "httpMethod": "PUT",
+          "id": "gamesConfiguration.achievementConfigurations.update",
+          "parameterOrder": [
+            "achievementId"
+          ],
+          "parameters": {
+            "achievementId": {
+              "description": "The ID of the achievement used by this method.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "achievements/{achievementId}",
+          "request": {
+            "$ref": "AchievementConfiguration"
+          },
+          "response": {
+            "$ref": "AchievementConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        }
+      }
+    },
+    "imageConfigurations": {
+      "methods": {
+        "upload": {
+          "description": "Uploads an image for a resource with the given ID and image type.",
+          "httpMethod": "POST",
+          "id": "gamesConfiguration.imageConfigurations.upload",
+          "mediaUpload": {
+            "accept": [
+              "image/*"
+            ],
+            "maxSize": "15MB",
+            "protocols": {
+              "resumable": {
+                "multipart": true,
+                "path": "/resumable/upload/games/v1configuration/images/{resourceId}/imageType/{imageType}"
+              },
+              "simple": {
+                "multipart": true,
+                "path": "/upload/games/v1configuration/images/{resourceId}/imageType/{imageType}"
+              }
+            }
+          },
+          "parameterOrder": [
+            "resourceId",
+            "imageType"
+          ],
+          "parameters": {
+            "imageType": {
+              "description": "Selects which image in a resource for this method.",
+              "enum": [
+                "ACHIEVEMENT_ICON",
+                "LEADERBOARD_ICON"
+              ],
+              "enumDescriptions": [
+                "The icon image for an achievement resource.",
+                "The icon image for a leaderboard resource."
+              ],
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "resourceId": {
+              "description": "The ID of the resource used by this method.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "images/{resourceId}/imageType/{imageType}",
+          "response": {
+            "$ref": "ImageConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ],
+          "supportsMediaUpload": true
+        }
+      }
+    },
+    "leaderboardConfigurations": {
+      "methods": {
+        "delete": {
+          "description": "Delete the leaderboard configuration with the given ID.",
+          "httpMethod": "DELETE",
+          "id": "gamesConfiguration.leaderboardConfigurations.delete",
+          "parameterOrder": [
+            "leaderboardId"
+          ],
+          "parameters": {
+            "leaderboardId": {
+              "description": "The ID of the leaderboard.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "leaderboards/{leaderboardId}",
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "get": {
+          "description": "Retrieves the metadata of the leaderboard configuration with the given ID.",
+          "httpMethod": "GET",
+          "id": "gamesConfiguration.leaderboardConfigurations.get",
+          "parameterOrder": [
+            "leaderboardId"
+          ],
+          "parameters": {
+            "leaderboardId": {
+              "description": "The ID of the leaderboard.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "leaderboards/{leaderboardId}",
+          "response": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "insert": {
+          "description": "Insert a new leaderboard configuration in this application.",
+          "httpMethod": "POST",
+          "id": "gamesConfiguration.leaderboardConfigurations.insert",
+          "parameterOrder": [
+            "applicationId"
+          ],
+          "parameters": {
+            "applicationId": {
+              "description": "The application ID from the Google Play developer console.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "applications/{applicationId}/leaderboards",
+          "request": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "response": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "list": {
+          "description": "Returns a list of the leaderboard configurations in this application.",
+          "httpMethod": "GET",
+          "id": "gamesConfiguration.leaderboardConfigurations.list",
+          "parameterOrder": [
+            "applicationId"
+          ],
+          "parameters": {
+            "applicationId": {
+              "description": "The application ID from the Google Play developer console.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "maxResults": {
+              "description": "The maximum number of resource configurations to return in the response, used for paging. For any response, the actual number of resources returned may be less than the specified maxResults.",
+              "format": "int32",
+              "location": "query",
+              "maximum": "200",
+              "minimum": "1",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "The token returned by the previous request.",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "applications/{applicationId}/leaderboards",
+          "response": {
+            "$ref": "LeaderboardConfigurationListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "patch": {
+          "description": "Update the metadata of the leaderboard configuration with the given ID. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "gamesConfiguration.leaderboardConfigurations.patch",
+          "parameterOrder": [
+            "leaderboardId"
+          ],
+          "parameters": {
+            "leaderboardId": {
+              "description": "The ID of the leaderboard.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "leaderboards/{leaderboardId}",
+          "request": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "response": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "update": {
+          "description": "Update the metadata of the leaderboard configuration with the given ID.",
+          "httpMethod": "PUT",
+          "id": "gamesConfiguration.leaderboardConfigurations.update",
+          "parameterOrder": [
+            "leaderboardId"
+          ],
+          "parameters": {
+            "leaderboardId": {
+              "description": "The ID of the leaderboard.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "leaderboards/{leaderboardId}",
+          "request": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "response": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20180417",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "AchievementConfiguration": {
+      "description": "This is a JSON template for an achievement configuration resource.",
+      "id": "AchievementConfiguration",
+      "properties": {
+        "achievementType": {
+          "description": "The type of the achievement.\nPossible values are:  \n- \"STANDARD\" - Achievement is either locked or unlocked. \n- \"INCREMENTAL\" - Achievement is incremental.",
+          "type": "string"
+        },
+        "draft": {
+          "$ref": "AchievementConfigurationDetail",
+          "description": "The draft data of the achievement."
+        },
+        "id": {
+          "description": "The ID of the achievement.",
+          "type": "string"
+        },
+        "initialState": {
+          "description": "The initial state of the achievement.\nPossible values are:  \n- \"HIDDEN\" - Achievement is hidden. \n- \"REVEALED\" - Achievement is revealed. \n- \"UNLOCKED\" - Achievement is unlocked.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "gamesConfiguration#achievementConfiguration",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#achievementConfiguration.",
+          "type": "string"
+        },
+        "published": {
+          "$ref": "AchievementConfigurationDetail",
+          "description": "The read-only published data of the achievement."
+        },
+        "stepsToUnlock": {
+          "description": "Steps to unlock. Only applicable to incremental achievements.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "token": {
+          "description": "The token for this resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AchievementConfigurationDetail": {
+      "description": "This is a JSON template for an achievement configuration detail.",
+      "id": "AchievementConfigurationDetail",
+      "properties": {
+        "description": {
+          "$ref": "LocalizedStringBundle",
+          "description": "Localized strings for the achievement description."
+        },
+        "iconUrl": {
+          "description": "The icon url of this achievement. Writes to this field are ignored.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "gamesConfiguration#achievementConfigurationDetail",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#achievementConfigurationDetail.",
+          "type": "string"
+        },
+        "name": {
+          "$ref": "LocalizedStringBundle",
+          "description": "Localized strings for the achievement name."
+        },
+        "pointValue": {
+          "description": "Point value for the achievement.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "sortRank": {
+          "description": "The sort rank of this achievement. Writes to this field are ignored.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "AchievementConfigurationListResponse": {
+      "description": "This is a JSON template for a ListConfigurations response.",
+      "id": "AchievementConfigurationListResponse",
+      "properties": {
+        "items": {
+          "description": "The achievement configurations.",
+          "items": {
+            "$ref": "AchievementConfiguration"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "gamesConfiguration#achievementConfigurationListResponse",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementConfigurationListResponse.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "The pagination token for the next page of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GamesNumberAffixConfiguration": {
+      "description": "This is a JSON template for a number affix resource.",
+      "id": "GamesNumberAffixConfiguration",
+      "properties": {
+        "few": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language requires special treatment of \"small\" numbers (as with 2, 3, and 4 in Czech; or numbers ending 2, 3, or 4 but not 12, 13, or 14 in Polish)."
+        },
+        "many": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language requires special treatment of \"large\" numbers (as with numbers ending 11-99 in Maltese)."
+        },
+        "one": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language requires special treatment of numbers like one (as with the number 1 in English and most other languages; in Russian, any number ending in 1 but not ending in 11 is in this class)."
+        },
+        "other": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language does not require special treatment of the given quantity (as with all numbers in Chinese, or 42 in English)."
+        },
+        "two": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language requires special treatment of numbers like two (as with 2 in Welsh, or 102 in Slovenian)."
+        },
+        "zero": {
+          "$ref": "LocalizedStringBundle",
+          "description": "When the language requires special treatment of the number 0 (as in Arabic)."
+        }
+      },
+      "type": "object"
+    },
+    "GamesNumberFormatConfiguration": {
+      "description": "This is a JSON template for a number format resource.",
+      "id": "GamesNumberFormatConfiguration",
+      "properties": {
+        "currencyCode": {
+          "description": "The curreny code string. Only used for CURRENCY format type.",
+          "type": "string"
+        },
+        "numDecimalPlaces": {
+          "description": "The number of decimal places for number. Only used for NUMERIC format type.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "numberFormatType": {
+          "description": "The formatting for the number.\nPossible values are:  \n- \"NUMERIC\" - Numbers are formatted to have no digits or a fixed number of digits after the decimal point according to locale. An optional custom unit can be added.\n- \"TIME_DURATION\" - Numbers are formatted to hours, minutes and seconds.\n- \"CURRENCY\" - Numbers are formatted to currency according to locale.",
+          "type": "string"
+        },
+        "suffix": {
+          "$ref": "GamesNumberAffixConfiguration",
+          "description": "An optional suffix for the NUMERIC format type. These strings follow the same  plural rules as all Android string resources."
+        }
+      },
+      "type": "object"
+    },
+    "ImageConfiguration": {
+      "description": "This is a JSON template for an image configuration resource.",
+      "id": "ImageConfiguration",
+      "properties": {
+        "imageType": {
+          "description": "The image type for the image.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "gamesConfiguration#imageConfiguration",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#imageConfiguration.",
+          "type": "string"
+        },
+        "resourceId": {
+          "description": "The resource ID of resource which the image belongs to.",
+          "type": "string"
+        },
+        "url": {
+          "description": "The url for this image.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LeaderboardConfiguration": {
+      "description": "This is a JSON template for an leaderboard configuration resource.",
+      "id": "LeaderboardConfiguration",
+      "properties": {
+        "draft": {
+          "$ref": "LeaderboardConfigurationDetail",
+          "description": "The draft data of the leaderboard."
+        },
+        "id": {
+          "description": "The ID of the leaderboard.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "gamesConfiguration#leaderboardConfiguration",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#leaderboardConfiguration.",
+          "type": "string"
+        },
+        "published": {
+          "$ref": "LeaderboardConfigurationDetail",
+          "description": "The read-only published data of the leaderboard."
+        },
+        "scoreMax": {
+          "description": "Maximum score that can be posted to this leaderboard.",
+          "format": "int64",
+          "type": "string"
+        },
+        "scoreMin": {
+          "description": "Minimum score that can be posted to this leaderboard.",
+          "format": "int64",
+          "type": "string"
+        },
+        "scoreOrder": {
+          "description": "The type of the leaderboard.\nPossible values are:  \n- \"LARGER_IS_BETTER\" - Larger scores posted are ranked higher. \n- \"SMALLER_IS_BETTER\" - Smaller scores posted are ranked higher.",
+          "type": "string"
+        },
+        "token": {
+          "description": "The token for this resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LeaderboardConfigurationDetail": {
+      "description": "This is a JSON template for a leaderboard configuration detail.",
+      "id": "LeaderboardConfigurationDetail",
+      "properties": {
+        "iconUrl": {
+          "description": "The icon url of this leaderboard. Writes to this field are ignored.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "gamesConfiguration#leaderboardConfigurationDetail",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#leaderboardConfigurationDetail.",
+          "type": "string"
+        },
+        "name": {
+          "$ref": "LocalizedStringBundle",
+          "description": "Localized strings for the leaderboard name."
+        },
+        "scoreFormat": {
+          "$ref": "GamesNumberFormatConfiguration",
+          "description": "The score formatting for the leaderboard."
+        },
+        "sortRank": {
+          "description": "The sort rank of this leaderboard. Writes to this field are ignored.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "LeaderboardConfigurationListResponse": {
+      "description": "This is a JSON template for a ListConfigurations response.",
+      "id": "LeaderboardConfigurationListResponse",
+      "properties": {
+        "items": {
+          "description": "The leaderboard configurations.",
+          "items": {
+            "$ref": "LeaderboardConfiguration"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "gamesConfiguration#leaderboardConfigurationListResponse",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboardConfigurationListResponse.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "The pagination token for the next page of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LocalizedString": {
+      "description": "This is a JSON template for a localized string resource.",
+      "id": "LocalizedString",
+      "properties": {
+        "kind": {
+          "default": "gamesConfiguration#localizedString",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#localizedString.",
+          "type": "string"
+        },
+        "locale": {
+          "description": "The locale string.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The string value.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LocalizedStringBundle": {
+      "description": "This is a JSON template for a localized string bundle resource.",
+      "id": "LocalizedStringBundle",
+      "properties": {
+        "kind": {
+          "default": "gamesConfiguration#localizedStringBundle",
+          "description": "Uniquely identifies the type of this resource. Value is always the fixed string gamesConfiguration#localizedStringBundle.",
+          "type": "string"
+        },
+        "translations": {
+          "description": "The locale strings.",
+          "items": {
+            "$ref": "LocalizedString"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "games/v1configuration/",
+  "title": "Google Play Game Services Publishing API",
+  "version": "v1configuration"
+}

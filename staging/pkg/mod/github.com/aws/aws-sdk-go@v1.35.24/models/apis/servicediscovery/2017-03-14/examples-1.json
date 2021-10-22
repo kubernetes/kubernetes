@@ -1,0 +1,672 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CreateHttpNamespace": [
+      {
+        "input": {
+          "CreatorRequestId": "example-creator-request-id-0001",
+          "Description": "Example.com AWS Cloud Map HTTP Namespace",
+          "Name": "example-http.com"
+        },
+        "output": {
+          "OperationId": "httpvoqozuhfet5kzxoxg-a-response-example"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates an HTTP namespace.",
+        "id": "createhttpnamespace-example-1590114811304",
+        "title": "CreateHttpNamespace example"
+      }
+    ],
+    "CreatePrivateDnsNamespace": [
+      {
+        "input": {
+          "CreatorRequestId": "eedd6892-50f3-41b2-8af9-611d6e1d1a8c",
+          "Name": "example.com",
+          "Vpc": "vpc-1c56417b"
+        },
+        "output": {
+          "OperationId": "gv4g5meo7ndmeh4fqskygvk23d2fijwa-k9302yzd"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Create private DNS namespace",
+        "id": "example-create-private-dns-namespace-1587058592930",
+        "title": "Example: Create private DNS namespace"
+      }
+    ],
+    "CreatePublicDnsNamespace": [
+      {
+        "input": {
+          "CreatorRequestId": "example-creator-request-id-0003",
+          "Description": "Example.com AWS Cloud Map Public DNS Namespace",
+          "Name": "example-public-dns.com"
+        },
+        "output": {
+          "OperationId": "dns2voqozuhfet5kzxoxg-a-response-example"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates a public namespace based on DNS.",
+        "id": "createpublicdnsnamespace-example-1590114940910",
+        "title": "CreatePublicDnsNamespace example"
+      }
+    ],
+    "CreateService": [
+      {
+        "input": {
+          "CreatorRequestId": "567c1193-6b00-4308-bd57-ad38a8822d25",
+          "DnsConfig": {
+            "DnsRecords": [
+              {
+                "TTL": 60,
+                "Type": "A"
+              }
+            ],
+            "NamespaceId": "ns-ylexjili4cdxy3xm",
+            "RoutingPolicy": "MULTIVALUE"
+          },
+          "Name": "myservice",
+          "NamespaceId": "ns-ylexjili4cdxy3xm"
+        },
+        "output": {
+          "Service": {
+            "Arn": "arn:aws:servicediscovery:us-west-2:123456789012:service/srv-p5zdwlg5uvvzjita",
+            "CreateDate": 1587081768.334,
+            "CreatorRequestId": "567c1193-6b00-4308-bd57-ad38a8822d25",
+            "DnsConfig": {
+              "DnsRecords": [
+                {
+                  "TTL": 60,
+                  "Type": "A"
+                }
+              ],
+              "NamespaceId": "ns-ylexjili4cdxy3xm",
+              "RoutingPolicy": "MULTIVALUE"
+            },
+            "Id": "srv-p5zdwlg5uvvzjita",
+            "Name": "myservice",
+            "NamespaceId": "ns-ylexjili4cdxy3xm"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Create service",
+        "id": "example-create-service-1587235913584",
+        "title": "Example: Create service"
+      }
+    ],
+    "DeleteNamespace": [
+      {
+        "input": {
+          "Id": "ns-ylexjili4cdxy3xm"
+        },
+        "output": {
+          "OperationId": "gv4g5meo7ndmeh4fqskygvk23d2fijwa-k98y6drk"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Delete namespace",
+        "id": "example-delete-namespace-1587416093508",
+        "title": "Example: Delete namespace"
+      }
+    ],
+    "DeleteService": [
+      {
+        "input": {
+          "Id": "srv-p5zdwlg5uvvzjita"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Delete service",
+        "id": "example-delete-service-1587416462902",
+        "title": "Example: Delete service"
+      }
+    ],
+    "DeregisterInstance": [
+      {
+        "input": {
+          "InstanceId": "myservice-53",
+          "ServiceId": "srv-p5zdwlg5uvvzjita"
+        },
+        "output": {
+          "OperationId": "4yejorelbukcjzpnr6tlmrghsjwpngf4-k98rnaiq"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Deregister a service instance",
+        "id": "example-deregister-a-service-instance-1587416305738",
+        "title": "Example: Deregister a service instance"
+      }
+    ],
+    "DiscoverInstances": [
+      {
+        "input": {
+          "HealthStatus": "ALL",
+          "MaxResults": 10,
+          "NamespaceName": "example.com",
+          "ServiceName": "myservice"
+        },
+        "output": {
+          "Instances": [
+            {
+              "Attributes": {
+                "AWS_INSTANCE_IPV4": "172.2.1.3",
+                "AWS_INSTANCE_PORT": "808"
+              },
+              "HealthStatus": "UNKNOWN",
+              "InstanceId": "myservice-53",
+              "NamespaceName": "example.com",
+              "ServiceName": "myservice"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Discover registered instances",
+        "id": "example-discover-registered-instances-1587236343568",
+        "title": "Example: Discover registered instances"
+      }
+    ],
+    "GetInstance": [
+      {
+        "input": {
+          "InstanceId": "i-abcd1234",
+          "ServiceId": "srv-e4anhexample0004"
+        },
+        "output": {
+          "Instance": {
+            "Attributes": {
+              "AWS_INSTANCE_IPV4": "192.0.2.44",
+              "AWS_INSTANCE_PORT": "80",
+              "color": "green",
+              "region": "us-west-2",
+              "stage": "beta"
+            },
+            "Id": "i-abcd1234"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example gets information about a specified instance.",
+        "id": "getinstance-example-1590115065598",
+        "title": "GetInstance example"
+      }
+    ],
+    "GetInstancesHealthStatus": [
+      {
+        "input": {
+          "ServiceId": "srv-e4anhexample0004"
+        },
+        "output": {
+          "Status": {
+            "i-abcd1234": "HEALTHY",
+            "i-abcd1235": "UNHEALTHY"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example gets the current health status of one or more instances that are associate with a specified service.",
+        "id": "getinstanceshealthstatus-example-1590115176146",
+        "title": "GetInstancesHealthStatus example"
+      }
+    ],
+    "GetNamespace": [
+      {
+        "input": {
+          "Id": "ns-e4anhexample0004"
+        },
+        "output": {
+          "Namespace": {
+            "Arn": "arn:aws:servicediscovery:us-west-2: 123456789120:namespace/ns-e1tpmexample0001",
+            "CreateDate": "20181118T211712Z",
+            "CreatorRequestId": "example-creator-request-id-0001",
+            "Description": "Example.com AWS Cloud Map HTTP Namespace",
+            "Id": "ns-e1tpmexample0001",
+            "Name": "example-http.com",
+            "Properties": {
+              "DnsProperties": {
+              },
+              "HttpProperties": {
+                "HttpName": "example-http.com"
+              }
+            },
+            "Type": "HTTP"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example gets information about a specified namespace.",
+        "id": "getnamespace-example-1590115383708",
+        "title": "GetNamespace example"
+      }
+    ],
+    "GetOperation": [
+      {
+        "input": {
+          "OperationId": "gv4g5meo7ndmeh4fqskygvk23d2fijwa-k9302yzd"
+        },
+        "output": {
+          "Operation": {
+            "CreateDate": 1587055860.121,
+            "Id": "gv4g5meo7ndmeh4fqskygvk23d2fijwa-k9302yzd",
+            "Status": "SUCCESS",
+            "Targets": {
+              "NAMESPACE": "ns-ylexjili4cdxy3xm"
+            },
+            "Type": "CREATE_NAMESPACE",
+            "UpdateDate": 1587055900.469
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Get operation result",
+        "id": "example-get-operation-result-1587073807124",
+        "title": "Example: Get operation result"
+      }
+    ],
+    "GetService": [
+      {
+        "input": {
+          "Id": "srv-e4anhexample0004"
+        },
+        "output": {
+          "Service": {
+            "Arn": "arn:aws:servicediscovery:us-west-2:123456789120:service/srv-e4anhexample0004",
+            "CreateDate": "20181118T211707Z",
+            "CreatorRequestId": "example-creator-request-id-0004",
+            "Description": "Example.com AWS Cloud Map HTTP Service",
+            "HealthCheckConfig": {
+              "FailureThreshold": 3,
+              "ResourcePath": "/",
+              "Type": "HTTPS"
+            },
+            "Id": "srv-e4anhexample0004",
+            "Name": "example-http-service",
+            "NamespaceId": "ns-e4anhexample0004"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example gets the settings for a specified service.",
+        "id": "getservice-example-1590117234294",
+        "title": "GetService Example"
+      }
+    ],
+    "ListInstances": [
+      {
+        "input": {
+          "ServiceId": "srv-qzpwvt2tfqcegapy"
+        },
+        "output": {
+          "Instances": [
+            {
+              "Attributes": {
+                "AWS_INSTANCE_IPV4": "172.2.1.3",
+                "AWS_INSTANCE_PORT": "808"
+              },
+              "Id": "i-06bdabbae60f65a4e"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: List service instances",
+        "id": "example-list-service-instances-1587236237008",
+        "title": "Example: List service instances"
+      }
+    ],
+    "ListNamespaces": [
+      {
+        "input": {
+        },
+        "output": {
+          "Namespaces": [
+            {
+              "Arn": "arn:aws:servicediscovery:us-west-2:123456789012:namespace/ns-a3ccy2e7e3a7rile",
+              "CreateDate": 1585354387.357,
+              "Id": "ns-a3ccy2e7e3a7rile",
+              "Name": "local",
+              "Properties": {
+                "DnsProperties": {
+                  "HostedZoneId": "Z06752353VBUDTC32S84S"
+                },
+                "HttpProperties": {
+                  "HttpName": "local"
+                }
+              },
+              "Type": "DNS_PRIVATE"
+            },
+            {
+              "Arn": "arn:aws:servicediscovery:us-west-2:123456789012:namespace/ns-pocfyjtrsmwtvcxx",
+              "CreateDate": 1586468974.698,
+              "Description": "My second namespace",
+              "Id": "ns-pocfyjtrsmwtvcxx",
+              "Name": "My-second-namespace",
+              "Properties": {
+                "DnsProperties": {
+                },
+                "HttpProperties": {
+                  "HttpName": "My-second-namespace"
+                }
+              },
+              "Type": "HTTP"
+            },
+            {
+              "Arn": "arn:aws:servicediscovery:us-west-2:123456789012:namespace/ns-ylexjili4cdxy3xm",
+              "CreateDate": 1587055896.798,
+              "Id": "ns-ylexjili4cdxy3xm",
+              "Name": "example.com",
+              "Properties": {
+                "DnsProperties": {
+                  "HostedZoneId": "Z09983722P0QME1B3KC8I"
+                },
+                "HttpProperties": {
+                  "HttpName": "example.com"
+                }
+              },
+              "Type": "DNS_PRIVATE"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: List namespaces",
+        "id": "example-list-namespaces-1587401553154",
+        "title": "Example: List namespaces"
+      }
+    ],
+    "ListOperations": [
+      {
+        "input": {
+          "Filters": [
+            {
+              "Condition": "IN",
+              "Name": "STATUS",
+              "Values": [
+                "PENDING",
+                "SUCCESS"
+              ]
+            }
+          ]
+        },
+        "output": {
+          "Operations": [
+            {
+              "Id": "76yy8ovhpdz0plmjzbsnqgnrqvpv2qdt-kexample",
+              "Status": "SUCCESS"
+            },
+            {
+              "Id": "prysnyzpji3u2ciy45nke83x2zanl7yk-dexample",
+              "Status": "SUCCESS"
+            },
+            {
+              "Id": "ko4ekftir7kzlbechsh7xvcdgcpk66gh-7example",
+              "Status": "PENDING"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example gets the operations that have a STATUS of either PENDING or SUCCESS.",
+        "id": "listoperations-example-1590117354396",
+        "title": "ListOperations Example"
+      }
+    ],
+    "ListServices": [
+      {
+        "input": {
+        },
+        "output": {
+          "Services": [
+            {
+              "Arn": "arn:aws:servicediscovery:us-west-2:123456789012:service/srv-p5zdwlg5uvvzjita",
+              "CreateDate": 1587081768.334,
+              "DnsConfig": {
+                "DnsRecords": [
+                  {
+                    "TTL": 60,
+                    "Type": "A"
+                  }
+                ],
+                "RoutingPolicy": "MULTIVALUE"
+              },
+              "Id": "srv-p5zdwlg5uvvzjita",
+              "Name": "myservice"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: List services",
+        "id": "example-list-services-1587236889840",
+        "title": "Example: List services"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:servicediscovery:us-east-1:123456789012:namespace/ns-ylexjili4cdxy3xm"
+        },
+        "output": {
+          "Tags": [
+            {
+              "Key": "Project",
+              "Value": "Zeta"
+            },
+            {
+              "Key": "Department",
+              "Value": "Engineering"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists the tags of a resource.",
+        "id": "listtagsforresource-example-1590093928416",
+        "title": "ListTagsForResource example"
+      }
+    ],
+    "RegisterInstance": [
+      {
+        "input": {
+          "Attributes": {
+            "AWS_INSTANCE_IPV4": "172.2.1.3",
+            "AWS_INSTANCE_PORT": "808"
+          },
+          "CreatorRequestId": "7a48a98a-72e6-4849-bfa7-1a458e030d7b",
+          "InstanceId": "myservice-53",
+          "ServiceId": "srv-p5zdwlg5uvvzjita"
+        },
+        "output": {
+          "OperationId": "4yejorelbukcjzpnr6tlmrghsjwpngf4-k95yg2u7"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Example: Register Instance",
+        "id": "example-register-instance-1587236116314",
+        "title": "Example: Register Instance"
+      }
+    ],
+    "TagResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:servicediscovery:us-east-1:123456789012:namespace/ns-ylexjili4cdxy3xm",
+          "Tags": [
+            {
+              "Key": "Department",
+              "Value": "Engineering"
+            },
+            {
+              "Key": "Project",
+              "Value": "Zeta"
+            }
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example adds \"Department\" and \"Project\" tags to a resource.",
+        "id": "tagresource-example-1590093532240",
+        "title": "TagResource example"
+      }
+    ],
+    "UntagResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:servicediscovery:us-east-1:123456789012:namespace/ns-ylexjili4cdxy3xm",
+          "TagKeys": [
+            "Project",
+            "Department"
+          ]
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example removes the \"Department\" and \"Project\" tags from a resource.",
+        "id": "untagresource-example-1590094024672",
+        "title": "UntagResource example"
+      }
+    ],
+    "UpdateInstanceCustomHealthStatus": [
+      {
+        "input": {
+          "InstanceId": "i-abcd1234",
+          "ServiceId": "srv-e4anhexample0004",
+          "Status": "HEALTHY"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example submits a request to change the health status of an instance associated with a service with a custom health check to HEALTHY.",
+        "id": "updateinstancecustomhealthstatus-example-1590118408574",
+        "title": "UpdateInstanceCustomHealthStatus Example"
+      }
+    ],
+    "UpdateService": [
+      {
+        "input": {
+          "Id": "srv-e4anhexample0004",
+          "Service": {
+            "DnsConfig": {
+              "DnsRecords": [
+                {
+                  "TTL": 60,
+                  "Type": "A"
+                }
+              ]
+            },
+            "HealthCheckConfig": {
+              "FailureThreshold": 2,
+              "ResourcePath": "/",
+              "Type": "HTTP"
+            }
+          }
+        },
+        "output": {
+          "OperationId": "m35hsdrkxwjffm3xef4bxyy6vc3ewakx-jdn3y5g5"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example submits a request to replace the DnsConfig and HealthCheckConfig settings of a specified service.",
+        "id": "updateservice-example-1590117830880",
+        "title": "UpdateService Example"
+      }
+    ]
+  }
+}

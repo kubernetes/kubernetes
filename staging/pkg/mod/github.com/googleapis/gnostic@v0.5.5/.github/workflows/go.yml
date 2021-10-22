@@ -1,0 +1,37 @@
+name: Go
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-18.04
+    steps:
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+      
+    - name: Get protoc
+      run: |
+        sudo curl -L https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protoc-3.13.0-linux-x86_64.zip > /tmp/protoc.zip
+        sudo unzip /tmp/protoc.zip -d /usr/local
+        sudo chown -R $USER /usr/local
+        
+    - name: Get dependencies
+      run: go get -v -t -d ./...
+             
+    - name: Build
+      run: make all
+      
+    - name: Test
+      run: make test

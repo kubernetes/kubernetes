@@ -1,0 +1,395 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CreateBackup": [
+      {
+        "input": {
+          "FileSystemId": "fs-0498eed5fe91001ec",
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": "MyBackup"
+            }
+          ]
+        },
+        "output": {
+          "Backup": {
+            "BackupId": "backup-03e3c82e0183b7b6b",
+            "CreationTime": "1481841524.0",
+            "FileSystem": {
+              "FileSystemId": "fs-0498eed5fe91001ec",
+              "OwnerId": "012345678912",
+              "StorageCapacity": 300,
+              "WindowsConfiguration": {
+                "ActiveDirectoryId": "d-1234abcd12",
+                "AutomaticBackupRetentionDays": 30,
+                "DailyAutomaticBackupStartTime": "05:00",
+                "WeeklyMaintenanceStartTime": "1:05:00"
+              }
+            },
+            "Lifecycle": "CREATING",
+            "ProgressPercent": 0,
+            "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:backup/backup-03e3c82e0183b7b6b",
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": "MyBackup"
+              }
+            ],
+            "Type": "USER_INITIATED"
+          }
+        },
+        "comments": {
+        },
+        "description": "This operation creates a new backup.",
+        "id": "to-create-a-new-backup-1481840798597",
+        "title": "To create a new backup"
+      }
+    ],
+    "CreateFileSystem": [
+      {
+        "input": {
+          "ClientRequestToken": "a8ca07e4-61ec-4399-99f4-19853801bcd5",
+          "FileSystemType": "WINDOWS",
+          "KmsKeyId": "arn:aws:kms:us-east-1:012345678912:key/1111abcd-2222-3333-4444-55556666eeff",
+          "SecurityGroupIds": [
+            "sg-edcd9784"
+          ],
+          "StorageCapacity": 3200,
+          "StorageType": "HDD",
+          "SubnetIds": [
+            "subnet-1234abcd"
+          ],
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": "MyFileSystem"
+            }
+          ],
+          "WindowsConfiguration": {
+            "ActiveDirectoryId": "d-1234abcd12",
+            "Aliases": [
+              "accounting.corp.example.com"
+            ],
+            "AutomaticBackupRetentionDays": 30,
+            "DailyAutomaticBackupStartTime": "05:00",
+            "ThroughputCapacity": 32,
+            "WeeklyMaintenanceStartTime": "1:05:00"
+          }
+        },
+        "output": {
+          "FileSystem": {
+            "CreationTime": "1481841524.0",
+            "DNSName": "fs-0123456789abcdef0.fsx.com",
+            "FileSystemId": "fs-0123456789abcdef0",
+            "KmsKeyId": "arn:aws:kms:us-east-1:012345678912:key/1111abcd-2222-3333-4444-55556666eeff",
+            "Lifecycle": "CREATING",
+            "OwnerId": "012345678912",
+            "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0123456789abcdef0",
+            "StorageCapacity": 3200,
+            "StorageType": "HDD",
+            "SubnetIds": [
+              "subnet-1234abcd"
+            ],
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": "MyFileSystem"
+              }
+            ],
+            "VpcId": "vpc-ab1234cd",
+            "WindowsConfiguration": {
+              "ActiveDirectoryId": "d-1234abcd12",
+              "Aliases": [
+                {
+                  "Lifecycle": "CREATING",
+                  "Name": "accounting.corp.example.com"
+                }
+              ],
+              "AutomaticBackupRetentionDays": 30,
+              "DailyAutomaticBackupStartTime": "05:00",
+              "ThroughputCapacity": 32,
+              "WeeklyMaintenanceStartTime": "1:05:00"
+            }
+          }
+        },
+        "comments": {
+        },
+        "description": "This operation creates a new Amazon FSx for Windows File Server file system.",
+        "id": "to-create-a-new-file-system-1481840798547",
+        "title": "To create a new file system"
+      }
+    ],
+    "CreateFileSystemFromBackup": [
+      {
+        "input": {
+          "BackupId": "backup-03e3c82e0183b7b6b",
+          "ClientRequestToken": "f4c94ed7-238d-4c46-93db-48cd62ec33b7",
+          "SecurityGroupIds": [
+            "sg-edcd9784"
+          ],
+          "SubnetIds": [
+            "subnet-1234abcd"
+          ],
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": "MyFileSystem"
+            }
+          ],
+          "WindowsConfiguration": {
+            "ThroughputCapacity": 8
+          }
+        },
+        "output": {
+          "FileSystem": {
+            "CreationTime": "1481841524.0",
+            "DNSName": "fs-0498eed5fe91001ec.fsx.com",
+            "FileSystemId": "fs-0498eed5fe91001ec",
+            "KmsKeyId": "arn:aws:kms:us-east-1:012345678912:key/0ff3ea8d-130e-4133-877f-93908b6fdbd6",
+            "Lifecycle": "CREATING",
+            "OwnerId": "012345678912",
+            "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec",
+            "StorageCapacity": 300,
+            "SubnetIds": [
+              "subnet-1234abcd"
+            ],
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": "MyFileSystem"
+              }
+            ],
+            "VpcId": "vpc-ab1234cd",
+            "WindowsConfiguration": {
+              "ActiveDirectoryId": "d-1234abcd12",
+              "AutomaticBackupRetentionDays": 30,
+              "DailyAutomaticBackupStartTime": "05:00",
+              "ThroughputCapacity": 8,
+              "WeeklyMaintenanceStartTime": "1:05:00"
+            }
+          }
+        },
+        "comments": {
+        },
+        "description": "This operation creates a new file system from backup.",
+        "id": "to-create-a-new-file-system-from-backup-1481840798598",
+        "title": "To create a new file system from backup"
+      }
+    ],
+    "DeleteBackup": [
+      {
+        "input": {
+          "BackupId": "backup-03e3c82e0183b7b6b"
+        },
+        "output": {
+          "BackupId": "backup-03e3c82e0183b7b6b",
+          "Lifecycle": "DELETED"
+        },
+        "comments": {
+        },
+        "description": "This operation deletes an Amazon FSx file system backup.",
+        "id": "to-delete-a-file-system-1481847318399",
+        "title": "To delete a backup"
+      }
+    ],
+    "DeleteFileSystem": [
+      {
+        "input": {
+          "FileSystemId": "fs-0498eed5fe91001ec"
+        },
+        "output": {
+          "FileSystemId": "fs-0498eed5fe91001ec",
+          "Lifecycle": "DELETING"
+        },
+        "comments": {
+        },
+        "description": "This operation deletes an Amazon FSx file system.",
+        "id": "to-delete-a-file-system-1481847318348",
+        "title": "To delete a file system"
+      }
+    ],
+    "DescribeBackups": [
+      {
+        "input": {
+        },
+        "output": {
+          "Backups": [
+            {
+              "BackupId": "backup-03e3c82e0183b7b6b",
+              "CreationTime": "1481841524.0",
+              "FileSystem": {
+                "FileSystemId": "fs-0498eed5fe91001ec",
+                "OwnerId": "012345678912",
+                "StorageCapacity": 300,
+                "WindowsConfiguration": {
+                  "ActiveDirectoryId": "d-1234abcd12",
+                  "AutomaticBackupRetentionDays": 30,
+                  "DailyAutomaticBackupStartTime": "05:00",
+                  "WeeklyMaintenanceStartTime": "1:05:00"
+                }
+              },
+              "Lifecycle": "AVAILABLE",
+              "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:backup/backup-03e3c82e0183b7b6b",
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": "MyBackup"
+                }
+              ],
+              "Type": "USER_INITIATED"
+            }
+          ]
+        },
+        "comments": {
+        },
+        "description": "This operation describes all of the Amazon FSx backups in an account.",
+        "id": "to-describe-backups-1481848448499",
+        "title": "To describe Amazon FSx backups"
+      }
+    ],
+    "DescribeFileSystems": [
+      {
+        "input": {
+        },
+        "output": {
+          "FileSystems": [
+            {
+              "CreationTime": "1481841524.0",
+              "DNSName": "fs-0498eed5fe91001ec.fsx.com",
+              "FileSystemId": "fs-0498eed5fe91001ec",
+              "KmsKeyId": "arn:aws:kms:us-east-1:012345678912:key/0ff3ea8d-130e-4133-877f-93908b6fdbd6",
+              "Lifecycle": "AVAILABLE",
+              "NetworkInterfaceIds": [
+                "eni-abcd1234"
+              ],
+              "OwnerId": "012345678912",
+              "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec",
+              "StorageCapacity": 300,
+              "SubnetIds": [
+                "subnet-1234abcd"
+              ],
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": "MyFileSystem"
+                }
+              ],
+              "VpcId": "vpc-ab1234cd",
+              "WindowsConfiguration": {
+                "ActiveDirectoryId": "d-1234abcd12",
+                "AutomaticBackupRetentionDays": 30,
+                "DailyAutomaticBackupStartTime": "05:00",
+                "ThroughputCapacity": 8,
+                "WeeklyMaintenanceStartTime": "1:05:00"
+              }
+            }
+          ]
+        },
+        "comments": {
+        },
+        "description": "This operation describes all of the Amazon FSx file systems in an account.",
+        "id": "to-describe-a-file-systems-1481848448460",
+        "title": "To describe an Amazon FSx file system"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec"
+        },
+        "output": {
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": "MyFileSystem"
+            }
+          ]
+        },
+        "comments": {
+        },
+        "description": "This operation lists tags for an Amazon FSx resource.",
+        "id": "to-list-tags-for-a-fsx-resource-1481847318372",
+        "title": "To list tags for a resource"
+      }
+    ],
+    "TagResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec",
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": "MyFileSystem"
+            }
+          ]
+        },
+        "comments": {
+        },
+        "description": "This operation tags an Amazon FSx resource.",
+        "id": "to-tag-a-fsx-resource-1481847318371",
+        "title": "To tag a resource"
+      }
+    ],
+    "UntagResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec",
+          "TagKeys": [
+            "Name"
+          ]
+        },
+        "comments": {
+        },
+        "description": "This operation untags an Amazon FSx resource.",
+        "id": "to-untag-a-fsx-resource-1481847318373",
+        "title": "To untag a resource"
+      }
+    ],
+    "UpdateFileSystem": [
+      {
+        "input": {
+          "FileSystemId": "fs-0498eed5fe91001ec",
+          "WindowsConfiguration": {
+            "AutomaticBackupRetentionDays": 10,
+            "DailyAutomaticBackupStartTime": "06:00",
+            "WeeklyMaintenanceStartTime": "3:06:00"
+          }
+        },
+        "output": {
+          "FileSystem": {
+            "CreationTime": "1481841524.0",
+            "DNSName": "fs-0498eed5fe91001ec.fsx.com",
+            "FileSystemId": "fs-0498eed5fe91001ec",
+            "KmsKeyId": "arn:aws:kms:us-east-1:012345678912:key/0ff3ea8d-130e-4133-877f-93908b6fdbd6",
+            "Lifecycle": "AVAILABLE",
+            "OwnerId": "012345678912",
+            "ResourceARN": "arn:aws:fsx:us-east-1:012345678912:file-system/fs-0498eed5fe91001ec",
+            "StorageCapacity": 300,
+            "SubnetIds": [
+              "subnet-1234abcd"
+            ],
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": "MyFileSystem"
+              }
+            ],
+            "VpcId": "vpc-ab1234cd",
+            "WindowsConfiguration": {
+              "AutomaticBackupRetentionDays": 10,
+              "DailyAutomaticBackupStartTime": "06:00",
+              "ThroughputCapacity": 8,
+              "WeeklyMaintenanceStartTime": "3:06:00"
+            }
+          }
+        },
+        "comments": {
+        },
+        "description": "This operation updates an existing file system.",
+        "id": "to-update-a-file-system-1481840798595",
+        "title": "To update an existing file system"
+      }
+    ]
+  }
+}

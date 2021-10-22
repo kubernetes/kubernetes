@@ -1,0 +1,1116 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/cloud-platform.read-only": {
+          "description": "View your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/ndev.cloudman": {
+          "description": "View and manage your Google Cloud Platform management resources and deployment status information"
+        },
+        "https://www.googleapis.com/auth/ndev.cloudman.readonly": {
+          "description": "View your Google Cloud Platform management resources and deployment status information"
+        },
+        "https://www.googleapis.com/auth/replicapool": {
+          "description": "View and manage replica pools"
+        },
+        "https://www.googleapis.com/auth/replicapool.readonly": {
+          "description": "View replica pools"
+        }
+      }
+    }
+  },
+  "basePath": "/replicapool/v1beta1/projects/",
+  "baseUrl": "https://www.googleapis.com/replicapool/v1beta1/projects/",
+  "batchPath": "batch/replicapool/v1beta1",
+  "description": "The Replica Pool API allows users to declaratively provision and manage groups of Google Compute Engine instances based on a common template.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/compute/docs/replica-pool/",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/vkT-xkmU9XwOepJLLEd3mTrcuvQ\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "replicapool:v1beta1",
+  "kind": "discovery#restDescription",
+  "labels": [
+    "limited_availability"
+  ],
+  "name": "replicapool",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "pools": {
+      "methods": {
+        "delete": {
+          "description": "Deletes a replica pool.",
+          "httpMethod": "POST",
+          "id": "replicapool.pools.delete",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The name of the replica pool for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}",
+          "request": {
+            "$ref": "PoolsDeleteRequest"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "get": {
+          "description": "Gets information about a single replica pool.",
+          "httpMethod": "GET",
+          "id": "replicapool.pools.get",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The name of the replica pool for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}",
+          "response": {
+            "$ref": "Pool"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "insert": {
+          "description": "Inserts a new replica pool.",
+          "httpMethod": "POST",
+          "id": "replicapool.pools.insert",
+          "parameterOrder": [
+            "projectName",
+            "zone"
+          ],
+          "parameters": {
+            "projectName": {
+              "description": "The project ID for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools",
+          "request": {
+            "$ref": "Pool"
+          },
+          "response": {
+            "$ref": "Pool"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "list": {
+          "description": "List all replica pools.",
+          "httpMethod": "GET",
+          "id": "replicapool.pools.list",
+          "parameterOrder": [
+            "projectName",
+            "zone"
+          ],
+          "parameters": {
+            "maxResults": {
+              "default": "500",
+              "description": "Maximum count of results to be returned. Acceptable values are 0 to 100, inclusive. (Default: 50)",
+              "format": "int32",
+              "location": "query",
+              "maximum": "1000",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Set this to the nextPageToken value returned by a previous list request to obtain the next page of results from the previous list request.",
+              "location": "query",
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools",
+          "response": {
+            "$ref": "PoolsListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "resize": {
+          "description": "Resize a pool. This is an asynchronous operation, and multiple overlapping resize requests can be made. Replica Pools will use the information from the last resize request.",
+          "httpMethod": "POST",
+          "id": "replicapool.pools.resize",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName"
+          ],
+          "parameters": {
+            "numReplicas": {
+              "description": "The desired number of replicas to resize to. If this number is larger than the existing number of replicas, new replicas will be added. If the number is smaller, then existing replicas will be deleted.",
+              "format": "int32",
+              "location": "query",
+              "type": "integer"
+            },
+            "poolName": {
+              "description": "The name of the replica pool for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/resize",
+          "response": {
+            "$ref": "Pool"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "updatetemplate": {
+          "description": "Update the template used by the pool.",
+          "httpMethod": "POST",
+          "id": "replicapool.pools.updatetemplate",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The name of the replica pool for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone for this replica pool.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/updateTemplate",
+          "request": {
+            "$ref": "Template"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        }
+      }
+    },
+    "replicas": {
+      "methods": {
+        "delete": {
+          "description": "Deletes a replica from the pool.",
+          "httpMethod": "POST",
+          "id": "replicapool.replicas.delete",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName",
+            "replicaName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The replica pool name for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "replicaName": {
+              "description": "The name of the replica for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone where the replica lives.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/replicas/{replicaName}",
+          "request": {
+            "$ref": "ReplicasDeleteRequest"
+          },
+          "response": {
+            "$ref": "Replica"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "get": {
+          "description": "Gets information about a specific replica.",
+          "httpMethod": "GET",
+          "id": "replicapool.replicas.get",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName",
+            "replicaName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The replica pool name for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "replicaName": {
+              "description": "The name of the replica for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone where the replica lives.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/replicas/{replicaName}",
+          "response": {
+            "$ref": "Replica"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "list": {
+          "description": "Lists all replicas in a pool.",
+          "httpMethod": "GET",
+          "id": "replicapool.replicas.list",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName"
+          ],
+          "parameters": {
+            "maxResults": {
+              "default": "500",
+              "description": "Maximum count of results to be returned. Acceptable values are 0 to 100, inclusive. (Default: 50)",
+              "format": "int32",
+              "location": "query",
+              "maximum": "1000",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Set this to the nextPageToken value returned by a previous list request to obtain the next page of results from the previous list request.",
+              "location": "query",
+              "type": "string"
+            },
+            "poolName": {
+              "description": "The replica pool name for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone where the replica pool lives.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/replicas",
+          "response": {
+            "$ref": "ReplicasListResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/ndev.cloudman.readonly",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "restart": {
+          "description": "Restarts a replica in a pool.",
+          "httpMethod": "POST",
+          "id": "replicapool.replicas.restart",
+          "parameterOrder": [
+            "projectName",
+            "zone",
+            "poolName",
+            "replicaName"
+          ],
+          "parameters": {
+            "poolName": {
+              "description": "The replica pool name for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projectName": {
+              "description": "The project ID for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "replicaName": {
+              "description": "The name of the replica for this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The zone where the replica lives.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{projectName}/zones/{zone}/pools/{poolName}/replicas/{replicaName}/restart",
+          "response": {
+            "$ref": "Replica"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/ndev.cloudman",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20160512",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "AccessConfig": {
+      "description": "A Compute Engine network accessConfig. Identical to the accessConfig on corresponding Compute Engine resource.",
+      "id": "AccessConfig",
+      "properties": {
+        "name": {
+          "description": "Name of this access configuration.",
+          "type": "string"
+        },
+        "natIp": {
+          "description": "An external IP address associated with this instance.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of this access configuration file. Currently only ONE_TO_ONE_NAT is supported.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Action": {
+      "description": "An action that gets executed during initialization of the replicas.",
+      "id": "Action",
+      "properties": {
+        "commands": {
+          "description": "A list of commands to run, one per line. If any command fails, the whole action is considered a failure and no further actions are run. This also marks the virtual machine or replica as a failure.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "envVariables": {
+          "description": "A list of environment variables to use for the commands in this action.",
+          "items": {
+            "$ref": "EnvVariable"
+          },
+          "type": "array"
+        },
+        "timeoutMilliSeconds": {
+          "description": "If an action's commands on a particular replica do not finish in the specified timeoutMilliSeconds, the replica is considered to be in a FAILING state. No efforts are made to stop any processes that were spawned or created as the result of running the action's commands. The default is the max allowed value, 1 hour (i.e. 3600000 milliseconds).",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "DiskAttachment": {
+      "description": "Specifies how to attach a disk to a Replica.",
+      "id": "DiskAttachment",
+      "properties": {
+        "deviceName": {
+          "description": "The device name of this disk.",
+          "type": "string"
+        },
+        "index": {
+          "description": "A zero-based index to assign to this disk, where 0 is reserved for the boot disk. If not specified, this is assigned by the server.",
+          "format": "uint32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "EnvVariable": {
+      "description": "An environment variable to set for an action.",
+      "id": "EnvVariable",
+      "properties": {
+        "hidden": {
+          "description": "Deprecated, do not use.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The name of the environment variable.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value of the variable.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ExistingDisk": {
+      "description": "A pre-existing persistent disk that will be attached to every Replica in the Pool in READ_ONLY mode.",
+      "id": "ExistingDisk",
+      "properties": {
+        "attachment": {
+          "$ref": "DiskAttachment",
+          "description": "How the disk will be attached to the Replica."
+        },
+        "source": {
+          "description": "The name of the Persistent Disk resource. The Persistent Disk resource must be in the same zone as the Pool.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HealthCheck": {
+      "id": "HealthCheck",
+      "properties": {
+        "checkIntervalSec": {
+          "description": "How often (in seconds) to make HTTP requests for this healthcheck. The default value is 5 seconds.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "description": {
+          "description": "The description for this health check.",
+          "type": "string"
+        },
+        "healthyThreshold": {
+          "description": "The number of consecutive health check requests that need to succeed before the replica is considered healthy again. The default value is 2.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "host": {
+          "description": "The value of the host header in the HTTP health check request. If left empty (default value), the localhost IP 127.0.0.1 will be used.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of this health check.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The localhost request path to send this health check, in the format /path/to/use. For example, /healthcheck.",
+          "type": "string"
+        },
+        "port": {
+          "description": "The TCP port for the health check requests.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "timeoutSec": {
+          "description": "How long (in seconds) to wait before a timeout failure for this healthcheck. The default value is 5 seconds.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "unhealthyThreshold": {
+          "description": "The number of consecutive health check requests that need to fail in order to consider the replica unhealthy. The default value is 2.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Label": {
+      "description": "A label to apply to this replica pool.",
+      "id": "Label",
+      "properties": {
+        "key": {
+          "description": "The key for this label.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value of this label.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Metadata": {
+      "description": "A Compute Engine metadata entry. Identical to the metadata on the corresponding Compute Engine resource.",
+      "id": "Metadata",
+      "properties": {
+        "fingerPrint": {
+          "description": "The fingerprint of the metadata. Required for updating the metadata entries for this instance.",
+          "type": "string"
+        },
+        "items": {
+          "description": "A list of metadata items.",
+          "items": {
+            "$ref": "MetadataItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "MetadataItem": {
+      "description": "A Compute Engine metadata item, defined as a key:value pair. Identical to the metadata on the corresponding Compute Engine resource.",
+      "id": "MetadataItem",
+      "properties": {
+        "key": {
+          "description": "A metadata key.",
+          "type": "string"
+        },
+        "value": {
+          "description": "A metadata value.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NetworkInterface": {
+      "description": "A Compute Engine NetworkInterface resource. Identical to the NetworkInterface on the corresponding Compute Engine resource.",
+      "id": "NetworkInterface",
+      "properties": {
+        "accessConfigs": {
+          "description": "An array of configurations for this interface. This specifies how this interface is configured to interact with other network services.",
+          "items": {
+            "$ref": "AccessConfig"
+          },
+          "type": "array"
+        },
+        "network": {
+          "description": "Name the Network resource to which this interface applies.",
+          "type": "string"
+        },
+        "networkIp": {
+          "description": "An optional IPV4 internal network address to assign to the instance for this network interface.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NewDisk": {
+      "description": "A Persistent Disk resource that will be created and attached to each Replica in the Pool. Each Replica will have a unique persistent disk that is created and attached to that Replica in READ_WRITE mode.",
+      "id": "NewDisk",
+      "properties": {
+        "attachment": {
+          "$ref": "DiskAttachment",
+          "description": "How the disk will be attached to the Replica."
+        },
+        "autoDelete": {
+          "description": "If true, then this disk will be deleted when the instance is deleted. The default value is true.",
+          "type": "boolean"
+        },
+        "boot": {
+          "description": "If true, indicates that this is the root persistent disk.",
+          "type": "boolean"
+        },
+        "initializeParams": {
+          "$ref": "NewDiskInitializeParams",
+          "description": "Create the new disk using these parameters. The name of the disk will be \u003cinstance_name\u003e-\u003cfour_random_charactersgt;."
+        }
+      },
+      "type": "object"
+    },
+    "NewDiskInitializeParams": {
+      "description": "Initialization parameters for creating a new disk.",
+      "id": "NewDiskInitializeParams",
+      "properties": {
+        "diskSizeGb": {
+          "description": "The size of the created disk in gigabytes.",
+          "format": "int64",
+          "type": "string"
+        },
+        "diskType": {
+          "description": "Name of the disk type resource describing which disk type to use to create the disk. For example 'pd-ssd' or 'pd-standard'. Default is 'pd-standard'",
+          "type": "string"
+        },
+        "sourceImage": {
+          "description": "The name or fully-qualified URL of a source image to use to create this disk. If you provide a name of the source image, Replica Pool will look for an image with that name in your project. If you are specifying an image provided by Compute Engine, you will need to provide the full URL with the correct project, such as:\nhttp://www.googleapis.com/compute/v1/projects/debian-cloud/ global/images/debian-wheezy-7-vYYYYMMDD",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Pool": {
+      "id": "Pool",
+      "properties": {
+        "autoRestart": {
+          "description": "Whether replicas in this pool should be restarted if they experience a failure. The default value is true.",
+          "type": "boolean"
+        },
+        "baseInstanceName": {
+          "description": "The base instance name to use for the replicas in this pool. This must match the regex [a-z]([-a-z0-9]*[a-z0-9])?. If specified, the instances in this replica pool will be named in the format \u003cbase-instance-name\u003e-\u003cID\u003e. The \u003cID\u003e postfix will be a four character alphanumeric identifier generated by the service.\n\nIf this is not specified by the user, a random base instance name is generated by the service.",
+          "type": "string"
+        },
+        "currentNumReplicas": {
+          "description": "[Output Only] The current number of replicas in the pool.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "description": {
+          "description": "An optional description of the replica pool.",
+          "type": "string"
+        },
+        "healthChecks": {
+          "description": "Deprecated. Please use template[].healthChecks instead.",
+          "items": {
+            "$ref": "HealthCheck"
+          },
+          "type": "array"
+        },
+        "initialNumReplicas": {
+          "description": "The initial number of replicas this pool should have. You must provide a value greater than or equal to 0.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "labels": {
+          "description": "A list of labels to attach to this replica pool and all created virtual machines in this replica pool.",
+          "items": {
+            "$ref": "Label"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "The name of the replica pool. Must follow the regex [a-z]([-a-z0-9]*[a-z0-9])? and be 1-28 characters long.",
+          "type": "string"
+        },
+        "numReplicas": {
+          "description": "Deprecated! Use initial_num_replicas instead.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "resourceViews": {
+          "description": "The list of resource views that should be updated with all the replicas that are managed by this pool.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selfLink": {
+          "description": "[Output Only] A self-link to the replica pool.",
+          "type": "string"
+        },
+        "targetPool": {
+          "description": "Deprecated, please use target_pools instead.",
+          "type": "string"
+        },
+        "targetPools": {
+          "description": "A list of target pools to update with the replicas that are managed by this pool. If specified, the replicas in this replica pool will be added to the specified target pools for load balancing purposes. The replica pool must live in the same region as the specified target pools. These values must be the target pool resource names, and not fully qualified URLs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "template": {
+          "$ref": "Template",
+          "description": "The template to use when creating replicas in this pool. This template is used during initial instance creation of the pool, when growing the pool in size, or when a replica restarts."
+        },
+        "type": {
+          "description": "Deprecated! Do not set.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PoolsDeleteRequest": {
+      "id": "PoolsDeleteRequest",
+      "properties": {
+        "abandonInstances": {
+          "description": "If there are instances you would like to keep, you can specify them here. These instances won't be deleted, but the associated replica objects will be removed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PoolsListResponse": {
+      "id": "PoolsListResponse",
+      "properties": {
+        "nextPageToken": {
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "Pool"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Replica": {
+      "description": "An individual Replica within a Pool. Replicas are automatically created by the replica pool, using the template provided by the user. You cannot directly create replicas.",
+      "id": "Replica",
+      "properties": {
+        "name": {
+          "description": "[Output Only] The name of the Replica object.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] The self-link of the Replica.",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "ReplicaStatus",
+          "description": "[Output Only] Last known status of the Replica."
+        }
+      },
+      "type": "object"
+    },
+    "ReplicaStatus": {
+      "description": "The current status of a Replica.",
+      "id": "ReplicaStatus",
+      "properties": {
+        "details": {
+          "description": "[Output Only] Human-readable details about the current state of the replica",
+          "type": "string"
+        },
+        "state": {
+          "description": "[Output Only] The state of the Replica.",
+          "type": "string"
+        },
+        "templateVersion": {
+          "description": "[Output Only] The template used to build the replica.",
+          "type": "string"
+        },
+        "vmLink": {
+          "description": "[Output Only] Link to the virtual machine that this Replica represents.",
+          "type": "string"
+        },
+        "vmStartTime": {
+          "description": "[Output Only] The time that this Replica got to the RUNNING state, in RFC 3339 format. If the start time is unknown, UNKNOWN is returned.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ReplicasDeleteRequest": {
+      "id": "ReplicasDeleteRequest",
+      "properties": {
+        "abandonInstance": {
+          "description": "Whether the instance resource represented by this replica should be deleted or abandoned. If abandoned, the replica will be deleted but the virtual machine instance will remain. By default, this is set to false and the instance will be deleted along with the replica.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ReplicasListResponse": {
+      "id": "ReplicasListResponse",
+      "properties": {
+        "nextPageToken": {
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "Replica"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ServiceAccount": {
+      "description": "A Compute Engine service account, identical to the Compute Engine resource.",
+      "id": "ServiceAccount",
+      "properties": {
+        "email": {
+          "description": "The service account email address, for example: 123845678986@project.gserviceaccount.com",
+          "type": "string"
+        },
+        "scopes": {
+          "description": "The list of OAuth2 scopes to obtain for the service account, for example: https://www.googleapis.com/auth/devstorage.full_control",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Tag": {
+      "description": "A Compute Engine Instance tag, identical to the tags on the corresponding Compute Engine Instance resource.",
+      "id": "Tag",
+      "properties": {
+        "fingerPrint": {
+          "description": "The fingerprint of the tag. Required for updating the list of tags.",
+          "type": "string"
+        },
+        "items": {
+          "description": "Items contained in this tag.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Template": {
+      "description": "The template used for creating replicas in the pool.",
+      "id": "Template",
+      "properties": {
+        "action": {
+          "$ref": "Action",
+          "description": "An action to run during initialization of your replicas. An action is run as shell commands which are executed one after the other in the same bash shell, so any state established by one command is inherited by later commands."
+        },
+        "healthChecks": {
+          "description": "A list of HTTP Health Checks to configure for this replica pool and all virtual machines in this replica pool.",
+          "items": {
+            "$ref": "HealthCheck"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "A free-form string describing the version of this template. You can provide any versioning string you would like. For example, version1 or template-v1.",
+          "type": "string"
+        },
+        "vmParams": {
+          "$ref": "VmParams",
+          "description": "The virtual machine parameters to use for creating replicas. You can define settings such as the machine type and the image of replicas in this pool. This is required if replica type is SMART_VM."
+        }
+      },
+      "type": "object"
+    },
+    "VmParams": {
+      "description": "Parameters for creating a Compute Engine Instance resource. Most fields are identical to the corresponding Compute Engine resource.",
+      "id": "VmParams",
+      "properties": {
+        "baseInstanceName": {
+          "description": "Deprecated. Please use baseInstanceName instead.",
+          "type": "string"
+        },
+        "canIpForward": {
+          "description": "Enables IP Forwarding, which allows this instance to receive packets destined for a different IP address, and send packets with a different source IP. See IP Forwarding for more information.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "An optional textual description of the instance.",
+          "type": "string"
+        },
+        "disksToAttach": {
+          "description": "A list of existing Persistent Disk resources to attach to each replica in the pool. Each disk will be attached in read-only mode to every replica.",
+          "items": {
+            "$ref": "ExistingDisk"
+          },
+          "type": "array"
+        },
+        "disksToCreate": {
+          "description": "A list of Disk resources to create and attach to each Replica in the Pool. Currently, you can only define one disk and it must be a root persistent disk. Note that Replica Pool will create a root persistent disk for each replica.",
+          "items": {
+            "$ref": "NewDisk"
+          },
+          "type": "array"
+        },
+        "machineType": {
+          "description": "The machine type for this instance. The resource name (e.g. n1-standard-1).",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "Metadata",
+          "description": "The metadata key/value pairs assigned to this instance."
+        },
+        "networkInterfaces": {
+          "description": "A list of network interfaces for the instance. Currently only one interface is supported by Google Compute Engine, ONE_TO_ONE_NAT.",
+          "items": {
+            "$ref": "NetworkInterface"
+          },
+          "type": "array"
+        },
+        "onHostMaintenance": {
+          "type": "string"
+        },
+        "serviceAccounts": {
+          "description": "A list of Service Accounts to enable for this instance.",
+          "items": {
+            "$ref": "ServiceAccount"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "$ref": "Tag",
+          "description": "A list of tags to apply to the Google Compute Engine instance to identify resources."
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "replicapool/v1beta1/projects/",
+  "title": "Replica Pool API",
+  "version": "v1beta1"
+}

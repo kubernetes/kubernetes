@@ -1,0 +1,15 @@
+schemas,"heelo",1
+schemas,"random",2
+schemas,"funcName",3
+schemas,"google",4
+properties,"Hello",4
+properties,"dog",3
+properties,"funcName",2
+properties,"cat",1
+operations,"countGreetings",12
+operations,"print",11
+operations,"funcName",4
+parameters,"name",5
+parameters,"id",1
+parameters,"tag",1
+parameters,"suggester",15

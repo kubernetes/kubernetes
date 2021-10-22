@@ -1,0 +1,27 @@
+parameters:
+  ArtifactPath: $(Build.ArtifactStagingDirectory)
+  Artifacts: []
+  ConfigFileDir: $(Build.ArtifactStagingDirectory)/PackageInfo
+
+steps:
+  # ideally this should be done as initial step of a job in caller template
+  # We can remove this step later once it is added in caller
+  - template: /eng/common/pipelines/templates/steps/set-default-branch.yml
+
+  - ${{ each artifact in parameters.Artifacts }}:
+    - task: Powershell@2
+      inputs:
+        filePath: $(Build.SourcesDirectory)/eng/common/scripts/Create-APIReview.ps1
+        arguments: >
+          -ArtifactPath ${{parameters.ArtifactPath}}
+          -APIViewUri $(azuresdk-apiview-uri)
+          -APIKey $(azuresdk-apiview-apikey)
+          -APILabel "Auto Review - $(Build.SourceVersion)"
+          -PackageName ${{artifact.name}}
+          -SourceBranch $(Build.SourceBranchName)
+          -DefaultBranch $(DefaultBranch)
+          -ConfigFileDir '${{parameters.ConfigFileDir}}'
+        pwsh: true
+        workingDirectory: $(Pipeline.Workspace)
+      displayName: Create API Review for ${{ artifact.name}}
+      condition: and(succeededOrFailed(), ne(variables['Skip.CreateApiReview'], 'true') , ne(variables['Build.Reason'],'PullRequest'), eq(variables['System.TeamProject'], 'internal'))

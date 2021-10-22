@@ -1,0 +1,41 @@
+[
+  {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "sizes": {
+          "type": "object",
+          "properties": {
+            "first": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "default": 3,
+                  "enum": [3, 5, 7]
+                }
+              },
+              "required": ["count"]
+            }
+          },
+          "required": ["first"]
+        }
+      },
+      "required": ["sizes"]
+    },
+    "valid": {
+      "sizes": {
+        "first": {
+          "count": 3
+        }
+      }
+    },
+    "invalid": {
+      "sizes": {
+        "first": {
+          "count": 2
+        }
+      }
+    }
+  }
+]

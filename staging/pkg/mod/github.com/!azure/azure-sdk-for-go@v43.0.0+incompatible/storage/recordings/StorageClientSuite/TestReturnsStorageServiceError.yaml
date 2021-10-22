@@ -1,0 +1,78 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:oca2/vqNW9fBF+qY9xDcal3l356F4aiBym7xr0DPqx8=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-49storageclientsuitetestretu?restype=container
+    method: DELETE
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x45\x72\x72\x6F\x72\x3E\x3C\x43\x6F\x64\x65\x3E\x43\x6F\x6E\x74\x61\x69\x6E\x65\x72\x4E\x6F\x74\x46\x6F\x75\x6E\x64\x3C\x2F\x43\x6F\x64\x65\x3E\x3C\x4D\x65\x73\x73\x61\x67\x65\x3E\x54\x68\x65\x20\x73\x70\x65\x63\x69\x66\x69\x65\x64\x20\x63\x6F\x6E\x74\x61\x69\x6E\x65\x72\x20\x64\x6F\x65\x73\x20\x6E\x6F\x74\x20\x65\x78\x69\x73\x74\x2E\n\x52\x65\x71\x75\x65\x73\x74\x49\x64\x3A\x33\x37\x38\x31\x34\x36\x65\x64\x2D\x65\x30\x31\x65\x2D\x30\x30\x62\x37\x2D\x37\x33\x61\x35\x2D\x31\x35\x64\x35\x61\x37\x30\x30\x30\x30\x30\x30\n\x54\x69\x6D\x65\x3A\x32\x30\x31\x39\x2D\x30\x35\x2D\x32\x38\x54\x32\x32\x3A\x33\x35\x3A\x33\x39\x2E\x32\x35\x35\x35\x33\x39\x37\x5A\x3C\x2F\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x2F\x45\x72\x72\x6F\x72\x3E"
+    headers:
+      Content-Length:
+      - "225"
+      Content-Type:
+      - application/xml
+      Date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Error-Code:
+      - ContainerNotFound
+      X-Ms-Request-Id:
+      - 378146ed-e01e-00b7-73a5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 404 The specified container does not exist.
+    code: 404
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:ef996kuOQdFBAUPSG1jCKe8+wiXlJHkXFfUm2PHIBLI=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table49storageclientsuitetestret%27%29?timeout=30
+    method: DELETE
+  response:
+    body: '{"odata.error":{"code":"ResourceNotFound","message":{"lang":"en-US","value":"The
+      specified resource does not exist.\nRequestId:ac80fafa-6002-0062-3da5-153a2a000000\nTime:2019-05-28T22:35:39.2649146Z"}}}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=nometadata;streaming=true;charset=utf-8
+      Date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac80fafa-6002-0062-3da5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 404 Not Found
+    code: 404
+    duration: ""

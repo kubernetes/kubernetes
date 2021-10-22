@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "DescribeBatchPredictions": {
+      "limit_key": "Limit",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "result_key": "Results"
+    },
+    "DescribeDataSources": {
+      "limit_key": "Limit",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "result_key": "Results"
+    },
+    "DescribeEvaluations": {
+      "limit_key": "Limit",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "result_key": "Results"
+    },
+    "DescribeMLModels": {
+      "limit_key": "Limit",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "result_key": "Results"
+    }
+  }
+}

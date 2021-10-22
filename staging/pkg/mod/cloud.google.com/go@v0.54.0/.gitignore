@@ -1,0 +1,11 @@
+# Editors
+.idea
+.vscode
+*.swp
+
+# Test files
+*.test
+coverage.txt
+
+# Other
+.DS_Store

@@ -1,0 +1,14 @@
+{
+  "pagination": {
+    "ListBundles": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListProjects": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

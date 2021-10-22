@@ -1,0 +1,582 @@
+{
+  "version": "2.0",
+  "service": "<p> Service Quotas is a web service that you can use to manage many of your AWS service quotas. Quotas, also referred to as limits, are the maximum values for a resource, item, or operation. This guide provide descriptions of the Service Quotas actions that you can call from an API. For the Service Quotas user guide, which explains how to use Service Quotas from the console, see <a href=\"https://docs.aws.amazon.com/servicequotas/latest/userguide/intro.html\">What is Service Quotas</a>. </p> <note> <p>AWS provides SDKs that consist of libraries and sample code for programming languages and platforms (Java, Ruby, .NET, iOS, Android, etc...,). The SDKs provide a convenient way to create programmatic access to Service Quotas and AWS. For information about the AWS SDKs, including how to download and install them, see the <a href=\"https://docs.aws.amazon.com/aws.amazon.com/tools\">Tools for Amazon Web Services</a> page.</p> </note>",
+  "operations": {
+    "AssociateServiceQuotaTemplate": "<p>Associates the Service Quotas template with your organization so that when new accounts are created in your organization, the template submits increase requests for the specified service quotas. Use the Service Quotas template to request an increase for any adjustable quota value. After you define the Service Quotas template, use this operation to associate, or enable, the template. </p>",
+    "DeleteServiceQuotaIncreaseRequestFromTemplate": "<p>Removes a service quota increase request from the Service Quotas template. </p>",
+    "DisassociateServiceQuotaTemplate": "<p>Disables the Service Quotas template. Once the template is disabled, it does not request quota increases for new accounts in your organization. Disabling the quota template does not apply the quota increase requests from the template. </p> <p> <b>Related operations</b> </p> <ul> <li> <p>To enable the quota template, call <a>AssociateServiceQuotaTemplate</a>. </p> </li> <li> <p>To delete a specific service quota from the template, use <a>DeleteServiceQuotaIncreaseRequestFromTemplate</a>.</p> </li> </ul>",
+    "GetAWSDefaultServiceQuota": "<p>Retrieves the default service quotas values. The Value returned for each quota is the AWS default value, even if the quotas have been increased.. </p>",
+    "GetAssociationForServiceQuotaTemplate": "<p>Retrieves the <code>ServiceQuotaTemplateAssociationStatus</code> value from the service. Use this action to determine if the Service Quota template is associated, or enabled. </p>",
+    "GetRequestedServiceQuotaChange": "<p>Retrieves the details for a particular increase request. </p>",
+    "GetServiceQuota": "<p>Returns the details for the specified service quota. This operation provides a different Value than the <code>GetAWSDefaultServiceQuota</code> operation. This operation returns the applied value for each quota. <code>GetAWSDefaultServiceQuota</code> returns the default AWS value for each quota. </p>",
+    "GetServiceQuotaIncreaseRequestFromTemplate": "<p>Returns the details of the service quota increase request in your template.</p>",
+    "ListAWSDefaultServiceQuotas": "<p>Lists all default service quotas for the specified AWS service or all AWS services. ListAWSDefaultServiceQuotas is similar to <a>ListServiceQuotas</a> except for the Value object. The Value object returned by <code>ListAWSDefaultServiceQuotas</code> is the default value assigned by AWS. This request returns a list of all service quotas for the specified service. The listing of each you'll see the default values are the values that AWS provides for the quotas. </p> <note> <p>Always check the <code>NextToken</code> response parameter when calling any of the <code>List*</code> operations. These operations can return an unexpected list of results, even when there are more results available. When this happens, the <code>NextToken</code> response parameter contains a value to pass the next call to the same API to request the next part of the list.</p> </note>",
+    "ListRequestedServiceQuotaChangeHistory": "<p>Requests a list of the changes to quotas for a service.</p>",
+    "ListRequestedServiceQuotaChangeHistoryByQuota": "<p>Requests a list of the changes to specific service quotas. This command provides additional granularity over the <code>ListRequestedServiceQuotaChangeHistory</code> command. Once a quota change request has reached <code>CASE_CLOSED, APPROVED,</code> or <code>DENIED</code>, the history has been kept for 90 days.</p>",
+    "ListServiceQuotaIncreaseRequestsInTemplate": "<p>Returns a list of the quota increase requests in the template. </p>",
+    "ListServiceQuotas": "<p>Lists all service quotas for the specified AWS service. This request returns a list of the service quotas for the specified service. you'll see the default values are the values that AWS provides for the quotas. </p> <note> <p>Always check the <code>NextToken</code> response parameter when calling any of the <code>List*</code> operations. These operations can return an unexpected list of results, even when there are more results available. When this happens, the <code>NextToken</code> response parameter contains a value to pass the next call to the same API to request the next part of the list.</p> </note>",
+    "ListServices": "<p>Lists the AWS services available in Service Quotas. Not all AWS services are available in Service Quotas. To list the see the list of the service quotas for a specific service, use <a>ListServiceQuotas</a>.</p>",
+    "PutServiceQuotaIncreaseRequestIntoTemplate": "<p>Defines and adds a quota to the service quota template. To add a quota to the template, you must provide the <code>ServiceCode</code>, <code>QuotaCode</code>, <code>AwsRegion</code>, and <code>DesiredValue</code>. Once you add a quota to the template, use <a>ListServiceQuotaIncreaseRequestsInTemplate</a> to see the list of quotas in the template.</p>",
+    "RequestServiceQuotaIncrease": "<p>Retrieves the details of a service quota increase request. The response to this command provides the details in the <a>RequestedServiceQuotaChange</a> object. </p>"
+  },
+  "shapes": {
+    "AWSServiceAccessNotEnabledException": {
+      "base": "<p>The action you attempted is not allowed unless Service Access with Service Quotas is enabled in your organization. To enable, call <a>AssociateServiceQuotaTemplate</a>.</p>",
+      "refs": {
+      }
+    },
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AssociateServiceQuotaTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateServiceQuotaTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AwsRegion": {
+      "base": null,
+      "refs": {
+        "DeleteServiceQuotaIncreaseRequestFromTemplateRequest$AwsRegion": "<p>Specifies the AWS Region for the quota that you want to delete.</p>",
+        "GetServiceQuotaIncreaseRequestFromTemplateRequest$AwsRegion": "<p>Specifies the AWS Region for the quota that you want to use.</p>",
+        "ListServiceQuotaIncreaseRequestsInTemplateRequest$AwsRegion": "<p>Specifies the AWS Region for the quota that you want to use.</p>",
+        "PutServiceQuotaIncreaseRequestIntoTemplateRequest$AwsRegion": "<p>Specifies the AWS Region for the quota. </p>",
+        "ServiceQuotaIncreaseRequestInTemplate$AwsRegion": "<p>The AWS Region where the increase request occurs.</p>"
+      }
+    },
+    "CustomerServiceEngagementId": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$CaseId": "<p>The case Id for the service quota increase request.</p>"
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$Created": "<p>The date and time when the service quota increase request was received and the case Id was created. </p>",
+        "RequestedServiceQuotaChange$LastUpdated": "<p>The date and time of the most recent change in the service quota increase request.</p>"
+      }
+    },
+    "DeleteServiceQuotaIncreaseRequestFromTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteServiceQuotaIncreaseRequestFromTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DependencyAccessDeniedException": {
+      "base": "<p>You can't perform this action because a dependency does not have access.</p>",
+      "refs": {
+      }
+    },
+    "DisassociateServiceQuotaTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateServiceQuotaTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "ErrorReason$ErrorCode": "<p>Service Quotas returns the following error values. </p> <p> <code>DEPENDENCY_ACCESS_DENIED_ERROR</code> is returned when the caller does not have permission to call the service or service quota. To resolve the error, you need permission to access the service or service quota.</p> <p> <code>DEPENDENCY_THROTTLING_ERROR</code> is returned when the service being called is throttling Service Quotas.</p> <p> <code>DEPENDENCY_SERVICE_ERROR</code> is returned when the service being called has availability issues.</p> <p> <code>SERVICE_QUOTA_NOT_AVAILABLE_ERROR</code> is returned when there was an error in Service Quotas.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "ErrorReason$ErrorMessage": "<p>The error message that provides more detail.</p>"
+      }
+    },
+    "ErrorReason": {
+      "base": "<p>Returns an error that explains why the action did not succeed.</p>",
+      "refs": {
+        "ServiceQuota$ErrorReason": "<p>Specifies the <code>ErrorCode</code> and <code>ErrorMessage</code> when success isn't achieved.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "AWSServiceAccessNotEnabledException$Message": null,
+        "AccessDeniedException$Message": null,
+        "DependencyAccessDeniedException$Message": null,
+        "IllegalArgumentException$Message": null,
+        "InvalidPaginationTokenException$Message": null,
+        "InvalidResourceStateException$Message": null,
+        "NoAvailableOrganizationException$Message": null,
+        "NoSuchResourceException$Message": null,
+        "OrganizationNotInAllFeaturesModeException$Message": null,
+        "QuotaExceededException$Message": null,
+        "ResourceAlreadyExistsException$Message": null,
+        "ServiceException$Message": null,
+        "ServiceQuotaTemplateNotInUseException$Message": null,
+        "TemplatesNotAvailableInRegionException$Message": null,
+        "TooManyRequestsException$Message": null
+      }
+    },
+    "GetAWSDefaultServiceQuotaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAWSDefaultServiceQuotaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssociationForServiceQuotaTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAssociationForServiceQuotaTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRequestedServiceQuotaChangeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRequestedServiceQuotaChangeResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServiceQuotaIncreaseRequestFromTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServiceQuotaIncreaseRequestFromTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServiceQuotaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServiceQuotaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GlobalQuota": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$GlobalQuota": "<p>Identifies if the quota is global.</p>",
+        "ServiceQuota$GlobalQuota": "<p>Specifies if the quota is global.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$GlobalQuota": "<p>Specifies if the quota is a global quota.</p>"
+      }
+    },
+    "IllegalArgumentException": {
+      "base": "<p>Invalid input was provided. </p>",
+      "refs": {
+      }
+    },
+    "InvalidPaginationTokenException": {
+      "base": "<p>Invalid input was provided.</p>",
+      "refs": {
+      }
+    },
+    "InvalidResourceStateException": {
+      "base": "<p>Invalid input was provided for the . </p>",
+      "refs": {
+      }
+    },
+    "ListAWSDefaultServiceQuotasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAWSDefaultServiceQuotasResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRequestedServiceQuotaChangeHistoryByQuotaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRequestedServiceQuotaChangeHistoryByQuotaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRequestedServiceQuotaChangeHistoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRequestedServiceQuotaChangeHistoryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServiceQuotaIncreaseRequestsInTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServiceQuotaIncreaseRequestsInTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServiceQuotasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServiceQuotasResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAWSDefaultServiceQuotasRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListRequestedServiceQuotaChangeHistoryByQuotaRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListRequestedServiceQuotaChangeHistoryRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListServiceQuotaIncreaseRequestsInTemplateRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListServiceQuotasRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListServicesRequest$MaxResults": "<p>(Optional) Limits the number of results that you want to include in the response. If you don't include this parameter, the response defaults to a value that's specific to the operation. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>"
+      }
+    },
+    "MetricDimensionName": {
+      "base": null,
+      "refs": {
+        "MetricDimensionsMapDefinition$key": null
+      }
+    },
+    "MetricDimensionValue": {
+      "base": null,
+      "refs": {
+        "MetricDimensionsMapDefinition$value": null
+      }
+    },
+    "MetricDimensionsMapDefinition": {
+      "base": null,
+      "refs": {
+        "MetricInfo$MetricDimensions": "<p>A dimension is a name/value pair that is part of the identity of a metric. Every metric has specific characteristics that describe it, and you can think of dimensions as categories for those characteristics. These dimensions are part of the CloudWatch Metric Identity that measures usage against a particular service quota.</p>"
+      }
+    },
+    "MetricInfo": {
+      "base": "<p>A structure that uses CloudWatch metrics to gather data about the service quota.</p>",
+      "refs": {
+        "ServiceQuota$UsageMetric": "<p>Specifies the details about the measurement. </p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListAWSDefaultServiceQuotasRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from. If additional items exist beyond the specified maximum, the <code>NextToken</code> element is present and has a value (isn't null). Include that value as the <code>NextToken</code> request parameter in the call to the operation to get the next part of the results. You should check <code>NextToken</code> after every operation to ensure that you receive all of the results.</p>",
+        "ListAWSDefaultServiceQuotasResponse$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListRequestedServiceQuotaChangeHistoryByQuotaRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListRequestedServiceQuotaChangeHistoryByQuotaResponse$NextToken": "<p>If present in the response, this value indicates there's more output available that what's included in the current response. This can occur even when the response includes no values at all, such as when you ask for a filtered view of a very long list. Use this value in the <code>NextToken</code> request parameter in a subsequent call to the operation to continue processing and get the next part of the output. You should repeat this until the <code>NextToken</code> response element comes back empty (as <code>null</code>).</p>",
+        "ListRequestedServiceQuotaChangeHistoryRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListRequestedServiceQuotaChangeHistoryResponse$NextToken": "<p>If present in the response, this value indicates there's more output available that what's included in the current response. This can occur even when the response includes no values at all, such as when you ask for a filtered view of a very long list. Use this value in the <code>NextToken</code> request parameter in a subsequent call to the operation to continue processing and get the next part of the output. You should repeat this until the <code>NextToken</code> response element comes back empty (as <code>null</code>).</p>",
+        "ListServiceQuotaIncreaseRequestsInTemplateRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListServiceQuotaIncreaseRequestsInTemplateResponse$NextToken": "<p>If present in the response, this value indicates there's more output available that what's included in the current response. This can occur even when the response includes no values at all, such as when you ask for a filtered view of a very long list. Use this value in the <code>NextToken</code> request parameter in a subsequent call to the operation to continue processing and get the next part of the output. You should repeat this until the <code>NextToken</code> response element comes back empty (as <code>null</code>).</p>",
+        "ListServiceQuotasRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListServiceQuotasResponse$NextToken": "<p>If present in the response, this value indicates there's more output available that what's included in the current response. This can occur even when the response includes no values at all, such as when you ask for a filtered view of a very long list. Use this value in the <code>NextToken</code> request parameter in a subsequent call to the operation to continue processing and get the next part of the output. You should repeat this until the <code>NextToken</code> response element comes back empty (as <code>null</code>).</p>",
+        "ListServicesRequest$NextToken": "<p>(Optional) Use this parameter in a request if you receive a <code>NextToken</code> response in a previous request that indicates that there's more output available. In a subsequent call, set it to the value of the previous call's <code>NextToken</code> response to indicate where the output should continue from.</p>",
+        "ListServicesResponse$NextToken": "<p>If present in the response, this value indicates there's more output available that what's included in the current response. This can occur even when the response includes no values at all, such as when you ask for a filtered view of a very long list. Use this value in the <code>NextToken</code> request parameter in a subsequent call to the operation to continue processing and get the next part of the output. You should repeat this until the <code>NextToken</code> response element comes back empty (as <code>null</code>).</p>"
+      }
+    },
+    "NoAvailableOrganizationException": {
+      "base": "<p>The account making this call is not a member of an organization.</p>",
+      "refs": {
+      }
+    },
+    "NoSuchResourceException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "OrganizationNotInAllFeaturesModeException": {
+      "base": "<p>The organization that your account belongs to, is not in All Features mode. To enable all features mode, see <a href=\"https://docs.aws.amazon.com/organizations/latest/APIReference/API_EnableAllFeatures.html\">EnableAllFeatures</a>.</p>",
+      "refs": {
+      }
+    },
+    "PeriodUnit": {
+      "base": null,
+      "refs": {
+        "QuotaPeriod$PeriodUnit": "<p>The time unit of a period.</p>"
+      }
+    },
+    "PeriodValue": {
+      "base": null,
+      "refs": {
+        "QuotaPeriod$PeriodValue": "<p>The value of a period.</p>"
+      }
+    },
+    "PutServiceQuotaIncreaseRequestIntoTemplateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutServiceQuotaIncreaseRequestIntoTemplateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QuotaAdjustable": {
+      "base": null,
+      "refs": {
+        "ServiceQuota$Adjustable": "<p>Specifies if the quota value can be increased.</p>"
+      }
+    },
+    "QuotaArn": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$QuotaArn": "<p>The Amazon Resource Name (ARN) of the service quota.</p>",
+        "ServiceQuota$QuotaArn": "<p>The Amazon Resource Name (ARN) of the service quota.</p>"
+      }
+    },
+    "QuotaCode": {
+      "base": null,
+      "refs": {
+        "DeleteServiceQuotaIncreaseRequestFromTemplateRequest$QuotaCode": "<p>Specifies the code for the quota that you want to delete.</p>",
+        "GetAWSDefaultServiceQuotaRequest$QuotaCode": "<p>Identifies the service quota you want to select.</p>",
+        "GetServiceQuotaIncreaseRequestFromTemplateRequest$QuotaCode": "<p>Specifies the quota you want.</p>",
+        "GetServiceQuotaRequest$QuotaCode": "<p>Identifies the service quota you want to select.</p>",
+        "ListRequestedServiceQuotaChangeHistoryByQuotaRequest$QuotaCode": "<p>Specifies the service quota that you want to use</p>",
+        "PutServiceQuotaIncreaseRequestIntoTemplateRequest$QuotaCode": "<p>Specifies the service quota that you want to use.</p>",
+        "RequestServiceQuotaIncreaseRequest$QuotaCode": "<p>Specifies the service quota that you want to use.</p>",
+        "RequestedServiceQuotaChange$QuotaCode": "<p>Specifies the service quota that you want to use.</p>",
+        "ServiceQuota$QuotaCode": "<p>The code identifier for the service quota specified.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$QuotaCode": "<p>The code identifier for the service quota specified in the increase request.</p>"
+      }
+    },
+    "QuotaExceededException": {
+      "base": "<p>You have exceeded your service quota. To perform the requested action, remove some of the relevant resources, or use Service Quotas to request a service quota increase.</p>",
+      "refs": {
+      }
+    },
+    "QuotaMetricName": {
+      "base": null,
+      "refs": {
+        "MetricInfo$MetricName": "<p>The name of the CloudWatch metric that measures usage of a service quota. This is a required field.</p>"
+      }
+    },
+    "QuotaMetricNamespace": {
+      "base": null,
+      "refs": {
+        "MetricInfo$MetricNamespace": "<p>The namespace of the metric. The namespace is a container for CloudWatch metrics. You can specify a name for the namespace when you create a metric.</p>"
+      }
+    },
+    "QuotaName": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$QuotaName": "<p>Name of the service quota.</p>",
+        "ServiceQuota$QuotaName": "<p>The name identifier of the service quota.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$QuotaName": "<p>The name of the service quota in the increase request.</p>"
+      }
+    },
+    "QuotaPeriod": {
+      "base": "<p>A structure that contains information about the quota period.</p>",
+      "refs": {
+        "ServiceQuota$Period": "<p>Identifies the unit and value of how time is measured.</p>"
+      }
+    },
+    "QuotaUnit": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$Unit": "<p>Specifies the unit used for the quota.</p>",
+        "ServiceQuota$Unit": "<p>The unit of measurement for the value of the service quota.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$Unit": "<p>The unit of measure for the increase request.</p>"
+      }
+    },
+    "QuotaValue": {
+      "base": null,
+      "refs": {
+        "PutServiceQuotaIncreaseRequestIntoTemplateRequest$DesiredValue": "<p>Specifies the new, increased value for the quota. </p>",
+        "RequestServiceQuotaIncreaseRequest$DesiredValue": "<p>Specifies the value submitted in the service quota increase request. </p>",
+        "RequestedServiceQuotaChange$DesiredValue": "<p>New increased value for the service quota.</p>",
+        "ServiceQuota$Value": "<p>The value of service quota.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$DesiredValue": "<p>Identifies the new, increased value of the service quota in the increase request. </p>"
+      }
+    },
+    "RequestId": {
+      "base": null,
+      "refs": {
+        "GetRequestedServiceQuotaChangeRequest$RequestId": "<p>Identifies the quota increase request.</p>",
+        "RequestedServiceQuotaChange$Id": "<p>The unique identifier of a requested service quota change.</p>"
+      }
+    },
+    "RequestServiceQuotaIncreaseRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestServiceQuotaIncreaseResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestStatus": {
+      "base": null,
+      "refs": {
+        "ListRequestedServiceQuotaChangeHistoryByQuotaRequest$Status": "<p>Specifies the status value of the quota increase request.</p>",
+        "ListRequestedServiceQuotaChangeHistoryRequest$Status": "<p>Specifies the status value of the quota increase request.</p>",
+        "RequestedServiceQuotaChange$Status": "<p>State of the service quota increase request.</p>"
+      }
+    },
+    "RequestedServiceQuotaChange": {
+      "base": "<p>A structure that contains information about a requested change for a quota.</p>",
+      "refs": {
+        "GetRequestedServiceQuotaChangeResponse$RequestedQuota": "<p>Returns the <code>RequestedServiceQuotaChange</code> object for the specific increase request.</p>",
+        "RequestServiceQuotaIncreaseResponse$RequestedQuota": "<p>Returns a list of service quota requests.</p>",
+        "RequestedServiceQuotaChangeHistoryListDefinition$member": null
+      }
+    },
+    "RequestedServiceQuotaChangeHistoryListDefinition": {
+      "base": null,
+      "refs": {
+        "ListRequestedServiceQuotaChangeHistoryByQuotaResponse$RequestedQuotas": "<p>Returns a list of service quota requests.</p>",
+        "ListRequestedServiceQuotaChangeHistoryResponse$RequestedQuotas": "<p>Returns a list of service quota requests.</p>"
+      }
+    },
+    "Requester": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$Requester": "<p>The IAM identity who submitted the service quota increase request.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ServiceCode": {
+      "base": null,
+      "refs": {
+        "DeleteServiceQuotaIncreaseRequestFromTemplateRequest$ServiceCode": "<p>Specifies the code for the service that you want to delete.</p>",
+        "GetAWSDefaultServiceQuotaRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "GetServiceQuotaIncreaseRequestFromTemplateRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "GetServiceQuotaRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ListAWSDefaultServiceQuotasRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ListRequestedServiceQuotaChangeHistoryByQuotaRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ListRequestedServiceQuotaChangeHistoryRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ListServiceQuotaIncreaseRequestsInTemplateRequest$ServiceCode": "<p>The identifier for a service. When performing an operation, use the <code>ServiceCode</code> to specify a particular service. </p>",
+        "ListServiceQuotasRequest$ServiceCode": "<p>The identifier for a service. When performing an operation, use the <code>ServiceCode</code> to specify a particular service. </p>",
+        "PutServiceQuotaIncreaseRequestIntoTemplateRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "RequestServiceQuotaIncreaseRequest$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "RequestedServiceQuotaChange$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ServiceInfo$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ServiceQuota$ServiceCode": "<p>Specifies the service that you want to use.</p>",
+        "ServiceQuotaIncreaseRequestInTemplate$ServiceCode": "<p>The code identifier for the AWS service specified in the increase request.</p>"
+      }
+    },
+    "ServiceException": {
+      "base": "<p>Something went wrong. </p>",
+      "refs": {
+      }
+    },
+    "ServiceInfo": {
+      "base": "<p>A structure that contains the <code>ServiceName</code> and <code>ServiceCode</code>. It does not include all details of the service quota. To get those values, use the <a>ListServiceQuotas</a> operation. </p>",
+      "refs": {
+        "ServiceInfoListDefinition$member": null
+      }
+    },
+    "ServiceInfoListDefinition": {
+      "base": null,
+      "refs": {
+        "ListServicesResponse$Services": "<p>Returns a list of services. </p>"
+      }
+    },
+    "ServiceName": {
+      "base": null,
+      "refs": {
+        "RequestedServiceQuotaChange$ServiceName": "<p>The name of the AWS service specified in the increase request. </p>",
+        "ServiceInfo$ServiceName": "<p>The name of the AWS service specified in the increase request. </p>",
+        "ServiceQuota$ServiceName": "<p>The name of the AWS service specified in the increase request. </p>",
+        "ServiceQuotaIncreaseRequestInTemplate$ServiceName": "<p>The name of the AWS service specified in the increase request. </p>"
+      }
+    },
+    "ServiceQuota": {
+      "base": "<p>A structure that contains the full set of details that define the service quota.</p>",
+      "refs": {
+        "GetAWSDefaultServiceQuotaResponse$Quota": "<p>Returns the <a>ServiceQuota</a> object which contains all values for a quota.</p>",
+        "GetServiceQuotaResponse$Quota": "<p>Returns the <a>ServiceQuota</a> object which contains all values for a quota.</p>",
+        "ServiceQuotaListDefinition$member": null
+      }
+    },
+    "ServiceQuotaIncreaseRequestInTemplate": {
+      "base": "<p>A structure that contains information about one service quota increase request.</p>",
+      "refs": {
+        "GetServiceQuotaIncreaseRequestFromTemplateResponse$ServiceQuotaIncreaseRequestInTemplate": "<p>This object contains the details about the quota increase request.</p>",
+        "PutServiceQuotaIncreaseRequestIntoTemplateResponse$ServiceQuotaIncreaseRequestInTemplate": "<p>A structure that contains information about one service quota increase request.</p>",
+        "ServiceQuotaIncreaseRequestInTemplateList$member": null
+      }
+    },
+    "ServiceQuotaIncreaseRequestInTemplateList": {
+      "base": null,
+      "refs": {
+        "ListServiceQuotaIncreaseRequestsInTemplateResponse$ServiceQuotaIncreaseRequestInTemplateList": "<p>Returns the list of values of the quota increase request in the template.</p>"
+      }
+    },
+    "ServiceQuotaListDefinition": {
+      "base": null,
+      "refs": {
+        "ListAWSDefaultServiceQuotasResponse$Quotas": "<p>A list of the quotas in the account with the AWS default values. </p>",
+        "ListServiceQuotasResponse$Quotas": "<p>The response information for a quota lists all attribute information for the quota. </p>"
+      }
+    },
+    "ServiceQuotaTemplateAssociationStatus": {
+      "base": null,
+      "refs": {
+        "GetAssociationForServiceQuotaTemplateResponse$ServiceQuotaTemplateAssociationStatus": "<p>Specifies whether the template is <code>ASSOCIATED</code> or <code>DISASSOCIATED</code>. If the template is <code>ASSOCIATED</code>, then it requests service quota increases for all new accounts created in your organization. </p>"
+      }
+    },
+    "ServiceQuotaTemplateNotInUseException": {
+      "base": "<p>The quota request template is not associated with your organization. </p> <p>To use the template, call <a>AssociateServiceQuotaTemplate</a>. </p>",
+      "refs": {
+      }
+    },
+    "Statistic": {
+      "base": null,
+      "refs": {
+        "MetricInfo$MetricStatisticRecommendation": "<p>Statistics are metric data aggregations over specified periods of time. This is the recommended statistic to use when comparing usage in the CloudWatch Metric against your Service Quota.</p>"
+      }
+    },
+    "TemplatesNotAvailableInRegionException": {
+      "base": "<p>The Service Quotas template is not available in the Region where you are making the request. Please make the request in us-east-1. </p>",
+      "refs": {
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p>Due to throttling, the request was denied. Slow down the rate of request calls, or request an increase for this quota. </p>",
+      "refs": {
+      }
+    }
+  }
+}

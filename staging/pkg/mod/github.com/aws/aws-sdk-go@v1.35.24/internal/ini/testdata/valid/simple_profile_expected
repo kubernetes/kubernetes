@@ -1,0 +1,8 @@
+{
+    "default": {
+        "output": "json",
+        "region": "foo-region",
+        "foo": "bar = baz",
+				"bar": "baz qux"
+    }
+}

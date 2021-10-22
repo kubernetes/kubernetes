@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListAliases",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "GetKeyPolicy",
+            "input": {
+                "KeyId": "12345678-1234-1234-1234-123456789012",
+                "PolicyName": "fakePolicy"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

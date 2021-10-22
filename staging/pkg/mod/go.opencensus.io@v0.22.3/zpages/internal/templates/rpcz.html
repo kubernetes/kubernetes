@@ -1,0 +1,52 @@
+{{range .StatGroups}}
+<p><table bgcolor=#eeeeff width=100%><tr align=center><td><font size=+2>{{.Direction}}</font></td></tr></table></p>
+<table bgcolor="#fff5ee" frame=box cellspacing=0 cellpadding=2>
+
+    <tr bgcolor="#eee5de">
+        <th></th><td></td>
+        <th class="l1" colspan=3>Count</th><td></td>
+        <th class="l1" colspan=3>Avg latency (ms)</th><td></td>
+        <th class="l1" colspan=3>Rate (rpc/s)</th><td></td>
+        <th class="l1" colspan=3>Input (kb/s)</th><td></td>
+        <th class="l1" colspan=3>Output (kb/s)</th><td></td>
+        <th class="l1" colspan=3>Errors</th>
+    </tr>
+
+    <tr bgcolor="#eee5de">
+        <th align=left>Method</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <th align=right>Min.</th><th align=right>Hr.</th><th align=right>Tot.</th>
+    </tr>
+
+    <tr><td colspan=33><font size=-2>&nbsp;</font></td></tr>
+
+{{range .Snapshots}}
+    <tr>
+        <td><b>{{.Method}}</b></td>
+        <td></td>
+        <td align="right">{{.CountMinute|count}}</td>
+        <td align="right">{{.CountHour|count}}</td>
+        <td align="right">{{.CountTotal|count}}</td><td></td>
+        <td align="right">{{.AvgLatencyMinute|ms}}</td>
+        <td align="right">{{.AvgLatencyHour|ms}}</td>
+        <td align="right">{{.AvgLatencyTotal|ms}}</td><td></td>
+        <td align="right">{{.RPCRateMinute|rate}}</td>
+        <td align="right">{{.RPCRateHour|rate}}</td>
+        <td align="right">{{.RPCRateTotal|rate}}</td><td></td>
+        <td align="right">{{.InputRateMinute|datarate}}</td>
+        <td align="right">{{.InputRateHour|datarate}}</td>
+        <td align="right">{{.InputRateTotal|datarate}}</td><td></td>
+        <td align="right">{{.OutputRateMinute|datarate}}</td>
+        <td align="right">{{.OutputRateHour|datarate}}</td>
+        <td align="right">{{.OutputRateTotal|datarate}}</td><td></td>
+        <td align="right">{{.ErrorsMinute|count}}</td>
+        <td align="right">{{.ErrorsHour|count}}</td>
+        <td align="right">{{.ErrorsTotal|count}}</td><td></td>
+    </tr>
+{{end}}
+</table>
+{{end}}

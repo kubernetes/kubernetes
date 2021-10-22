@@ -1,0 +1,30 @@
+{
+  "include": [
+    "../../services/resources/mgmt/2016-09-01/locks",
+    "../../services/resources/mgmt/2016-12-01/policy",
+    "../../services/authorization/mgmt/2015-07-01/authorization",
+    "../../services/preview/commerce/mgmt/2015-06-01-preview/commerce",
+    "../../services/databoxedge/mgmt/2019-08-01/databoxedge",
+    "../../services/preview/iothub/mgmt/2019-07-01-preview/devices",
+    "../../services/preview/monitor/mgmt/2019-06-01/insights",
+    "../../services/keyvault/mgmt/2019-09-01/keyvault",
+    "../../services/network/mgmt/2018-11-01/network",
+    "../../services/dns/mgmt/2016-04-01/dns",
+    "../../services/resources/mgmt/2018-06-01/subscriptions",
+    "../../services/resources/mgmt/2018-05-01/resources",
+    "../../services/storage/mgmt/2017-10-01/storage",
+    "../../services/keyvault/2016-10-01/keyvault",
+    "../../services/web/mgmt/2018-02-01/web"
+  ],
+  "pathOverride": {
+    "github.com/Azure/azure-sdk-for-go/services/preview/commerce/mgmt/2015-06-01-preview/commerce": "commerce/mgmt/commerce",
+    "github.com/Azure/azure-sdk-for-go/services/preview/commerce/mgmt/2015-06-01-preview/commerce/commerceapi": "commerce/mgmt/commerce/commerceapi",
+    "github.com/Azure/azure-sdk-for-go/services/preview/iothub/mgmt/2019-07-01-preview/devices":"iothub/mgmt/devices",
+    "github.com/Azure/azure-sdk-for-go/services/preview/iothub/mgmt/2019-07-01-preview/devices/devicesapi":"iothub/mgmt/devices/devicesapi",
+    "github.com/Azure/azure-sdk-for-go/services/preview/monitor/mgmt/2019-06-01/insights": "monitor/mgmt/insights",
+    "github.com/Azure/azure-sdk-for-go/services/preview/monitor/mgmt/2019-06-01/insights/insightsapi": "monitor/mgmt/insights/insightsapi"
+  },
+  "ignoredPaths": [
+    "compute"
+  ]
+}

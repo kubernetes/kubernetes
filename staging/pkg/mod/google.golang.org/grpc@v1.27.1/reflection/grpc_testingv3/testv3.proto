@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package grpc.testingv3;
+
+message SearchResponseV3 {
+  message Result {
+    string url = 1;
+    string title = 2;
+    repeated string snippets = 3;
+    message Value {
+      oneof val {
+        string str = 1;
+        int64 int = 2;
+        double real = 3;
+      }
+    }
+    map<string, Value> metadata = 4;
+  }
+  enum State {
+    UNKNOWN = 0;
+    FRESH = 1;
+    STALE = 2;
+  }
+  repeated Result results = 1;
+  State state = 2;
+}
+
+message SearchRequestV3 {
+  string query = 1;
+}
+
+service SearchServiceV3 {
+  rpc Search(SearchRequestV3) returns (SearchResponseV3);
+  rpc StreamingSearch(stream SearchRequestV3) returns (stream SearchResponseV3);
+}

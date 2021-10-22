@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+# Run the unit tests.
+
+# Do extra rounds of testing to help identify reauth concurrency issues.
+# All other packages are tested in the `coverage` tests.
+go test -v -race -count=5 ./testing

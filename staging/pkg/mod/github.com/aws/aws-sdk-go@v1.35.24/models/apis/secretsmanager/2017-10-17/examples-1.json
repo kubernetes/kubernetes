@@ -1,0 +1,594 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CancelRotateSecret": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "Name"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to cancel rotation for a secret. The operation sets the RotationEnabled field to false and cancels all scheduled rotations. To resume scheduled rotations, you must re-enable rotation by calling the rotate-secret operation.",
+        "id": "to-cancel-scheduled-rotation-for-a-secret-1523996016032",
+        "title": "To cancel scheduled rotation for a secret"
+      }
+    ],
+    "CreateSecret": [
+      {
+        "input": {
+          "ClientRequestToken": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1",
+          "Description": "My test database secret created with the CLI",
+          "Name": "MyTestDatabaseSecret",
+          "SecretString": "{\"username\":\"david\",\"password\":\"BnQw!XDWgaEeT9XGTT29\"}"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "VersionId": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to create a secret. The credentials stored in the encrypted secret value are retrieved from a file on disk named mycreds.json.",
+        "id": "to-create-a-basic-secret-1523996473658",
+        "title": "To create a basic secret"
+      }
+    ],
+    "DeleteResourcePolicy": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseMasterSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to delete the resource-based policy that is attached to a secret.",
+        "id": "to-delete-the-resource-based-policy-attached-to-a-secret-1530209419204",
+        "title": "To delete the resource-based policy attached to a secret"
+      }
+    ],
+    "DeleteSecret": [
+      {
+        "input": {
+          "RecoveryWindowInDays": 7,
+          "SecretId": "MyTestDatabaseSecret1"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "DeletionDate": "1524085349.095",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to delete a secret. The secret stays in your account in a deprecated and inaccessible state until the recovery window ends. After the date and time in the DeletionDate response field has passed, you can no longer recover this secret with restore-secret.",
+        "id": "to-delete-a-secret-1523996905092",
+        "title": "To delete a secret"
+      }
+    ],
+    "DescribeSecret": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Description": "My test database secret",
+          "KmsKeyId": "arn:aws:kms:us-west-2:123456789012:key/EXAMPLE1-90ab-cdef-fedc-ba987KMSKEY1",
+          "LastAccessedDate": "1523923200",
+          "LastChangedDate": 1523477145.729,
+          "LastRotatedDate": 1525747253.72,
+          "Name": "MyTestDatabaseSecret",
+          "RotationEnabled": true,
+          "RotationLambdaARN": "arn:aws:lambda:us-west-2:123456789012:function:MyTestRotationLambda",
+          "RotationRules": {
+            "AutomaticallyAfterDays": 30
+          },
+          "Tags": [
+            {
+              "Key": "SecondTag",
+              "Value": "AnotherValue"
+            },
+            {
+              "Key": "FirstTag",
+              "Value": "SomeValue"
+            }
+          ],
+          "VersionIdsToStages": {
+            "EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE": [
+              "AWSPREVIOUS"
+            ],
+            "EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE": [
+              "AWSCURRENT"
+            ]
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to get the details about a secret.",
+        "id": "to-retrieve-the-details-of-a-secret-1524000138629",
+        "title": "To retrieve the details of a secret"
+      }
+    ],
+    "GetRandomPassword": [
+      {
+        "input": {
+          "IncludeSpace": true,
+          "PasswordLength": 20,
+          "RequireEachIncludedType": true
+        },
+        "output": {
+          "RandomPassword": "N+Z43a,>vx7j O8^*<8i3"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to request a randomly generated password. This example includes the optional flags to require spaces and at least one character of each included type. It specifies a length of 20 characters.",
+        "id": "to-generate-a-random-password-1524000546092",
+        "title": "To generate a random password"
+      }
+    ],
+    "GetResourcePolicy": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "ResourcePolicy": "{\n\"Version\":\"2012-10-17\",\n\"Statement\":[{\n\"Effect\":\"Allow\",\n\"Principal\":{\n\"AWS\":\"arn:aws:iam::123456789012:root\"\n},\n\"Action\":\"secretsmanager:GetSecretValue\",\n\"Resource\":\"*\"\n}]\n}"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to retrieve the resource-based policy that is attached to a secret.",
+        "id": "to-retrieve-the-resource-based-policy-attached-to-a-secret-1530209677536",
+        "title": "To retrieve the resource-based policy attached to a secret"
+      }
+    ],
+    "GetSecretValue": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret",
+          "VersionStage": "AWSPREVIOUS"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "CreatedDate": 1523477145.713,
+          "Name": "MyTestDatabaseSecret",
+          "SecretString": "{\n  \"username\":\"david\",\n  \"password\":\"BnQw&XDWgaEeT9XGTT29\"\n}\n",
+          "VersionId": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1",
+          "VersionStages": [
+            "AWSPREVIOUS"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to retrieve the secret string value from the version of the secret that has the AWSPREVIOUS staging label attached. If you want to retrieve the AWSCURRENT version of the secret, then you can omit the VersionStage parameter because it defaults to AWSCURRENT.",
+        "id": "to-retrieve-the-encrypted-secret-value-of-a-secret-1524000702484",
+        "title": "To retrieve the encrypted secret value of a secret"
+      }
+    ],
+    "ListSecretVersionIds": [
+      {
+        "input": {
+          "IncludeDeprecated": true,
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "Versions": [
+            {
+              "CreatedDate": 1523477145.713,
+              "VersionId": "EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE",
+              "VersionStages": [
+                "AWSPREVIOUS"
+              ]
+            },
+            {
+              "CreatedDate": 1523486221.391,
+              "VersionId": "EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE",
+              "VersionStages": [
+                "AWSCURRENT"
+              ]
+            },
+            {
+              "CreatedDate": 1511974462.36,
+              "VersionId": "EXAMPLE3-90ab-cdef-fedc-ba987EXAMPLE;"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to retrieve a list of all of the versions of a secret, including those without any staging labels.",
+        "id": "to-list-all-of-the-secret-versions-associated-with-a-secret-1524000999164",
+        "title": "To list all of the secret versions associated with a secret"
+      }
+    ],
+    "ListSecrets": [
+      {
+        "input": {
+        },
+        "output": {
+          "SecretList": [
+            {
+              "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+              "Description": "My test database secret",
+              "LastChangedDate": 1523477145.729,
+              "Name": "MyTestDatabaseSecret",
+              "SecretVersionsToStages": {
+                "EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE": [
+                  "AWSCURRENT"
+                ]
+              }
+            },
+            {
+              "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret1-d4e5f6",
+              "Description": "Another secret created for a different database",
+              "LastChangedDate": 1523482025.685,
+              "Name": "MyTestDatabaseSecret1",
+              "SecretVersionsToStages": {
+                "EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE": [
+                  "AWSCURRENT"
+                ]
+              }
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to list all of the secrets in your account.",
+        "id": "to-list-the-secrets-in-your-account-1524001246087",
+        "title": "To list the secrets in your account"
+      }
+    ],
+    "PutResourcePolicy": [
+      {
+        "input": {
+          "ResourcePolicy": "{\n\"Version\":\"2012-10-17\",\n\"Statement\":[{\n\"Effect\":\"Allow\",\n\"Principal\":{\n\"AWS\":\"arn:aws:iam::123456789012:root\"\n},\n\"Action\":\"secretsmanager:GetSecretValue\",\n\"Resource\":\"*\"\n}]\n}",
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to add a resource-based policy to a secret.",
+        "id": "to-add-a-resource-based-policy-to-a-secret-1530209881839",
+        "title": "To add a resource-based policy to a secret"
+      }
+    ],
+    "PutSecretValue": [
+      {
+        "input": {
+          "ClientRequestToken": "EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE",
+          "SecretId": "MyTestDatabaseSecret",
+          "SecretString": "{\"username\":\"david\",\"password\":\"BnQw!XDWgaEeT9XGTT29\"}"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "VersionId": "EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE",
+          "VersionStages": [
+            "AWSCURRENT"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to create a new version of the secret. Alternatively, you can use the update-secret command.",
+        "id": "to-store-a-secret-value-in-a-new-version-of-a-secret-1524001393971",
+        "title": "To store a secret value in a new version of a secret"
+      }
+    ],
+    "RestoreSecret": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to restore a secret that you previously scheduled for deletion.",
+        "id": "to-restore-a-previously-deleted-secret-1524001513930",
+        "title": "To restore a previously deleted secret"
+      }
+    ],
+    "RotateSecret": [
+      {
+        "input": {
+          "RotationLambdaARN": "arn:aws:lambda:us-west-2:123456789012:function:MyTestDatabaseRotationLambda",
+          "RotationRules": {
+            "AutomaticallyAfterDays": 30
+          },
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "VersionId": "EXAMPLE2-90ab-cdef-fedc-ba987SECRET2"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example configures rotation for a secret by providing the ARN of a Lambda rotation function (which must already exist) and the number of days between rotation. The first rotation happens immediately upon completion of this command. The rotation function runs asynchronously in the background.",
+        "id": "to-configure-rotation-for-a-secret-1524001629475",
+        "title": "To configure rotation for a secret"
+      },
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "SecretARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "SecretName": "MyTestDatabaseSecret",
+          "SecretVersionId": "EXAMPLE2-90ab-cdef-fedc-ba987SECRET2"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example requests an immediate invocation of the secret's Lambda rotation function. It assumes that the specified secret already has rotation configured. The rotation function runs asynchronously in the background.",
+        "id": "to-request-an-immediate-rotation-for-a-secret-1524001949004",
+        "title": "To request an immediate rotation for a secret"
+      }
+    ],
+    "TagResource": [
+      {
+        "input": {
+          "SecretId": "MyExampleSecret",
+          "Tags": [
+            {
+              "Key": "FirstTag",
+              "Value": "SomeValue"
+            },
+            {
+              "Key": "SecondTag",
+              "Value": "AnotherValue"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to attach two tags each with a Key and Value to a secret. There is no output from this API. To see the result, use the DescribeSecret operation.",
+        "id": "to-add-tags-to-a-secret-1524002106718",
+        "title": "To add tags to a secret"
+      }
+    ],
+    "UntagResource": [
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret",
+          "TagKeys": [
+            "FirstTag",
+            "SecondTag"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to remove two tags from a secret's metadata. For each, both the tag and the associated value are removed. There is no output from this API. To see the result, use the DescribeSecret operation.",
+        "id": "to-remove-tags-from-a-secret-1524002239065",
+        "title": "To remove tags from a secret"
+      }
+    ],
+    "UpdateSecret": [
+      {
+        "input": {
+          "ClientRequestToken": "EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE",
+          "Description": "This is a new description for the secret.",
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to modify the description of a secret.",
+        "id": "to-update-the-description-of-a-secret-1524002349094",
+        "title": "To update the description of a secret"
+      },
+      {
+        "input": {
+          "KmsKeyId": "arn:aws:kms:us-west-2:123456789012:key/EXAMPLE2-90ab-cdef-fedc-ba987EXAMPLE",
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example shows how to update the KMS customer managed key (CMK) used to encrypt the secret value. The KMS CMK must be in the same region as the secret.",
+        "id": "to-update-the-kms-key-associated-with-a-secret-1524002421563",
+        "title": "To update the KMS key associated with a secret"
+      },
+      {
+        "input": {
+          "SecretId": "MyTestDatabaseSecret",
+          "SecretString": "{JSON STRING WITH CREDENTIALS}"
+        },
+        "output": {
+          "ARN": "aws:arn:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret",
+          "VersionId": "EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to create a new version of the secret by updating the SecretString field. Alternatively, you can use the put-secret-value operation.",
+        "id": "to-create-a-new-version-of-the-encrypted-secret-value-1524004651836",
+        "title": "To create a new version of the encrypted secret value"
+      }
+    ],
+    "UpdateSecretVersionStage": [
+      {
+        "input": {
+          "MoveToVersionId": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1",
+          "SecretId": "MyTestDatabaseSecret",
+          "VersionStage": "STAGINGLABEL1"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows you how to add a staging label to a version of a secret. You can review the results by running the operation ListSecretVersionIds and viewing the VersionStages response field for the affected version.",
+        "id": "to-add-a-staging-label-attached-to-a-version-of-a-secret-1524004783841",
+        "title": "To add a staging label attached to a version of a secret"
+      },
+      {
+        "input": {
+          "RemoveFromVersionId": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1",
+          "SecretId": "MyTestDatabaseSecret",
+          "VersionStage": "STAGINGLABEL1"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows you how to delete a staging label that is attached to a version of a secret. You can review the results by running the operation ListSecretVersionIds and viewing the VersionStages response field for the affected version.",
+        "id": "to-delete-a-staging-label-attached-to-a-version-of-a-secret-1524004862181",
+        "title": "To delete a staging label attached to a version of a secret"
+      },
+      {
+        "input": {
+          "MoveToVersionId": "EXAMPLE2-90ab-cdef-fedc-ba987SECRET2",
+          "RemoveFromVersionId": "EXAMPLE1-90ab-cdef-fedc-ba987SECRET1",
+          "SecretId": "MyTestDatabaseSecret",
+          "VersionStage": "AWSCURRENT"
+        },
+        "output": {
+          "ARN": "arn:aws:secretsmanager:us-west-2:123456789012:secret:MyTestDatabaseSecret-a1b2c3",
+          "Name": "MyTestDatabaseSecret"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows you how to move a staging label that is attached to one version of a secret to a different version. You can review the results by running the operation ListSecretVersionIds and viewing the VersionStages response field for the affected version.",
+        "id": "to-move-a-staging-label-from-one-version-of-a-secret-to-another-1524004963841",
+        "title": "To move a staging label from one version of a secret to another"
+      }
+    ],
+    "ValidateResourcePolicy": [
+      {
+        "input": {
+          "ResourcePolicy": "{\n\"Version\":\"2012-10-17\",\n\"Statement\":[{\n\"Effect\":\"Allow\",\n\"Principal\":{\n\"AWS\":\"arn:aws:iam::123456789012:root\"\n},\n\"Action\":\"secretsmanager:GetSecretValue\",\n\"Resource\":\"*\"\n}]\n}",
+          "SecretId": "MyTestDatabaseSecret"
+        },
+        "output": {
+          "PolicyValidationPassed": true,
+          "ValidationErrors": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows how to validate a resource-based policy to a secret.",
+        "id": "to-validate-the-resource-policy-of-a-secret-1524000138629",
+        "title": "To validate a resource-based policy to a secret"
+      }
+    ]
+  }
+}

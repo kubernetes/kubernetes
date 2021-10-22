@@ -1,0 +1,975 @@
+{
+  "version": "2.0",
+  "service": "<p>When you create a VPC using Amazon VPC, you automatically get DNS resolution within the VPC from Route 53 Resolver. By default, Resolver answers DNS queries for VPC domain names such as domain names for EC2 instances or ELB load balancers. Resolver performs recursive lookups against public name servers for all other domain names.</p> <p>You can also configure DNS resolution between your VPC and your network over a Direct Connect or VPN connection:</p> <p> <b>Forward DNS queries from resolvers on your network to Route 53 Resolver</b> </p> <p>DNS resolvers on your network can forward DNS queries to Resolver in a specified VPC. This allows your DNS resolvers to easily resolve domain names for AWS resources such as EC2 instances or records in a Route 53 private hosted zone. For more information, see <a href=\"https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver.html#resolver-overview-forward-network-to-vpc\">How DNS Resolvers on Your Network Forward DNS Queries to Route 53 Resolver</a> in the <i>Amazon Route 53 Developer Guide</i>.</p> <p> <b>Conditionally forward queries from a VPC to resolvers on your network</b> </p> <p>You can configure Resolver to forward queries that it receives from EC2 instances in your VPCs to DNS resolvers on your network. To forward selected queries, you create Resolver rules that specify the domain names for the DNS queries that you want to forward (such as example.com), and the IP addresses of the DNS resolvers on your network that you want to forward the queries to. If a query matches multiple rules (example.com, acme.example.com), Resolver chooses the rule with the most specific match (acme.example.com) and forwards the query to the IP addresses that you specified in that rule. For more information, see <a href=\"https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver.html#resolver-overview-forward-vpc-to-network\">How Route 53 Resolver Forwards DNS Queries from Your VPCs to Your Network</a> in the <i>Amazon Route 53 Developer Guide</i>.</p> <p>Like Amazon VPC, Resolver is regional. In each region where you have VPCs, you can choose whether to forward queries from your VPCs to your network (outbound queries), from your network to your VPCs (inbound queries), or both.</p>",
+  "operations": {
+    "AssociateResolverEndpointIpAddress": "<p>Adds IP addresses to an inbound or an outbound Resolver endpoint. If you want to add more than one IP address, submit one <code>AssociateResolverEndpointIpAddress</code> request for each IP address.</p> <p>To remove an IP address from an endpoint, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverEndpointIpAddress.html\">DisassociateResolverEndpointIpAddress</a>. </p>",
+    "AssociateResolverQueryLogConfig": "<p>Associates an Amazon VPC with a specified query logging configuration. Route 53 Resolver logs DNS queries that originate in all of the Amazon VPCs that are associated with a specified query logging configuration. To associate more than one VPC with a configuration, submit one <code>AssociateResolverQueryLogConfig</code> request for each VPC.</p> <note> <p>The VPCs that you associate with a query logging configuration must be in the same Region as the configuration.</p> </note> <p>To remove a VPC from a query logging configuration, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverQueryLogConfig.html\">DisassociateResolverQueryLogConfig</a>. </p>",
+    "AssociateResolverRule": "<p>Associates a Resolver rule with a VPC. When you associate a rule with a VPC, Resolver forwards all DNS queries for the domain name that is specified in the rule and that originate in the VPC. The queries are forwarded to the IP addresses for the DNS resolvers that are specified in the rule. For more information about rules, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverRule.html\">CreateResolverRule</a>. </p>",
+    "CreateResolverEndpoint": "<p>Creates a Resolver endpoint. There are two types of Resolver endpoints, inbound and outbound:</p> <ul> <li> <p>An <i>inbound Resolver endpoint</i> forwards DNS queries to the DNS service for a VPC from your network.</p> </li> <li> <p>An <i>outbound Resolver endpoint</i> forwards DNS queries from the DNS service for a VPC to your network.</p> </li> </ul>",
+    "CreateResolverQueryLogConfig": "<p>Creates a Resolver query logging configuration, which defines where you want Resolver to save DNS query logs that originate in your VPCs. Resolver can log queries only for VPCs that are in the same Region as the query logging configuration.</p> <p>To specify which VPCs you want to log queries for, you use <code>AssociateResolverQueryLogConfig</code>. For more information, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverQueryLogConfig.html\">AssociateResolverQueryLogConfig</a>. </p> <p>You can optionally use AWS Resource Access Manager (AWS RAM) to share a query logging configuration with other AWS accounts. The other accounts can then associate VPCs with the configuration. The query logs that Resolver creates for a configuration include all DNS queries that originate in all VPCs that are associated with the configuration.</p>",
+    "CreateResolverRule": "<p>For DNS queries that originate in your VPCs, specifies which Resolver endpoint the queries pass through, one domain name that you want to forward to your network, and the IP addresses of the DNS resolvers in your network.</p>",
+    "DeleteResolverEndpoint": "<p>Deletes a Resolver endpoint. The effect of deleting a Resolver endpoint depends on whether it's an inbound or an outbound Resolver endpoint:</p> <ul> <li> <p> <b>Inbound</b>: DNS queries from your network are no longer routed to the DNS service for the specified VPC.</p> </li> <li> <p> <b>Outbound</b>: DNS queries from a VPC are no longer routed to your network.</p> </li> </ul>",
+    "DeleteResolverQueryLogConfig": "<p>Deletes a query logging configuration. When you delete a configuration, Resolver stops logging DNS queries for all of the Amazon VPCs that are associated with the configuration. This also applies if the query logging configuration is shared with other AWS accounts, and the other accounts have associated VPCs with the shared configuration.</p> <p>Before you can delete a query logging configuration, you must first disassociate all VPCs from the configuration. See <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverQueryLogConfig.html\">DisassociateResolverQueryLogConfig</a>.</p> <p>If you used Resource Access Manager (RAM) to share a query logging configuration with other accounts, you must stop sharing the configuration before you can delete a configuration. The accounts that you shared the configuration with can first disassociate VPCs that they associated with the configuration, but that's not necessary. If you stop sharing the configuration, those VPCs are automatically disassociated from the configuration.</p>",
+    "DeleteResolverRule": "<p>Deletes a Resolver rule. Before you can delete a Resolver rule, you must disassociate it from all the VPCs that you associated the Resolver rule with. For more information, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverRule.html\">DisassociateResolverRule</a>.</p>",
+    "DisassociateResolverEndpointIpAddress": "<p>Removes IP addresses from an inbound or an outbound Resolver endpoint. If you want to remove more than one IP address, submit one <code>DisassociateResolverEndpointIpAddress</code> request for each IP address.</p> <p>To add an IP address to an endpoint, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverEndpointIpAddress.html\">AssociateResolverEndpointIpAddress</a>. </p>",
+    "DisassociateResolverQueryLogConfig": "<p>Disassociates a VPC from a query logging configuration.</p> <note> <p>Before you can delete a query logging configuration, you must first disassociate all VPCs from the configuration. If you used Resource Access Manager (RAM) to share a query logging configuration with other accounts, VPCs can be disassociated from the configuration in the following ways:</p> <ul> <li> <p>The accounts that you shared the configuration with can disassociate VPCs from the configuration.</p> </li> <li> <p>You can stop sharing the configuration.</p> </li> </ul> </note>",
+    "DisassociateResolverRule": "<p>Removes the association between a specified Resolver rule and a specified VPC.</p> <important> <p>If you disassociate a Resolver rule from a VPC, Resolver stops forwarding DNS queries for the domain name that you specified in the Resolver rule. </p> </important>",
+    "GetResolverEndpoint": "<p>Gets information about a specified Resolver endpoint, such as whether it's an inbound or an outbound Resolver endpoint, and the current status of the endpoint.</p>",
+    "GetResolverQueryLogConfig": "<p>Gets information about a specified Resolver query logging configuration, such as the number of VPCs that the configuration is logging queries for and the location that logs are sent to. </p>",
+    "GetResolverQueryLogConfigAssociation": "<p>Gets information about a specified association between a Resolver query logging configuration and an Amazon VPC. When you associate a VPC with a query logging configuration, Resolver logs DNS queries that originate in that VPC.</p>",
+    "GetResolverQueryLogConfigPolicy": "<p>Gets information about a query logging policy. A query logging policy specifies the Resolver query logging operations and resources that you want to allow another AWS account to be able to use.</p>",
+    "GetResolverRule": "<p>Gets information about a specified Resolver rule, such as the domain name that the rule forwards DNS queries for and the ID of the outbound Resolver endpoint that the rule is associated with.</p>",
+    "GetResolverRuleAssociation": "<p>Gets information about an association between a specified Resolver rule and a VPC. You associate a Resolver rule and a VPC using <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverRule.html\">AssociateResolverRule</a>. </p>",
+    "GetResolverRulePolicy": "<p>Gets information about a Resolver rule policy. A Resolver rule policy specifies the Resolver operations and resources that you want to allow another AWS account to be able to use. </p>",
+    "ListResolverEndpointIpAddresses": "<p>Gets the IP addresses for a specified Resolver endpoint.</p>",
+    "ListResolverEndpoints": "<p>Lists all the Resolver endpoints that were created using the current AWS account.</p>",
+    "ListResolverQueryLogConfigAssociations": "<p>Lists information about associations between Amazon VPCs and query logging configurations.</p>",
+    "ListResolverQueryLogConfigs": "<p>Lists information about the specified query logging configurations. Each configuration defines where you want Resolver to save DNS query logs and specifies the VPCs that you want to log queries for.</p>",
+    "ListResolverRuleAssociations": "<p>Lists the associations that were created between Resolver rules and VPCs using the current AWS account.</p>",
+    "ListResolverRules": "<p>Lists the Resolver rules that were created using the current AWS account.</p>",
+    "ListTagsForResource": "<p>Lists the tags that you associated with the specified resource.</p>",
+    "PutResolverQueryLogConfigPolicy": "<p>Specifies an AWS account that you want to share a query logging configuration with, the query logging configuration that you want to share, and the operations that you want the account to be able to perform on the configuration.</p>",
+    "PutResolverRulePolicy": "<p>Specifies an AWS account that you want to share rules with, the Resolver rules that you want to share, and the operations that you want the account to be able to perform on those rules.</p>",
+    "TagResource": "<p>Adds one or more tags to a specified resource.</p>",
+    "UntagResource": "<p>Removes one or more tags from a specified resource.</p>",
+    "UpdateResolverEndpoint": "<p>Updates the name of an inbound or an outbound Resolver endpoint. </p>",
+    "UpdateResolverRule": "<p>Updates settings for a specified Resolver rule. <code>ResolverRuleId</code> is required, and all other parameters are optional. If you don't specify a parameter, it retains its current value.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>The current account doesn't have the IAM permissions required to perform the specified Resolver operation.</p>",
+      "refs": {
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfig$OwnerId": "<p>The AWS account ID for the account that created the query logging configuration. </p>",
+        "ResolverRule$OwnerId": "<p>When a rule is shared with another AWS account, the account ID of the account that the rule is shared with.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "GetResolverQueryLogConfigPolicyRequest$Arn": "<p>The ARN of the query logging configuration that you want to get the query logging policy for.</p>",
+        "GetResolverRulePolicyRequest$Arn": "<p>The ID of the Resolver rule policy that you want to get information about.</p>",
+        "ListTagsForResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the resource that you want to list tags for.</p>",
+        "PutResolverQueryLogConfigPolicyRequest$Arn": "<p>The Amazon Resource Name (ARN) of the account that you want to share rules with.</p>",
+        "PutResolverRulePolicyRequest$Arn": "<p>The Amazon Resource Name (ARN) of the account that you want to share rules with.</p>",
+        "ResolverEndpoint$Arn": "<p>The ARN (Amazon Resource Name) for the Resolver endpoint.</p>",
+        "ResolverQueryLogConfig$Arn": "<p>The ARN for the query logging configuration.</p>",
+        "ResolverRule$Arn": "<p>The ARN (Amazon Resource Name) for the Resolver rule specified by <code>Id</code>.</p>",
+        "TagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the resource that you want to add tags to. To get the ARN for a resource, use the applicable <code>Get</code> or <code>List</code> command: </p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverRule.html\">GetResolverRule</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverRuleAssociation.html\">GetResolverRuleAssociation</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverEndpoints.html\">ListResolverEndpoints</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRuleAssociations.html\">ListResolverRuleAssociations</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a> </p> </li> </ul>",
+        "UntagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the resource that you want to remove tags from. To get the ARN for a resource, use the applicable <code>Get</code> or <code>List</code> command: </p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverRule.html\">GetResolverRule</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverRuleAssociation.html\">GetResolverRuleAssociation</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverEndpoints.html\">ListResolverEndpoints</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRuleAssociations.html\">ListResolverRuleAssociations</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a> </p> </li> </ul>"
+      }
+    },
+    "AssociateResolverEndpointIpAddressRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateResolverEndpointIpAddressResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateResolverQueryLogConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateResolverQueryLogConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "PutResolverQueryLogConfigPolicyResponse$ReturnValue": "<p>Whether the <code>PutResolverQueryLogConfigPolicy</code> request was successful.</p>",
+        "PutResolverRulePolicyResponse$ReturnValue": "<p>Whether the <code>PutResolverRulePolicy</code> request was successful.</p>"
+      }
+    },
+    "Count": {
+      "base": null,
+      "refs": {
+        "ListResolverQueryLogConfigAssociationsResponse$TotalCount": "<p>The total number of query logging associations that were created by the current account in the specified Region. This count can differ from the number of associations that are returned in a <code>ListResolverQueryLogConfigAssociations</code> response, depending on the values that you specify in the request.</p>",
+        "ListResolverQueryLogConfigAssociationsResponse$TotalFilteredCount": "<p>The total number of query logging associations that were created by the current account in the specified Region and that match the filters that were specified in the <code>ListResolverQueryLogConfigAssociations</code> request. For the total number of associations that were created by the current account in the specified Region, see <code>TotalCount</code>.</p>",
+        "ListResolverQueryLogConfigsResponse$TotalCount": "<p>The total number of query logging configurations that were created by the current account in the specified Region. This count can differ from the number of query logging configurations that are returned in a <code>ListResolverQueryLogConfigs</code> response, depending on the values that you specify in the request.</p>",
+        "ListResolverQueryLogConfigsResponse$TotalFilteredCount": "<p>The total number of query logging configurations that were created by the current account in the specified Region and that match the filters that were specified in the <code>ListResolverQueryLogConfigs</code> request. For the total number of query logging configurations that were created by the current account in the specified Region, see <code>TotalCount</code>.</p>",
+        "ResolverQueryLogConfig$AssociationCount": "<p>The number of VPCs that are associated with the query logging configuration.</p>"
+      }
+    },
+    "CreateResolverEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResolverEndpointResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResolverQueryLogConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResolverQueryLogConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatorRequestId": {
+      "base": null,
+      "refs": {
+        "CreateResolverEndpointRequest$CreatorRequestId": "<p>A unique string that identifies the request and that allows failed requests to be retried without the risk of executing the operation twice. <code>CreatorRequestId</code> can be any unique string, for example, a date/time stamp. </p>",
+        "CreateResolverQueryLogConfigRequest$CreatorRequestId": "<p>A unique string that identifies the request and that allows failed requests to be retried without the risk of executing the operation twice. <code>CreatorRequestId</code> can be any unique string, for example, a date/time stamp. </p>",
+        "CreateResolverRuleRequest$CreatorRequestId": "<p>A unique string that identifies the request and that allows failed requests to be retried without the risk of executing the operation twice. <code>CreatorRequestId</code> can be any unique string, for example, a date/time stamp. </p>",
+        "ResolverEndpoint$CreatorRequestId": "<p>A unique string that identifies the request that created the Resolver endpoint. The <code>CreatorRequestId</code> allows failed requests to be retried without the risk of executing the operation twice.</p>",
+        "ResolverQueryLogConfig$CreatorRequestId": "<p>A unique string that identifies the request that created the query logging configuration. The <code>CreatorRequestId</code> allows failed requests to be retried without the risk of executing the operation twice.</p>",
+        "ResolverRule$CreatorRequestId": "<p>A unique string that you specified when you created the Resolver rule. <code>CreatorRequestId</code> identifies the request and allows failed requests to be retried without the risk of executing the operation twice. </p>"
+      }
+    },
+    "DeleteResolverEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResolverEndpointResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResolverQueryLogConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResolverQueryLogConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DestinationArn": {
+      "base": null,
+      "refs": {
+        "CreateResolverQueryLogConfigRequest$DestinationArn": "<p>The ARN of the resource that you want Resolver to send query logs. You can send query logs to an S3 bucket, a CloudWatch Logs log group, or a Kinesis Data Firehose delivery stream. Examples of valid values include the following:</p> <ul> <li> <p> <b>S3 bucket</b>: </p> <p> <code>arn:aws:s3:::examplebucket</code> </p> <p>You can optionally append a file prefix to the end of the ARN.</p> <p> <code>arn:aws:s3:::examplebucket/development/</code> </p> </li> <li> <p> <b>CloudWatch Logs log group</b>: </p> <p> <code>arn:aws:logs:us-west-1:123456789012:log-group:/mystack-testgroup-12ABC1AB12A1:*</code> </p> </li> <li> <p> <b>Kinesis Data Firehose delivery stream</b>:</p> <p> <code>arn:aws:kinesis:us-east-2:0123456789:stream/my_stream_name</code> </p> </li> </ul>",
+        "ResolverQueryLogConfig$DestinationArn": "<p>The ARN of the resource that you want Resolver to send query logs: an Amazon S3 bucket, a CloudWatch Logs log group, or a Kinesis Data Firehose delivery stream.</p>"
+      }
+    },
+    "DisassociateResolverEndpointIpAddressRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateResolverEndpointIpAddressResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateResolverQueryLogConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateResolverQueryLogConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DomainName": {
+      "base": null,
+      "refs": {
+        "CreateResolverRuleRequest$DomainName": "<p>DNS queries for this domain name are forwarded to the IP addresses that you specify in <code>TargetIps</code>. If a query matches multiple Resolver rules (example.com and www.example.com), outbound DNS queries are routed using the Resolver rule that contains the most specific domain name (www.example.com).</p>",
+        "ResolverRule$DomainName": "<p>DNS queries for this domain name are forwarded to the IP addresses that are specified in <code>TargetIps</code>. If a query matches multiple Resolver rules (example.com and www.example.com), the query is routed using the Resolver rule that contains the most specific domain name (www.example.com).</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "InternalServiceErrorException$Message": null,
+        "InvalidParameterException$Message": null,
+        "InvalidPolicyDocument$Message": null,
+        "InvalidRequestException$Message": null,
+        "InvalidTagException$Message": null,
+        "ThrottlingException$Message": null,
+        "UnknownResourceException$Message": null
+      }
+    },
+    "Filter": {
+      "base": "<p>For Resolver list operations (<a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverEndpoints.html\">ListResolverEndpoints</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRuleAssociations.html\">ListResolverRuleAssociations</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigs.html\">ListResolverQueryLogConfigs</a>, and <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigAssociations.html\">ListResolverQueryLogConfigAssociations</a>), an optional specification to return a subset of objects.</p> <p>To filter objects, such as Resolver endpoints or Resolver rules, you specify <code>Name</code> and <code>Values</code>. For example, to list only inbound Resolver endpoints, specify <code>Direction</code> for <code>Name</code> and specify <code>INBOUND</code> for <code>Values</code>. </p>",
+      "refs": {
+        "Filters$member": null
+      }
+    },
+    "FilterName": {
+      "base": null,
+      "refs": {
+        "Filter$Name": "<p>The name of the parameter that you want to use to filter objects.</p> <p>The valid values for <code>Name</code> depend on the action that you're including the filter in, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverEndpoints.html\">ListResolverEndpoints</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRuleAssociations.html\">ListResolverRuleAssociations</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigs.html\">ListResolverQueryLogConfigs</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigAssociations.html\">ListResolverQueryLogConfigAssociations</a>.</p> <note> <p>In early versions of Resolver, values for <code>Name</code> were listed as uppercase, with underscore (_) delimiters. For example, <code>CreatorRequestId</code> was originally listed as <code>CREATOR_REQUEST_ID</code>. Uppercase values for <code>Name</code> are still supported.</p> </note> <p> <b>ListResolverEndpoints</b> </p> <p>Valid values for <code>Name</code> include the following:</p> <ul> <li> <p> <code>CreatorRequestId</code>: The value that you specified when you created the Resolver endpoint.</p> </li> <li> <p> <code>Direction</code>: Whether you want to return inbound or outbound Resolver endpoints. If you specify <code>DIRECTION</code> for <code>Name</code>, specify <code>INBOUND</code> or <code>OUTBOUND</code> for <code>Values</code>.</p> </li> <li> <p> <code>HostVpcId</code>: The ID of the VPC that inbound DNS queries pass through on the way from your network to your VPCs in a region, or the VPC that outbound queries pass through on the way from your VPCs to your network. In a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html\">CreateResolverEndpoint</a> request, <code>SubnetId</code> indirectly identifies the VPC. In a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a> request, the VPC ID for a Resolver endpoint is returned in the <code>HostVPCId</code> element. </p> </li> <li> <p> <code>IpAddressCount</code>: The number of IP addresses that you have associated with the Resolver endpoint.</p> </li> <li> <p> <code>Name</code>: The name of the Resolver endpoint.</p> </li> <li> <p> <code>SecurityGroupIds</code>: The IDs of the VPC security groups that you specified when you created the Resolver endpoint.</p> </li> <li> <p> <code>Status</code>: The status of the Resolver endpoint. If you specify <code>Status</code> for <code>Name</code>, specify one of the following status codes for <code>Values</code>: <code>CREATING</code>, <code>OPERATIONAL</code>, <code>UPDATING</code>, <code>AUTO_RECOVERING</code>, <code>ACTION_NEEDED</code>, or <code>DELETING</code>. For more information, see <code>Status</code> in <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ResolverEndpoint.html\">ResolverEndpoint</a>.</p> </li> </ul> <p> <b>ListResolverRules</b> </p> <p>Valid values for <code>Name</code> include the following:</p> <ul> <li> <p> <code>CreatorRequestId</code>: The value that you specified when you created the Resolver rule.</p> </li> <li> <p> <code>DomainName</code>: The domain name for which Resolver is forwarding DNS queries to your network. In the value that you specify for <code>Values</code>, include a trailing dot (.) after the domain name. For example, if the domain name is example.com, specify the following value. Note the \".\" after <code>com</code>:</p> <p> <code>example.com.</code> </p> </li> <li> <p> <code>Name</code>: The name of the Resolver rule.</p> </li> <li> <p> <code>ResolverEndpointId</code>: The ID of the Resolver endpoint that the Resolver rule is associated with.</p> <note> <p>You can filter on the Resolver endpoint only for rules that have a value of <code>FORWARD</code> for <code>RuleType</code>.</p> </note> </li> <li> <p> <code>Status</code>: The status of the Resolver rule. If you specify <code>Status</code> for <code>Name</code>, specify one of the following status codes for <code>Values</code>: <code>COMPLETE</code>, <code>DELETING</code>, <code>UPDATING</code>, or <code>FAILED</code>.</p> </li> <li> <p> <code>Type</code>: The type of the Resolver rule. If you specify <code>TYPE</code> for <code>Name</code>, specify <code>FORWARD</code> or <code>SYSTEM</code> for <code>Values</code>.</p> </li> </ul> <p> <b>ListResolverRuleAssociations</b> </p> <p>Valid values for <code>Name</code> include the following:</p> <ul> <li> <p> <code>Name</code>: The name of the Resolver rule association.</p> </li> <li> <p> <code>ResolverRuleId</code>: The ID of the Resolver rule that is associated with one or more VPCs.</p> </li> <li> <p> <code>Status</code>: The status of the Resolver rule association. If you specify <code>Status</code> for <code>Name</code>, specify one of the following status codes for <code>Values</code>: <code>CREATING</code>, <code>COMPLETE</code>, <code>DELETING</code>, or <code>FAILED</code>.</p> </li> <li> <p> <code>VPCId</code>: The ID of the VPC that the Resolver rule is associated with.</p> </li> </ul> <p> <b>ListResolverQueryLogConfigs</b> </p> <p>Valid values for <code>Name</code> include the following:</p> <ul> <li> <p> <code>Arn</code>: The ARN for the query logging configuration.</p> </li> <li> <p> <code>AssociationCount</code>: The number of VPCs that are associated with the query logging configuration.</p> </li> <li> <p> <code>CreationTime</code>: The date and time that the query logging configuration was created, in Unix time format and Coordinated Universal Time (UTC). </p> </li> <li> <p> <code>CreatorRequestId</code>: A unique string that identifies the request that created the query logging configuration.</p> </li> <li> <p> <code>Destination</code>: The AWS service that you want to forward query logs to. Valid values include the following:</p> <ul> <li> <p> <code>S3</code> </p> </li> <li> <p> <code>CloudWatchLogs</code> </p> </li> <li> <p> <code>KinesisFirehose</code> </p> </li> </ul> </li> <li> <p> <code>DestinationArn</code>: The ARN of the location that Resolver is sending query logs to. This value can be the ARN for an S3 bucket, a CloudWatch Logs log group, or a Kinesis Data Firehose delivery stream.</p> </li> <li> <p> <code>Id</code>: The ID of the query logging configuration</p> </li> <li> <p> <code>Name</code>: The name of the query logging configuration</p> </li> <li> <p> <code>OwnerId</code>: The AWS account ID for the account that created the query logging configuration.</p> </li> <li> <p> <code>ShareStatus</code>: An indication of whether the query logging configuration is shared with other AWS accounts, or was shared with the current account by another AWS account. Valid values include: <code>NOT_SHARED</code>, <code>SHARED_WITH_ME</code>, or <code>SHARED_BY_ME</code>.</p> </li> <li> <p> <code>Status</code>: The status of the query logging configuration. If you specify <code>Status</code> for <code>Name</code>, specify the applicable status code for <code>Values</code>: <code>CREATING</code>, <code>CREATED</code>, <code>DELETING</code>, or <code>FAILED</code>. For more information, see <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ResolverQueryLogConfig.html#Route53Resolver-Type-route53resolver_ResolverQueryLogConfig-Status\">Status</a>. </p> </li> </ul> <p> <b>ListResolverQueryLogConfigAssociations</b> </p> <p>Valid values for <code>Name</code> include the following:</p> <ul> <li> <p> <code>CreationTime</code>: The date and time that the VPC was associated with the query logging configuration, in Unix time format and Coordinated Universal Time (UTC).</p> </li> <li> <p> <code>Error</code>: If the value of <code>Status</code> is <code>FAILED</code>, specify the cause: <code>DESTINATION_NOT_FOUND</code> or <code>ACCESS_DENIED</code>.</p> </li> <li> <p> <code>Id</code>: The ID of the query logging association.</p> </li> <li> <p> <code>ResolverQueryLogConfigId</code>: The ID of the query logging configuration that a VPC is associated with.</p> </li> <li> <p> <code>ResourceId</code>: The ID of the Amazon VPC that is associated with the query logging configuration.</p> </li> <li> <p> <code>Status</code>: The status of the query logging association. If you specify <code>Status</code> for <code>Name</code>, specify the applicable status code for <code>Values</code>: <code>CREATING</code>, <code>CREATED</code>, <code>DELETING</code>, or <code>FAILED</code>. For more information, see <a href=\"https://docs.aws.amazon.com/API_route53resolver_ResolverQueryLogConfigAssociation.html#Route53Resolver-Type-route53resolver_ResolverQueryLogConfigAssociation-Status\">Status</a>. </p> </li> </ul>"
+      }
+    },
+    "FilterValue": {
+      "base": null,
+      "refs": {
+        "FilterValues$member": null
+      }
+    },
+    "FilterValues": {
+      "base": null,
+      "refs": {
+        "Filter$Values": "<p>When you're using a <code>List</code> operation and you want the operation to return a subset of objects, such as Resolver endpoints or Resolver rules, the value of the parameter that you want to use to filter objects. For example, to list only inbound Resolver endpoints, specify <code>Direction</code> for <code>Name</code> and specify <code>INBOUND</code> for <code>Values</code>.</p>"
+      }
+    },
+    "Filters": {
+      "base": null,
+      "refs": {
+        "ListResolverEndpointsRequest$Filters": "<p>An optional specification to return a subset of Resolver endpoints, such as all inbound Resolver endpoints.</p> <note> <p>If you submit a second or subsequent <code>ListResolverEndpoints</code> request and specify the <code>NextToken</code> parameter, you must use the same values for <code>Filters</code>, if any, as in the previous request.</p> </note>",
+        "ListResolverQueryLogConfigAssociationsRequest$Filters": "<p>An optional specification to return a subset of query logging associations.</p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigAssociations</code> request and specify the <code>NextToken</code> parameter, you must use the same values for <code>Filters</code>, if any, as in the previous request.</p> </note>",
+        "ListResolverQueryLogConfigsRequest$Filters": "<p>An optional specification to return a subset of query logging configurations.</p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigs</code> request and specify the <code>NextToken</code> parameter, you must use the same values for <code>Filters</code>, if any, as in the previous request.</p> </note>",
+        "ListResolverRuleAssociationsRequest$Filters": "<p>An optional specification to return a subset of Resolver rules, such as Resolver rules that are associated with the same VPC ID.</p> <note> <p>If you submit a second or subsequent <code>ListResolverRuleAssociations</code> request and specify the <code>NextToken</code> parameter, you must use the same values for <code>Filters</code>, if any, as in the previous request.</p> </note>",
+        "ListResolverRulesRequest$Filters": "<p>An optional specification to return a subset of Resolver rules, such as all Resolver rules that are associated with the same Resolver endpoint.</p> <note> <p>If you submit a second or subsequent <code>ListResolverRules</code> request and specify the <code>NextToken</code> parameter, you must use the same values for <code>Filters</code>, if any, as in the previous request.</p> </note>"
+      }
+    },
+    "GetResolverEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverEndpointResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigAssociationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverQueryLogConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRuleAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRuleAssociationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRulePolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRulePolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalServiceErrorException": {
+      "base": "<p>We encountered an unknown error. Try again in a few minutes.</p>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The value that you specified for <code>NextToken</code> in a <code>List</code> request isn't valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>One or more parameters in this request are not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidPolicyDocument": {
+      "base": "<p>The specified Resolver rule policy is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidTagException": {
+      "base": "<p>The specified tag is invalid.</p>",
+      "refs": {
+      }
+    },
+    "Ip": {
+      "base": null,
+      "refs": {
+        "IpAddressRequest$Ip": "<p>The IP address that you want to use for DNS queries.</p>",
+        "IpAddressResponse$Ip": "<p>One IP address that the Resolver endpoint uses for DNS queries.</p>",
+        "IpAddressUpdate$Ip": "<p>The new IP address.</p>",
+        "TargetAddress$Ip": "<p>One IP address that you want to forward DNS queries to. You can specify only IPv4 addresses.</p>"
+      }
+    },
+    "IpAddressCount": {
+      "base": null,
+      "refs": {
+        "ResolverEndpoint$IpAddressCount": "<p>The number of IP addresses that the Resolver endpoint can use for DNS queries.</p>"
+      }
+    },
+    "IpAddressRequest": {
+      "base": "<p>In a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html\">CreateResolverEndpoint</a> request, the IP address that DNS queries originate from (for outbound endpoints) or that you forward DNS queries to (for inbound endpoints). <code>IpAddressRequest</code> also includes the ID of the subnet that contains the IP address.</p>",
+      "refs": {
+        "IpAddressesRequest$member": null
+      }
+    },
+    "IpAddressResponse": {
+      "base": "<p>In the response to a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a> request, information about the IP addresses that the Resolver endpoint uses for DNS queries.</p>",
+      "refs": {
+        "IpAddressesResponse$member": null
+      }
+    },
+    "IpAddressStatus": {
+      "base": null,
+      "refs": {
+        "IpAddressResponse$Status": "<p>A status code that gives the current status of the request.</p>"
+      }
+    },
+    "IpAddressUpdate": {
+      "base": "<p>In an <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_UpdateResolverEndpoint.html\">UpdateResolverEndpoint</a> request, information about an IP address to update.</p>",
+      "refs": {
+        "AssociateResolverEndpointIpAddressRequest$IpAddress": "<p>Either the IPv4 address that you want to add to a Resolver endpoint or a subnet ID. If you specify a subnet ID, Resolver chooses an IP address for you from the available IPs in the specified subnet.</p>",
+        "DisassociateResolverEndpointIpAddressRequest$IpAddress": "<p>The IPv4 address that you want to remove from a Resolver endpoint.</p>"
+      }
+    },
+    "IpAddressesRequest": {
+      "base": null,
+      "refs": {
+        "CreateResolverEndpointRequest$IpAddresses": "<p>The subnets and IP addresses in your VPC that DNS queries originate from (for outbound endpoints) or that you forward DNS queries to (for inbound endpoints). The subnet ID uniquely identifies a VPC. </p>"
+      }
+    },
+    "IpAddressesResponse": {
+      "base": null,
+      "refs": {
+        "ListResolverEndpointIpAddressesResponse$IpAddresses": "<p>Information about the IP addresses in your VPC that DNS queries originate from (for outbound endpoints) or that you forward DNS queries to (for inbound endpoints).</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The request caused one or more limits to be exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListResolverEndpointIpAddressesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverEndpointIpAddressesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverEndpointsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverEndpointsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverQueryLogConfigAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverQueryLogConfigAssociationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverQueryLogConfigsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverQueryLogConfigsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverRuleAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverRuleAssociationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListResolverRulesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListResolverEndpointIpAddressesRequest$MaxResults": "<p>The maximum number of IP addresses that you want to return in the response to a <code>ListResolverEndpointIpAddresses</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 IP addresses. </p>",
+        "ListResolverEndpointIpAddressesResponse$MaxResults": "<p>The value that you specified for <code>MaxResults</code> in the request.</p>",
+        "ListResolverEndpointsRequest$MaxResults": "<p>The maximum number of Resolver endpoints that you want to return in the response to a <code>ListResolverEndpoints</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 Resolver endpoints. </p>",
+        "ListResolverEndpointsResponse$MaxResults": "<p>The value that you specified for <code>MaxResults</code> in the request.</p>",
+        "ListResolverQueryLogConfigAssociationsRequest$MaxResults": "<p>The maximum number of query logging associations that you want to return in the response to a <code>ListResolverQueryLogConfigAssociations</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 query logging associations. </p>",
+        "ListResolverQueryLogConfigsRequest$MaxResults": "<p>The maximum number of query logging configurations that you want to return in the response to a <code>ListResolverQueryLogConfigs</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 query logging configurations. </p>",
+        "ListResolverRuleAssociationsRequest$MaxResults": "<p>The maximum number of rule associations that you want to return in the response to a <code>ListResolverRuleAssociations</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 rule associations. </p>",
+        "ListResolverRuleAssociationsResponse$MaxResults": "<p>The value that you specified for <code>MaxResults</code> in the request.</p>",
+        "ListResolverRulesRequest$MaxResults": "<p>The maximum number of Resolver rules that you want to return in the response to a <code>ListResolverRules</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 Resolver rules.</p>",
+        "ListResolverRulesResponse$MaxResults": "<p>The value that you specified for <code>MaxResults</code> in the request.</p>",
+        "ListTagsForResourceRequest$MaxResults": "<p>The maximum number of tags that you want to return in the response to a <code>ListTagsForResource</code> request. If you don't specify a value for <code>MaxResults</code>, Resolver returns up to 100 tags.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "AssociateResolverRuleRequest$Name": "<p>A name for the association that you're creating between a Resolver rule and a VPC.</p>",
+        "CreateResolverEndpointRequest$Name": "<p>A friendly name that lets you easily find a configuration in the Resolver dashboard in the Route 53 console.</p>",
+        "CreateResolverRuleRequest$Name": "<p>A friendly name that lets you easily find a rule in the Resolver dashboard in the Route 53 console.</p>",
+        "ResolverEndpoint$Name": "<p>The name that you assigned to the Resolver endpoint when you submitted a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html\">CreateResolverEndpoint</a> request.</p>",
+        "ResolverRule$Name": "<p>The name for the Resolver rule, which you specified when you created the Resolver rule.</p>",
+        "ResolverRuleAssociation$Name": "<p>The name of an association between a Resolver rule and a VPC.</p>",
+        "ResolverRuleConfig$Name": "<p>The new name for the Resolver rule. The name that you specify appears in the Resolver dashboard in the Route 53 console. </p>",
+        "UpdateResolverEndpointRequest$Name": "<p>The name of the Resolver endpoint that you want to update.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListResolverEndpointIpAddressesRequest$NextToken": "<p>For the first <code>ListResolverEndpointIpAddresses</code> request, omit this value.</p> <p>If the specified Resolver endpoint has more than <code>MaxResults</code> IP addresses, you can submit another <code>ListResolverEndpointIpAddresses</code> request to get the next group of IP addresses. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverEndpointIpAddressesResponse$NextToken": "<p>If the specified endpoint has more than <code>MaxResults</code> IP addresses, you can submit another <code>ListResolverEndpointIpAddresses</code> request to get the next group of IP addresses. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverEndpointsRequest$NextToken": "<p>For the first <code>ListResolverEndpoints</code> request, omit this value.</p> <p>If you have more than <code>MaxResults</code> Resolver endpoints, you can submit another <code>ListResolverEndpoints</code> request to get the next group of Resolver endpoints. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverEndpointsResponse$NextToken": "<p>If more than <code>MaxResults</code> IP addresses match the specified criteria, you can submit another <code>ListResolverEndpoint</code> request to get the next group of results. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverQueryLogConfigAssociationsRequest$NextToken": "<p>For the first <code>ListResolverQueryLogConfigAssociations</code> request, omit this value.</p> <p>If there are more than <code>MaxResults</code> query logging associations that match the values that you specify for <code>Filters</code>, you can submit another <code>ListResolverQueryLogConfigAssociations</code> request to get the next group of associations. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverQueryLogConfigAssociationsResponse$NextToken": "<p>If there are more than <code>MaxResults</code> query logging associations, you can submit another <code>ListResolverQueryLogConfigAssociations</code> request to get the next group of associations. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverQueryLogConfigsRequest$NextToken": "<p>For the first <code>ListResolverQueryLogConfigs</code> request, omit this value.</p> <p>If there are more than <code>MaxResults</code> query logging configurations that match the values that you specify for <code>Filters</code>, you can submit another <code>ListResolverQueryLogConfigs</code> request to get the next group of configurations. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverQueryLogConfigsResponse$NextToken": "<p>If there are more than <code>MaxResults</code> query logging configurations, you can submit another <code>ListResolverQueryLogConfigs</code> request to get the next group of configurations. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverRuleAssociationsRequest$NextToken": "<p>For the first <code>ListResolverRuleAssociation</code> request, omit this value.</p> <p>If you have more than <code>MaxResults</code> rule associations, you can submit another <code>ListResolverRuleAssociation</code> request to get the next group of rule associations. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverRuleAssociationsResponse$NextToken": "<p>If more than <code>MaxResults</code> rule associations match the specified criteria, you can submit another <code>ListResolverRuleAssociation</code> request to get the next group of results. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverRulesRequest$NextToken": "<p>For the first <code>ListResolverRules</code> request, omit this value.</p> <p>If you have more than <code>MaxResults</code> Resolver rules, you can submit another <code>ListResolverRules</code> request to get the next group of Resolver rules. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListResolverRulesResponse$NextToken": "<p>If more than <code>MaxResults</code> Resolver rules match the specified criteria, you can submit another <code>ListResolverRules</code> request to get the next group of results. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListTagsForResourceRequest$NextToken": "<p>For the first <code>ListTagsForResource</code> request, omit this value.</p> <p>If you have more than <code>MaxResults</code> tags, you can submit another <code>ListTagsForResource</code> request to get the next group of tags for the resource. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>",
+        "ListTagsForResourceResponse$NextToken": "<p>If more than <code>MaxResults</code> tags match the specified criteria, you can submit another <code>ListTagsForResource</code> request to get the next group of results. In the next request, specify the value of <code>NextToken</code> from the previous response. </p>"
+      }
+    },
+    "Port": {
+      "base": null,
+      "refs": {
+        "TargetAddress$Port": "<p>The port at <code>Ip</code> that you want to forward DNS queries to.</p>"
+      }
+    },
+    "PutResolverQueryLogConfigPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutResolverQueryLogConfigPolicyResponse": {
+      "base": "<p>The response to a <code>PutResolverQueryLogConfigPolicy</code> request.</p>",
+      "refs": {
+      }
+    },
+    "PutResolverRulePolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutResolverRulePolicyResponse": {
+      "base": "<p>The response to a <code>PutResolverRulePolicy</code> request.</p>",
+      "refs": {
+      }
+    },
+    "ResolverEndpoint": {
+      "base": "<p>In the response to a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html\">CreateResolverEndpoint</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DeleteResolverEndpoint.html\">DeleteResolverEndpoint</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverEndpoints.html\">ListResolverEndpoints</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_UpdateResolverEndpoint.html\">UpdateResolverEndpoint</a> request, a complex type that contains settings for an existing inbound or outbound Resolver endpoint.</p>",
+      "refs": {
+        "AssociateResolverEndpointIpAddressResponse$ResolverEndpoint": "<p>The response to an <code>AssociateResolverEndpointIpAddress</code> request.</p>",
+        "CreateResolverEndpointResponse$ResolverEndpoint": "<p>Information about the <code>CreateResolverEndpoint</code> request, including the status of the request.</p>",
+        "DeleteResolverEndpointResponse$ResolverEndpoint": "<p>Information about the <code>DeleteResolverEndpoint</code> request, including the status of the request.</p>",
+        "DisassociateResolverEndpointIpAddressResponse$ResolverEndpoint": "<p>The response to an <code>DisassociateResolverEndpointIpAddress</code> request.</p>",
+        "GetResolverEndpointResponse$ResolverEndpoint": "<p>Information about the Resolver endpoint that you specified in a <code>GetResolverEndpoint</code> request.</p>",
+        "ResolverEndpoints$member": null,
+        "UpdateResolverEndpointResponse$ResolverEndpoint": "<p>The response to an <code>UpdateResolverEndpoint</code> request.</p>"
+      }
+    },
+    "ResolverEndpointDirection": {
+      "base": null,
+      "refs": {
+        "CreateResolverEndpointRequest$Direction": "<p>Specify the applicable value:</p> <ul> <li> <p> <code>INBOUND</code>: Resolver forwards DNS queries to the DNS service for a VPC from your network</p> </li> <li> <p> <code>OUTBOUND</code>: Resolver forwards DNS queries from the DNS service for a VPC to your network</p> </li> </ul>",
+        "ResolverEndpoint$Direction": "<p>Indicates whether the Resolver endpoint allows inbound or outbound DNS queries:</p> <ul> <li> <p> <code>INBOUND</code>: allows DNS queries to your VPC from your network</p> </li> <li> <p> <code>OUTBOUND</code>: allows DNS queries from your VPC to your network</p> </li> </ul>"
+      }
+    },
+    "ResolverEndpointStatus": {
+      "base": null,
+      "refs": {
+        "ResolverEndpoint$Status": "<p>A code that specifies the current status of the Resolver endpoint. Valid values include the following:</p> <ul> <li> <p> <code>CREATING</code>: Resolver is creating and configuring one or more Amazon VPC network interfaces for this endpoint.</p> </li> <li> <p> <code>OPERATIONAL</code>: The Amazon VPC network interfaces for this endpoint are correctly configured and able to pass inbound or outbound DNS queries between your network and Resolver.</p> </li> <li> <p> <code>UPDATING</code>: Resolver is associating or disassociating one or more network interfaces with this endpoint.</p> </li> <li> <p> <code>AUTO_RECOVERING</code>: Resolver is trying to recover one or more of the network interfaces that are associated with this endpoint. During the recovery process, the endpoint functions with limited capacity because of the limit on the number of DNS queries per IP address (per network interface). For the current limit, see <a href=\"https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSLimitations.html#limits-api-entities-resolver\">Limits on Route 53 Resolver</a>.</p> </li> <li> <p> <code>ACTION_NEEDED</code>: This endpoint is unhealthy, and Resolver can't automatically recover it. To resolve the problem, we recommend that you check each IP address that you associated with the endpoint. For each IP address that isn't available, add another IP address and then delete the IP address that isn't available. (An endpoint must always include at least two IP addresses.) A status of <code>ACTION_NEEDED</code> can have a variety of causes. Here are two common causes:</p> <ul> <li> <p>One or more of the network interfaces that are associated with the endpoint were deleted using Amazon VPC.</p> </li> <li> <p>The network interface couldn't be created for some reason that's outside the control of Resolver.</p> </li> </ul> </li> <li> <p> <code>DELETING</code>: Resolver is deleting this endpoint and the associated network interfaces.</p> </li> </ul>"
+      }
+    },
+    "ResolverEndpoints": {
+      "base": null,
+      "refs": {
+        "ListResolverEndpointsResponse$ResolverEndpoints": "<p>The Resolver endpoints that were created by using the current AWS account, and that match the specified filters, if any.</p>"
+      }
+    },
+    "ResolverQueryLogConfig": {
+      "base": "<p>In the response to a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverQueryLogConfig.html\">CreateResolverQueryLogConfig</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DeleteResolverQueryLogConfig.html\">DeleteResolverQueryLogConfig</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverQueryLogConfig.html\">GetResolverQueryLogConfig</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigs.html\">ListResolverQueryLogConfigs</a> request, a complex type that contains settings for one query logging configuration.</p>",
+      "refs": {
+        "CreateResolverQueryLogConfigResponse$ResolverQueryLogConfig": "<p>Information about the <code>CreateResolverQueryLogConfig</code> request, including the status of the request.</p>",
+        "DeleteResolverQueryLogConfigResponse$ResolverQueryLogConfig": "<p>Information about the query logging configuration that you deleted, including the status of the request.</p>",
+        "GetResolverQueryLogConfigResponse$ResolverQueryLogConfig": "<p>Information about the Resolver query logging configuration that you specified in a <code>GetQueryLogConfig</code> request.</p>",
+        "ResolverQueryLogConfigList$member": null
+      }
+    },
+    "ResolverQueryLogConfigAssociation": {
+      "base": "<p>In the response to an <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverQueryLogConfig.html\">AssociateResolverQueryLogConfig</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverQueryLogConfig.html\">DisassociateResolverQueryLogConfig</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverQueryLogConfigAssociation.html\">GetResolverQueryLogConfigAssociation</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverQueryLogConfigAssociations.html\">ListResolverQueryLogConfigAssociations</a>, request, a complex type that contains settings for a specified association between an Amazon VPC and a query logging configuration.</p>",
+      "refs": {
+        "AssociateResolverQueryLogConfigResponse$ResolverQueryLogConfigAssociation": "<p>A complex type that contains settings for a specified association between an Amazon VPC and a query logging configuration.</p>",
+        "DisassociateResolverQueryLogConfigResponse$ResolverQueryLogConfigAssociation": "<p>A complex type that contains settings for the association that you deleted between an Amazon VPC and a query logging configuration.</p>",
+        "GetResolverQueryLogConfigAssociationResponse$ResolverQueryLogConfigAssociation": "<p>Information about the Resolver query logging configuration association that you specified in a <code>GetQueryLogConfigAssociation</code> request.</p>",
+        "ResolverQueryLogConfigAssociationList$member": null
+      }
+    },
+    "ResolverQueryLogConfigAssociationError": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfigAssociation$Error": "<p>If the value of <code>Status</code> is <code>FAILED</code>, the value of <code>Error</code> indicates the cause:</p> <ul> <li> <p> <code>DESTINATION_NOT_FOUND</code>: The specified destination (for example, an Amazon S3 bucket) was deleted.</p> </li> <li> <p> <code>ACCESS_DENIED</code>: Permissions don't allow sending logs to the destination.</p> </li> </ul> <p>If the value of <code>Status</code> is a value other than <code>FAILED</code>, <code>Error</code> is null. </p>"
+      }
+    },
+    "ResolverQueryLogConfigAssociationErrorMessage": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfigAssociation$ErrorMessage": "<p>Contains additional information about the error. If the value or <code>Error</code> is null, the value of <code>ErrorMessage</code> also is null.</p>"
+      }
+    },
+    "ResolverQueryLogConfigAssociationList": {
+      "base": null,
+      "refs": {
+        "ListResolverQueryLogConfigAssociationsResponse$ResolverQueryLogConfigAssociations": "<p>A list that contains one <code>ResolverQueryLogConfigAssociations</code> element for each query logging association that matches the values that you specified for <code>Filter</code>.</p>"
+      }
+    },
+    "ResolverQueryLogConfigAssociationStatus": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfigAssociation$Status": "<p>The status of the specified query logging association. Valid values include the following:</p> <ul> <li> <p> <code>CREATING</code>: Resolver is creating an association between an Amazon VPC and a query logging configuration.</p> </li> <li> <p> <code>CREATED</code>: The association between an Amazon VPC and a query logging configuration was successfully created. Resolver is logging queries that originate in the specified VPC.</p> </li> <li> <p> <code>DELETING</code>: Resolver is deleting this query logging association.</p> </li> <li> <p> <code>FAILED</code>: Resolver either couldn't create or couldn't delete the query logging association.</p> </li> </ul>"
+      }
+    },
+    "ResolverQueryLogConfigList": {
+      "base": null,
+      "refs": {
+        "ListResolverQueryLogConfigsResponse$ResolverQueryLogConfigs": "<p>A list that contains one <code>ResolverQueryLogConfig</code> element for each query logging configuration that matches the values that you specified for <code>Filter</code>.</p>"
+      }
+    },
+    "ResolverQueryLogConfigName": {
+      "base": null,
+      "refs": {
+        "CreateResolverQueryLogConfigRequest$Name": "<p>The name that you want to give the query logging configuration</p>",
+        "ResolverQueryLogConfig$Name": "<p>The name of the query logging configuration. </p>"
+      }
+    },
+    "ResolverQueryLogConfigPolicy": {
+      "base": null,
+      "refs": {
+        "GetResolverQueryLogConfigPolicyResponse$ResolverQueryLogConfigPolicy": "<p>Information about the query logging policy for the query logging configuration that you specified in a <code>GetResolverQueryLogConfigPolicy</code> request.</p>",
+        "PutResolverQueryLogConfigPolicyRequest$ResolverQueryLogConfigPolicy": "<p>An AWS Identity and Access Management policy statement that lists the query logging configurations that you want to share with another AWS account and the operations that you want the account to be able to perform. You can specify the following operations in the <code>Actions</code> section of the statement:</p> <ul> <li> <p> <code>route53resolver:AssociateResolverQueryLogConfig</code> </p> </li> <li> <p> <code>route53resolver:DisassociateResolverQueryLogConfig</code> </p> </li> <li> <p> <code>route53resolver:ListResolverQueryLogConfigAssociations</code> </p> </li> <li> <p> <code>route53resolver:ListResolverQueryLogConfigs</code> </p> </li> </ul> <p>In the <code>Resource</code> section of the statement, you specify the ARNs for the query logging configurations that you want to share with the account that you specified in <code>Arn</code>. </p>"
+      }
+    },
+    "ResolverQueryLogConfigStatus": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfig$Status": "<p>The status of the specified query logging configuration. Valid values include the following:</p> <ul> <li> <p> <code>CREATING</code>: Resolver is creating the query logging configuration.</p> </li> <li> <p> <code>CREATED</code>: The query logging configuration was successfully created. Resolver is logging queries that originate in the specified VPC.</p> </li> <li> <p> <code>DELETING</code>: Resolver is deleting this query logging configuration.</p> </li> <li> <p> <code>FAILED</code>: Resolver can't deliver logs to the location that is specified in the query logging configuration. Here are two common causes:</p> <ul> <li> <p>The specified destination (for example, an Amazon S3 bucket) was deleted.</p> </li> <li> <p>Permissions don't allow sending logs to the destination.</p> </li> </ul> </li> </ul>"
+      }
+    },
+    "ResolverRule": {
+      "base": "<p>For queries that originate in your VPC, detailed information about a Resolver rule, which specifies how to route DNS queries out of the VPC. The <code>ResolverRule</code> parameter appears in the response to a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverRule.html\">CreateResolverRule</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DeleteResolverRule.html\">DeleteResolverRule</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverRule.html\">GetResolverRule</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_UpdateResolverRule.html\">UpdateResolverRule</a> request.</p>",
+      "refs": {
+        "CreateResolverRuleResponse$ResolverRule": "<p>Information about the <code>CreateResolverRule</code> request, including the status of the request.</p>",
+        "DeleteResolverRuleResponse$ResolverRule": "<p>Information about the <code>DeleteResolverRule</code> request, including the status of the request.</p>",
+        "GetResolverRuleResponse$ResolverRule": "<p>Information about the Resolver rule that you specified in a <code>GetResolverRule</code> request.</p>",
+        "ResolverRules$member": null,
+        "UpdateResolverRuleResponse$ResolverRule": "<p>The response to an <code>UpdateResolverRule</code> request.</p>"
+      }
+    },
+    "ResolverRuleAssociation": {
+      "base": "<p>In the response to an <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverRule.html\">AssociateResolverRule</a>, <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_DisassociateResolverRule.html\">DisassociateResolverRule</a>, or <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRuleAssociations.html\">ListResolverRuleAssociations</a> request, provides information about an association between a Resolver rule and a VPC. The association determines which DNS queries that originate in the VPC are forwarded to your network. </p>",
+      "refs": {
+        "AssociateResolverRuleResponse$ResolverRuleAssociation": "<p>Information about the <code>AssociateResolverRule</code> request, including the status of the request.</p>",
+        "DisassociateResolverRuleResponse$ResolverRuleAssociation": "<p>Information about the <code>DisassociateResolverRule</code> request, including the status of the request.</p>",
+        "GetResolverRuleAssociationResponse$ResolverRuleAssociation": "<p>Information about the Resolver rule association that you specified in a <code>GetResolverRuleAssociation</code> request.</p>",
+        "ResolverRuleAssociations$member": null
+      }
+    },
+    "ResolverRuleAssociationStatus": {
+      "base": null,
+      "refs": {
+        "ResolverRuleAssociation$Status": "<p>A code that specifies the current status of the association between a Resolver rule and a VPC.</p>"
+      }
+    },
+    "ResolverRuleAssociations": {
+      "base": null,
+      "refs": {
+        "ListResolverRuleAssociationsResponse$ResolverRuleAssociations": "<p>The associations that were created between Resolver rules and VPCs using the current AWS account, and that match the specified filters, if any.</p>"
+      }
+    },
+    "ResolverRuleConfig": {
+      "base": "<p>In an <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_UpdateResolverRule.html\">UpdateResolverRule</a> request, information about the changes that you want to make.</p>",
+      "refs": {
+        "UpdateResolverRuleRequest$Config": "<p>The new settings for the Resolver rule.</p>"
+      }
+    },
+    "ResolverRulePolicy": {
+      "base": null,
+      "refs": {
+        "GetResolverRulePolicyResponse$ResolverRulePolicy": "<p>Information about the Resolver rule policy that you specified in a <code>GetResolverRulePolicy</code> request.</p>",
+        "PutResolverRulePolicyRequest$ResolverRulePolicy": "<p>An AWS Identity and Access Management policy statement that lists the rules that you want to share with another AWS account and the operations that you want the account to be able to perform. You can specify the following operations in the <code>Actions</code> section of the statement:</p> <ul> <li> <p> <code>route53resolver:GetResolverRule</code> </p> </li> <li> <p> <code>route53resolver:AssociateResolverRule</code> </p> </li> <li> <p> <code>route53resolver:DisassociateResolverRule</code> </p> </li> <li> <p> <code>route53resolver:ListResolverRules</code> </p> </li> <li> <p> <code>route53resolver:ListResolverRuleAssociations</code> </p> </li> </ul> <p>In the <code>Resource</code> section of the statement, you specify the ARNs for the rules that you want to share with the account that you specified in <code>Arn</code>. </p>"
+      }
+    },
+    "ResolverRuleStatus": {
+      "base": null,
+      "refs": {
+        "ResolverRule$Status": "<p>A code that specifies the current status of the Resolver rule.</p>"
+      }
+    },
+    "ResolverRules": {
+      "base": null,
+      "refs": {
+        "ListResolverRulesResponse$ResolverRules": "<p>The Resolver rules that were created using the current AWS account and that match the specified filters, if any.</p>"
+      }
+    },
+    "ResourceExistsException": {
+      "base": "<p>The resource that you tried to create already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "AssociateResolverEndpointIpAddressRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to associate IP addresses with.</p>",
+        "AssociateResolverQueryLogConfigRequest$ResolverQueryLogConfigId": "<p>The ID of the query logging configuration that you want to associate a VPC with.</p>",
+        "AssociateResolverQueryLogConfigRequest$ResourceId": "<p>The ID of an Amazon VPC that you want this query logging configuration to log queries for.</p> <note> <p>The VPCs and the query logging configuration must be in the same Region.</p> </note>",
+        "AssociateResolverRuleRequest$ResolverRuleId": "<p>The ID of the Resolver rule that you want to associate with the VPC. To list the existing Resolver rules, use <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_ListResolverRules.html\">ListResolverRules</a>.</p>",
+        "AssociateResolverRuleRequest$VPCId": "<p>The ID of the VPC that you want to associate the Resolver rule with.</p>",
+        "CreateResolverRuleRequest$ResolverEndpointId": "<p>The ID of the outbound Resolver endpoint that you want to use to route DNS queries to the IP addresses that you specify in <code>TargetIps</code>.</p>",
+        "DeleteResolverEndpointRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to delete.</p>",
+        "DeleteResolverQueryLogConfigRequest$ResolverQueryLogConfigId": "<p>The ID of the query logging configuration that you want to delete.</p>",
+        "DeleteResolverRuleRequest$ResolverRuleId": "<p>The ID of the Resolver rule that you want to delete.</p>",
+        "DisassociateResolverEndpointIpAddressRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to disassociate an IP address from.</p>",
+        "DisassociateResolverQueryLogConfigRequest$ResolverQueryLogConfigId": "<p>The ID of the query logging configuration that you want to disassociate a specified VPC from.</p>",
+        "DisassociateResolverQueryLogConfigRequest$ResourceId": "<p>The ID of the Amazon VPC that you want to disassociate from a specified query logging configuration.</p>",
+        "DisassociateResolverRuleRequest$VPCId": "<p>The ID of the VPC that you want to disassociate the Resolver rule from.</p>",
+        "DisassociateResolverRuleRequest$ResolverRuleId": "<p>The ID of the Resolver rule that you want to disassociate from the specified VPC.</p>",
+        "GetResolverEndpointRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to get information about.</p>",
+        "GetResolverQueryLogConfigAssociationRequest$ResolverQueryLogConfigAssociationId": "<p>The ID of the Resolver query logging configuration association that you want to get information about.</p>",
+        "GetResolverQueryLogConfigRequest$ResolverQueryLogConfigId": "<p>The ID of the Resolver query logging configuration that you want to get information about.</p>",
+        "GetResolverRuleAssociationRequest$ResolverRuleAssociationId": "<p>The ID of the Resolver rule association that you want to get information about.</p>",
+        "GetResolverRuleRequest$ResolverRuleId": "<p>The ID of the Resolver rule that you want to get information about.</p>",
+        "IpAddressResponse$IpId": "<p>The ID of one IP address.</p>",
+        "IpAddressUpdate$IpId": "<p> <i>Only when removing an IP address from a Resolver endpoint</i>: The ID of the IP address that you want to remove. To get this ID, use <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a>.</p>",
+        "ListResolverEndpointIpAddressesRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to get IP addresses for.</p>",
+        "ResolverEndpoint$Id": "<p>The ID of the Resolver endpoint.</p>",
+        "ResolverEndpoint$HostVPCId": "<p>The ID of the VPC that you want to create the Resolver endpoint in.</p>",
+        "ResolverQueryLogConfig$Id": "<p>The ID for the query logging configuration.</p>",
+        "ResolverQueryLogConfigAssociation$Id": "<p>The ID of the query logging association.</p>",
+        "ResolverQueryLogConfigAssociation$ResolverQueryLogConfigId": "<p>The ID of the query logging configuration that a VPC is associated with.</p>",
+        "ResolverQueryLogConfigAssociation$ResourceId": "<p>The ID of the Amazon VPC that is associated with the query logging configuration.</p>",
+        "ResolverRule$Id": "<p>The ID that Resolver assigned to the Resolver rule when you created it.</p>",
+        "ResolverRule$ResolverEndpointId": "<p>The ID of the endpoint that the rule is associated with.</p>",
+        "ResolverRuleAssociation$Id": "<p>The ID of the association between a Resolver rule and a VPC. Resolver assigns this value when you submit an <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_AssociateResolverRule.html\">AssociateResolverRule</a> request.</p>",
+        "ResolverRuleAssociation$ResolverRuleId": "<p>The ID of the Resolver rule that you associated with the VPC that is specified by <code>VPCId</code>.</p>",
+        "ResolverRuleAssociation$VPCId": "<p>The ID of the VPC that you associated the Resolver rule with.</p>",
+        "ResolverRuleConfig$ResolverEndpointId": "<p>The ID of the new outbound Resolver endpoint that you want to use to route DNS queries to the IP addresses that you specify in <code>TargetIps</code>.</p>",
+        "SecurityGroupIds$member": null,
+        "UpdateResolverEndpointRequest$ResolverEndpointId": "<p>The ID of the Resolver endpoint that you want to update.</p>",
+        "UpdateResolverRuleRequest$ResolverRuleId": "<p>The ID of the Resolver rule that you want to update.</p>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The resource that you tried to update or delete is currently in use.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource doesn't exist.</p>",
+      "refs": {
+      }
+    },
+    "ResourceUnavailableException": {
+      "base": "<p>The specified resource isn't available.</p>",
+      "refs": {
+      }
+    },
+    "Rfc3339TimeString": {
+      "base": null,
+      "refs": {
+        "IpAddressResponse$CreationTime": "<p>The date and time that the IP address was created, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "IpAddressResponse$ModificationTime": "<p>The date and time that the IP address was last modified, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverEndpoint$CreationTime": "<p>The date and time that the endpoint was created, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverEndpoint$ModificationTime": "<p>The date and time that the endpoint was last modified, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverQueryLogConfig$CreationTime": "<p>The date and time that the query logging configuration was created, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverQueryLogConfigAssociation$CreationTime": "<p>The date and time that the VPC was associated with the query logging configuration, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverRule$CreationTime": "<p>The date and time that the Resolver rule was created, in Unix time format and Coordinated Universal Time (UTC).</p>",
+        "ResolverRule$ModificationTime": "<p>The date and time that the Resolver rule was last updated, in Unix time format and Coordinated Universal Time (UTC).</p>"
+      }
+    },
+    "RuleTypeOption": {
+      "base": null,
+      "refs": {
+        "CreateResolverRuleRequest$RuleType": "<p>When you want to forward DNS queries for specified domain name to resolvers on your network, specify <code>FORWARD</code>.</p> <p>When you have a forwarding rule to forward DNS queries for a domain to your network and you want Resolver to process queries for a subdomain of that domain, specify <code>SYSTEM</code>.</p> <p>For example, to forward DNS queries for example.com to resolvers on your network, you create a rule and specify <code>FORWARD</code> for <code>RuleType</code>. To then have Resolver process queries for apex.example.com, you create a rule and specify <code>SYSTEM</code> for <code>RuleType</code>.</p> <p>Currently, only Resolver can create rules that have a value of <code>RECURSIVE</code> for <code>RuleType</code>.</p>",
+        "ResolverRule$RuleType": "<p>When you want to forward DNS queries for specified domain name to resolvers on your network, specify <code>FORWARD</code>.</p> <p>When you have a forwarding rule to forward DNS queries for a domain to your network and you want Resolver to process queries for a subdomain of that domain, specify <code>SYSTEM</code>.</p> <p>For example, to forward DNS queries for example.com to resolvers on your network, you create a rule and specify <code>FORWARD</code> for <code>RuleType</code>. To then have Resolver process queries for apex.example.com, you create a rule and specify <code>SYSTEM</code> for <code>RuleType</code>.</p> <p>Currently, only Resolver can create rules that have a value of <code>RECURSIVE</code> for <code>RuleType</code>.</p>"
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "CreateResolverEndpointRequest$SecurityGroupIds": "<p>The ID of one or more security groups that you want to use to control access to this VPC. The security group that you specify must include one or more inbound rules (for inbound Resolver endpoints) or outbound rules (for outbound Resolver endpoints). Inbound and outbound rules must allow TCP and UDP access. For inbound access, open port 53. For outbound access, open the port that you're using for DNS queries on your network.</p>",
+        "ResolverEndpoint$SecurityGroupIds": "<p>The ID of one or more security groups that control access to this VPC. The security group must include one or more inbound rules (for inbound endpoints) or outbound rules (for outbound endpoints). Inbound and outbound rules must allow TCP and UDP access. For inbound access, open port 53. For outbound access, open the port that you're using for DNS queries on your network.</p>"
+      }
+    },
+    "ShareStatus": {
+      "base": null,
+      "refs": {
+        "ResolverQueryLogConfig$ShareStatus": "<p>An indication of whether the query logging configuration is shared with other AWS accounts, or was shared with the current account by another AWS account. Sharing is configured through AWS Resource Access Manager (AWS RAM).</p>",
+        "ResolverRule$ShareStatus": "<p>Whether the rules is shared and, if so, whether the current account is sharing the rule with another account, or another account is sharing the rule with the current account.</p>"
+      }
+    },
+    "SortByKey": {
+      "base": null,
+      "refs": {
+        "ListResolverQueryLogConfigAssociationsRequest$SortBy": "<p>The element that you want Resolver to sort query logging associations by. </p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigAssociations</code> request and specify the <code>NextToken</code> parameter, you must use the same value for <code>SortBy</code>, if any, as in the previous request.</p> </note> <p>Valid values include the following elements:</p> <ul> <li> <p> <code>CreationTime</code>: The ID of the query logging association.</p> </li> <li> <p> <code>Error</code>: If the value of <code>Status</code> is <code>FAILED</code>, the value of <code>Error</code> indicates the cause: </p> <ul> <li> <p> <code>DESTINATION_NOT_FOUND</code>: The specified destination (for example, an Amazon S3 bucket) was deleted.</p> </li> <li> <p> <code>ACCESS_DENIED</code>: Permissions don't allow sending logs to the destination.</p> </li> </ul> <p>If <code>Status</code> is a value other than <code>FAILED</code>, <code>ERROR</code> is null.</p> </li> <li> <p> <code>Id</code>: The ID of the query logging association</p> </li> <li> <p> <code>ResolverQueryLogConfigId</code>: The ID of the query logging configuration</p> </li> <li> <p> <code>ResourceId</code>: The ID of the VPC that is associated with the query logging configuration</p> </li> <li> <p> <code>Status</code>: The current status of the configuration. Valid values include the following:</p> <ul> <li> <p> <code>CREATING</code>: Resolver is creating an association between an Amazon VPC and a query logging configuration.</p> </li> <li> <p> <code>CREATED</code>: The association between an Amazon VPC and a query logging configuration was successfully created. Resolver is logging queries that originate in the specified VPC.</p> </li> <li> <p> <code>DELETING</code>: Resolver is deleting this query logging association.</p> </li> <li> <p> <code>FAILED</code>: Resolver either couldn't create or couldn't delete the query logging association. Here are two common causes:</p> <ul> <li> <p>The specified destination (for example, an Amazon S3 bucket) was deleted.</p> </li> <li> <p>Permissions don't allow sending logs to the destination.</p> </li> </ul> </li> </ul> </li> </ul>",
+        "ListResolverQueryLogConfigsRequest$SortBy": "<p>The element that you want Resolver to sort query logging configurations by. </p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigs</code> request and specify the <code>NextToken</code> parameter, you must use the same value for <code>SortBy</code>, if any, as in the previous request.</p> </note> <p>Valid values include the following elements:</p> <ul> <li> <p> <code>Arn</code>: The ARN of the query logging configuration</p> </li> <li> <p> <code>AssociationCount</code>: The number of VPCs that are associated with the specified configuration </p> </li> <li> <p> <code>CreationTime</code>: The date and time that Resolver returned when the configuration was created</p> </li> <li> <p> <code>CreatorRequestId</code>: The value that was specified for <code>CreatorRequestId</code> when the configuration was created</p> </li> <li> <p> <code>DestinationArn</code>: The location that logs are sent to</p> </li> <li> <p> <code>Id</code>: The ID of the configuration</p> </li> <li> <p> <code>Name</code>: The name of the configuration</p> </li> <li> <p> <code>OwnerId</code>: The AWS account number of the account that created the configuration</p> </li> <li> <p> <code>ShareStatus</code>: Whether the configuration is shared with other AWS accounts or shared with the current account by another AWS account. Sharing is configured through AWS Resource Access Manager (AWS RAM).</p> </li> <li> <p> <code>Status</code>: The current status of the configuration. Valid values include the following:</p> <ul> <li> <p> <code>CREATING</code>: Resolver is creating the query logging configuration.</p> </li> <li> <p> <code>CREATED</code>: The query logging configuration was successfully created. Resolver is logging queries that originate in the specified VPC.</p> </li> <li> <p> <code>DELETING</code>: Resolver is deleting this query logging configuration.</p> </li> <li> <p> <code>FAILED</code>: Resolver either couldn't create or couldn't delete the query logging configuration. Here are two common causes:</p> <ul> <li> <p>The specified destination (for example, an Amazon S3 bucket) was deleted.</p> </li> <li> <p>Permissions don't allow sending logs to the destination.</p> </li> </ul> </li> </ul> </li> </ul>"
+      }
+    },
+    "SortOrder": {
+      "base": null,
+      "refs": {
+        "ListResolverQueryLogConfigAssociationsRequest$SortOrder": "<p>If you specified a value for <code>SortBy</code>, the order that you want query logging associations to be listed in, <code>ASCENDING</code> or <code>DESCENDING</code>.</p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigAssociations</code> request and specify the <code>NextToken</code> parameter, you must use the same value for <code>SortOrder</code>, if any, as in the previous request.</p> </note>",
+        "ListResolverQueryLogConfigsRequest$SortOrder": "<p>If you specified a value for <code>SortBy</code>, the order that you want query logging configurations to be listed in, <code>ASCENDING</code> or <code>DESCENDING</code>.</p> <note> <p>If you submit a second or subsequent <code>ListResolverQueryLogConfigs</code> request and specify the <code>NextToken</code> parameter, you must use the same value for <code>SortOrder</code>, if any, as in the previous request.</p> </note>"
+      }
+    },
+    "StatusMessage": {
+      "base": null,
+      "refs": {
+        "IpAddressResponse$StatusMessage": "<p>A message that provides additional information about the status of the request.</p>",
+        "ResolverEndpoint$StatusMessage": "<p>A detailed description of the status of the Resolver endpoint.</p>",
+        "ResolverRule$StatusMessage": "<p>A detailed description of the status of a Resolver rule.</p>",
+        "ResolverRuleAssociation$StatusMessage": "<p>A detailed description of the status of the association between a Resolver rule and a VPC.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "InvalidNextTokenException$Message": null,
+        "InvalidParameterException$FieldName": "<p>For an <code>InvalidParameterException</code> error, the name of the parameter that's invalid.</p>",
+        "LimitExceededException$Message": null,
+        "LimitExceededException$ResourceType": "<p>For a <code>LimitExceededException</code> error, the type of resource that exceeded the current limit.</p>",
+        "ResourceExistsException$Message": null,
+        "ResourceExistsException$ResourceType": "<p>For a <code>ResourceExistsException</code> error, the type of resource that the error applies to.</p>",
+        "ResourceInUseException$Message": null,
+        "ResourceInUseException$ResourceType": "<p>For a <code>ResourceInUseException</code> error, the type of resource that is currently in use.</p>",
+        "ResourceNotFoundException$Message": null,
+        "ResourceNotFoundException$ResourceType": "<p>For a <code>ResourceNotFoundException</code> error, the type of resource that doesn't exist.</p>",
+        "ResourceUnavailableException$Message": null,
+        "ResourceUnavailableException$ResourceType": "<p>For a <code>ResourceUnavailableException</code> error, the type of resource that isn't available.</p>"
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "IpAddressRequest$SubnetId": "<p>The ID of the subnet that contains the IP address. </p>",
+        "IpAddressResponse$SubnetId": "<p>The ID of one subnet.</p>",
+        "IpAddressUpdate$SubnetId": "<p>The ID of the subnet that includes the IP address that you want to update. To get this ID, use <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_GetResolverEndpoint.html\">GetResolverEndpoint</a>.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>One tag that you want to add to the specified resource. A tag consists of a <code>Key</code> (a name for the tag) and a <code>Value</code>.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The name for the tag. For example, if you want to associate Resolver resources with the account IDs of your customers for billing purposes, the value of <code>Key</code> might be <code>account-id</code>.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tags that you want to remove to the specified resource.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateResolverEndpointRequest$Tags": "<p>A list of the tag keys and values that you want to associate with the endpoint.</p>",
+        "CreateResolverQueryLogConfigRequest$Tags": "<p>A list of the tag keys and values that you want to associate with the query logging configuration.</p>",
+        "CreateResolverRuleRequest$Tags": "<p>A list of the tag keys and values that you want to associate with the endpoint.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>The tags that are associated with the resource that you specified in the <code>ListTagsForResource</code> request.</p>",
+        "TagResourceRequest$Tags": "<p>The tags that you want to add to the specified resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value for the tag. For example, if <code>Key</code> is <code>account-id</code>, then <code>Value</code> might be the ID of the customer account that you're creating the resource for.</p>"
+      }
+    },
+    "TargetAddress": {
+      "base": "<p>In a <a href=\"https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverRule.html\">CreateResolverRule</a> request, an array of the IPs that you want to forward DNS queries to.</p>",
+      "refs": {
+        "TargetList$member": null
+      }
+    },
+    "TargetList": {
+      "base": null,
+      "refs": {
+        "CreateResolverRuleRequest$TargetIps": "<p>The IPs that you want Resolver to forward DNS queries to. You can specify only IPv4 addresses. Separate IP addresses with a comma.</p> <p> <code>TargetIps</code> is available only when the value of <code>Rule type</code> is <code>FORWARD</code>.</p>",
+        "ResolverRule$TargetIps": "<p>An array that contains the IP addresses and ports that an outbound endpoint forwards DNS queries to. Typically, these are the IP addresses of DNS resolvers on your network. Specify IPv4 addresses. IPv6 is not supported.</p>",
+        "ResolverRuleConfig$TargetIps": "<p>For DNS queries that originate in your VPC, the new IP addresses that you want to route outbound DNS queries to.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request was throttled. Try again in a few minutes.</p>",
+      "refs": {
+      }
+    },
+    "UnknownResourceException": {
+      "base": "<p>The specified resource doesn't exist.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResolverEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResolverEndpointResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResolverRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateResolverRuleResponse": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "commit": "394395ed0bdc1c5c05cb37a031379ca03bfebbb5",
+  "readme": "/_/azure-rest-api-specs/specification/cognitiveservices/resource-manager/readme.md",
+  "tag": "package-2021-04",
+  "use": "@microsoft.azure/autorest.go@2.1.183",
+  "repository_url": "https://github.com/Azure/azure-rest-api-specs.git",
+  "autorest_command": "autorest --use=@microsoft.azure/autorest.go@2.1.183 --tag=package-2021-04 --go-sdk-folder=/_/azure-sdk-for-go --go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION --enum-prefix /_/azure-rest-api-specs/specification/cognitiveservices/resource-manager/readme.md",
+  "additional_properties": {
+    "additional_options": "--go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION --enum-prefix"
+  }
+}

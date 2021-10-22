@@ -1,0 +1,23 @@
+{
+  "pagination": {
+    "DescribeConnectorProfiles": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "DescribeConnectors": {
+      "input_token": "nextToken",
+      "output_token": "nextToken"
+    },
+    "DescribeFlowExecutionRecords": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "ListFlows": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

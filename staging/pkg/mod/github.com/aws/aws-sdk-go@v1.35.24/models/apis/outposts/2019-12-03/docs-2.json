@@ -1,0 +1,267 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS Outposts is a fully-managed service that extends AWS infrastructure, APIs, and tools to customer premises. By providing local access to AWS-managed infrastructure, AWS Outposts enables customers to build and run applications on premises using the same programming interfaces as in AWS Regions, while using local compute and storage resources for lower latency and local data processing needs.</p>",
+  "operations": {
+    "CreateOutpost": "<p>Creates an Outpost.</p>",
+    "DeleteOutpost": "<p>Deletes the Outpost.</p>",
+    "DeleteSite": "<p>Deletes the site.</p>",
+    "GetOutpost": "<p>Gets information about the specified Outpost.</p>",
+    "GetOutpostInstanceTypes": "<p>Lists the instance types for the specified Outpost.</p>",
+    "ListOutposts": "<p>List the Outposts for your AWS account.</p>",
+    "ListSites": "<p>Lists the sites for the specified AWS account.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have permission to perform this operation.</p>",
+      "refs": {
+      }
+    },
+    "AccountId": {
+      "base": "<p>The ID of the AWS account.</p>",
+      "refs": {
+        "Site$AccountId": null
+      }
+    },
+    "AvailabilityZone": {
+      "base": "<p>The Availability Zone.</p> <p>You must specify <code>AvailabilityZone</code> or <code>AvailabilityZoneId</code>.</p>",
+      "refs": {
+        "CreateOutpostInput$AvailabilityZone": null,
+        "Outpost$AvailabilityZone": null
+      }
+    },
+    "AvailabilityZoneId": {
+      "base": "<p>The ID of the Availability Zone.</p> <p>You must specify <code>AvailabilityZone</code> or <code>AvailabilityZoneId</code>.</p>",
+      "refs": {
+        "CreateOutpostInput$AvailabilityZoneId": null,
+        "Outpost$AvailabilityZoneId": null
+      }
+    },
+    "CreateOutpostInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateOutpostOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOutpostInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOutpostOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSiteInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSiteOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "InternalServerException$Message": null,
+        "NotFoundException$Message": null,
+        "ServiceQuotaExceededException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "GetOutpostInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOutpostInstanceTypesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOutpostInstanceTypesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOutpostOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InstanceType": {
+      "base": "<p>The instance type.</p>",
+      "refs": {
+        "InstanceTypeItem$InstanceType": null
+      }
+    },
+    "InstanceTypeItem": {
+      "base": "<p>Information about an instance type.</p>",
+      "refs": {
+        "InstanceTypeListDefinition$member": null
+      }
+    },
+    "InstanceTypeListDefinition": {
+      "base": "<p>Information about the instance types.</p>",
+      "refs": {
+        "GetOutpostInstanceTypesOutput$InstanceTypes": null
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>An internal error has occurred.</p>",
+      "refs": {
+      }
+    },
+    "LifeCycleStatus": {
+      "base": "<p>The life cycle status.</p>",
+      "refs": {
+        "Outpost$LifeCycleStatus": null
+      }
+    },
+    "ListOutpostsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOutpostsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSitesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSitesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults1000": {
+      "base": "<p>The maximum page size.</p>",
+      "refs": {
+        "GetOutpostInstanceTypesInput$MaxResults": null,
+        "ListOutpostsInput$MaxResults": null,
+        "ListSitesInput$MaxResults": null
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The specified request is not valid.</p>",
+      "refs": {
+      }
+    },
+    "Outpost": {
+      "base": "<p>Information about an Outpost.</p>",
+      "refs": {
+        "CreateOutpostOutput$Outpost": null,
+        "GetOutpostOutput$Outpost": null,
+        "outpostListDefinition$member": null
+      }
+    },
+    "OutpostArn": {
+      "base": "<p>The Amazon Resource Name (ARN) of the Outpost.</p>",
+      "refs": {
+        "GetOutpostInstanceTypesOutput$OutpostArn": null,
+        "Outpost$OutpostArn": null
+      }
+    },
+    "OutpostDescription": {
+      "base": "<p>The Outpost description.</p>",
+      "refs": {
+        "CreateOutpostInput$Description": null,
+        "Outpost$Description": null
+      }
+    },
+    "OutpostId": {
+      "base": "<p>The ID of the Outpost.</p>",
+      "refs": {
+        "DeleteOutpostInput$OutpostId": null,
+        "GetOutpostInput$OutpostId": null,
+        "GetOutpostInstanceTypesInput$OutpostId": null,
+        "GetOutpostInstanceTypesOutput$OutpostId": null,
+        "Outpost$OutpostId": null
+      }
+    },
+    "OutpostName": {
+      "base": "<p>The name of the Outpost.</p>",
+      "refs": {
+        "CreateOutpostInput$Name": null,
+        "Outpost$Name": null
+      }
+    },
+    "OwnerId": {
+      "base": "<p>The AWS account ID of the Outpost owner.</p>",
+      "refs": {
+        "Outpost$OwnerId": null
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>You have exceeded a service quota.</p>",
+      "refs": {
+      }
+    },
+    "Site": {
+      "base": "<p>Information about a site.</p>",
+      "refs": {
+        "siteListDefinition$member": null
+      }
+    },
+    "SiteDescription": {
+      "base": "<p>The description of the site.</p>",
+      "refs": {
+        "Site$Description": null
+      }
+    },
+    "SiteId": {
+      "base": "<p>The ID of the site.</p>",
+      "refs": {
+        "CreateOutpostInput$SiteId": null,
+        "DeleteSiteInput$SiteId": null,
+        "Outpost$SiteId": null,
+        "Site$SiteId": null
+      }
+    },
+    "SiteName": {
+      "base": "<p>The name of the site.</p>",
+      "refs": {
+        "Site$Name": null
+      }
+    },
+    "Token": {
+      "base": "<p>The pagination token.</p>",
+      "refs": {
+        "GetOutpostInstanceTypesInput$NextToken": null,
+        "GetOutpostInstanceTypesOutput$NextToken": null,
+        "ListOutpostsInput$NextToken": null,
+        "ListOutpostsOutput$NextToken": null,
+        "ListSitesInput$NextToken": null,
+        "ListSitesOutput$NextToken": null
+      }
+    },
+    "ValidationException": {
+      "base": "<p>A parameter is not valid.</p>",
+      "refs": {
+      }
+    },
+    "outpostListDefinition": {
+      "base": "<p>Information about the Outposts.</p>",
+      "refs": {
+        "ListOutpostsOutput$Outposts": null
+      }
+    },
+    "siteListDefinition": {
+      "base": "<p>Information about the sites.</p>",
+      "refs": {
+        "ListSitesOutput$Sites": null
+      }
+    }
+  }
+}

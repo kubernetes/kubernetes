@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeConfigurationRecorders",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "GetResourceConfigHistory",
+            "input": {
+                "resourceType": "fake-type",
+                "resourceId": "fake-id"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

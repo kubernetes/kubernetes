@@ -1,0 +1,2026 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Directory Service</fullname> <p>AWS Directory Service is a web service that makes it easy for you to setup and run directories in the AWS cloud, or connect your AWS resources with an existing on-premises Microsoft Active Directory. This guide provides detailed information about AWS Directory Service operations, data types, parameters, and errors. For information about AWS Directory Services features, see <a href=\"https://aws.amazon.com/directoryservice/\">AWS Directory Service</a> and the <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/what_is.html\">AWS Directory Service Administration Guide</a>.</p> <note> <p>AWS provides SDKs that consist of libraries and sample code for various programming languages and platforms (Java, Ruby, .Net, iOS, Android, etc.). The SDKs provide a convenient way to create programmatic access to AWS Directory Service and other AWS services. For more information about the AWS SDKs, including how to download and install them, see <a href=\"http://aws.amazon.com/tools/\">Tools for Amazon Web Services</a>.</p> </note>",
+  "operations": {
+    "AcceptSharedDirectory": "<p>Accepts a directory sharing request that was sent from the directory owner account.</p>",
+    "AddIpRoutes": "<p>If the DNS server for your on-premises domain uses a publicly addressable IP address, you must add a CIDR address block to correctly route traffic to and from your Microsoft AD on Amazon Web Services. <i>AddIpRoutes</i> adds this address block. You can also use <i>AddIpRoutes</i> to facilitate routing traffic that uses public IP ranges from your Microsoft AD on AWS to a peer VPC. </p> <p>Before you call <i>AddIpRoutes</i>, ensure that all of the required permissions have been explicitly granted through a policy. For details about what permissions are required to run the <i>AddIpRoutes</i> operation, see <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/UsingWithDS_IAM_ResourcePermissions.html\">AWS Directory Service API Permissions: Actions, Resources, and Conditions Reference</a>.</p>",
+    "AddTagsToResource": "<p>Adds or overwrites one or more tags for the specified directory. Each directory can have a maximum of 50 tags. Each tag consists of a key and optional value. Tag keys must be unique to each resource.</p>",
+    "CancelSchemaExtension": "<p>Cancels an in-progress schema extension to a Microsoft AD directory. Once a schema extension has started replicating to all domain controllers, the task can no longer be canceled. A schema extension can be canceled during any of the following states; <code>Initializing</code>, <code>CreatingSnapshot</code>, and <code>UpdatingSchema</code>.</p>",
+    "ConnectDirectory": "<p>Creates an AD Connector to connect to an on-premises directory.</p> <p>Before you call <code>ConnectDirectory</code>, ensure that all of the required permissions have been explicitly granted through a policy. For details about what permissions are required to run the <code>ConnectDirectory</code> operation, see <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/UsingWithDS_IAM_ResourcePermissions.html\">AWS Directory Service API Permissions: Actions, Resources, and Conditions Reference</a>.</p>",
+    "CreateAlias": "<p>Creates an alias for a directory and assigns the alias to the directory. The alias is used to construct the access URL for the directory, such as <code>http://&lt;alias&gt;.awsapps.com</code>.</p> <important> <p>After an alias has been created, it cannot be deleted or reused, so this operation should only be used when absolutely necessary.</p> </important>",
+    "CreateComputer": "<p>Creates a computer account in the specified directory, and joins the computer to the directory.</p>",
+    "CreateConditionalForwarder": "<p>Creates a conditional forwarder associated with your AWS directory. Conditional forwarders are required in order to set up a trust relationship with another domain. The conditional forwarder points to the trusted domain.</p>",
+    "CreateDirectory": "<p>Creates a Simple AD directory. For more information, see <a href=\"https://docs.aws.amazon.com/directoryservice/latest/admin-guide/directory_simple_ad.html\">Simple Active Directory</a> in the <i>AWS Directory Service Admin Guide</i>.</p> <p>Before you call <code>CreateDirectory</code>, ensure that all of the required permissions have been explicitly granted through a policy. For details about what permissions are required to run the <code>CreateDirectory</code> operation, see <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/UsingWithDS_IAM_ResourcePermissions.html\">AWS Directory Service API Permissions: Actions, Resources, and Conditions Reference</a>.</p>",
+    "CreateLogSubscription": "<p>Creates a subscription to forward real-time Directory Service domain controller security logs to the specified Amazon CloudWatch log group in your AWS account.</p>",
+    "CreateMicrosoftAD": "<p>Creates a Microsoft AD directory in the AWS Cloud. For more information, see <a href=\"https://docs.aws.amazon.com/directoryservice/latest/admin-guide/directory_microsoft_ad.html\">AWS Managed Microsoft AD</a> in the <i>AWS Directory Service Admin Guide</i>.</p> <p>Before you call <i>CreateMicrosoftAD</i>, ensure that all of the required permissions have been explicitly granted through a policy. For details about what permissions are required to run the <i>CreateMicrosoftAD</i> operation, see <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/UsingWithDS_IAM_ResourcePermissions.html\">AWS Directory Service API Permissions: Actions, Resources, and Conditions Reference</a>.</p>",
+    "CreateSnapshot": "<p>Creates a snapshot of a Simple AD or Microsoft AD directory in the AWS cloud.</p> <note> <p>You cannot take snapshots of AD Connector directories.</p> </note>",
+    "CreateTrust": "<p>AWS Directory Service for Microsoft Active Directory allows you to configure trust relationships. For example, you can establish a trust between your AWS Managed Microsoft AD directory, and your existing on-premises Microsoft Active Directory. This would allow you to provide users and groups access to resources in either domain, with a single set of credentials.</p> <p>This action initiates the creation of the AWS side of a trust relationship between an AWS Managed Microsoft AD directory and an external domain. You can create either a forest trust or an external trust.</p>",
+    "DeleteConditionalForwarder": "<p>Deletes a conditional forwarder that has been set up for your AWS directory.</p>",
+    "DeleteDirectory": "<p>Deletes an AWS Directory Service directory.</p> <p>Before you call <code>DeleteDirectory</code>, ensure that all of the required permissions have been explicitly granted through a policy. For details about what permissions are required to run the <code>DeleteDirectory</code> operation, see <a href=\"http://docs.aws.amazon.com/directoryservice/latest/admin-guide/UsingWithDS_IAM_ResourcePermissions.html\">AWS Directory Service API Permissions: Actions, Resources, and Conditions Reference</a>.</p>",
+    "DeleteLogSubscription": "<p>Deletes the specified log subscription.</p>",
+    "DeleteSnapshot": "<p>Deletes a directory snapshot.</p>",
+    "DeleteTrust": "<p>Deletes an existing trust relationship between your AWS Managed Microsoft AD directory and an external domain.</p>",
+    "DeregisterCertificate": "<p>Deletes from the system the certificate that was registered for a secured LDAP connection.</p>",
+    "DeregisterEventTopic": "<p>Removes the specified directory as a publisher to the specified SNS topic.</p>",
+    "DescribeCertificate": "<p>Displays information about the certificate registered for a secured LDAP connection.</p>",
+    "DescribeConditionalForwarders": "<p>Obtains information about the conditional forwarders for this account.</p> <p>If no input parameters are provided for RemoteDomainNames, this request describes all conditional forwarders for the specified directory ID.</p>",
+    "DescribeDirectories": "<p>Obtains information about the directories that belong to this account.</p> <p>You can retrieve information about specific directories by passing the directory identifiers in the <code>DirectoryIds</code> parameter. Otherwise, all directories that belong to the current account are returned.</p> <p>This operation supports pagination with the use of the <code>NextToken</code> request and response parameters. If more results are available, the <code>DescribeDirectoriesResult.NextToken</code> member contains a token that you pass in the next call to <a>DescribeDirectories</a> to retrieve the next set of items.</p> <p>You can also specify a maximum number of return results with the <code>Limit</code> parameter.</p>",
+    "DescribeDomainControllers": "<p>Provides information about any domain controllers in your directory.</p>",
+    "DescribeEventTopics": "<p>Obtains information about which SNS topics receive status messages from the specified directory.</p> <p>If no input parameters are provided, such as DirectoryId or TopicName, this request describes all of the associations in the account.</p>",
+    "DescribeLDAPSSettings": "<p>Describes the status of LDAP security for the specified directory.</p>",
+    "DescribeSharedDirectories": "<p>Returns the shared directories in your account. </p>",
+    "DescribeSnapshots": "<p>Obtains information about the directory snapshots that belong to this account.</p> <p>This operation supports pagination with the use of the <i>NextToken</i> request and response parameters. If more results are available, the <i>DescribeSnapshots.NextToken</i> member contains a token that you pass in the next call to <a>DescribeSnapshots</a> to retrieve the next set of items.</p> <p>You can also specify a maximum number of return results with the <i>Limit</i> parameter.</p>",
+    "DescribeTrusts": "<p>Obtains information about the trust relationships for this account.</p> <p>If no input parameters are provided, such as DirectoryId or TrustIds, this request describes all the trust relationships belonging to the account.</p>",
+    "DisableLDAPS": "<p>Deactivates LDAP secure calls for the specified directory.</p>",
+    "DisableRadius": "<p>Disables multi-factor authentication (MFA) with the Remote Authentication Dial In User Service (RADIUS) server for an AD Connector or Microsoft AD directory.</p>",
+    "DisableSso": "<p>Disables single-sign on for a directory.</p>",
+    "EnableLDAPS": "<p>Activates the switch for the specific directory to always use LDAP secure calls.</p>",
+    "EnableRadius": "<p>Enables multi-factor authentication (MFA) with the Remote Authentication Dial In User Service (RADIUS) server for an AD Connector or Microsoft AD directory.</p>",
+    "EnableSso": "<p>Enables single sign-on for a directory. Single sign-on allows users in your directory to access certain AWS services from a computer joined to the directory without having to enter their credentials separately.</p>",
+    "GetDirectoryLimits": "<p>Obtains directory limit information for the current Region.</p>",
+    "GetSnapshotLimits": "<p>Obtains the manual snapshot limits for a directory.</p>",
+    "ListCertificates": "<p>For the specified directory, lists all the certificates registered for a secured LDAP connection.</p>",
+    "ListIpRoutes": "<p>Lists the address blocks that you have added to a directory.</p>",
+    "ListLogSubscriptions": "<p>Lists the active log subscriptions for the AWS account.</p>",
+    "ListSchemaExtensions": "<p>Lists all schema extensions applied to a Microsoft AD Directory.</p>",
+    "ListTagsForResource": "<p>Lists all tags on a directory.</p>",
+    "RegisterCertificate": "<p>Registers a certificate for secured LDAP connection.</p>",
+    "RegisterEventTopic": "<p>Associates a directory with an SNS topic. This establishes the directory as a publisher to the specified SNS topic. You can then receive email or text (SMS) messages when the status of your directory changes. You get notified if your directory goes from an Active status to an Impaired or Inoperable status. You also receive a notification when the directory returns to an Active status.</p>",
+    "RejectSharedDirectory": "<p>Rejects a directory sharing request that was sent from the directory owner account.</p>",
+    "RemoveIpRoutes": "<p>Removes IP address blocks from a directory.</p>",
+    "RemoveTagsFromResource": "<p>Removes tags from a directory.</p>",
+    "ResetUserPassword": "<p>Resets the password for any user in your AWS Managed Microsoft AD or Simple AD directory.</p> <p>You can reset the password for any user in your directory with the following exceptions:</p> <ul> <li> <p>For Simple AD, you cannot reset the password for any user that is a member of either the <b>Domain Admins</b> or <b>Enterprise Admins</b> group except for the administrator user.</p> </li> <li> <p>For AWS Managed Microsoft AD, you can only reset the password for a user that is in an OU based off of the NetBIOS name that you typed when you created your directory. For example, you cannot reset the password for a user in the <b>AWS Reserved</b> OU. For more information about the OU structure for an AWS Managed Microsoft AD directory, see <a href=\"https://docs.aws.amazon.com/directoryservice/latest/admin-guide/ms_ad_getting_started_what_gets_created.html\">What Gets Created</a> in the <i>AWS Directory Service Administration Guide</i>.</p> </li> </ul>",
+    "RestoreFromSnapshot": "<p>Restores a directory using an existing directory snapshot.</p> <p>When you restore a directory from a snapshot, any changes made to the directory after the snapshot date are overwritten.</p> <p>This action returns as soon as the restore operation is initiated. You can monitor the progress of the restore operation by calling the <a>DescribeDirectories</a> operation with the directory identifier. When the <b>DirectoryDescription.Stage</b> value changes to <code>Active</code>, the restore operation is complete.</p>",
+    "ShareDirectory": "<p>Shares a specified directory (<code>DirectoryId</code>) in your AWS account (directory owner) with another AWS account (directory consumer). With this operation you can use your directory from any AWS account and from any Amazon VPC within an AWS Region.</p> <p>When you share your AWS Managed Microsoft AD directory, AWS Directory Service creates a shared directory in the directory consumer account. This shared directory contains the metadata to provide access to the directory within the directory owner account. The shared directory is visible in all VPCs in the directory consumer account.</p> <p>The <code>ShareMethod</code> parameter determines whether the specified directory can be shared between AWS accounts inside the same AWS organization (<code>ORGANIZATIONS</code>). It also determines whether you can share the directory with any other AWS account either inside or outside of the organization (<code>HANDSHAKE</code>).</p> <p>The <code>ShareNotes</code> parameter is only used when <code>HANDSHAKE</code> is called, which sends a directory sharing request to the directory consumer. </p>",
+    "StartSchemaExtension": "<p>Applies a schema extension to a Microsoft AD directory.</p>",
+    "UnshareDirectory": "<p>Stops the directory sharing between the directory owner and consumer accounts. </p>",
+    "UpdateConditionalForwarder": "<p>Updates a conditional forwarder that has been set up for your AWS directory.</p>",
+    "UpdateNumberOfDomainControllers": "<p>Adds or removes domain controllers to or from the directory. Based on the difference between current value and new value (provided through this API call), domain controllers will be added or removed. It may take up to 45 minutes for any new domain controllers to become fully active once the requested number of domain controllers is updated. During this time, you cannot make another update request.</p>",
+    "UpdateRadius": "<p>Updates the Remote Authentication Dial In User Service (RADIUS) server information for an AD Connector or Microsoft AD directory.</p>",
+    "UpdateTrust": "<p>Updates the trust that has been set up between your AWS Managed Microsoft AD directory and an on-premises Active Directory.</p>",
+    "VerifyTrust": "<p>AWS Directory Service for Microsoft Active Directory allows you to configure and verify trust relationships.</p> <p>This action verifies a trust relationship between your AWS Managed Microsoft AD directory and an external domain.</p>"
+  },
+  "shapes": {
+    "AcceptSharedDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AcceptSharedDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AccessUrl": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$AccessUrl": "<p>The access URL for the directory, such as <code>http://&lt;alias&gt;.awsapps.com</code>. If no alias has been created for the directory, <code>&lt;alias&gt;</code> is the directory identifier, such as <code>d-XXXXXXXXXX</code>.</p>"
+      }
+    },
+    "AddIpRoutesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddIpRoutesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddTagsToResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddTagsToResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddedDateTime": {
+      "base": null,
+      "refs": {
+        "IpRouteInfo$AddedDateTime": "<p>The date and time the address block was added to the directory.</p>"
+      }
+    },
+    "AliasName": {
+      "base": null,
+      "refs": {
+        "CreateAliasRequest$Alias": "<p>The requested alias.</p> <p>The alias must be unique amongst all aliases in AWS. This operation throws an <code>EntityAlreadyExistsException</code> error if the alias already exists.</p>",
+        "CreateAliasResult$Alias": "<p>The alias for the directory.</p>",
+        "DirectoryDescription$Alias": "<p>The alias for the directory. If no alias has been created for the directory, the alias is the directory identifier, such as <code>d-XXXXXXXXXX</code>.</p>"
+      }
+    },
+    "Attribute": {
+      "base": "<p>Represents a named directory attribute.</p>",
+      "refs": {
+        "Attributes$member": null
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "Attribute$Name": "<p>The name of the attribute.</p>"
+      }
+    },
+    "AttributeValue": {
+      "base": null,
+      "refs": {
+        "Attribute$Value": "<p>The value of the attribute.</p>"
+      }
+    },
+    "Attributes": {
+      "base": null,
+      "refs": {
+        "Computer$ComputerAttributes": "<p>An array of <a>Attribute</a> objects containing the LDAP attributes that belong to the computer account.</p>",
+        "CreateComputerRequest$ComputerAttributes": "<p>An array of <a>Attribute</a> objects that contain any LDAP attributes to apply to the computer account.</p>"
+      }
+    },
+    "AuthenticationFailedException": {
+      "base": "<p>An authentication error occurred.</p>",
+      "refs": {
+      }
+    },
+    "AvailabilityZone": {
+      "base": null,
+      "refs": {
+        "AvailabilityZones$member": null,
+        "DomainController$AvailabilityZone": "<p>The Availability Zone where the domain controller is located.</p>"
+      }
+    },
+    "AvailabilityZones": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettingsDescription$AvailabilityZones": "<p>A list of the Availability Zones that the directory is in.</p>",
+        "DirectoryVpcSettingsDescription$AvailabilityZones": "<p>The list of Availability Zones that the directory is in.</p>"
+      }
+    },
+    "CancelSchemaExtensionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelSchemaExtensionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Certificate": {
+      "base": "<p>Information about the certificate.</p>",
+      "refs": {
+        "DescribeCertificateResult$Certificate": "<p>Information about the certificate, including registered date time, certificate state, the reason for the state, expiration date time, and certificate common name.</p>"
+      }
+    },
+    "CertificateAlreadyExistsException": {
+      "base": "<p>The certificate has already been registered into the system.</p>",
+      "refs": {
+      }
+    },
+    "CertificateCN": {
+      "base": null,
+      "refs": {
+        "Certificate$CommonName": "<p>The common name for the certificate.</p>",
+        "CertificateInfo$CommonName": "<p>The common name for the certificate.</p>"
+      }
+    },
+    "CertificateData": {
+      "base": null,
+      "refs": {
+        "RegisterCertificateRequest$CertificateData": "<p>The certificate PEM string that needs to be registered.</p>"
+      }
+    },
+    "CertificateDoesNotExistException": {
+      "base": "<p>The certificate is not present in the system for describe or deregister activities.</p>",
+      "refs": {
+      }
+    },
+    "CertificateExpiryDateTime": {
+      "base": null,
+      "refs": {
+        "Certificate$ExpiryDateTime": "<p>The date and time when the certificate will expire.</p>",
+        "CertificateInfo$ExpiryDateTime": "<p>The date and time when the certificate will expire.</p>"
+      }
+    },
+    "CertificateId": {
+      "base": null,
+      "refs": {
+        "Certificate$CertificateId": "<p>The identifier of the certificate.</p>",
+        "CertificateInfo$CertificateId": "<p>The identifier of the certificate.</p>",
+        "DeregisterCertificateRequest$CertificateId": "<p>The identifier of the certificate.</p>",
+        "DescribeCertificateRequest$CertificateId": "<p>The identifier of the certificate.</p>",
+        "RegisterCertificateResult$CertificateId": "<p>The identifier of the certificate.</p>"
+      }
+    },
+    "CertificateInUseException": {
+      "base": "<p>The certificate is being used for the LDAP security connection and cannot be removed without disabling LDAP security.</p>",
+      "refs": {
+      }
+    },
+    "CertificateInfo": {
+      "base": "<p>Contains general information about a certificate.</p>",
+      "refs": {
+        "CertificatesInfo$member": null
+      }
+    },
+    "CertificateLimitExceededException": {
+      "base": "<p>The certificate could not be added because the certificate limit has been reached.</p>",
+      "refs": {
+      }
+    },
+    "CertificateRegisteredDateTime": {
+      "base": null,
+      "refs": {
+        "Certificate$RegisteredDateTime": "<p>The date and time that the certificate was registered.</p>"
+      }
+    },
+    "CertificateState": {
+      "base": null,
+      "refs": {
+        "Certificate$State": "<p>The state of the certificate.</p>",
+        "CertificateInfo$State": "<p>The state of the certificate.</p>"
+      }
+    },
+    "CertificateStateReason": {
+      "base": null,
+      "refs": {
+        "Certificate$StateReason": "<p>Describes a state change for the certificate.</p>"
+      }
+    },
+    "CertificatesInfo": {
+      "base": null,
+      "refs": {
+        "ListCertificatesResult$CertificatesInfo": "<p>A list of certificates with basic details including certificate ID, certificate common name, certificate state.</p>"
+      }
+    },
+    "CidrIp": {
+      "base": null,
+      "refs": {
+        "CidrIps$member": null,
+        "IpRoute$CidrIp": "<p>IP address block using CIDR format, for example 10.0.0.0/24. This is often the address block of the DNS server used for your on-premises domain. For a single IP address use a CIDR address block with /32. For example 10.0.0.0/32.</p>",
+        "IpRouteInfo$CidrIp": "<p>IP address block in the <a>IpRoute</a>.</p>"
+      }
+    },
+    "CidrIps": {
+      "base": null,
+      "refs": {
+        "RemoveIpRoutesRequest$CidrIps": "<p>IP address blocks that you want to remove.</p>"
+      }
+    },
+    "ClientException": {
+      "base": "<p>A client exception has occurred.</p>",
+      "refs": {
+      }
+    },
+    "CloudOnlyDirectoriesLimitReached": {
+      "base": null,
+      "refs": {
+        "DirectoryLimits$CloudOnlyDirectoriesLimitReached": "<p>Indicates if the cloud directory limit has been reached.</p>",
+        "DirectoryLimits$CloudOnlyMicrosoftADLimitReached": "<p>Indicates if the AWS Managed Microsoft AD directory limit has been reached.</p>"
+      }
+    },
+    "Computer": {
+      "base": "<p>Contains information about a computer account in a directory.</p>",
+      "refs": {
+        "CreateComputerResult$Computer": "<p>A <a>Computer</a> object that represents the computer account.</p>"
+      }
+    },
+    "ComputerName": {
+      "base": null,
+      "refs": {
+        "Computer$ComputerName": "<p>The computer name.</p>",
+        "CreateComputerRequest$ComputerName": "<p>The name of the computer account.</p>"
+      }
+    },
+    "ComputerPassword": {
+      "base": null,
+      "refs": {
+        "CreateComputerRequest$Password": "<p>A one-time password that is used to join the computer to the directory. You should generate a random, strong password to use for this parameter.</p>"
+      }
+    },
+    "ConditionalForwarder": {
+      "base": "<p>Points to a remote domain with which you are setting up a trust relationship. Conditional forwarders are required in order to set up a trust relationship with another domain.</p>",
+      "refs": {
+        "ConditionalForwarders$member": null
+      }
+    },
+    "ConditionalForwarders": {
+      "base": null,
+      "refs": {
+        "DescribeConditionalForwardersResult$ConditionalForwarders": "<p>The list of conditional forwarders that have been created.</p>"
+      }
+    },
+    "ConnectDirectoryRequest": {
+      "base": "<p>Contains the inputs for the <a>ConnectDirectory</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ConnectDirectoryResult": {
+      "base": "<p>Contains the results of the <a>ConnectDirectory</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ConnectPassword": {
+      "base": null,
+      "refs": {
+        "ConnectDirectoryRequest$Password": "<p>The password for the on-premises user account.</p>",
+        "DisableSsoRequest$Password": "<p>The password of an alternate account to use to disable single-sign on. This is only used for AD Connector directories. For more information, see the <i>UserName</i> parameter.</p>",
+        "EnableSsoRequest$Password": "<p>The password of an alternate account to use to enable single-sign on. This is only used for AD Connector directories. For more information, see the <i>UserName</i> parameter.</p>"
+      }
+    },
+    "ConnectedDirectoriesLimitReached": {
+      "base": null,
+      "refs": {
+        "DirectoryLimits$ConnectedDirectoriesLimitReached": "<p>Indicates if the connected directory limit has been reached.</p>"
+      }
+    },
+    "CreateAliasRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateAlias</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateAliasResult": {
+      "base": "<p>Contains the results of the <a>CreateAlias</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateComputerRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateComputer</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateComputerResult": {
+      "base": "<p>Contains the results for the <a>CreateComputer</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateConditionalForwarderRequest": {
+      "base": "<p>Initiates the creation of a conditional forwarder for your AWS Directory Service for Microsoft Active Directory. Conditional forwarders are required in order to set up a trust relationship with another domain.</p>",
+      "refs": {
+      }
+    },
+    "CreateConditionalForwarderResult": {
+      "base": "<p>The result of a CreateConditinalForwarder request.</p>",
+      "refs": {
+      }
+    },
+    "CreateDirectoryRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateDirectory</a> operation. </p>",
+      "refs": {
+      }
+    },
+    "CreateDirectoryResult": {
+      "base": "<p>Contains the results of the <a>CreateDirectory</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateLogSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLogSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMicrosoftADRequest": {
+      "base": "<p>Creates an AWS Managed Microsoft AD directory.</p>",
+      "refs": {
+      }
+    },
+    "CreateMicrosoftADResult": {
+      "base": "<p>Result of a CreateMicrosoftAD request.</p>",
+      "refs": {
+      }
+    },
+    "CreateSnapshotBeforeSchemaExtension": {
+      "base": null,
+      "refs": {
+        "StartSchemaExtensionRequest$CreateSnapshotBeforeSchemaExtension": "<p>If true, creates a snapshot of the directory before applying the schema extension.</p>"
+      }
+    },
+    "CreateSnapshotRequest": {
+      "base": "<p>Contains the inputs for the <a>CreateSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateSnapshotResult": {
+      "base": "<p>Contains the results of the <a>CreateSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateTrustRequest": {
+      "base": "<p>AWS Directory Service for Microsoft Active Directory allows you to configure trust relationships. For example, you can establish a trust between your AWS Managed Microsoft AD directory, and your existing on-premises Microsoft Active Directory. This would allow you to provide users and groups access to resources in either domain, with a single set of credentials.</p> <p>This action initiates the creation of the AWS side of a trust relationship between an AWS Managed Microsoft AD directory and an external domain.</p>",
+      "refs": {
+      }
+    },
+    "CreateTrustResult": {
+      "base": "<p>The result of a CreateTrust request.</p>",
+      "refs": {
+      }
+    },
+    "CreatedDateTime": {
+      "base": null,
+      "refs": {
+        "EventTopic$CreatedDateTime": "<p>The date and time of when you associated your directory with the SNS topic.</p>",
+        "SharedDirectory$CreatedDateTime": "<p>The date and time that the shared directory was created.</p>",
+        "Trust$CreatedDateTime": "<p>The date and time that the trust relationship was created.</p>"
+      }
+    },
+    "CustomerId": {
+      "base": null,
+      "refs": {
+        "OwnerDirectoryDescription$AccountId": "<p>Identifier of the directory owner account.</p>",
+        "SharedDirectory$OwnerAccountId": "<p>Identifier of the directory owner account, which contains the directory that has been shared to the consumer account.</p>",
+        "SharedDirectory$SharedAccountId": "<p>Identifier of the directory consumer account that has access to the shared directory (<code>OwnerDirectoryId</code>) in the directory owner account.</p>"
+      }
+    },
+    "CustomerUserName": {
+      "base": null,
+      "refs": {
+        "ResetUserPasswordRequest$UserName": "<p>The user name of the user whose password will be reset.</p>"
+      }
+    },
+    "DeleteAssociatedConditionalForwarder": {
+      "base": null,
+      "refs": {
+        "DeleteTrustRequest$DeleteAssociatedConditionalForwarder": "<p>Delete a conditional forwarder as part of a DeleteTrustRequest.</p>"
+      }
+    },
+    "DeleteConditionalForwarderRequest": {
+      "base": "<p>Deletes a conditional forwarder.</p>",
+      "refs": {
+      }
+    },
+    "DeleteConditionalForwarderResult": {
+      "base": "<p>The result of a DeleteConditionalForwarder request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDirectoryRequest": {
+      "base": "<p>Contains the inputs for the <a>DeleteDirectory</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDirectoryResult": {
+      "base": "<p>Contains the results of the <a>DeleteDirectory</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteLogSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLogSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSnapshotRequest": {
+      "base": "<p>Contains the inputs for the <a>DeleteSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteSnapshotResult": {
+      "base": "<p>Contains the results of the <a>DeleteSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteTrustRequest": {
+      "base": "<p>Deletes the local side of an existing trust relationship between the AWS Managed Microsoft AD directory and the external domain.</p>",
+      "refs": {
+      }
+    },
+    "DeleteTrustResult": {
+      "base": "<p>The result of a DeleteTrust request.</p>",
+      "refs": {
+      }
+    },
+    "DeregisterCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterCertificateResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterEventTopicRequest": {
+      "base": "<p>Removes the specified directory as a publisher to the specified SNS topic.</p>",
+      "refs": {
+      }
+    },
+    "DeregisterEventTopicResult": {
+      "base": "<p>The result of a DeregisterEventTopic request.</p>",
+      "refs": {
+      }
+    },
+    "DescribeCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCertificateResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConditionalForwardersRequest": {
+      "base": "<p>Describes a conditional forwarder.</p>",
+      "refs": {
+      }
+    },
+    "DescribeConditionalForwardersResult": {
+      "base": "<p>The result of a DescribeConditionalForwarder request.</p>",
+      "refs": {
+      }
+    },
+    "DescribeDirectoriesRequest": {
+      "base": "<p>Contains the inputs for the <a>DescribeDirectories</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeDirectoriesResult": {
+      "base": "<p>Contains the results of the <a>DescribeDirectories</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeDomainControllersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDomainControllersResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventTopicsRequest": {
+      "base": "<p>Describes event topics.</p>",
+      "refs": {
+      }
+    },
+    "DescribeEventTopicsResult": {
+      "base": "<p>The result of a DescribeEventTopic request.</p>",
+      "refs": {
+      }
+    },
+    "DescribeLDAPSSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLDAPSSettingsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSharedDirectoriesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSharedDirectoriesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSnapshotsRequest": {
+      "base": "<p>Contains the inputs for the <a>DescribeSnapshots</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeSnapshotsResult": {
+      "base": "<p>Contains the results of the <a>DescribeSnapshots</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeTrustsRequest": {
+      "base": "<p>Describes the trust relationships for a particular AWS Managed Microsoft AD directory. If no input parameters are are provided, such as directory ID or trust ID, this request describes all the trust relationships.</p>",
+      "refs": {
+      }
+    },
+    "DescribeTrustsResult": {
+      "base": "<p>The result of a DescribeTrust request.</p>",
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "ConnectDirectoryRequest$Description": "<p>A description for the directory.</p>",
+        "CreateDirectoryRequest$Description": "<p>A description for the directory.</p>",
+        "CreateMicrosoftADRequest$Description": "<p>A description for the directory. This label will appear on the AWS console <code>Directory Details</code> page after the directory is created.</p>",
+        "DirectoryDescription$Description": "<p>The description for the directory.</p>",
+        "IpRoute$Description": "<p>Description of the address block.</p>",
+        "IpRouteInfo$Description": "<p>Description of the <a>IpRouteInfo</a>.</p>",
+        "SchemaExtensionInfo$Description": "<p>A description of the schema extension.</p>",
+        "StartSchemaExtensionRequest$Description": "<p>A description of the schema extension.</p>"
+      }
+    },
+    "DesiredNumberOfDomainControllers": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$DesiredNumberOfDomainControllers": "<p>The desired number of domain controllers in the directory if the directory is Microsoft AD.</p>",
+        "UpdateNumberOfDomainControllersRequest$DesiredNumber": "<p>The number of domain controllers desired in the directory.</p>"
+      }
+    },
+    "DirectoryAlreadySharedException": {
+      "base": "<p>The specified directory has already been shared with this AWS account.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryConnectSettings": {
+      "base": "<p>Contains information for the <a>ConnectDirectory</a> operation when an AD Connector directory is being created.</p>",
+      "refs": {
+        "ConnectDirectoryRequest$ConnectSettings": "<p>A <a>DirectoryConnectSettings</a> object that contains additional information for the operation.</p>"
+      }
+    },
+    "DirectoryConnectSettingsDescription": {
+      "base": "<p>Contains information about an AD Connector directory.</p>",
+      "refs": {
+        "DirectoryDescription$ConnectSettings": "<p>A <a>DirectoryConnectSettingsDescription</a> object that contains additional information about an AD Connector directory. This member is only present if the directory is an AD Connector directory.</p>"
+      }
+    },
+    "DirectoryDescription": {
+      "base": "<p>Contains information about an AWS Directory Service directory.</p>",
+      "refs": {
+        "DirectoryDescriptions$member": null
+      }
+    },
+    "DirectoryDescriptions": {
+      "base": "<p>A list of directory descriptions.</p>",
+      "refs": {
+        "DescribeDirectoriesResult$DirectoryDescriptions": "<p>The list of <a>DirectoryDescription</a> objects that were retrieved.</p> <p>It is possible that this list contains less than the number of items specified in the <code>Limit</code> member of the request. This occurs if there are less than the requested number of items left to retrieve, or if the limitations of the operation have been exceeded.</p>"
+      }
+    },
+    "DirectoryDoesNotExistException": {
+      "base": "<p>The specified directory does not exist in the system.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryEdition": {
+      "base": null,
+      "refs": {
+        "CreateMicrosoftADRequest$Edition": "<p>AWS Managed Microsoft AD is available in two editions: <code>Standard</code> and <code>Enterprise</code>. <code>Enterprise</code> is the default.</p>",
+        "DirectoryDescription$Edition": "<p>The edition associated with this directory.</p>"
+      }
+    },
+    "DirectoryId": {
+      "base": null,
+      "refs": {
+        "AcceptSharedDirectoryRequest$SharedDirectoryId": "<p>Identifier of the shared directory in the directory consumer account. This identifier is different for each directory owner account. </p>",
+        "AddIpRoutesRequest$DirectoryId": "<p>Identifier (ID) of the directory to which to add the address block.</p>",
+        "CancelSchemaExtensionRequest$DirectoryId": "<p>The identifier of the directory whose schema extension will be canceled.</p>",
+        "ConnectDirectoryResult$DirectoryId": "<p>The identifier of the new directory.</p>",
+        "CreateAliasRequest$DirectoryId": "<p>The identifier of the directory for which to create the alias.</p>",
+        "CreateAliasResult$DirectoryId": "<p>The identifier of the directory.</p>",
+        "CreateComputerRequest$DirectoryId": "<p>The identifier of the directory in which to create the computer account.</p>",
+        "CreateConditionalForwarderRequest$DirectoryId": "<p>The directory ID of the AWS directory for which you are creating the conditional forwarder.</p>",
+        "CreateDirectoryResult$DirectoryId": "<p>The identifier of the directory that was created.</p>",
+        "CreateLogSubscriptionRequest$DirectoryId": "<p>Identifier of the directory to which you want to subscribe and receive real-time logs to your specified CloudWatch log group.</p>",
+        "CreateMicrosoftADResult$DirectoryId": "<p>The identifier of the directory that was created.</p>",
+        "CreateSnapshotRequest$DirectoryId": "<p>The identifier of the directory of which to take a snapshot.</p>",
+        "CreateTrustRequest$DirectoryId": "<p>The Directory ID of the AWS Managed Microsoft AD directory for which to establish the trust relationship.</p>",
+        "DeleteConditionalForwarderRequest$DirectoryId": "<p>The directory ID for which you are deleting the conditional forwarder.</p>",
+        "DeleteDirectoryRequest$DirectoryId": "<p>The identifier of the directory to delete.</p>",
+        "DeleteDirectoryResult$DirectoryId": "<p>The directory identifier.</p>",
+        "DeleteLogSubscriptionRequest$DirectoryId": "<p>Identifier of the directory whose log subscription you want to delete.</p>",
+        "DeregisterCertificateRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "DeregisterEventTopicRequest$DirectoryId": "<p>The Directory ID to remove as a publisher. This directory will no longer send messages to the specified SNS topic.</p>",
+        "DescribeCertificateRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "DescribeConditionalForwardersRequest$DirectoryId": "<p>The directory ID for which to get the list of associated conditional forwarders.</p>",
+        "DescribeDomainControllersRequest$DirectoryId": "<p>Identifier of the directory for which to retrieve the domain controller information.</p>",
+        "DescribeEventTopicsRequest$DirectoryId": "<p>The Directory ID for which to get the list of associated SNS topics. If this member is null, associations for all Directory IDs are returned.</p>",
+        "DescribeLDAPSSettingsRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "DescribeSharedDirectoriesRequest$OwnerDirectoryId": "<p>Returns the identifier of the directory in the directory owner account. </p>",
+        "DescribeSnapshotsRequest$DirectoryId": "<p>The identifier of the directory for which to retrieve snapshot information.</p>",
+        "DescribeTrustsRequest$DirectoryId": "<p>The Directory ID of the AWS directory that is a part of the requested trust relationship.</p>",
+        "DirectoryDescription$DirectoryId": "<p>The directory identifier.</p>",
+        "DirectoryIds$member": null,
+        "DisableLDAPSRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "DisableRadiusRequest$DirectoryId": "<p>The identifier of the directory for which to disable MFA.</p>",
+        "DisableSsoRequest$DirectoryId": "<p>The identifier of the directory for which to disable single-sign on.</p>",
+        "DomainController$DirectoryId": "<p>Identifier of the directory where the domain controller resides.</p>",
+        "EnableLDAPSRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "EnableRadiusRequest$DirectoryId": "<p>The identifier of the directory for which to enable MFA.</p>",
+        "EnableSsoRequest$DirectoryId": "<p>The identifier of the directory for which to enable single-sign on.</p>",
+        "EventTopic$DirectoryId": "<p>The Directory ID of an AWS Directory Service directory that will publish status messages to an SNS topic.</p>",
+        "GetSnapshotLimitsRequest$DirectoryId": "<p>Contains the identifier of the directory to obtain the limits for.</p>",
+        "IpRouteInfo$DirectoryId": "<p>Identifier (ID) of the directory associated with the IP addresses.</p>",
+        "ListCertificatesRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "ListIpRoutesRequest$DirectoryId": "<p>Identifier (ID) of the directory for which you want to retrieve the IP addresses.</p>",
+        "ListLogSubscriptionsRequest$DirectoryId": "<p>If a <i>DirectoryID</i> is provided, lists only the log subscription associated with that directory. If no <i>DirectoryId</i> is provided, lists all log subscriptions associated with your AWS account. If there are no log subscriptions for the AWS account or the directory, an empty list will be returned.</p>",
+        "ListSchemaExtensionsRequest$DirectoryId": "<p>The identifier of the directory from which to retrieve the schema extension information.</p>",
+        "LogSubscription$DirectoryId": "<p>Identifier (ID) of the directory that you want to associate with the log subscription.</p>",
+        "OwnerDirectoryDescription$DirectoryId": "<p>Identifier of the AWS Managed Microsoft AD directory in the directory owner account.</p>",
+        "RegisterCertificateRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "RegisterEventTopicRequest$DirectoryId": "<p>The Directory ID that will publish status messages to the SNS topic.</p>",
+        "RejectSharedDirectoryRequest$SharedDirectoryId": "<p>Identifier of the shared directory in the directory consumer account. This identifier is different for each directory owner account.</p>",
+        "RejectSharedDirectoryResult$SharedDirectoryId": "<p>Identifier of the shared directory in the directory consumer account.</p>",
+        "RemoveIpRoutesRequest$DirectoryId": "<p>Identifier (ID) of the directory from which you want to remove the IP addresses.</p>",
+        "ResetUserPasswordRequest$DirectoryId": "<p>Identifier of the AWS Managed Microsoft AD or Simple AD directory in which the user resides.</p>",
+        "SchemaExtensionInfo$DirectoryId": "<p>The identifier of the directory to which the schema extension is applied.</p>",
+        "ShareDirectoryRequest$DirectoryId": "<p>Identifier of the AWS Managed Microsoft AD directory that you want to share with other AWS accounts.</p>",
+        "ShareDirectoryResult$SharedDirectoryId": "<p>Identifier of the directory that is stored in the directory consumer account that is shared from the specified directory (<code>DirectoryId</code>).</p>",
+        "SharedDirectory$OwnerDirectoryId": "<p>Identifier of the directory in the directory owner account. </p>",
+        "SharedDirectory$SharedDirectoryId": "<p>Identifier of the shared directory in the directory consumer account. This identifier is different for each directory owner account.</p>",
+        "Snapshot$DirectoryId": "<p>The directory identifier.</p>",
+        "StartSchemaExtensionRequest$DirectoryId": "<p>The identifier of the directory for which the schema extension will be applied to.</p>",
+        "Trust$DirectoryId": "<p>The Directory ID of the AWS directory involved in the trust relationship.</p>",
+        "UnshareDirectoryRequest$DirectoryId": "<p>The identifier of the AWS Managed Microsoft AD directory that you want to stop sharing.</p>",
+        "UnshareDirectoryResult$SharedDirectoryId": "<p>Identifier of the directory stored in the directory consumer account that is to be unshared from the specified directory (<code>DirectoryId</code>).</p>",
+        "UpdateConditionalForwarderRequest$DirectoryId": "<p>The directory ID of the AWS directory for which to update the conditional forwarder.</p>",
+        "UpdateNumberOfDomainControllersRequest$DirectoryId": "<p>Identifier of the directory to which the domain controllers will be added or removed.</p>",
+        "UpdateRadiusRequest$DirectoryId": "<p>The identifier of the directory for which to update the RADIUS server information.</p>"
+      }
+    },
+    "DirectoryIds": {
+      "base": "<p>A list of directory identifiers.</p>",
+      "refs": {
+        "DescribeDirectoriesRequest$DirectoryIds": "<p>A list of identifiers of the directories for which to obtain the information. If this member is null, all directories that belong to the current account are returned.</p> <p>An empty list results in an <code>InvalidParameterException</code> being thrown.</p>",
+        "DescribeSharedDirectoriesRequest$SharedDirectoryIds": "<p>A list of identifiers of all shared directories in your account. </p>"
+      }
+    },
+    "DirectoryLimitExceededException": {
+      "base": "<p>The maximum number of directories in the region has been reached. You can use the <a>GetDirectoryLimits</a> operation to determine your directory limits in the region.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryLimits": {
+      "base": "<p>Contains directory limit information for a Region.</p>",
+      "refs": {
+        "GetDirectoryLimitsResult$DirectoryLimits": "<p>A <a>DirectoryLimits</a> object that contains the directory limits for the current rRegion.</p>"
+      }
+    },
+    "DirectoryName": {
+      "base": null,
+      "refs": {
+        "ConnectDirectoryRequest$Name": "<p>The fully qualified name of the on-premises directory, such as <code>corp.example.com</code>.</p>",
+        "CreateDirectoryRequest$Name": "<p>The fully qualified name for the directory, such as <code>corp.example.com</code>.</p>",
+        "CreateMicrosoftADRequest$Name": "<p>The fully qualified domain name for the AWS Managed Microsoft AD directory, such as <code>corp.example.com</code>. This name will resolve inside your VPC only. It does not need to be publicly resolvable.</p>",
+        "DirectoryDescription$Name": "<p>The fully qualified name of the directory.</p>"
+      }
+    },
+    "DirectoryNotSharedException": {
+      "base": "<p>The specified directory has not been shared with this AWS account.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryShortName": {
+      "base": null,
+      "refs": {
+        "ConnectDirectoryRequest$ShortName": "<p>The NetBIOS name of the on-premises directory, such as <code>CORP</code>.</p>",
+        "CreateDirectoryRequest$ShortName": "<p>The NetBIOS name of the directory, such as <code>CORP</code>.</p>",
+        "CreateMicrosoftADRequest$ShortName": "<p>The NetBIOS name for your domain, such as <code>CORP</code>. If you don't specify a NetBIOS name, it will default to the first part of your directory DNS. For example, <code>CORP</code> for the directory DNS <code>corp.example.com</code>. </p>",
+        "DirectoryDescription$ShortName": "<p>The short name of the directory.</p>"
+      }
+    },
+    "DirectorySize": {
+      "base": null,
+      "refs": {
+        "ConnectDirectoryRequest$Size": "<p>The size of the directory.</p>",
+        "CreateDirectoryRequest$Size": "<p>The size of the directory.</p>",
+        "DirectoryDescription$Size": "<p>The directory size.</p>"
+      }
+    },
+    "DirectoryStage": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$Stage": "<p>The current stage of the directory.</p>"
+      }
+    },
+    "DirectoryType": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$Type": "<p>The directory size.</p>"
+      }
+    },
+    "DirectoryUnavailableException": {
+      "base": "<p>The specified directory is unavailable or could not be found.</p>",
+      "refs": {
+      }
+    },
+    "DirectoryVpcSettings": {
+      "base": "<p>Contains VPC information for the <a>CreateDirectory</a> or <a>CreateMicrosoftAD</a> operation.</p>",
+      "refs": {
+        "CreateDirectoryRequest$VpcSettings": "<p>A <a>DirectoryVpcSettings</a> object that contains additional information for the operation.</p>",
+        "CreateMicrosoftADRequest$VpcSettings": "<p>Contains VPC information for the <a>CreateDirectory</a> or <a>CreateMicrosoftAD</a> operation.</p>"
+      }
+    },
+    "DirectoryVpcSettingsDescription": {
+      "base": "<p>Contains information about the directory.</p>",
+      "refs": {
+        "DirectoryDescription$VpcSettings": "<p>A <a>DirectoryVpcSettingsDescription</a> object that contains additional information about a directory. This member is only present if the directory is a Simple AD or Managed AD directory.</p>",
+        "OwnerDirectoryDescription$VpcSettings": "<p>Information about the VPC settings for the directory.</p>"
+      }
+    },
+    "DisableLDAPSRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableLDAPSResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableRadiusRequest": {
+      "base": "<p>Contains the inputs for the <a>DisableRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DisableRadiusResult": {
+      "base": "<p>Contains the results of the <a>DisableRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DisableSsoRequest": {
+      "base": "<p>Contains the inputs for the <a>DisableSso</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DisableSsoResult": {
+      "base": "<p>Contains the results of the <a>DisableSso</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DnsIpAddrs": {
+      "base": null,
+      "refs": {
+        "ConditionalForwarder$DnsIpAddrs": "<p>The IP addresses of the remote DNS server associated with RemoteDomainName. This is the IP address of the DNS server that your conditional forwarder points to.</p>",
+        "CreateConditionalForwarderRequest$DnsIpAddrs": "<p>The IP addresses of the remote DNS server associated with RemoteDomainName.</p>",
+        "CreateTrustRequest$ConditionalForwarderIpAddrs": "<p>The IP addresses of the remote DNS server associated with RemoteDomainName.</p>",
+        "DirectoryConnectSettings$CustomerDnsIps": "<p>A list of one or more IP addresses of DNS servers or domain controllers in the on-premises directory.</p>",
+        "DirectoryDescription$DnsIpAddrs": "<p>The IP addresses of the DNS servers for the directory. For a Simple AD or Microsoft AD directory, these are the IP addresses of the Simple AD or Microsoft AD directory servers. For an AD Connector directory, these are the IP addresses of the DNS servers or domain controllers in the on-premises directory to which the AD Connector is connected.</p>",
+        "OwnerDirectoryDescription$DnsIpAddrs": "<p>IP address of the directory’s domain controllers.</p>",
+        "UpdateConditionalForwarderRequest$DnsIpAddrs": "<p>The updated IP addresses of the remote DNS server associated with the conditional forwarder.</p>"
+      }
+    },
+    "DomainController": {
+      "base": "<p>Contains information about the domain controllers for a specified directory.</p>",
+      "refs": {
+        "DomainControllers$member": null
+      }
+    },
+    "DomainControllerId": {
+      "base": null,
+      "refs": {
+        "DomainController$DomainControllerId": "<p>Identifies a specific domain controller in the directory.</p>",
+        "DomainControllerIds$member": null
+      }
+    },
+    "DomainControllerIds": {
+      "base": null,
+      "refs": {
+        "DescribeDomainControllersRequest$DomainControllerIds": "<p>A list of identifiers for the domain controllers whose information will be provided.</p>"
+      }
+    },
+    "DomainControllerLimitExceededException": {
+      "base": "<p>The maximum allowed number of domain controllers per directory was exceeded. The default limit per directory is 20 domain controllers.</p>",
+      "refs": {
+      }
+    },
+    "DomainControllerStatus": {
+      "base": null,
+      "refs": {
+        "DomainController$Status": "<p>The status of the domain controller.</p>"
+      }
+    },
+    "DomainControllerStatusReason": {
+      "base": null,
+      "refs": {
+        "DomainController$StatusReason": "<p>A description of the domain controller state.</p>"
+      }
+    },
+    "DomainControllers": {
+      "base": null,
+      "refs": {
+        "DescribeDomainControllersResult$DomainControllers": "<p>List of the <a>DomainController</a> objects that were retrieved.</p>"
+      }
+    },
+    "EnableLDAPSRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnableLDAPSResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnableRadiusRequest": {
+      "base": "<p>Contains the inputs for the <a>EnableRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "EnableRadiusResult": {
+      "base": "<p>Contains the results of the <a>EnableRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "EnableSsoRequest": {
+      "base": "<p>Contains the inputs for the <a>EnableSso</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "EnableSsoResult": {
+      "base": "<p>Contains the results of the <a>EnableSso</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "EndDateTime": {
+      "base": null,
+      "refs": {
+        "SchemaExtensionInfo$EndDateTime": "<p>The date and time that the schema extension was completed.</p>"
+      }
+    },
+    "EntityAlreadyExistsException": {
+      "base": "<p>The specified entity already exists.</p>",
+      "refs": {
+      }
+    },
+    "EntityDoesNotExistException": {
+      "base": "<p>The specified entity could not be found.</p>",
+      "refs": {
+      }
+    },
+    "EventTopic": {
+      "base": "<p>Information about SNS topic and AWS Directory Service directory associations.</p>",
+      "refs": {
+        "EventTopics$member": null
+      }
+    },
+    "EventTopics": {
+      "base": null,
+      "refs": {
+        "DescribeEventTopicsResult$EventTopics": "<p>A list of SNS topic names that receive status messages from the specified Directory ID.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": "<p>The descriptive message for the exception.</p>",
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "AuthenticationFailedException$Message": "<p>The textual message for the exception.</p>",
+        "CertificateAlreadyExistsException$Message": null,
+        "CertificateDoesNotExistException$Message": null,
+        "CertificateInUseException$Message": null,
+        "CertificateLimitExceededException$Message": null,
+        "ClientException$Message": null,
+        "DirectoryAlreadySharedException$Message": null,
+        "DirectoryDoesNotExistException$Message": null,
+        "DirectoryLimitExceededException$Message": null,
+        "DirectoryNotSharedException$Message": null,
+        "DirectoryUnavailableException$Message": null,
+        "DomainControllerLimitExceededException$Message": null,
+        "EntityAlreadyExistsException$Message": null,
+        "EntityDoesNotExistException$Message": null,
+        "InsufficientPermissionsException$Message": null,
+        "InvalidCertificateException$Message": null,
+        "InvalidLDAPSStatusException$Message": null,
+        "InvalidNextTokenException$Message": null,
+        "InvalidParameterException$Message": null,
+        "InvalidPasswordException$Message": null,
+        "InvalidTargetException$Message": null,
+        "IpRouteLimitExceededException$Message": null,
+        "NoAvailableCertificateException$Message": null,
+        "OrganizationsException$Message": null,
+        "ServiceException$Message": null,
+        "ShareLimitExceededException$Message": null,
+        "SnapshotLimitExceededException$Message": null,
+        "TagLimitExceededException$Message": null,
+        "UnsupportedOperationException$Message": null,
+        "UserDoesNotExistException$Message": null
+      }
+    },
+    "GetDirectoryLimitsRequest": {
+      "base": "<p>Contains the inputs for the <a>GetDirectoryLimits</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "GetDirectoryLimitsResult": {
+      "base": "<p>Contains the results of the <a>GetDirectoryLimits</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "GetSnapshotLimitsRequest": {
+      "base": "<p>Contains the inputs for the <a>GetSnapshotLimits</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "GetSnapshotLimitsResult": {
+      "base": "<p>Contains the results of the <a>GetSnapshotLimits</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "InsufficientPermissionsException": {
+      "base": "<p>The account does not have sufficient permission to perform the operation.</p>",
+      "refs": {
+      }
+    },
+    "InvalidCertificateException": {
+      "base": "<p>The certificate PEM that was provided has incorrect encoding.</p>",
+      "refs": {
+      }
+    },
+    "InvalidLDAPSStatusException": {
+      "base": "<p>The LDAP activities could not be performed because they are limited by the LDAPS status.</p>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The <code>NextToken</code> value is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>One or more parameters are not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidPasswordException": {
+      "base": "<p>The new password provided by the user does not meet the password complexity requirements defined in your directory.</p>",
+      "refs": {
+      }
+    },
+    "InvalidTargetException": {
+      "base": "<p>The specified shared target is not valid.</p>",
+      "refs": {
+      }
+    },
+    "IpAddr": {
+      "base": null,
+      "refs": {
+        "DnsIpAddrs$member": null,
+        "DomainController$DnsIpAddr": "<p>The IP address of the domain controller.</p>",
+        "IpAddrs$member": null
+      }
+    },
+    "IpAddrs": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettingsDescription$ConnectIps": "<p>The IP addresses of the AD Connector servers.</p>"
+      }
+    },
+    "IpRoute": {
+      "base": "<p>IP address block. This is often the address block of the DNS server used for your on-premises domain. </p>",
+      "refs": {
+        "IpRoutes$member": null
+      }
+    },
+    "IpRouteInfo": {
+      "base": "<p>Information about one or more IP address blocks.</p>",
+      "refs": {
+        "IpRoutesInfo$member": null
+      }
+    },
+    "IpRouteLimitExceededException": {
+      "base": "<p>The maximum allowed number of IP addresses was exceeded. The default limit is 100 IP address blocks.</p>",
+      "refs": {
+      }
+    },
+    "IpRouteStatusMsg": {
+      "base": null,
+      "refs": {
+        "IpRouteInfo$IpRouteStatusMsg": "<p>The status of the IP address block.</p>"
+      }
+    },
+    "IpRouteStatusReason": {
+      "base": null,
+      "refs": {
+        "IpRouteInfo$IpRouteStatusReason": "<p>The reason for the IpRouteStatusMsg.</p>"
+      }
+    },
+    "IpRoutes": {
+      "base": null,
+      "refs": {
+        "AddIpRoutesRequest$IpRoutes": "<p>IP address blocks, using CIDR format, of the traffic to route. This is often the IP address block of the DNS server used for your on-premises domain.</p>"
+      }
+    },
+    "IpRoutesInfo": {
+      "base": null,
+      "refs": {
+        "ListIpRoutesResult$IpRoutesInfo": "<p>A list of <a>IpRoute</a>s.</p>"
+      }
+    },
+    "LDAPSSettingInfo": {
+      "base": "<p>Contains general information about the LDAPS settings.</p>",
+      "refs": {
+        "LDAPSSettingsInfo$member": null
+      }
+    },
+    "LDAPSSettingsInfo": {
+      "base": null,
+      "refs": {
+        "DescribeLDAPSSettingsResult$LDAPSSettingsInfo": "<p>Information about LDAP security for the specified directory, including status of enablement, state last updated date time, and the reason for the state.</p>"
+      }
+    },
+    "LDAPSStatus": {
+      "base": null,
+      "refs": {
+        "LDAPSSettingInfo$LDAPSStatus": "<p>The state of the LDAPS settings.</p>"
+      }
+    },
+    "LDAPSStatusReason": {
+      "base": null,
+      "refs": {
+        "LDAPSSettingInfo$LDAPSStatusReason": "<p>Describes a state change for LDAPS.</p>"
+      }
+    },
+    "LDAPSType": {
+      "base": null,
+      "refs": {
+        "DescribeLDAPSSettingsRequest$Type": "<p>The type of LDAP security to enable. Currently only the value <code>Client</code> is supported.</p>",
+        "DisableLDAPSRequest$Type": "<p>The type of LDAP security to enable. Currently only the value <code>Client</code> is supported.</p>",
+        "EnableLDAPSRequest$Type": "<p>The type of LDAP security to enable. Currently only the value <code>Client</code> is supported.</p>"
+      }
+    },
+    "LastUpdatedDateTime": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$StageLastUpdatedDateTime": "<p>The date and time that the stage was last updated.</p>",
+        "DomainController$StatusLastUpdatedDateTime": "<p>The date and time that the status was last updated.</p>",
+        "LDAPSSettingInfo$LastUpdatedDateTime": "<p>The date and time when the LDAPS settings were last updated.</p>",
+        "SharedDirectory$LastUpdatedDateTime": "<p>The date and time that the shared directory was last updated.</p>",
+        "Trust$LastUpdatedDateTime": "<p>The date and time that the trust relationship was last updated.</p>"
+      }
+    },
+    "LaunchTime": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$LaunchTime": "<p>Specifies when the directory was created.</p>",
+        "DomainController$LaunchTime": "<p>Specifies when the domain controller was created.</p>"
+      }
+    },
+    "LdifContent": {
+      "base": null,
+      "refs": {
+        "StartSchemaExtensionRequest$LdifContent": "<p>The LDIF file represented as a string. To construct the LdifContent string, precede each line as it would be formatted in an ldif file with \\n. See the example request below for more details. The file size can be no larger than 1MB.</p>"
+      }
+    },
+    "Limit": {
+      "base": null,
+      "refs": {
+        "DescribeDirectoriesRequest$Limit": "<p>The maximum number of items to return. If this value is zero, the maximum number of items is specified by the limitations of the operation.</p>",
+        "DescribeDomainControllersRequest$Limit": "<p>The maximum number of items to return.</p>",
+        "DescribeSharedDirectoriesRequest$Limit": "<p>The number of shared directories to return in the response object.</p>",
+        "DescribeSnapshotsRequest$Limit": "<p>The maximum number of objects to return.</p>",
+        "DescribeTrustsRequest$Limit": "<p>The maximum number of objects to return.</p>",
+        "DirectoryLimits$CloudOnlyDirectoriesLimit": "<p>The maximum number of cloud directories allowed in the Region.</p>",
+        "DirectoryLimits$CloudOnlyDirectoriesCurrentCount": "<p>The current number of cloud directories in the Region.</p>",
+        "DirectoryLimits$CloudOnlyMicrosoftADLimit": "<p>The maximum number of AWS Managed Microsoft AD directories allowed in the region.</p>",
+        "DirectoryLimits$CloudOnlyMicrosoftADCurrentCount": "<p>The current number of AWS Managed Microsoft AD directories in the region.</p>",
+        "DirectoryLimits$ConnectedDirectoriesLimit": "<p>The maximum number of connected directories allowed in the Region.</p>",
+        "DirectoryLimits$ConnectedDirectoriesCurrentCount": "<p>The current number of connected directories in the Region.</p>",
+        "ListIpRoutesRequest$Limit": "<p>Maximum number of items to return. If this value is zero, the maximum number of items is specified by the limitations of the operation.</p>",
+        "ListLogSubscriptionsRequest$Limit": "<p>The maximum number of items returned.</p>",
+        "ListSchemaExtensionsRequest$Limit": "<p>The maximum number of items to return.</p>",
+        "ListTagsForResourceRequest$Limit": "<p>Reserved for future use.</p>",
+        "SnapshotLimits$ManualSnapshotsLimit": "<p>The maximum number of manual snapshots allowed.</p>",
+        "SnapshotLimits$ManualSnapshotsCurrentCount": "<p>The current number of manual snapshots of the directory.</p>"
+      }
+    },
+    "ListCertificatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCertificatesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIpRoutesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIpRoutesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogSubscriptionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogSubscriptionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSchemaExtensionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSchemaExtensionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogGroupName": {
+      "base": null,
+      "refs": {
+        "CreateLogSubscriptionRequest$LogGroupName": "<p>The name of the CloudWatch log group where the real-time domain controller logs are forwarded.</p>",
+        "LogSubscription$LogGroupName": "<p>The name of the log group.</p>"
+      }
+    },
+    "LogSubscription": {
+      "base": "<p>Represents a log subscription, which tracks real-time data from a chosen log group to a specified destination.</p>",
+      "refs": {
+        "LogSubscriptions$member": null
+      }
+    },
+    "LogSubscriptions": {
+      "base": null,
+      "refs": {
+        "ListLogSubscriptionsResult$LogSubscriptions": "<p>A list of active <a>LogSubscription</a> objects for calling the AWS account.</p>"
+      }
+    },
+    "ManualSnapshotsLimitReached": {
+      "base": null,
+      "refs": {
+        "SnapshotLimits$ManualSnapshotsLimitReached": "<p>Indicates if the manual snapshot limit has been reached.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "DescribeDirectoriesRequest$NextToken": "<p>The <code>DescribeDirectoriesResult.NextToken</code> value from a previous call to <a>DescribeDirectories</a>. Pass null if this is the first call.</p>",
+        "DescribeDirectoriesResult$NextToken": "<p>If not null, more results are available. Pass this value for the <code>NextToken</code> parameter in a subsequent call to <a>DescribeDirectories</a> to retrieve the next set of items.</p>",
+        "DescribeDomainControllersRequest$NextToken": "<p>The <i>DescribeDomainControllers.NextToken</i> value from a previous call to <a>DescribeDomainControllers</a>. Pass null if this is the first call. </p>",
+        "DescribeDomainControllersResult$NextToken": "<p>If not null, more results are available. Pass this value for the <code>NextToken</code> parameter in a subsequent call to <a>DescribeDomainControllers</a> retrieve the next set of items.</p>",
+        "DescribeLDAPSSettingsRequest$NextToken": "<p>The type of next token used for pagination.</p>",
+        "DescribeLDAPSSettingsResult$NextToken": "<p>The next token used to retrieve the LDAPS settings if the number of setting types exceeds page limit and there is another page.</p>",
+        "DescribeSharedDirectoriesRequest$NextToken": "<p>The <code>DescribeSharedDirectoriesResult.NextToken</code> value from a previous call to <a>DescribeSharedDirectories</a>. Pass null if this is the first call. </p>",
+        "DescribeSharedDirectoriesResult$NextToken": "<p>If not null, token that indicates that more results are available. Pass this value for the <code>NextToken</code> parameter in a subsequent call to <a>DescribeSharedDirectories</a> to retrieve the next set of items.</p>",
+        "DescribeSnapshotsRequest$NextToken": "<p>The <i>DescribeSnapshotsResult.NextToken</i> value from a previous call to <a>DescribeSnapshots</a>. Pass null if this is the first call.</p>",
+        "DescribeSnapshotsResult$NextToken": "<p>If not null, more results are available. Pass this value in the <i>NextToken</i> member of a subsequent call to <a>DescribeSnapshots</a>.</p>",
+        "DescribeTrustsRequest$NextToken": "<p>The <i>DescribeTrustsResult.NextToken</i> value from a previous call to <a>DescribeTrusts</a>. Pass null if this is the first call.</p>",
+        "DescribeTrustsResult$NextToken": "<p>If not null, more results are available. Pass this value for the <i>NextToken</i> parameter in a subsequent call to <a>DescribeTrusts</a> to retrieve the next set of items.</p>",
+        "ListCertificatesRequest$NextToken": "<p>A token for requesting another page of certificates if the <code>NextToken</code> response element indicates that more certificates are available. Use the value of the returned <code>NextToken</code> element in your request until the token comes back as <code>null</code>. Pass <code>null</code> if this is the first call.</p>",
+        "ListCertificatesResult$NextToken": "<p>Indicates whether another page of certificates is available when the number of available certificates exceeds the page limit.</p>",
+        "ListIpRoutesRequest$NextToken": "<p>The <i>ListIpRoutes.NextToken</i> value from a previous call to <a>ListIpRoutes</a>. Pass null if this is the first call.</p>",
+        "ListIpRoutesResult$NextToken": "<p>If not null, more results are available. Pass this value for the <i>NextToken</i> parameter in a subsequent call to <a>ListIpRoutes</a> to retrieve the next set of items.</p>",
+        "ListLogSubscriptionsRequest$NextToken": "<p>The token for the next set of items to return.</p>",
+        "ListLogSubscriptionsResult$NextToken": "<p>The token for the next set of items to return.</p>",
+        "ListSchemaExtensionsRequest$NextToken": "<p>The <code>ListSchemaExtensions.NextToken</code> value from a previous call to <code>ListSchemaExtensions</code>. Pass null if this is the first call.</p>",
+        "ListSchemaExtensionsResult$NextToken": "<p>If not null, more results are available. Pass this value for the <code>NextToken</code> parameter in a subsequent call to <code>ListSchemaExtensions</code> to retrieve the next set of items.</p>",
+        "ListTagsForResourceRequest$NextToken": "<p>Reserved for future use.</p>",
+        "ListTagsForResourceResult$NextToken": "<p>Reserved for future use.</p>"
+      }
+    },
+    "NoAvailableCertificateException": {
+      "base": "<p>The LDAP activities could not be performed because at least one valid certificate must be registered with the system.</p>",
+      "refs": {
+      }
+    },
+    "Notes": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$ShareNotes": "<p>A directory share request that is sent by the directory owner to the directory consumer. The request includes a typed message to help the directory consumer administrator determine whether to approve or reject the share invitation.</p>",
+        "ShareDirectoryRequest$ShareNotes": "<p>A directory share request that is sent by the directory owner to the directory consumer. The request includes a typed message to help the directory consumer administrator determine whether to approve or reject the share invitation.</p>",
+        "SharedDirectory$ShareNotes": "<p>A directory share request that is sent by the directory owner to the directory consumer. The request includes a typed message to help the directory consumer administrator determine whether to approve or reject the share invitation.</p>"
+      }
+    },
+    "OrganizationalUnitDN": {
+      "base": null,
+      "refs": {
+        "CreateComputerRequest$OrganizationalUnitDistinguishedName": "<p>The fully-qualified distinguished name of the organizational unit to place the computer account in.</p>"
+      }
+    },
+    "OrganizationsException": {
+      "base": "<p>Exception encountered while trying to access your AWS organization.</p>",
+      "refs": {
+      }
+    },
+    "OwnerDirectoryDescription": {
+      "base": "<p>Describes the directory owner account details that have been shared to the directory consumer account.</p>",
+      "refs": {
+        "DirectoryDescription$OwnerDirectoryDescription": "<p>Describes the AWS Managed Microsoft AD directory in the directory owner account.</p>"
+      }
+    },
+    "PageLimit": {
+      "base": null,
+      "refs": {
+        "DescribeLDAPSSettingsRequest$Limit": "<p>Specifies the number of items that should be displayed on one page.</p>",
+        "ListCertificatesRequest$Limit": "<p>The number of items that should show up on one page</p>"
+      }
+    },
+    "Password": {
+      "base": null,
+      "refs": {
+        "CreateDirectoryRequest$Password": "<p>The password for the directory administrator. The directory creation process creates a directory administrator account with the user name <code>Administrator</code> and this password.</p> <p>If you need to change the password for the administrator account, you can use the <a>ResetUserPassword</a> API call.</p>",
+        "CreateMicrosoftADRequest$Password": "<p>The password for the default administrative user named <code>Admin</code>.</p> <p>If you need to change the password for the administrator account, you can use the <a>ResetUserPassword</a> API call.</p>"
+      }
+    },
+    "PortNumber": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$RadiusPort": "<p>The port that your RADIUS server is using for communications. Your on-premises network must allow inbound traffic over this port from the AWS Directory Service servers.</p>"
+      }
+    },
+    "RadiusAuthenticationProtocol": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$AuthenticationProtocol": "<p>The protocol specified for your RADIUS endpoints.</p>"
+      }
+    },
+    "RadiusDisplayLabel": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$DisplayLabel": "<p>Not currently used.</p>"
+      }
+    },
+    "RadiusRetries": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$RadiusRetries": "<p>The maximum number of times that communication with the RADIUS server is attempted.</p>"
+      }
+    },
+    "RadiusSettings": {
+      "base": "<p>Contains information about a Remote Authentication Dial In User Service (RADIUS) server.</p>",
+      "refs": {
+        "DirectoryDescription$RadiusSettings": "<p>A <a>RadiusSettings</a> object that contains information about the RADIUS server configured for this directory.</p>",
+        "EnableRadiusRequest$RadiusSettings": "<p>A <a>RadiusSettings</a> object that contains information about the RADIUS server.</p>",
+        "OwnerDirectoryDescription$RadiusSettings": "<p>A <a>RadiusSettings</a> object that contains information about the RADIUS server.</p>",
+        "UpdateRadiusRequest$RadiusSettings": "<p>A <a>RadiusSettings</a> object that contains information about the RADIUS server.</p>"
+      }
+    },
+    "RadiusSharedSecret": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$SharedSecret": "<p>Required for enabling RADIUS on the directory.</p>"
+      }
+    },
+    "RadiusStatus": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$RadiusStatus": "<p>The status of the RADIUS MFA server connection.</p>",
+        "OwnerDirectoryDescription$RadiusStatus": "<p>Information about the status of the RADIUS server.</p>"
+      }
+    },
+    "RadiusTimeout": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$RadiusTimeout": "<p>The amount of time, in seconds, to wait for the RADIUS server to respond.</p>"
+      }
+    },
+    "RegisterCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterCertificateResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterEventTopicRequest": {
+      "base": "<p>Registers a new event topic.</p>",
+      "refs": {
+      }
+    },
+    "RegisterEventTopicResult": {
+      "base": "<p>The result of a RegisterEventTopic request.</p>",
+      "refs": {
+      }
+    },
+    "RejectSharedDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RejectSharedDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoteDomainName": {
+      "base": null,
+      "refs": {
+        "ConditionalForwarder$RemoteDomainName": "<p>The fully qualified domain name (FQDN) of the remote domains pointed to by the conditional forwarder.</p>",
+        "CreateConditionalForwarderRequest$RemoteDomainName": "<p>The fully qualified domain name (FQDN) of the remote domain with which you will set up a trust relationship.</p>",
+        "CreateTrustRequest$RemoteDomainName": "<p>The Fully Qualified Domain Name (FQDN) of the external domain for which to create the trust relationship.</p>",
+        "DeleteConditionalForwarderRequest$RemoteDomainName": "<p>The fully qualified domain name (FQDN) of the remote domain with which you are deleting the conditional forwarder.</p>",
+        "RemoteDomainNames$member": null,
+        "Trust$RemoteDomainName": "<p>The Fully Qualified Domain Name (FQDN) of the external domain involved in the trust relationship.</p>",
+        "UpdateConditionalForwarderRequest$RemoteDomainName": "<p>The fully qualified domain name (FQDN) of the remote domain with which you will set up a trust relationship.</p>"
+      }
+    },
+    "RemoteDomainNames": {
+      "base": null,
+      "refs": {
+        "DescribeConditionalForwardersRequest$RemoteDomainNames": "<p>The fully qualified domain names (FQDN) of the remote domains for which to get the list of associated conditional forwarders. If this member is null, all conditional forwarders are returned.</p>"
+      }
+    },
+    "RemoveIpRoutesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveIpRoutesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReplicationScope": {
+      "base": null,
+      "refs": {
+        "ConditionalForwarder$ReplicationScope": "<p>The replication scope of the conditional forwarder. The only allowed value is <code>Domain</code>, which will replicate the conditional forwarder to all of the domain controllers for your AWS directory.</p>"
+      }
+    },
+    "RequestId": {
+      "base": "<p>The AWS request identifier.</p>",
+      "refs": {
+        "AccessDeniedException$RequestId": null,
+        "AuthenticationFailedException$RequestId": "<p>The identifier of the request that caused the exception.</p>",
+        "CertificateAlreadyExistsException$RequestId": null,
+        "CertificateDoesNotExistException$RequestId": null,
+        "CertificateInUseException$RequestId": null,
+        "CertificateLimitExceededException$RequestId": null,
+        "ClientException$RequestId": null,
+        "DirectoryAlreadySharedException$RequestId": null,
+        "DirectoryDoesNotExistException$RequestId": null,
+        "DirectoryLimitExceededException$RequestId": null,
+        "DirectoryNotSharedException$RequestId": null,
+        "DirectoryUnavailableException$RequestId": null,
+        "DomainControllerLimitExceededException$RequestId": null,
+        "EntityAlreadyExistsException$RequestId": null,
+        "EntityDoesNotExistException$RequestId": null,
+        "InsufficientPermissionsException$RequestId": null,
+        "InvalidCertificateException$RequestId": null,
+        "InvalidLDAPSStatusException$RequestId": null,
+        "InvalidNextTokenException$RequestId": null,
+        "InvalidParameterException$RequestId": null,
+        "InvalidPasswordException$RequestId": null,
+        "InvalidTargetException$RequestId": null,
+        "IpRouteLimitExceededException$RequestId": null,
+        "NoAvailableCertificateException$RequestId": null,
+        "OrganizationsException$RequestId": null,
+        "ServiceException$RequestId": null,
+        "ShareLimitExceededException$RequestId": null,
+        "SnapshotLimitExceededException$RequestId": null,
+        "TagLimitExceededException$RequestId": null,
+        "UnsupportedOperationException$RequestId": null,
+        "UpdateTrustResult$RequestId": null,
+        "UserDoesNotExistException$RequestId": null
+      }
+    },
+    "ResetUserPasswordRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResetUserPasswordResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceRequest$ResourceId": "<p>Identifier (ID) for the directory to which to add the tag.</p>",
+        "ListTagsForResourceRequest$ResourceId": "<p>Identifier (ID) of the directory for which you want to retrieve tags.</p>",
+        "RemoveTagsFromResourceRequest$ResourceId": "<p>Identifier (ID) of the directory from which to remove the tag.</p>"
+      }
+    },
+    "RestoreFromSnapshotRequest": {
+      "base": "<p>An object representing the inputs for the <a>RestoreFromSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "RestoreFromSnapshotResult": {
+      "base": "<p>Contains the results of the <a>RestoreFromSnapshot</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "SID": {
+      "base": null,
+      "refs": {
+        "Computer$ComputerId": "<p>The identifier of the computer.</p>"
+      }
+    },
+    "SchemaExtensionId": {
+      "base": null,
+      "refs": {
+        "CancelSchemaExtensionRequest$SchemaExtensionId": "<p>The identifier of the schema extension that will be canceled.</p>",
+        "SchemaExtensionInfo$SchemaExtensionId": "<p>The identifier of the schema extension.</p>",
+        "StartSchemaExtensionResult$SchemaExtensionId": "<p>The identifier of the schema extension that will be applied.</p>"
+      }
+    },
+    "SchemaExtensionInfo": {
+      "base": "<p>Information about a schema extension.</p>",
+      "refs": {
+        "SchemaExtensionsInfo$member": null
+      }
+    },
+    "SchemaExtensionStatus": {
+      "base": null,
+      "refs": {
+        "SchemaExtensionInfo$SchemaExtensionStatus": "<p>The current status of the schema extension.</p>"
+      }
+    },
+    "SchemaExtensionStatusReason": {
+      "base": null,
+      "refs": {
+        "SchemaExtensionInfo$SchemaExtensionStatusReason": "<p>The reason for the <code>SchemaExtensionStatus</code>.</p>"
+      }
+    },
+    "SchemaExtensionsInfo": {
+      "base": null,
+      "refs": {
+        "ListSchemaExtensionsResult$SchemaExtensionsInfo": "<p>Information about the schema extensions applied to the directory.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettingsDescription$SecurityGroupId": "<p>The security group identifier for the AD Connector directory.</p>",
+        "DirectoryVpcSettingsDescription$SecurityGroupId": "<p>The domain controller security group identifier for the directory.</p>"
+      }
+    },
+    "SelectiveAuth": {
+      "base": null,
+      "refs": {
+        "CreateTrustRequest$SelectiveAuth": "<p>Optional parameter to enable selective authentication for the trust.</p>",
+        "Trust$SelectiveAuth": "<p>Current state of selective authentication for the trust.</p>",
+        "UpdateTrustRequest$SelectiveAuth": "<p>Updates selective authentication for the trust.</p>"
+      }
+    },
+    "Server": {
+      "base": null,
+      "refs": {
+        "Servers$member": null
+      }
+    },
+    "Servers": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$RadiusServers": "<p>An array of strings that contains the IP addresses of the RADIUS server endpoints, or the IP addresses of your RADIUS server load balancer.</p>"
+      }
+    },
+    "ServiceException": {
+      "base": "<p>An exception has occurred in AWS Directory Service.</p>",
+      "refs": {
+      }
+    },
+    "ShareDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ShareDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ShareLimitExceededException": {
+      "base": "<p>The maximum number of AWS accounts that you can share with this directory has been reached.</p>",
+      "refs": {
+      }
+    },
+    "ShareMethod": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$ShareMethod": "<p>The method used when sharing a directory to determine whether the directory should be shared within your AWS organization (<code>ORGANIZATIONS</code>) or with any AWS account by sending a shared directory request (<code>HANDSHAKE</code>).</p>",
+        "ShareDirectoryRequest$ShareMethod": "<p>The method used when sharing a directory to determine whether the directory should be shared within your AWS organization (<code>ORGANIZATIONS</code>) or with any AWS account by sending a directory sharing request (<code>HANDSHAKE</code>).</p>",
+        "SharedDirectory$ShareMethod": "<p>The method used when sharing a directory to determine whether the directory should be shared within your AWS organization (<code>ORGANIZATIONS</code>) or with any AWS account by sending a shared directory request (<code>HANDSHAKE</code>).</p>"
+      }
+    },
+    "ShareStatus": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$ShareStatus": "<p>Current directory status of the shared AWS Managed Microsoft AD directory.</p>",
+        "SharedDirectory$ShareStatus": "<p>Current directory status of the shared AWS Managed Microsoft AD directory.</p>"
+      }
+    },
+    "ShareTarget": {
+      "base": "<p>Identifier that contains details about the directory consumer account.</p>",
+      "refs": {
+        "ShareDirectoryRequest$ShareTarget": "<p>Identifier for the directory consumer account with whom the directory is to be shared.</p>"
+      }
+    },
+    "SharedDirectories": {
+      "base": null,
+      "refs": {
+        "DescribeSharedDirectoriesResult$SharedDirectories": "<p>A list of all shared directories in your account.</p>"
+      }
+    },
+    "SharedDirectory": {
+      "base": "<p>Details about the shared directory in the directory owner account for which the share request in the directory consumer account has been accepted.</p>",
+      "refs": {
+        "AcceptSharedDirectoryResult$SharedDirectory": "<p>The shared directory in the directory consumer account.</p>",
+        "SharedDirectories$member": null
+      }
+    },
+    "Snapshot": {
+      "base": "<p>Describes a directory snapshot.</p>",
+      "refs": {
+        "Snapshots$member": null
+      }
+    },
+    "SnapshotId": {
+      "base": null,
+      "refs": {
+        "CreateSnapshotResult$SnapshotId": "<p>The identifier of the snapshot that was created.</p>",
+        "DeleteSnapshotRequest$SnapshotId": "<p>The identifier of the directory snapshot to be deleted.</p>",
+        "DeleteSnapshotResult$SnapshotId": "<p>The identifier of the directory snapshot that was deleted.</p>",
+        "RestoreFromSnapshotRequest$SnapshotId": "<p>The identifier of the snapshot to restore from.</p>",
+        "Snapshot$SnapshotId": "<p>The snapshot identifier.</p>",
+        "SnapshotIds$member": null
+      }
+    },
+    "SnapshotIds": {
+      "base": "<p>A list of directory snapshot identifiers.</p>",
+      "refs": {
+        "DescribeSnapshotsRequest$SnapshotIds": "<p>A list of identifiers of the snapshots to obtain the information for. If this member is null or empty, all snapshots are returned using the <i>Limit</i> and <i>NextToken</i> members.</p>"
+      }
+    },
+    "SnapshotLimitExceededException": {
+      "base": "<p>The maximum number of manual snapshots for the directory has been reached. You can use the <a>GetSnapshotLimits</a> operation to determine the snapshot limits for a directory.</p>",
+      "refs": {
+      }
+    },
+    "SnapshotLimits": {
+      "base": "<p>Contains manual snapshot limit information for a directory.</p>",
+      "refs": {
+        "GetSnapshotLimitsResult$SnapshotLimits": "<p>A <a>SnapshotLimits</a> object that contains the manual snapshot limits for the specified directory.</p>"
+      }
+    },
+    "SnapshotName": {
+      "base": null,
+      "refs": {
+        "CreateSnapshotRequest$Name": "<p>The descriptive name to apply to the snapshot.</p>",
+        "Snapshot$Name": "<p>The descriptive name of the snapshot.</p>"
+      }
+    },
+    "SnapshotStatus": {
+      "base": null,
+      "refs": {
+        "Snapshot$Status": "<p>The snapshot status.</p>"
+      }
+    },
+    "SnapshotType": {
+      "base": null,
+      "refs": {
+        "Snapshot$Type": "<p>The snapshot type.</p>"
+      }
+    },
+    "Snapshots": {
+      "base": "<p>A list of descriptions of directory snapshots.</p>",
+      "refs": {
+        "DescribeSnapshotsResult$Snapshots": "<p>The list of <a>Snapshot</a> objects that were retrieved.</p> <p>It is possible that this list contains less than the number of items specified in the <i>Limit</i> member of the request. This occurs if there are less than the requested number of items left to retrieve, or if the limitations of the operation have been exceeded.</p>"
+      }
+    },
+    "SsoEnabled": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$SsoEnabled": "<p>Indicates if single sign-on is enabled for the directory. For more information, see <a>EnableSso</a> and <a>DisableSso</a>.</p>"
+      }
+    },
+    "StageReason": {
+      "base": null,
+      "refs": {
+        "DirectoryDescription$StageReason": "<p>Additional information about the directory stage.</p>"
+      }
+    },
+    "StartDateTime": {
+      "base": null,
+      "refs": {
+        "SchemaExtensionInfo$StartDateTime": "<p>The date and time that the schema extension started being applied to the directory.</p>"
+      }
+    },
+    "StartSchemaExtensionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartSchemaExtensionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartTime": {
+      "base": null,
+      "refs": {
+        "Snapshot$StartTime": "<p>The date and time that the snapshot was taken.</p>"
+      }
+    },
+    "StateLastUpdatedDateTime": {
+      "base": null,
+      "refs": {
+        "Trust$StateLastUpdatedDateTime": "<p>The date and time that the TrustState was last updated.</p>"
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "DomainController$SubnetId": "<p>Identifier of the subnet in the VPC that contains the domain controller.</p>",
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettings$SubnetIds": "<p>A list of subnet identifiers in the VPC in which the AD Connector is created.</p>",
+        "DirectoryConnectSettingsDescription$SubnetIds": "<p>A list of subnet identifiers in the VPC that the AD Connector is in.</p>",
+        "DirectoryVpcSettings$SubnetIds": "<p>The identifiers of the subnets for the directory servers. The two subnets must be in different Availability Zones. AWS Directory Service creates a directory server and a DNS server in each of these subnets.</p>",
+        "DirectoryVpcSettingsDescription$SubnetIds": "<p>The identifiers of the subnets for the directory servers.</p>"
+      }
+    },
+    "SubscriptionCreatedDateTime": {
+      "base": null,
+      "refs": {
+        "LogSubscription$SubscriptionCreatedDateTime": "<p>The date and time that the log subscription was created.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Metadata assigned to a directory consisting of a key-value pair.</p>",
+      "refs": {
+        "Tags$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>Required name of the tag. The string value can be Unicode characters and cannot be prefixed with \"aws:\". The string can contain only the set of Unicode letters, digits, white-space, '_', '.', '/', '=', '+', '-' (Java regex: \"^([\\\\p{L}\\\\p{Z}\\\\p{N}_.:/=+\\\\-]*)$\").</p>",
+        "TagKeys$member": null
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "RemoveTagsFromResourceRequest$TagKeys": "<p>The tag key (name) of the tag to be removed.</p>"
+      }
+    },
+    "TagLimitExceededException": {
+      "base": "<p>The maximum allowed number of tags was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The optional value of the tag. The string value can be Unicode characters. The string can contain only the set of Unicode letters, digits, white-space, '_', '.', '/', '=', '+', '-' (Java regex: \"^([\\\\p{L}\\\\p{Z}\\\\p{N}_.:/=+\\\\-]*)$\").</p>"
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceRequest$Tags": "<p>The tags to be assigned to the directory.</p>",
+        "ConnectDirectoryRequest$Tags": "<p>The tags to be assigned to AD Connector.</p>",
+        "CreateDirectoryRequest$Tags": "<p>The tags to be assigned to the Simple AD directory.</p>",
+        "CreateMicrosoftADRequest$Tags": "<p>The tags to be assigned to the AWS Managed Microsoft AD directory.</p>",
+        "ListTagsForResourceResult$Tags": "<p>List of tags returned by the ListTagsForResource operation.</p>"
+      }
+    },
+    "TargetId": {
+      "base": null,
+      "refs": {
+        "ShareTarget$Id": "<p>Identifier of the directory consumer account.</p>",
+        "UnshareTarget$Id": "<p>Identifier of the directory consumer account.</p>"
+      }
+    },
+    "TargetType": {
+      "base": null,
+      "refs": {
+        "ShareTarget$Type": "<p>Type of identifier to be used in the <code>Id</code> field.</p>",
+        "UnshareTarget$Type": "<p>Type of identifier to be used in the <i>Id</i> field.</p>"
+      }
+    },
+    "TopicArn": {
+      "base": null,
+      "refs": {
+        "EventTopic$TopicArn": "<p>The SNS topic ARN (Amazon Resource Name).</p>"
+      }
+    },
+    "TopicName": {
+      "base": null,
+      "refs": {
+        "DeregisterEventTopicRequest$TopicName": "<p>The name of the SNS topic from which to remove the directory as a publisher.</p>",
+        "EventTopic$TopicName": "<p>The name of an AWS SNS topic the receives status messages from the directory.</p>",
+        "RegisterEventTopicRequest$TopicName": "<p>The SNS topic name to which the directory will publish status messages. This SNS topic must be in the same region as the specified Directory ID.</p>",
+        "TopicNames$member": null
+      }
+    },
+    "TopicNames": {
+      "base": null,
+      "refs": {
+        "DescribeEventTopicsRequest$TopicNames": "<p>A list of SNS topic names for which to obtain the information. If this member is null, all associations for the specified Directory ID are returned.</p> <p>An empty list results in an <code>InvalidParameterException</code> being thrown.</p>"
+      }
+    },
+    "TopicStatus": {
+      "base": null,
+      "refs": {
+        "EventTopic$Status": "<p>The topic registration status.</p>"
+      }
+    },
+    "Trust": {
+      "base": "<p>Describes a trust relationship between an AWS Managed Microsoft AD directory and an external domain.</p>",
+      "refs": {
+        "Trusts$member": null
+      }
+    },
+    "TrustDirection": {
+      "base": null,
+      "refs": {
+        "CreateTrustRequest$TrustDirection": "<p>The direction of the trust relationship.</p>",
+        "Trust$TrustDirection": "<p>The trust relationship direction.</p>"
+      }
+    },
+    "TrustId": {
+      "base": null,
+      "refs": {
+        "CreateTrustResult$TrustId": "<p>A unique identifier for the trust relationship that was created.</p>",
+        "DeleteTrustRequest$TrustId": "<p>The Trust ID of the trust relationship to be deleted.</p>",
+        "DeleteTrustResult$TrustId": "<p>The Trust ID of the trust relationship that was deleted.</p>",
+        "Trust$TrustId": "<p>The unique ID of the trust relationship.</p>",
+        "TrustIds$member": null,
+        "UpdateTrustRequest$TrustId": "<p>Identifier of the trust relationship.</p>",
+        "UpdateTrustResult$TrustId": "<p>Identifier of the trust relationship.</p>",
+        "VerifyTrustRequest$TrustId": "<p>The unique Trust ID of the trust relationship to verify.</p>",
+        "VerifyTrustResult$TrustId": "<p>The unique Trust ID of the trust relationship that was verified.</p>"
+      }
+    },
+    "TrustIds": {
+      "base": null,
+      "refs": {
+        "DescribeTrustsRequest$TrustIds": "<p>A list of identifiers of the trust relationships for which to obtain the information. If this member is null, all trust relationships that belong to the current account are returned.</p> <p>An empty list results in an <code>InvalidParameterException</code> being thrown.</p>"
+      }
+    },
+    "TrustPassword": {
+      "base": null,
+      "refs": {
+        "CreateTrustRequest$TrustPassword": "<p>The trust password. The must be the same password that was used when creating the trust relationship on the external domain.</p>"
+      }
+    },
+    "TrustState": {
+      "base": null,
+      "refs": {
+        "Trust$TrustState": "<p>The trust relationship state.</p>"
+      }
+    },
+    "TrustStateReason": {
+      "base": null,
+      "refs": {
+        "Trust$TrustStateReason": "<p>The reason for the TrustState.</p>"
+      }
+    },
+    "TrustType": {
+      "base": null,
+      "refs": {
+        "CreateTrustRequest$TrustType": "<p>The trust relationship type. <code>Forest</code> is the default.</p>",
+        "Trust$TrustType": "<p>The trust relationship type. <code>Forest</code> is the default.</p>"
+      }
+    },
+    "Trusts": {
+      "base": null,
+      "refs": {
+        "DescribeTrustsResult$Trusts": "<p>The list of Trust objects that were retrieved.</p> <p>It is possible that this list contains less than the number of items specified in the <i>Limit</i> member of the request. This occurs if there are less than the requested number of items left to retrieve, or if the limitations of the operation have been exceeded.</p>"
+      }
+    },
+    "UnshareDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnshareDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnshareTarget": {
+      "base": "<p>Identifier that contains details about the directory consumer account with whom the directory is being unshared.</p>",
+      "refs": {
+        "UnshareDirectoryRequest$UnshareTarget": "<p>Identifier for the directory consumer account with whom the directory has to be unshared.</p>"
+      }
+    },
+    "UnsupportedOperationException": {
+      "base": "<p>The operation is not supported.</p>",
+      "refs": {
+      }
+    },
+    "UpdateConditionalForwarderRequest": {
+      "base": "<p>Updates a conditional forwarder.</p>",
+      "refs": {
+      }
+    },
+    "UpdateConditionalForwarderResult": {
+      "base": "<p>The result of an UpdateConditionalForwarder request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateNumberOfDomainControllersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateNumberOfDomainControllersResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRadiusRequest": {
+      "base": "<p>Contains the inputs for the <a>UpdateRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateRadiusResult": {
+      "base": "<p>Contains the results of the <a>UpdateRadius</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateSecurityGroupForDirectoryControllers": {
+      "base": null,
+      "refs": {
+        "AddIpRoutesRequest$UpdateSecurityGroupForDirectoryControllers": "<p>If set to true, updates the inbound and outbound rules of the security group that has the description: \"AWS created security group for <i>directory ID</i> directory controllers.\" Following are the new rules: </p> <p>Inbound:</p> <ul> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 88, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 123, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 138, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 389, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 464, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom UDP Rule, Protocol: UDP, Range: 445, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 88, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 135, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 445, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 464, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 636, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 1024-65535, Source: 0.0.0.0/0</p> </li> <li> <p>Type: Custom TCP Rule, Protocol: TCP, Range: 3268-33269, Source: 0.0.0.0/0</p> </li> <li> <p>Type: DNS (UDP), Protocol: UDP, Range: 53, Source: 0.0.0.0/0</p> </li> <li> <p>Type: DNS (TCP), Protocol: TCP, Range: 53, Source: 0.0.0.0/0</p> </li> <li> <p>Type: LDAP, Protocol: TCP, Range: 389, Source: 0.0.0.0/0</p> </li> <li> <p>Type: All ICMP, Protocol: All, Range: N/A, Source: 0.0.0.0/0</p> </li> </ul> <p/> <p>Outbound:</p> <ul> <li> <p>Type: All traffic, Protocol: All, Range: All, Destination: 0.0.0.0/0</p> </li> </ul> <p>These security rules impact an internal network interface that is not exposed publicly.</p>"
+      }
+    },
+    "UpdateTrustRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTrustResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UseSameUsername": {
+      "base": null,
+      "refs": {
+        "RadiusSettings$UseSameUsername": "<p>Not currently used.</p>"
+      }
+    },
+    "UserDoesNotExistException": {
+      "base": "<p>The user provided a username that does not exist in your directory.</p>",
+      "refs": {
+      }
+    },
+    "UserName": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettings$CustomerUserName": "<p>The user name of an account in the on-premises directory that is used to connect to the directory. This account must have the following permissions:</p> <ul> <li> <p>Read users and groups</p> </li> <li> <p>Create computer objects</p> </li> <li> <p>Join computers to the domain</p> </li> </ul>",
+        "DirectoryConnectSettingsDescription$CustomerUserName": "<p>The user name of the service account in the on-premises directory.</p>",
+        "DisableSsoRequest$UserName": "<p>The username of an alternate account to use to disable single-sign on. This is only used for AD Connector directories. This account must have privileges to remove a service principal name.</p> <p>If the AD Connector service account does not have privileges to remove a service principal name, you can specify an alternate account with the <i>UserName</i> and <i>Password</i> parameters. These credentials are only used to disable single sign-on and are not stored by the service. The AD Connector service account is not changed.</p>",
+        "EnableSsoRequest$UserName": "<p>The username of an alternate account to use to enable single-sign on. This is only used for AD Connector directories. This account must have privileges to add a service principal name.</p> <p>If the AD Connector service account does not have privileges to add a service principal name, you can specify an alternate account with the <i>UserName</i> and <i>Password</i> parameters. These credentials are only used to enable single sign-on and are not stored by the service. The AD Connector service account is not changed.</p>"
+      }
+    },
+    "UserPassword": {
+      "base": null,
+      "refs": {
+        "ResetUserPasswordRequest$NewPassword": "<p>The new password that will be reset.</p>"
+      }
+    },
+    "VerifyTrustRequest": {
+      "base": "<p>Initiates the verification of an existing trust relationship between an AWS Managed Microsoft AD directory and an external domain.</p>",
+      "refs": {
+      }
+    },
+    "VerifyTrustResult": {
+      "base": "<p>Result of a VerifyTrust request.</p>",
+      "refs": {
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "DirectoryConnectSettings$VpcId": "<p>The identifier of the VPC in which the AD Connector is created.</p>",
+        "DirectoryConnectSettingsDescription$VpcId": "<p>The identifier of the VPC that the AD Connector is in.</p>",
+        "DirectoryVpcSettings$VpcId": "<p>The identifier of the VPC in which to create the directory.</p>",
+        "DirectoryVpcSettingsDescription$VpcId": "<p>The identifier of the VPC that the directory is in.</p>",
+        "DomainController$VpcId": "<p>The identifier of the VPC that contains the domain controller.</p>"
+      }
+    }
+  }
+}

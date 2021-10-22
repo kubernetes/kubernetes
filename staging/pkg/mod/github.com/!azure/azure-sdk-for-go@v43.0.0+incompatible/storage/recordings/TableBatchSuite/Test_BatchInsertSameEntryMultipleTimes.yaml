@@ -1,0 +1,144 @@
+---
+version: 1
+interactions:
+- request:
+    body: |
+      {"TableName":"table54tablebatchsuitetestbatchi"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:dtcC3wSMuK4W9SYTiGjiH2R7zkevmJsRIdu8aCBqg40=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table54tablebatchsuitetestbatchi')
+      Date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table54tablebatchsuitetestbatchi')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac811031-6002-0062-3da5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: "--batch_a77e6a42-61a7-49e7-b07b-0668ed91d09b\r\nContent-Type: multipart/mixed;
+      boundary=changeset_ddc85175-8660-484a-9be5-4041b30fd3e6\r\n\r\n\r\n--changeset_ddc85175-8660-484a-9be5-4041b30fd3e6\r\nContent-Transfer-Encoding:
+      binary\r\nContent-Type: application/http\r\n\r\nPUT https://golangrocksonazure.table.core.windows.net/table54tablebatchsuitetestbatchi%28PartitionKey=%27mypartitionkey%27,%20RowKey=%27myrowkey%27%29
+      HTTP/1.1\r\nAccept: application/json;odata=minimalmetadata\r\nContent-Type:
+      application/json\r\nPrefer: return-no-content\r\n\r\n{\"AmountDue\":\"200.23\",\"AmountDue@odata.type\":\"Edm.Double\",\"CustomerCode\":\"c9da6455-213d-42c9-9a79-3e9149a57833\",\"CustomerCode@odata.type\":\"Edm.Guid\",\"CustomerSince\":\"1992-12-20T21:55:00Z\",\"CustomerSince@odata.type\":\"Edm.DateTime\",\"IsActive\":true,\"NumberOfOrders\":\"255\",\"NumberOfOrders@odata.type\":\"Edm.Int64\",\"PartitionKey\":\"mypartitionkey\",\"RowKey\":\"myrowkey\"}\r\n--changeset_ddc85175-8660-484a-9be5-4041b30fd3e6\r\nContent-Transfer-Encoding:
+      binary\r\nContent-Type: application/http\r\n\r\nPUT https://golangrocksonazure.table.core.windows.net/table54tablebatchsuitetestbatchi%28PartitionKey=%27mypartitionkey%27,%20RowKey=%27myrowkey%27%29
+      HTTP/1.1\r\nAccept: application/json;odata=minimalmetadata\r\nContent-Type:
+      application/json\r\nPrefer: return-no-content\r\n\r\n{\"AmountDue\":\"200.23\",\"AmountDue@odata.type\":\"Edm.Double\",\"CustomerCode\":\"c9da6455-213d-42c9-9a79-3e9149a57833\",\"CustomerCode@odata.type\":\"Edm.Guid\",\"CustomerSince\":\"1992-12-20T21:55:00Z\",\"CustomerSince@odata.type\":\"Edm.DateTime\",\"IsActive\":true,\"NumberOfOrders\":\"255\",\"NumberOfOrders@odata.type\":\"Edm.Int64\",\"PartitionKey\":\"mypartitionkey\",\"RowKey\":\"myrowkey\"}\r\n--changeset_ddc85175-8660-484a-9be5-4041b30fd3e6--\r\n\r\n--batch_a77e6a42-61a7-49e7-b07b-0668ed91d09b--\r\n"
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:Vktv/EPRarD/jWJUOSJkaczy97I8Tm6m/CcDrYKZbes=
+      Content-Type:
+      - multipart/mixed; boundary=batch_a77e6a42-61a7-49e7-b07b-0668ed91d09b
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      X-Ms-Date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      X-Ms-Version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/$batch
+    method: POST
+  response:
+    body: "--batchresponse_bbac7797-11d0-4f08-907e-1dd2431e5e0e\r\nContent-Type: multipart/mixed;
+      boundary=changesetresponse_735e4f9e-d199-4edc-9077-4286f7a682af\r\n\r\n--changesetresponse_735e4f9e-d199-4edc-9077-4286f7a682af\r\nContent-Type:
+      application/http\r\nContent-Transfer-Encoding: binary\r\n\r\nHTTP/1.1 400 Bad
+      Request\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-cache\r\nPreference-Applied:
+      return-no-content\r\nDataServiceVersion: 3.0;\r\nContent-Type: application/json;odata=minimalmetadata;streaming=true;charset=utf-8\r\n\r\n{\"odata.error\":{\"code\":\"InvalidDuplicateRow\",\"message\":{\"lang\":\"en-US\",\"value\":\"1:The
+      batch request contains multiple changes with same row key. An entity can appear
+      only once in a batch request.\\nRequestId:ac811036-6002-0062-41a5-153a2a000000\\nTime:2019-05-28T22:36:11.4295316Z\"}}}\r\n--changesetresponse_735e4f9e-d199-4edc-9077-4286f7a682af--\r\n--batchresponse_bbac7797-11d0-4f08-907e-1dd2431e5e0e--\r\n"
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - multipart/mixed; boundary=batchresponse_bbac7797-11d0-4f08-907e-1dd2431e5e0e
+      Date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac811036-6002-0062-41a5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:yZXPy/GbW18k8cLCSly0UNcefUKl9vI4pAV/k7D9W2k=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table54tablebatchsuitetestbatchi%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac811037-6002-0062-42a5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""

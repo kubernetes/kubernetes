@@ -1,0 +1,49 @@
+// Copyright 2015-2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Contains the definitions for a metrics service and the type of metrics
+// exposed by the service.
+//
+// Currently, 'Gauge' (i.e a metric that represents the measured value of
+// something at an instant of time) is the only metric type supported by the
+// service.
+syntax = "proto3";
+
+package grpc.testing;
+
+// Response message containing the gauge name and value
+message GaugeResponse {
+  string name = 1;
+  oneof value {
+    int64 long_value = 2;
+    double double_value = 3;
+    string string_value = 4;
+  }
+}
+
+// Request message containing the gauge name
+message GaugeRequest {
+  string name = 1;
+}
+
+message EmptyMessage {}
+
+service MetricsService {
+  // Returns the values of all the gauges that are currently being maintained by
+  // the service
+  rpc GetAllGauges(EmptyMessage) returns (stream GaugeResponse);
+
+  // Returns the value of one gauge
+  rpc GetGauge(GaugeRequest) returns (GaugeResponse);
+}

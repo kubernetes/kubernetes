@@ -1,0 +1,587 @@
+{
+  "version": "2.0",
+  "service": "<p>With code signing for IoT, you can sign code that you create for any IoT device that is supported by Amazon Web Services (AWS). Code signing is available through <a href=\"http://docs.aws.amazon.com/freertos/latest/userguide/\">Amazon FreeRTOS</a> and <a href=\"http://docs.aws.amazon.com/iot/latest/developerguide/\">AWS IoT Device Management</a>, and integrated with <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/\">AWS Certificate Manager (ACM)</a>. In order to sign code, you import a third-party code signing certificate with ACM that is used to sign updates in Amazon FreeRTOS and AWS IoT Device Management. For general information about using code signing, see the <a href=\"http://docs.aws.amazon.com/signer/latest/developerguide/Welcome.html\">Code Signing for IoT Developer Guide</a>.</p>",
+  "operations": {
+    "CancelSigningProfile": "<p>Changes the state of an <code>ACTIVE</code> signing profile to <code>CANCELED</code>. A canceled profile is still viewable with the <code>ListSigningProfiles</code> operation, but it cannot perform new signing jobs, and is deleted two years after cancelation.</p>",
+    "DescribeSigningJob": "<p>Returns information about a specific code signing job. You specify the job by using the <code>jobId</code> value that is returned by the <a>StartSigningJob</a> operation. </p>",
+    "GetSigningPlatform": "<p>Returns information on a specific signing platform.</p>",
+    "GetSigningProfile": "<p>Returns information on a specific signing profile.</p>",
+    "ListSigningJobs": "<p>Lists all your signing jobs. You can use the <code>maxResults</code> parameter to limit the number of signing jobs that are returned in the response. If additional jobs remain to be listed, code signing returns a <code>nextToken</code> value. Use this value in subsequent calls to <code>ListSigningJobs</code> to fetch the remaining values. You can continue calling <code>ListSigningJobs</code> with your <code>maxResults</code> parameter and with new values that code signing returns in the <code>nextToken</code> parameter until all of your signing jobs have been returned. </p>",
+    "ListSigningPlatforms": "<p>Lists all signing platforms available in code signing that match the request parameters. If additional jobs remain to be listed, code signing returns a <code>nextToken</code> value. Use this value in subsequent calls to <code>ListSigningJobs</code> to fetch the remaining values. You can continue calling <code>ListSigningJobs</code> with your <code>maxResults</code> parameter and with new values that code signing returns in the <code>nextToken</code> parameter until all of your signing jobs have been returned.</p>",
+    "ListSigningProfiles": "<p>Lists all available signing profiles in your AWS account. Returns only profiles with an <code>ACTIVE</code> status unless the <code>includeCanceled</code> request field is set to <code>true</code>. If additional jobs remain to be listed, code signing returns a <code>nextToken</code> value. Use this value in subsequent calls to <code>ListSigningJobs</code> to fetch the remaining values. You can continue calling <code>ListSigningJobs</code> with your <code>maxResults</code> parameter and with new values that code signing returns in the <code>nextToken</code> parameter until all of your signing jobs have been returned.</p>",
+    "ListTagsForResource": "<p>Returns a list of the tags associated with a signing profile resource.</p>",
+    "PutSigningProfile": "<p>Creates a signing profile. A signing profile is a code signing template that can be used to carry out a pre-defined signing job. For more information, see <a href=\"http://docs.aws.amazon.com/signer/latest/developerguide/gs-profile.html\">http://docs.aws.amazon.com/signer/latest/developerguide/gs-profile.html</a> </p>",
+    "StartSigningJob": "<p>Initiates a signing job to be performed on the code provided. Signing jobs are viewable by the <code>ListSigningJobs</code> operation for two years after they are performed. Note the following requirements: </p> <ul> <li> <p> You must create an Amazon S3 source bucket. For more information, see <a href=\"http://docs.aws.amazon.com/AmazonS3/latest/gsg/CreatingABucket.html\">Create a Bucket</a> in the <i>Amazon S3 Getting Started Guide</i>. </p> </li> <li> <p>Your S3 source bucket must be version enabled.</p> </li> <li> <p>You must create an S3 destination bucket. Code signing uses your S3 destination bucket to write your signed code.</p> </li> <li> <p>You specify the name of the source and destination buckets when calling the <code>StartSigningJob</code> operation.</p> </li> <li> <p>You must also specify a request token that identifies your request to code signing.</p> </li> </ul> <p>You can call the <a>DescribeSigningJob</a> and the <a>ListSigningJobs</a> actions after you call <code>StartSigningJob</code>.</p> <p>For a Java example that shows how to use this action, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/\">http://docs.aws.amazon.com/acm/latest/userguide/</a> </p>",
+    "TagResource": "<p>Adds one or more tags to a signing profile. Tags are labels that you can use to identify and organize your AWS resources. Each tag consists of a key and an optional value. To specify the signing profile, use its Amazon Resource Name (ARN). To specify the tag, use a key-value pair.</p>",
+    "UntagResource": "<p>Removes one or more tags from a signing profile. To remove the tags, specify a list of tag keys.</p>"
+  },
+  "shapes": {
+    "key": {
+      "base": null,
+      "refs": {
+        "S3SignedObject$key": "<p>Key name that uniquely identifies a signed code image in your bucket.</p>"
+      }
+    },
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>The request contains invalid parameters for the ARN or tags. This exception also occurs when you call a tagging API on a cancelled signing profile.</p>",
+      "refs": {
+      }
+    },
+    "BucketName": {
+      "base": null,
+      "refs": {
+        "S3Destination$bucketName": "<p>Name of the S3 bucket.</p>",
+        "S3SignedObject$bucketName": "<p>Name of the S3 bucket.</p>",
+        "S3Source$bucketName": "<p>Name of the S3 bucket.</p>"
+      }
+    },
+    "CancelSigningProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Category": {
+      "base": null,
+      "refs": {
+        "GetSigningPlatformResponse$category": "<p>The category type of the target signing platform.</p>",
+        "SigningPlatform$category": "<p>The category of a code signing platform.</p>"
+      }
+    },
+    "CertificateArn": {
+      "base": null,
+      "refs": {
+        "SigningMaterial$certificateArn": "<p>The Amazon Resource Name (ARN) of the certificates that is used to sign your code.</p>"
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "StartSigningJobRequest$clientRequestToken": "<p>String that identifies the signing request. All calls after the first that use this token return the same response as the first call.</p>"
+      }
+    },
+    "CompletedAt": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$completedAt": "<p>Date and time that the signing job was completed.</p>"
+      }
+    },
+    "CreatedAt": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$createdAt": "<p>Date and time that the signing job was created.</p>",
+        "SigningJob$createdAt": "<p>The date and time that the signing job was created.</p>"
+      }
+    },
+    "DescribeSigningJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSigningJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Destination": {
+      "base": "<p>Points to an <code>S3Destination</code> object that contains information about your S3 bucket.</p>",
+      "refs": {
+        "StartSigningJobRequest$destination": "<p>The S3 bucket in which to save your signed object. The destination contains the name of your bucket and an optional prefix.</p>"
+      }
+    },
+    "DisplayName": {
+      "base": null,
+      "refs": {
+        "GetSigningPlatformResponse$displayName": "<p>The display name of the target signing platform.</p>"
+      }
+    },
+    "EncryptionAlgorithm": {
+      "base": null,
+      "refs": {
+        "EncryptionAlgorithmOptions$defaultValue": "<p>The default encryption algorithm that is used by a code signing job.</p>",
+        "EncryptionAlgorithms$member": null,
+        "SigningConfigurationOverrides$encryptionAlgorithm": "<p>A specified override of the default encryption algorithm that is used in a code signing job.</p>"
+      }
+    },
+    "EncryptionAlgorithmOptions": {
+      "base": "<p>The encryption algorithm options that are available to a code signing job.</p>",
+      "refs": {
+        "SigningConfiguration$encryptionAlgorithmOptions": "<p>The encryption algorithm options that are available for a code signing job.</p>"
+      }
+    },
+    "EncryptionAlgorithms": {
+      "base": null,
+      "refs": {
+        "EncryptionAlgorithmOptions$allowedValues": "<p>The set of accepted encryption algorithms that are allowed in a code signing job.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "BadRequestException$message": null,
+        "InternalServiceErrorException$message": null,
+        "NotFoundException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ThrottlingException$message": null,
+        "ValidationException$message": null
+      }
+    },
+    "GetSigningPlatformRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSigningPlatformResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSigningProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSigningProfileResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HashAlgorithm": {
+      "base": null,
+      "refs": {
+        "HashAlgorithmOptions$defaultValue": "<p>The default hash algorithm that is used in a code signing job.</p>",
+        "HashAlgorithms$member": null,
+        "SigningConfigurationOverrides$hashAlgorithm": "<p>A specified override of the default hash algorithm that is used in a code signing job.</p>"
+      }
+    },
+    "HashAlgorithmOptions": {
+      "base": "<p>The hash algorithms that are available to a code signing job.</p>",
+      "refs": {
+        "SigningConfiguration$hashAlgorithmOptions": "<p>The hash algorithm options that are available for a code signing job.</p>"
+      }
+    },
+    "HashAlgorithms": {
+      "base": null,
+      "refs": {
+        "HashAlgorithmOptions$allowedValues": "<p>The set of accepted hash algorithms allowed in a code signing job.</p>"
+      }
+    },
+    "ImageFormat": {
+      "base": null,
+      "refs": {
+        "ImageFormats$member": null,
+        "SigningImageFormat$defaultFormat": "<p>The default format of a code signing image.</p>",
+        "SigningPlatformOverrides$signingImageFormat": "<p>A signed image is a JSON object. When overriding the default signing platform configuration, a customer can select either of two signing formats, <code>JSONEmbedded</code> or <code>JSONDetached</code>. (A third format value, <code>JSON</code>, is reserved for future use.) With <code>JSONEmbedded</code>, the signing image has the payload embedded in it. With <code>JSONDetached</code>, the payload is not be embedded in the signing image.</p>"
+      }
+    },
+    "ImageFormats": {
+      "base": null,
+      "refs": {
+        "SigningImageFormat$supportedFormats": "<p>The supported formats of a code signing image.</p>"
+      }
+    },
+    "InternalServiceErrorException": {
+      "base": "<p>An internal error occurred.</p>",
+      "refs": {
+      }
+    },
+    "JobId": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobRequest$jobId": "<p>The ID of the signing job on input.</p>",
+        "DescribeSigningJobResponse$jobId": "<p>The ID of the signing job on output.</p>",
+        "SigningJob$jobId": "<p>The ID of the signing job.</p>",
+        "StartSigningJobResponse$jobId": "<p>The ID of your signing job.</p>"
+      }
+    },
+    "Key": {
+      "base": null,
+      "refs": {
+        "S3Source$key": "<p>Key name of the bucket object that contains your unsigned code.</p>"
+      }
+    },
+    "ListSigningJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSigningJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSigningPlatformsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSigningPlatformsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSigningProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSigningProfilesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListSigningJobsRequest$maxResults": "<p>Specifies the maximum number of items to return in the response. Use this parameter when paginating results. If additional items exist beyond the number you specify, the <code>nextToken</code> element is set in the response. Use the <code>nextToken</code> value in a subsequent request to retrieve additional items. </p>",
+        "ListSigningPlatformsRequest$maxResults": "<p>The maximum number of results to be returned by this operation.</p>",
+        "ListSigningProfilesRequest$maxResults": "<p>The maximum number of profiles to be returned.</p>"
+      }
+    },
+    "MaxSizeInMB": {
+      "base": null,
+      "refs": {
+        "GetSigningPlatformResponse$maxSizeInMB": "<p>The maximum size (in MB) of the payload that can be signed by the target platform.</p>",
+        "SigningPlatform$maxSizeInMB": "<p>The maximum size (in MB) of code that can be signed by a code signing platform.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListSigningJobsRequest$nextToken": "<p>String for specifying the next set of paginated results to return. After you receive a response with truncated results, use this parameter in a subsequent request. Set it to the value of <code>nextToken</code> from the response that you just received.</p>",
+        "ListSigningJobsResponse$nextToken": "<p>String for specifying the next set of paginated results.</p>",
+        "ListSigningProfilesRequest$nextToken": "<p>Value for specifying the next set of paginated results to return. After you receive a response with truncated results, use this parameter in a subsequent request. Set it to the value of <code>nextToken</code> from the response that you just received.</p>",
+        "ListSigningProfilesResponse$nextToken": "<p>Value for specifying the next set of paginated results to return.</p>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The signing profile was not found.</p>",
+      "refs": {
+      }
+    },
+    "PlatformId": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$platformId": "<p>The microcontroller platform to which your signed code image will be distributed.</p>",
+        "GetSigningPlatformRequest$platformId": "<p>The ID of the target signing platform.</p>",
+        "GetSigningPlatformResponse$platformId": "<p>The ID of the target signing platform.</p>",
+        "GetSigningProfileResponse$platformId": "<p>The ID of the platform that is used by the target signing profile.</p>",
+        "ListSigningJobsRequest$platformId": "<p>The ID of microcontroller platform that you specified for the distribution of your code image.</p>",
+        "PutSigningProfileRequest$platformId": "<p>The ID of the signing platform to be created.</p>",
+        "SigningProfile$platformId": "<p>The ID of a platform that is available for use by a signing profile.</p>"
+      }
+    },
+    "Prefix": {
+      "base": null,
+      "refs": {
+        "S3Destination$prefix": "<p>An Amazon S3 prefix that you can use to limit responses to those that begin with the specified prefix.</p>"
+      }
+    },
+    "ProfileName": {
+      "base": null,
+      "refs": {
+        "CancelSigningProfileRequest$profileName": "<p>The name of the signing profile to be canceled.</p>",
+        "DescribeSigningJobResponse$profileName": "<p>The name of the profile that initiated the signing operation.</p>",
+        "GetSigningProfileRequest$profileName": "<p>The name of the target signing profile.</p>",
+        "GetSigningProfileResponse$profileName": "<p>The name of the target signing profile.</p>",
+        "PutSigningProfileRequest$profileName": "<p>The name of the signing profile to be created.</p>",
+        "SigningProfile$profileName": "<p>The name of the signing profile.</p>",
+        "StartSigningJobRequest$profileName": "<p>The name of the signing profile.</p>"
+      }
+    },
+    "PutSigningProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutSigningProfileResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestedBy": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$requestedBy": "<p>The IAM principal that requested the signing job.</p>",
+        "ListSigningJobsRequest$requestedBy": "<p>The IAM principal that requested the signing job.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>A specified resource could not be found.</p>",
+      "refs": {
+      }
+    },
+    "S3Destination": {
+      "base": "<p>The name and prefix of the S3 bucket where code signing saves your signed objects.</p>",
+      "refs": {
+        "Destination$s3": "<p>The <code>S3Destination</code> object.</p>"
+      }
+    },
+    "S3SignedObject": {
+      "base": "<p>The S3 bucket name and key where code signing saved your signed code image.</p>",
+      "refs": {
+        "SignedObject$s3": "<p>The <code>S3SignedObject</code>.</p>"
+      }
+    },
+    "S3Source": {
+      "base": "<p>Information about the S3 bucket where you saved your unsigned code.</p>",
+      "refs": {
+        "Source$s3": "<p>The <code>S3Source</code> object.</p>"
+      }
+    },
+    "SignedObject": {
+      "base": "<p>Points to an <code>S3SignedObject</code> object that contains information about your signed code image.</p>",
+      "refs": {
+        "DescribeSigningJobResponse$signedObject": "<p>Name of the S3 bucket where the signed code image is saved by code signing.</p>",
+        "SigningJob$signedObject": "<p>A <code>SignedObject</code> structure that contains information about a signing job's signed code image.</p>"
+      }
+    },
+    "SigningConfiguration": {
+      "base": "<p>The configuration of a code signing operation.</p>",
+      "refs": {
+        "GetSigningPlatformResponse$signingConfiguration": "<p>A list of configurations applied to the target platform at signing.</p>",
+        "SigningPlatform$signingConfiguration": "<p>The configuration of a code signing platform. This includes the designated hash algorithm and encryption algorithm of a signing platform.</p>"
+      }
+    },
+    "SigningConfigurationOverrides": {
+      "base": "<p>A signing configuration that overrides the default encryption or hash algorithm of a signing job.</p>",
+      "refs": {
+        "SigningPlatformOverrides$signingConfiguration": "<p>A signing configuration that overrides the default encryption or hash algorithm of a signing job.</p>"
+      }
+    },
+    "SigningImageFormat": {
+      "base": "<p>The image format of a code signing platform or profile.</p>",
+      "refs": {
+        "GetSigningPlatformResponse$signingImageFormat": "<p>The format of the target platform's signing image.</p>",
+        "SigningPlatform$signingImageFormat": null
+      }
+    },
+    "SigningJob": {
+      "base": "<p>Contains information about a signing job.</p>",
+      "refs": {
+        "SigningJobs$member": null
+      }
+    },
+    "SigningJobs": {
+      "base": null,
+      "refs": {
+        "ListSigningJobsResponse$jobs": "<p>A list of your signing jobs.</p>"
+      }
+    },
+    "SigningMaterial": {
+      "base": "<p>The ACM certificate that is used to sign your code.</p>",
+      "refs": {
+        "DescribeSigningJobResponse$signingMaterial": "<p>The Amazon Resource Name (ARN) of your code signing certificate.</p>",
+        "GetSigningProfileResponse$signingMaterial": "<p>The ARN of the certificate that the target profile uses for signing operations.</p>",
+        "PutSigningProfileRequest$signingMaterial": "<p>The AWS Certificate Manager certificate that will be used to sign code with the new signing profile.</p>",
+        "SigningJob$signingMaterial": "<p>A <code>SigningMaterial</code> object that contains the Amazon Resource Name (ARN) of the certificate used for the signing job.</p>",
+        "SigningProfile$signingMaterial": "<p>The ACM certificate that is available for use by a signing profile.</p>"
+      }
+    },
+    "SigningParameterKey": {
+      "base": null,
+      "refs": {
+        "SigningParameters$key": null
+      }
+    },
+    "SigningParameterValue": {
+      "base": null,
+      "refs": {
+        "SigningParameters$value": null
+      }
+    },
+    "SigningParameters": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$signingParameters": "<p>Map of user-assigned key-value pairs used during signing. These values contain any information that you specified for use in your signing job. </p>",
+        "GetSigningProfileResponse$signingParameters": "<p>A map of key-value pairs for signing operations that is attached to the target signing profile.</p>",
+        "PutSigningProfileRequest$signingParameters": "<p>Map of key-value pairs for signing. These can include any information that you want to use during signing.</p>",
+        "SigningProfile$signingParameters": "<p>The parameters that are available for use by a code signing user.</p>"
+      }
+    },
+    "SigningPlatform": {
+      "base": "<p>Contains information about the signing configurations and parameters that are used to perform a code signing job.</p>",
+      "refs": {
+        "SigningPlatforms$member": null
+      }
+    },
+    "SigningPlatformOverrides": {
+      "base": "<p>Any overrides that are applied to the signing configuration of a code signing platform.</p>",
+      "refs": {
+        "DescribeSigningJobResponse$overrides": "<p>A list of any overrides that were applied to the signing operation.</p>",
+        "GetSigningProfileResponse$overrides": "<p>A list of overrides applied by the target signing profile for signing operations.</p>",
+        "PutSigningProfileRequest$overrides": "<p>A subfield of <code>platform</code>. This specifies any different configuration options that you want to apply to the chosen platform (such as a different <code>hash-algorithm</code> or <code>signing-algorithm</code>).</p>"
+      }
+    },
+    "SigningPlatforms": {
+      "base": null,
+      "refs": {
+        "ListSigningPlatformsResponse$platforms": "<p>A list of all platforms that match the request parameters.</p>"
+      }
+    },
+    "SigningProfile": {
+      "base": "<p>Contains information about the ACM certificates and code signing configuration parameters that can be used by a given code signing user.</p>",
+      "refs": {
+        "SigningProfiles$member": null
+      }
+    },
+    "SigningProfileStatus": {
+      "base": null,
+      "refs": {
+        "GetSigningProfileResponse$status": "<p>The status of the target signing profile.</p>",
+        "SigningProfile$status": "<p>The status of a code signing profile.</p>"
+      }
+    },
+    "SigningProfiles": {
+      "base": null,
+      "refs": {
+        "ListSigningProfilesResponse$profiles": "<p>A list of profiles that are available in the AWS account. This includes profiles with the status of <code>CANCELED</code> if the <code>includeCanceled</code> parameter is set to <code>true</code>.</p>"
+      }
+    },
+    "SigningStatus": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$status": "<p>Status of the signing job.</p>",
+        "ListSigningJobsRequest$status": "<p>A status value with which to filter your results.</p>",
+        "SigningJob$status": "<p>The status of the signing job.</p>"
+      }
+    },
+    "Source": {
+      "base": "<p>An <code>S3Source</code> object that contains information about the S3 bucket where you saved your unsigned code.</p>",
+      "refs": {
+        "DescribeSigningJobResponse$source": "<p>The object that contains the name of your S3 bucket or your raw code.</p>",
+        "SigningJob$source": "<p>A <code>Source</code> that contains information about a signing job's code image source.</p>",
+        "StartSigningJobRequest$source": "<p>The S3 bucket that contains the object to sign or a BLOB that contains your raw code.</p>"
+      }
+    },
+    "StartSigningJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartSigningJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StatusReason": {
+      "base": null,
+      "refs": {
+        "DescribeSigningJobResponse$statusReason": "<p>String value that contains the status reason.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "GetSigningPlatformResponse$partner": "<p>A list of partner entities that use the target signing platform.</p>",
+        "GetSigningPlatformResponse$target": "<p>The validation template that is used by the target signing platform.</p>",
+        "ListSigningPlatformsRequest$category": "<p>The category type of a signing platform.</p>",
+        "ListSigningPlatformsRequest$partner": "<p>Any partner entities connected to a signing platform.</p>",
+        "ListSigningPlatformsRequest$target": "<p>The validation template that is used by the target signing platform.</p>",
+        "ListSigningPlatformsRequest$nextToken": "<p>Value for specifying the next set of paginated results to return. After you receive a response with truncated results, use this parameter in a subsequent request. Set it to the value of <code>nextToken</code> from the response that you just received.</p>",
+        "ListSigningPlatformsResponse$nextToken": "<p>Value for specifying the next set of paginated results to return.</p>",
+        "ListTagsForResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) for the signing profile.</p>",
+        "SigningPlatform$platformId": "<p>The ID of a code signing; platform.</p>",
+        "SigningPlatform$displayName": "<p>The display name of a code signing platform.</p>",
+        "SigningPlatform$partner": "<p>Any partner entities linked to a code signing platform.</p>",
+        "SigningPlatform$target": "<p>The types of targets that can be signed by a code signing platform.</p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) for the signing profile.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) for the signing profile.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>A list of tag keys to be removed from the signing profile.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "GetSigningProfileResponse$tags": "<p>A list of tags associated with the signing profile.</p>",
+        "ListTagsForResourceResponse$tags": "<p>A list of tags associated with the signing profile.</p>",
+        "PutSigningProfileRequest$tags": "<p>Tags to be associated with the signing profile that is being created.</p>",
+        "SigningProfile$tags": "<p>A list of tags associated with the signing profile.</p>",
+        "TagResourceRequest$tags": "<p>One or more tags to be associated with the signing profile.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The signing job has been throttled.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>You signing certificate could not be validated.</p>",
+      "refs": {
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "S3Source$version": "<p>Version of your source image in your version enabled S3 bucket.</p>"
+      }
+    },
+    "bool": {
+      "base": null,
+      "refs": {
+        "ListSigningProfilesRequest$includeCanceled": "<p>Designates whether to include profiles with the status of <code>CANCELED</code>.</p>"
+      }
+    },
+    "string": {
+      "base": null,
+      "refs": {
+        "GetSigningProfileResponse$arn": "<p>The Amazon Resource Name (ARN) for the signing profile.</p>",
+        "PutSigningProfileResponse$arn": "<p>The Amazon Resource Name (ARN) of the signing profile created.</p>",
+        "SigningProfile$arn": "<p>The Amazon Resource Name (ARN) for the signing profile.</p>"
+      }
+    }
+  }
+}

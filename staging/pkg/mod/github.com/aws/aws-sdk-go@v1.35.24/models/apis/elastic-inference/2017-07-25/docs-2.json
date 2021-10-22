@@ -1,0 +1,306 @@
+{
+  "version": "2.0",
+  "service": "<p> Elastic Inference public APIs. </p>",
+  "operations": {
+    "DescribeAcceleratorOfferings": "<p> Describes the locations in which a given accelerator type or set of types is present in a given region. </p>",
+    "DescribeAcceleratorTypes": "<p> Describes the accelerator types available in a given region, as well as their characteristics, such as memory and throughput. </p>",
+    "DescribeAccelerators": "<p> Describes information over a provided set of accelerators belonging to an account. </p>",
+    "ListTagsForResource": "<p> Returns all tags of an Elastic Inference Accelerator. </p>",
+    "TagResource": "<p> Adds the specified tags to an Elastic Inference Accelerator. </p>",
+    "UntagResource": "<p> Removes the specified tags from an Elastic Inference Accelerator. </p>"
+  },
+  "shapes": {
+    "AcceleratorHealthStatus": {
+      "base": null,
+      "refs": {
+        "ElasticInferenceAcceleratorHealth$status": "<p> The health status of the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "AcceleratorId": {
+      "base": null,
+      "refs": {
+        "AcceleratorIdList$member": null,
+        "ElasticInferenceAccelerator$acceleratorId": "<p> The ID of the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "AcceleratorIdList": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorsRequest$acceleratorIds": "<p> The IDs of the accelerators to describe. </p>"
+      }
+    },
+    "AcceleratorType": {
+      "base": "<p> The details of an Elastic Inference Accelerator type. </p>",
+      "refs": {
+        "AcceleratorTypeList$member": null
+      }
+    },
+    "AcceleratorTypeList": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorTypesResponse$acceleratorTypes": "<p> The available accelerator types. </p>"
+      }
+    },
+    "AcceleratorTypeName": {
+      "base": null,
+      "refs": {
+        "AcceleratorType$acceleratorTypeName": "<p> The name of the Elastic Inference Accelerator type. </p>",
+        "AcceleratorTypeNameList$member": null,
+        "AcceleratorTypeOffering$acceleratorType": "<p> The name of the Elastic Inference Accelerator type. </p>",
+        "ElasticInferenceAccelerator$acceleratorType": "<p> The type of the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "AcceleratorTypeNameList": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorOfferingsRequest$acceleratorTypes": "<p> The list of accelerator types to describe. </p>"
+      }
+    },
+    "AcceleratorTypeOffering": {
+      "base": "<p> The offering for an Elastic Inference Accelerator type. </p>",
+      "refs": {
+        "AcceleratorTypeOfferingList$member": null
+      }
+    },
+    "AcceleratorTypeOfferingList": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorOfferingsResponse$acceleratorTypeOfferings": "<p> The list of accelerator type offerings for a specific location. </p>"
+      }
+    },
+    "AvailabilityZone": {
+      "base": null,
+      "refs": {
+        "ElasticInferenceAccelerator$availabilityZone": "<p> The availability zone where the Elastic Inference Accelerator is present. </p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p> Raised when a malformed input has been provided to the API. </p>",
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorOfferingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorOfferingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorTypesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorTypesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAcceleratorsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ElasticInferenceAccelerator": {
+      "base": "<p> The details of an Elastic Inference Accelerator. </p>",
+      "refs": {
+        "ElasticInferenceAcceleratorSet$member": null
+      }
+    },
+    "ElasticInferenceAcceleratorHealth": {
+      "base": "<p> The health details of an Elastic Inference Accelerator. </p>",
+      "refs": {
+        "ElasticInferenceAccelerator$acceleratorHealth": "<p> The health of the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "ElasticInferenceAcceleratorSet": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorsResponse$acceleratorSet": "<p> The details of the Elastic Inference Accelerators. </p>"
+      }
+    },
+    "Filter": {
+      "base": "<p> A filter expression for the Elastic Inference Accelerator list. </p>",
+      "refs": {
+        "FilterList$member": null
+      }
+    },
+    "FilterList": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorsRequest$filters": "<p> One or more filters. Filter names and values are case-sensitive. Valid filter names are: accelerator-types: can provide a list of accelerator type names to filter for. instance-id: can provide a list of EC2 instance ids to filter for. </p>"
+      }
+    },
+    "FilterName": {
+      "base": null,
+      "refs": {
+        "Filter$name": "<p> The filter name for the Elastic Inference Accelerator list. It can assume the following values: accelerator-type: the type of Elastic Inference Accelerator to filter for. instance-id: an EC2 instance id to filter for. </p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "MemoryInfo$sizeInMiB": "<p> The size in mebibytes of the Elastic Inference Accelerator type. </p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p> Raised when an unexpected error occurred during request processing. </p>",
+      "refs": {
+      }
+    },
+    "Key": {
+      "base": null,
+      "refs": {
+        "KeyValuePair$key": "<p> The throughput value of the Elastic Inference Accelerator type. It can assume the following values: TFLOPS16bit: the throughput expressed in 16bit TeraFLOPS. TFLOPS32bit: the throughput expressed in 32bit TeraFLOPS. </p>"
+      }
+    },
+    "KeyValuePair": {
+      "base": "<p> A throughput entry for an Elastic Inference Accelerator type. </p>",
+      "refs": {
+        "ThroughputInfoList$member": null
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Location": {
+      "base": null,
+      "refs": {
+        "AcceleratorTypeOffering$location": "<p> The location for the offering. It will return either the region, availability zone or availability zone id for the offering depending on the locationType value. </p>"
+      }
+    },
+    "LocationType": {
+      "base": null,
+      "refs": {
+        "AcceleratorTypeOffering$locationType": "<p> The location type for the offering. It can assume the following values: region: defines that the offering is at the regional level. availability-zone: defines that the offering is at the availability zone level. availability-zone-id: defines that the offering is at the availability zone level, defined by the availability zone id. </p>",
+        "DescribeAcceleratorOfferingsRequest$locationType": "<p> The location type that you want to describe accelerator type offerings for. It can assume the following values: region: will return the accelerator type offering at the regional level. availability-zone: will return the accelerator type offering at the availability zone level. availability-zone-id: will return the accelerator type offering at the availability zone level returning the availability zone id. </p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorsRequest$maxResults": "<p> The total number of items to return in the command's output. If the total number of items available is more than the value specified, a NextToken is provided in the command's output. To resume pagination, provide the NextToken value in the starting-token argument of a subsequent command. Do not use the NextToken response element directly outside of the AWS CLI. </p>"
+      }
+    },
+    "MemoryInfo": {
+      "base": "<p> The memory information of an Elastic Inference Accelerator type. </p>",
+      "refs": {
+        "AcceleratorType$memoryInfo": "<p> The memory information of the Elastic Inference Accelerator type. </p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "DescribeAcceleratorsRequest$nextToken": "<p> A token to specify where to start paginating. This is the NextToken from a previously truncated response. </p>",
+        "DescribeAcceleratorsResponse$nextToken": "<p> A token to specify where to start paginating. This is the NextToken from a previously truncated response. </p>"
+      }
+    },
+    "ResourceARN": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$resourceArn": "<p> The ARN of the Elastic Inference Accelerator to list the tags for. </p>",
+        "TagResourceRequest$resourceArn": "<p> The ARN of the Elastic Inference Accelerator to tag. </p>",
+        "UntagResourceRequest$resourceArn": "<p> The ARN of the Elastic Inference Accelerator to untag. </p>"
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "ElasticInferenceAccelerator$attachedResource": "<p> The ARN of the resource that the Elastic Inference Accelerator is attached to. </p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p> Raised when the requested resource cannot be found. </p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "BadRequestException$message": null,
+        "InternalServerException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ValueStringList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p> The list of tags to remove from the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceResult$tags": "<p> The tags of the Elastic Inference Accelerator. </p>",
+        "TagResourceRequest$tags": "<p> The tags to add to the Elastic Inference Accelerator. </p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "ThroughputInfoList": {
+      "base": null,
+      "refs": {
+        "AcceleratorType$throughputInfo": "<p> The throughput information of the Elastic Inference Accelerator type. </p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Value": {
+      "base": null,
+      "refs": {
+        "KeyValuePair$value": "<p> The throughput value of the Elastic Inference Accelerator type. </p>"
+      }
+    },
+    "ValueStringList": {
+      "base": null,
+      "refs": {
+        "Filter$values": "<p> The values for the filter of the Elastic Inference Accelerator list. </p>"
+      }
+    }
+  }
+}

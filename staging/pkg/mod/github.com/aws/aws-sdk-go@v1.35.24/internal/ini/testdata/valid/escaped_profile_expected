@@ -1,0 +1,6 @@
+{
+    "default": {
+        "foo": "\"bar\"",
+        "baz": "qux\n"
+    }
+}

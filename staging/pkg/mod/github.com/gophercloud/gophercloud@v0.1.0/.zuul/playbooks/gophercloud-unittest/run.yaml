@@ -1,0 +1,16 @@
+- hosts: all
+  become: yes
+  roles:
+    - config-golang
+  tasks:
+    - name: Run unit tests with gophercloud
+      shell:
+        cmd: |
+          set -e
+          set -o pipefail
+          set -x
+          go get ./... || true
+          ./script/unittest -v 2>&1 | tee $TEST_RESULTS_TXT
+        executable: /bin/bash
+        chdir: '{{ zuul.project.src_dir }}'
+      environment: '{{ global_env }}'

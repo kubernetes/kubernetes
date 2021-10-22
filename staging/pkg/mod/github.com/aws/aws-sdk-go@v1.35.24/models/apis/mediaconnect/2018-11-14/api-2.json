@@ -1,0 +1,2882 @@
+{
+  "metadata": {
+    "apiVersion": "2018-11-14",
+    "endpointPrefix": "mediaconnect",
+    "signingName": "mediaconnect",
+    "serviceFullName": "AWS MediaConnect",
+    "serviceId": "MediaConnect",
+    "protocol": "rest-json",
+    "jsonVersion": "1.1",
+    "uid": "mediaconnect-2018-11-14",
+    "signatureVersion": "v4"
+  },
+  "operations": {
+    "AddFlowOutputs": {
+      "name": "AddFlowOutputs",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/{flowArn}/outputs",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "AddFlowOutputsRequest"
+      },
+      "output": {
+        "shape": "AddFlowOutputsResponse"
+      },
+      "errors": [
+        {
+          "shape": "AddFlowOutputs420Exception"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "AddFlowSources": {
+      "name": "AddFlowSources",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/{flowArn}/source",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "AddFlowSourcesRequest"
+      },
+      "output": {
+        "shape": "AddFlowSourcesResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "AddFlowVpcInterfaces": {
+      "name": "AddFlowVpcInterfaces",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/{flowArn}/vpcInterfaces",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "AddFlowVpcInterfacesRequest"
+      },
+      "output": {
+        "shape": "AddFlowVpcInterfacesResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "CreateFlow": {
+      "name": "CreateFlow",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "CreateFlowRequest"
+      },
+      "output": {
+        "shape": "CreateFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "CreateFlow420Exception"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "DeleteFlow": {
+      "name": "DeleteFlow",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/flows/{flowArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "DeleteFlowRequest"
+      },
+      "output": {
+        "shape": "DeleteFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "DescribeFlow": {
+      "name": "DescribeFlow",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/flows/{flowArn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeFlowRequest"
+      },
+      "output": {
+        "shape": "DescribeFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "DescribeOffering": {
+      "name": "DescribeOffering",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/offerings/{offeringArn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeOfferingRequest"
+      },
+      "output": {
+        "shape": "DescribeOfferingResponse"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "DescribeReservation": {
+      "name": "DescribeReservation",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/reservations/{reservationArn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "DescribeReservationRequest"
+      },
+      "output": {
+        "shape": "DescribeReservationResponse"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "GrantFlowEntitlements": {
+      "name": "GrantFlowEntitlements",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/{flowArn}/entitlements",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "GrantFlowEntitlementsRequest"
+      },
+      "output": {
+        "shape": "GrantFlowEntitlementsResponse"
+      },
+      "errors": [
+        {
+          "shape": "GrantFlowEntitlements420Exception"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "ListEntitlements": {
+      "name": "ListEntitlements",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/entitlements",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListEntitlementsRequest"
+      },
+      "output": {
+        "shape": "ListEntitlementsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "ListFlows": {
+      "name": "ListFlows",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/flows",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListFlowsRequest"
+      },
+      "output": {
+        "shape": "ListFlowsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "ListOfferings": {
+      "name": "ListOfferings",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/offerings",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListOfferingsRequest"
+      },
+      "output": {
+        "shape": "ListOfferingsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "ListReservations": {
+      "name": "ListReservations",
+      "http": {
+        "method": "GET",
+        "requestUri": "/v1/reservations",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListReservationsRequest"
+      },
+      "output": {
+        "shape": "ListReservationsResponse"
+      },
+      "errors": [
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "ListTagsForResource": {
+      "name": "ListTagsForResource",
+      "http": {
+        "method": "GET",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListTagsForResourceRequest"
+      },
+      "output": {
+        "shape": "ListTagsForResourceResponse"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "PurchaseOffering": {
+      "name": "PurchaseOffering",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/offerings/{offeringArn}",
+        "responseCode": 201
+      },
+      "input": {
+        "shape": "PurchaseOfferingRequest"
+      },
+      "output": {
+        "shape": "PurchaseOfferingResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "RemoveFlowOutput": {
+      "name": "RemoveFlowOutput",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/flows/{flowArn}/outputs/{outputArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "RemoveFlowOutputRequest"
+      },
+      "output": {
+        "shape": "RemoveFlowOutputResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "RemoveFlowSource": {
+      "name": "RemoveFlowSource",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/flows/{flowArn}/source/{sourceArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "RemoveFlowSourceRequest"
+      },
+      "output": {
+        "shape": "RemoveFlowSourceResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "RemoveFlowVpcInterface": {
+      "name": "RemoveFlowVpcInterface",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/flows/{flowArn}/vpcInterfaces/{vpcInterfaceName}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "RemoveFlowVpcInterfaceRequest"
+      },
+      "output": {
+        "shape": "RemoveFlowVpcInterfaceResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "RevokeFlowEntitlement": {
+      "name": "RevokeFlowEntitlement",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/v1/flows/{flowArn}/entitlements/{entitlementArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "RevokeFlowEntitlementRequest"
+      },
+      "output": {
+        "shape": "RevokeFlowEntitlementResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "StartFlow": {
+      "name": "StartFlow",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/start/{flowArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "StartFlowRequest"
+      },
+      "output": {
+        "shape": "StartFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "StopFlow": {
+      "name": "StopFlow",
+      "http": {
+        "method": "POST",
+        "requestUri": "/v1/flows/stop/{flowArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "StopFlowRequest"
+      },
+      "output": {
+        "shape": "StopFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "TagResource": {
+      "name": "TagResource",
+      "http": {
+        "method": "POST",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "TagResourceRequest"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "UntagResource": {
+      "name": "UntagResource",
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/tags/{resourceArn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "UntagResourceRequest"
+      },
+      "errors": [
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        }
+      ]
+    },
+    "UpdateFlow": {
+      "name": "UpdateFlow",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/flows/{flowArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "UpdateFlowRequest"
+      },
+      "output": {
+        "shape": "UpdateFlowResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "UpdateFlowEntitlement": {
+      "name": "UpdateFlowEntitlement",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/flows/{flowArn}/entitlements/{entitlementArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "UpdateFlowEntitlementRequest"
+      },
+      "output": {
+        "shape": "UpdateFlowEntitlementResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "UpdateFlowOutput": {
+      "name": "UpdateFlowOutput",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/flows/{flowArn}/outputs/{outputArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "UpdateFlowOutputRequest"
+      },
+      "output": {
+        "shape": "UpdateFlowOutputResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    },
+    "UpdateFlowSource": {
+      "name": "UpdateFlowSource",
+      "http": {
+        "method": "PUT",
+        "requestUri": "/v1/flows/{flowArn}/source/{sourceArn}",
+        "responseCode": 202
+      },
+      "input": {
+        "shape": "UpdateFlowSourceRequest"
+      },
+      "output": {
+        "shape": "UpdateFlowSourceResponse"
+      },
+      "errors": [
+        {
+          "shape": "BadRequestException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ]
+    }
+  },
+  "shapes": {
+    "AddFlowOutputs420Exception": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 420
+      }
+    },
+    "AddFlowOutputsRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "Outputs": {
+          "shape": "__listOfAddOutputRequest",
+          "locationName": "outputs"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "Outputs"
+      ]
+    },
+    "AddFlowOutputsResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Outputs": {
+          "shape": "__listOfOutput",
+          "locationName": "outputs"
+        }
+      }
+    },
+    "AddFlowSourcesRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "Sources": {
+          "shape": "__listOfSetSourceRequest",
+          "locationName": "sources"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "Sources"
+      ]
+    },
+    "AddFlowSourcesResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Sources": {
+          "shape": "__listOfSource",
+          "locationName": "sources"
+        }
+      }
+    },
+    "AddFlowVpcInterfacesRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "VpcInterfaces": {
+          "shape": "__listOfVpcInterfaceRequest",
+          "locationName": "vpcInterfaces"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "VpcInterfaces"
+      ]
+    },
+    "AddFlowVpcInterfacesResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "VpcInterfaces": {
+          "shape": "__listOfVpcInterface",
+          "locationName": "vpcInterfaces"
+        }
+      }
+    },
+    "AddOutputRequest": {
+      "type": "structure",
+      "members": {
+        "CidrAllowList": {
+          "shape": "__listOf__string",
+          "locationName": "cidrAllowList"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Destination": {
+          "shape": "__string",
+          "locationName": "destination"
+        },
+        "Encryption": {
+          "shape": "Encryption",
+          "locationName": "encryption"
+        },
+        "MaxLatency": {
+          "shape": "__integer",
+          "locationName": "maxLatency"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Port": {
+          "shape": "__integer",
+          "locationName": "port"
+        },
+        "Protocol": {
+          "shape": "Protocol",
+          "locationName": "protocol"
+        },
+        "RemoteId": {
+          "shape": "__string",
+          "locationName": "remoteId"
+        },
+        "SmoothingLatency": {
+          "shape": "__integer",
+          "locationName": "smoothingLatency"
+        },
+        "StreamId": {
+          "shape": "__string",
+          "locationName": "streamId"
+        },
+        "VpcInterfaceAttachment": {
+          "shape": "VpcInterfaceAttachment",
+          "locationName": "vpcInterfaceAttachment"
+        }
+      },
+      "required": [
+        "Protocol"
+      ]
+    },
+    "Algorithm": {
+      "type": "string",
+      "enum": [
+        "aes128",
+        "aes192",
+        "aes256"
+      ]
+    },
+    "BadRequestException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 400
+      }
+    },
+    "CreateFlow420Exception": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 420
+      }
+    },
+    "CreateFlowRequest": {
+      "type": "structure",
+      "members": {
+        "AvailabilityZone": {
+          "shape": "__string",
+          "locationName": "availabilityZone"
+        },
+        "Entitlements": {
+          "shape": "__listOfGrantEntitlementRequest",
+          "locationName": "entitlements"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Outputs": {
+          "shape": "__listOfAddOutputRequest",
+          "locationName": "outputs"
+        },
+        "Source": {
+          "shape": "SetSourceRequest",
+          "locationName": "source"
+        },
+        "SourceFailoverConfig": {
+          "shape": "FailoverConfig",
+          "locationName": "sourceFailoverConfig"
+        },
+        "Sources": {
+          "shape": "__listOfSetSourceRequest",
+          "locationName": "sources"
+        },
+        "VpcInterfaces": {
+          "shape": "__listOfVpcInterfaceRequest",
+          "locationName": "vpcInterfaces"
+        }
+      },
+      "required": [
+        "Name"
+      ]
+    },
+    "CreateFlowResponse": {
+      "type": "structure",
+      "members": {
+        "Flow": {
+          "shape": "Flow",
+          "locationName": "flow"
+        }
+      }
+    },
+    "DeleteFlowRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn"
+      ]
+    },
+    "DeleteFlowResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Status": {
+          "shape": "Status",
+          "locationName": "status"
+        }
+      }
+    },
+    "DescribeFlowRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn"
+      ]
+    },
+    "DescribeFlowResponse": {
+      "type": "structure",
+      "members": {
+        "Flow": {
+          "shape": "Flow",
+          "locationName": "flow"
+        },
+        "Messages": {
+          "shape": "Messages",
+          "locationName": "messages"
+        }
+      }
+    },
+    "DescribeOfferingRequest": {
+      "type": "structure",
+      "members": {
+        "OfferingArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "offeringArn"
+        }
+      },
+      "required": [
+        "OfferingArn"
+      ]
+    },
+    "DescribeOfferingResponse": {
+      "type": "structure",
+      "members": {
+        "Offering": {
+          "shape": "Offering",
+          "locationName": "offering"
+        }
+      }
+    },
+    "DescribeReservationRequest": {
+      "type": "structure",
+      "members": {
+        "ReservationArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "reservationArn"
+        }
+      },
+      "required": [
+        "ReservationArn"
+      ]
+    },
+    "DescribeReservationResponse": {
+      "type": "structure",
+      "members": {
+        "Reservation": {
+          "shape": "Reservation",
+          "locationName": "reservation"
+        }
+      }
+    },
+    "DurationUnits": {
+      "type": "string",
+      "enum": [
+        "MONTHS"
+      ]
+    },
+    "Encryption": {
+      "type": "structure",
+      "members": {
+        "Algorithm": {
+          "shape": "Algorithm",
+          "locationName": "algorithm"
+        },
+        "ConstantInitializationVector": {
+          "shape": "__string",
+          "locationName": "constantInitializationVector"
+        },
+        "DeviceId": {
+          "shape": "__string",
+          "locationName": "deviceId"
+        },
+        "KeyType": {
+          "shape": "KeyType",
+          "locationName": "keyType"
+        },
+        "Region": {
+          "shape": "__string",
+          "locationName": "region"
+        },
+        "ResourceId": {
+          "shape": "__string",
+          "locationName": "resourceId"
+        },
+        "RoleArn": {
+          "shape": "__string",
+          "locationName": "roleArn"
+        },
+        "SecretArn": {
+          "shape": "__string",
+          "locationName": "secretArn"
+        },
+        "Url": {
+          "shape": "__string",
+          "locationName": "url"
+        }
+      },
+      "required": [
+        "Algorithm",
+        "RoleArn"
+      ]
+    },
+    "Entitlement": {
+      "type": "structure",
+      "members": {
+        "DataTransferSubscriberFeePercent": {
+          "shape": "__integer",
+          "locationName": "dataTransferSubscriberFeePercent"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Encryption": {
+          "shape": "Encryption",
+          "locationName": "encryption"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "EntitlementStatus": {
+          "shape": "EntitlementStatus",
+          "locationName": "entitlementStatus"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Subscribers": {
+          "shape": "__listOf__string",
+          "locationName": "subscribers"
+        }
+      },
+      "required": [
+        "EntitlementArn",
+        "Subscribers",
+        "Name"
+      ]
+    },
+    "EntitlementStatus": {
+      "type": "string",
+      "enum": [
+        "ENABLED",
+        "DISABLED"
+      ]
+    },
+    "FailoverConfig": {
+      "type": "structure",
+      "members": {
+        "RecoveryWindow": {
+          "shape": "__integer",
+          "locationName": "recoveryWindow"
+        },
+        "State": {
+          "shape": "State",
+          "locationName": "state"
+        }
+      }
+    },
+    "Flow": {
+      "type": "structure",
+      "members": {
+        "AvailabilityZone": {
+          "shape": "__string",
+          "locationName": "availabilityZone"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "EgressIp": {
+          "shape": "__string",
+          "locationName": "egressIp"
+        },
+        "Entitlements": {
+          "shape": "__listOfEntitlement",
+          "locationName": "entitlements"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Outputs": {
+          "shape": "__listOfOutput",
+          "locationName": "outputs"
+        },
+        "Source": {
+          "shape": "Source",
+          "locationName": "source"
+        },
+        "SourceFailoverConfig": {
+          "shape": "FailoverConfig",
+          "locationName": "sourceFailoverConfig"
+        },
+        "Sources": {
+          "shape": "__listOfSource",
+          "locationName": "sources"
+        },
+        "Status": {
+          "shape": "Status",
+          "locationName": "status"
+        },
+        "VpcInterfaces": {
+          "shape": "__listOfVpcInterface",
+          "locationName": "vpcInterfaces"
+        }
+      },
+      "required": [
+        "Status",
+        "Entitlements",
+        "Outputs",
+        "AvailabilityZone",
+        "FlowArn",
+        "Source",
+        "Name"
+      ]
+    },
+    "ForbiddenException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 403
+      }
+    },
+    "GrantEntitlementRequest": {
+      "type": "structure",
+      "members": {
+        "DataTransferSubscriberFeePercent": {
+          "shape": "__integer",
+          "locationName": "dataTransferSubscriberFeePercent"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Encryption": {
+          "shape": "Encryption",
+          "locationName": "encryption"
+        },
+        "EntitlementStatus": {
+          "shape": "EntitlementStatus",
+          "locationName": "entitlementStatus"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Subscribers": {
+          "shape": "__listOf__string",
+          "locationName": "subscribers"
+        }
+      },
+      "required": [
+        "Subscribers"
+      ]
+    },
+    "GrantFlowEntitlements420Exception": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 420
+      }
+    },
+    "GrantFlowEntitlementsRequest": {
+      "type": "structure",
+      "members": {
+        "Entitlements": {
+          "shape": "__listOfGrantEntitlementRequest",
+          "locationName": "entitlements"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "Entitlements"
+      ]
+    },
+    "GrantFlowEntitlementsResponse": {
+      "type": "structure",
+      "members": {
+        "Entitlements": {
+          "shape": "__listOfEntitlement",
+          "locationName": "entitlements"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        }
+      }
+    },
+    "InternalServerErrorException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 500
+      }
+    },
+    "KeyType": {
+      "type": "string",
+      "enum": [
+        "speke",
+        "static-key"
+      ]
+    },
+    "ListEntitlementsRequest": {
+      "type": "structure",
+      "members": {
+        "MaxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListEntitlementsResponse": {
+      "type": "structure",
+      "members": {
+        "Entitlements": {
+          "shape": "__listOfListedEntitlement",
+          "locationName": "entitlements"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListFlowsRequest": {
+      "type": "structure",
+      "members": {
+        "MaxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListFlowsResponse": {
+      "type": "structure",
+      "members": {
+        "Flows": {
+          "shape": "__listOfListedFlow",
+          "locationName": "flows"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListOfferingsRequest": {
+      "type": "structure",
+      "members": {
+        "MaxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListOfferingsResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "Offerings": {
+          "shape": "__listOfOffering",
+          "locationName": "offerings"
+        }
+      }
+    },
+    "ListReservationsRequest": {
+      "type": "structure",
+      "members": {
+        "MaxResults": {
+          "shape": "MaxResults",
+          "location": "querystring",
+          "locationName": "maxResults"
+        },
+        "NextToken": {
+          "shape": "__string",
+          "location": "querystring",
+          "locationName": "nextToken"
+        }
+      }
+    },
+    "ListReservationsResponse": {
+      "type": "structure",
+      "members": {
+        "NextToken": {
+          "shape": "__string",
+          "locationName": "nextToken"
+        },
+        "Reservations": {
+          "shape": "__listOfReservation",
+          "locationName": "reservations"
+        }
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        }
+      },
+      "required": [
+        "ResourceArn"
+      ]
+    },
+    "ListTagsForResourceResponse": {
+      "type": "structure",
+      "members": {
+        "Tags": {
+          "shape": "__mapOf__string",
+          "locationName": "tags"
+        }
+      }
+    },
+    "ListedEntitlement": {
+      "type": "structure",
+      "members": {
+        "DataTransferSubscriberFeePercent": {
+          "shape": "__integer",
+          "locationName": "dataTransferSubscriberFeePercent"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "EntitlementName": {
+          "shape": "__string",
+          "locationName": "entitlementName"
+        }
+      },
+      "required": [
+        "EntitlementArn",
+        "EntitlementName"
+      ]
+    },
+    "ListedFlow": {
+      "type": "structure",
+      "members": {
+        "AvailabilityZone": {
+          "shape": "__string",
+          "locationName": "availabilityZone"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "SourceType": {
+          "shape": "SourceType",
+          "locationName": "sourceType"
+        },
+        "Status": {
+          "shape": "Status",
+          "locationName": "status"
+        }
+      },
+      "required": [
+        "Status",
+        "Description",
+        "SourceType",
+        "AvailabilityZone",
+        "FlowArn",
+        "Name"
+      ]
+    },
+    "MaxResults": {
+      "type": "integer",
+      "min": 1,
+      "max": 1000
+    },
+    "Messages": {
+      "type": "structure",
+      "members": {
+        "Errors": {
+          "shape": "__listOf__string",
+          "locationName": "errors"
+        }
+      },
+      "required": [
+        "Errors"
+      ]
+    },
+    "NotFoundException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 404
+      }
+    },
+    "Offering": {
+      "type": "structure",
+      "members": {
+        "CurrencyCode": {
+          "shape": "__string",
+          "locationName": "currencyCode"
+        },
+        "Duration": {
+          "shape": "__integer",
+          "locationName": "duration"
+        },
+        "DurationUnits": {
+          "shape": "DurationUnits",
+          "locationName": "durationUnits"
+        },
+        "OfferingArn": {
+          "shape": "__string",
+          "locationName": "offeringArn"
+        },
+        "OfferingDescription": {
+          "shape": "__string",
+          "locationName": "offeringDescription"
+        },
+        "PricePerUnit": {
+          "shape": "__string",
+          "locationName": "pricePerUnit"
+        },
+        "PriceUnits": {
+          "shape": "PriceUnits",
+          "locationName": "priceUnits"
+        },
+        "ResourceSpecification": {
+          "shape": "ResourceSpecification",
+          "locationName": "resourceSpecification"
+        }
+      },
+      "required": [
+        "CurrencyCode",
+        "OfferingArn",
+        "OfferingDescription",
+        "DurationUnits",
+        "Duration",
+        "PricePerUnit",
+        "ResourceSpecification",
+        "PriceUnits"
+      ]
+    },
+    "Output": {
+      "type": "structure",
+      "members": {
+        "DataTransferSubscriberFeePercent": {
+          "shape": "__integer",
+          "locationName": "dataTransferSubscriberFeePercent"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Destination": {
+          "shape": "__string",
+          "locationName": "destination"
+        },
+        "Encryption": {
+          "shape": "Encryption",
+          "locationName": "encryption"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "MediaLiveInputArn": {
+          "shape": "__string",
+          "locationName": "mediaLiveInputArn"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "OutputArn": {
+          "shape": "__string",
+          "locationName": "outputArn"
+        },
+        "Port": {
+          "shape": "__integer",
+          "locationName": "port"
+        },
+        "Transport": {
+          "shape": "Transport",
+          "locationName": "transport"
+        },
+        "VpcInterfaceAttachment": {
+          "shape": "VpcInterfaceAttachment",
+          "locationName": "vpcInterfaceAttachment"
+        }
+      },
+      "required": [
+        "OutputArn",
+        "Name"
+      ]
+    },
+    "PriceUnits": {
+      "type": "string",
+      "enum": [
+        "HOURLY"
+      ]
+    },
+    "Protocol": {
+      "type": "string",
+      "enum": [
+        "zixi-push",
+        "rtp-fec",
+        "rtp",
+        "zixi-pull",
+        "rist"
+      ]
+    },
+    "PurchaseOfferingRequest": {
+      "type": "structure",
+      "members": {
+        "OfferingArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "offeringArn"
+        },
+        "ReservationName": {
+          "shape": "__string",
+          "locationName": "reservationName"
+        },
+        "Start": {
+          "shape": "__string",
+          "locationName": "start"
+        }
+      },
+      "required": [
+        "OfferingArn",
+        "Start",
+        "ReservationName"
+      ]
+    },
+    "PurchaseOfferingResponse": {
+      "type": "structure",
+      "members": {
+        "Reservation": {
+          "shape": "Reservation",
+          "locationName": "reservation"
+        }
+      }
+    },
+    "RemoveFlowOutputRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "OutputArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "outputArn"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "OutputArn"
+      ]
+    },
+    "RemoveFlowOutputResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "OutputArn": {
+          "shape": "__string",
+          "locationName": "outputArn"
+        }
+      }
+    },
+    "RemoveFlowSourceRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "SourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "sourceArn"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "SourceArn"
+      ]
+    },
+    "RemoveFlowSourceResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "SourceArn": {
+          "shape": "__string",
+          "locationName": "sourceArn"
+        }
+      }
+    },
+    "RemoveFlowVpcInterfaceRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "vpcInterfaceName"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "VpcInterfaceName"
+      ]
+    },
+    "RemoveFlowVpcInterfaceResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "NonDeletedNetworkInterfaceIds": {
+          "shape": "__listOf__string",
+          "locationName": "nonDeletedNetworkInterfaceIds"
+        },
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "locationName": "vpcInterfaceName"
+        }
+      }
+    },
+    "Reservation": {
+      "type": "structure",
+      "members": {
+        "CurrencyCode": {
+          "shape": "__string",
+          "locationName": "currencyCode"
+        },
+        "Duration": {
+          "shape": "__integer",
+          "locationName": "duration"
+        },
+        "DurationUnits": {
+          "shape": "DurationUnits",
+          "locationName": "durationUnits"
+        },
+        "End": {
+          "shape": "__string",
+          "locationName": "end"
+        },
+        "OfferingArn": {
+          "shape": "__string",
+          "locationName": "offeringArn"
+        },
+        "OfferingDescription": {
+          "shape": "__string",
+          "locationName": "offeringDescription"
+        },
+        "PricePerUnit": {
+          "shape": "__string",
+          "locationName": "pricePerUnit"
+        },
+        "PriceUnits": {
+          "shape": "PriceUnits",
+          "locationName": "priceUnits"
+        },
+        "ReservationArn": {
+          "shape": "__string",
+          "locationName": "reservationArn"
+        },
+        "ReservationName": {
+          "shape": "__string",
+          "locationName": "reservationName"
+        },
+        "ReservationState": {
+          "shape": "ReservationState",
+          "locationName": "reservationState"
+        },
+        "ResourceSpecification": {
+          "shape": "ResourceSpecification",
+          "locationName": "resourceSpecification"
+        },
+        "Start": {
+          "shape": "__string",
+          "locationName": "start"
+        }
+      },
+      "required": [
+        "CurrencyCode",
+        "ReservationState",
+        "OfferingArn",
+        "ReservationArn",
+        "Start",
+        "OfferingDescription",
+        "ReservationName",
+        "End",
+        "Duration",
+        "DurationUnits",
+        "PricePerUnit",
+        "ResourceSpecification",
+        "PriceUnits"
+      ]
+    },
+    "ReservationState": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "EXPIRED",
+        "PROCESSING",
+        "CANCELED"
+      ]
+    },
+    "ResourceSpecification": {
+      "type": "structure",
+      "members": {
+        "ReservedBitrate": {
+          "shape": "__integer",
+          "locationName": "reservedBitrate"
+        },
+        "ResourceType": {
+          "shape": "ResourceType",
+          "locationName": "resourceType"
+        }
+      },
+      "required": [
+        "ResourceType"
+      ]
+    },
+    "ResourceType": {
+      "type": "string",
+      "enum": [
+        "Mbps_Outbound_Bandwidth"
+      ]
+    },
+    "ResponseError": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ]
+    },
+    "RevokeFlowEntitlementRequest": {
+      "type": "structure",
+      "members": {
+        "EntitlementArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "entitlementArn"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "EntitlementArn"
+      ]
+    },
+    "RevokeFlowEntitlementResponse": {
+      "type": "structure",
+      "members": {
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        }
+      }
+    },
+    "ServiceUnavailableException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 503
+      }
+    },
+    "SetSourceRequest": {
+      "type": "structure",
+      "members": {
+        "Decryption": {
+          "shape": "Encryption",
+          "locationName": "decryption"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "IngestPort": {
+          "shape": "__integer",
+          "locationName": "ingestPort"
+        },
+        "MaxBitrate": {
+          "shape": "__integer",
+          "locationName": "maxBitrate"
+        },
+        "MaxLatency": {
+          "shape": "__integer",
+          "locationName": "maxLatency"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "Protocol": {
+          "shape": "Protocol",
+          "locationName": "protocol"
+        },
+        "StreamId": {
+          "shape": "__string",
+          "locationName": "streamId"
+        },
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "locationName": "vpcInterfaceName"
+        },
+        "WhitelistCidr": {
+          "shape": "__string",
+          "locationName": "whitelistCidr"
+        }
+      }
+    },
+    "Source": {
+      "type": "structure",
+      "members": {
+        "DataTransferSubscriberFeePercent": {
+          "shape": "__integer",
+          "locationName": "dataTransferSubscriberFeePercent"
+        },
+        "Decryption": {
+          "shape": "Encryption",
+          "locationName": "decryption"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "IngestIp": {
+          "shape": "__string",
+          "locationName": "ingestIp"
+        },
+        "IngestPort": {
+          "shape": "__integer",
+          "locationName": "ingestPort"
+        },
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "SourceArn": {
+          "shape": "__string",
+          "locationName": "sourceArn"
+        },
+        "Transport": {
+          "shape": "Transport",
+          "locationName": "transport"
+        },
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "locationName": "vpcInterfaceName"
+        },
+        "WhitelistCidr": {
+          "shape": "__string",
+          "locationName": "whitelistCidr"
+        }
+      },
+      "required": [
+        "SourceArn",
+        "Name"
+      ]
+    },
+    "SourceType": {
+      "type": "string",
+      "enum": [
+        "OWNED",
+        "ENTITLED"
+      ]
+    },
+    "StartFlowRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn"
+      ]
+    },
+    "StartFlowResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Status": {
+          "shape": "Status",
+          "locationName": "status"
+        }
+      }
+    },
+    "State": {
+      "type": "string",
+      "enum": [
+        "ENABLED",
+        "DISABLED"
+      ]
+    },
+    "Status": {
+      "type": "string",
+      "enum": [
+        "STANDBY",
+        "ACTIVE",
+        "UPDATING",
+        "DELETING",
+        "STARTING",
+        "STOPPING",
+        "ERROR"
+      ]
+    },
+    "StopFlowRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        }
+      },
+      "required": [
+        "FlowArn"
+      ]
+    },
+    "StopFlowResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Status": {
+          "shape": "Status",
+          "locationName": "status"
+        }
+      }
+    },
+    "TagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        },
+        "Tags": {
+          "shape": "__mapOf__string",
+          "locationName": "tags"
+        }
+      },
+      "required": [
+        "ResourceArn",
+        "Tags"
+      ]
+    },
+    "TooManyRequestsException": {
+      "type": "structure",
+      "members": {
+        "Message": {
+          "shape": "__string",
+          "locationName": "message"
+        }
+      },
+      "required": [
+        "Message"
+      ],
+      "exception": true,
+      "error": {
+        "httpStatusCode": 429
+      }
+    },
+    "Transport": {
+      "type": "structure",
+      "members": {
+        "CidrAllowList": {
+          "shape": "__listOf__string",
+          "locationName": "cidrAllowList"
+        },
+        "MaxBitrate": {
+          "shape": "__integer",
+          "locationName": "maxBitrate"
+        },
+        "MaxLatency": {
+          "shape": "__integer",
+          "locationName": "maxLatency"
+        },
+        "Protocol": {
+          "shape": "Protocol",
+          "locationName": "protocol"
+        },
+        "RemoteId": {
+          "shape": "__string",
+          "locationName": "remoteId"
+        },
+        "SmoothingLatency": {
+          "shape": "__integer",
+          "locationName": "smoothingLatency"
+        },
+        "StreamId": {
+          "shape": "__string",
+          "locationName": "streamId"
+        }
+      },
+      "required": [
+        "Protocol"
+      ]
+    },
+    "UntagResourceRequest": {
+      "type": "structure",
+      "members": {
+        "ResourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "resourceArn"
+        },
+        "TagKeys": {
+          "shape": "__listOf__string",
+          "location": "querystring",
+          "locationName": "tagKeys"
+        }
+      },
+      "required": [
+        "TagKeys",
+        "ResourceArn"
+      ]
+    },
+    "UpdateEncryption": {
+      "type": "structure",
+      "members": {
+        "Algorithm": {
+          "shape": "Algorithm",
+          "locationName": "algorithm"
+        },
+        "ConstantInitializationVector": {
+          "shape": "__string",
+          "locationName": "constantInitializationVector"
+        },
+        "DeviceId": {
+          "shape": "__string",
+          "locationName": "deviceId"
+        },
+        "KeyType": {
+          "shape": "KeyType",
+          "locationName": "keyType"
+        },
+        "Region": {
+          "shape": "__string",
+          "locationName": "region"
+        },
+        "ResourceId": {
+          "shape": "__string",
+          "locationName": "resourceId"
+        },
+        "RoleArn": {
+          "shape": "__string",
+          "locationName": "roleArn"
+        },
+        "SecretArn": {
+          "shape": "__string",
+          "locationName": "secretArn"
+        },
+        "Url": {
+          "shape": "__string",
+          "locationName": "url"
+        }
+      }
+    },
+    "UpdateFailoverConfig": {
+      "type": "structure",
+      "members": {
+        "RecoveryWindow": {
+          "shape": "__integer",
+          "locationName": "recoveryWindow"
+        },
+        "State": {
+          "shape": "State",
+          "locationName": "state"
+        }
+      }
+    },
+    "UpdateFlowEntitlementRequest": {
+      "type": "structure",
+      "members": {
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Encryption": {
+          "shape": "UpdateEncryption",
+          "locationName": "encryption"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "entitlementArn"
+        },
+        "EntitlementStatus": {
+          "shape": "EntitlementStatus",
+          "locationName": "entitlementStatus"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "Subscribers": {
+          "shape": "__listOf__string",
+          "locationName": "subscribers"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "EntitlementArn"
+      ]
+    },
+    "UpdateFlowEntitlementResponse": {
+      "type": "structure",
+      "members": {
+        "Entitlement": {
+          "shape": "Entitlement",
+          "locationName": "entitlement"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        }
+      }
+    },
+    "UpdateFlowOutputRequest": {
+      "type": "structure",
+      "members": {
+        "CidrAllowList": {
+          "shape": "__listOf__string",
+          "locationName": "cidrAllowList"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "Destination": {
+          "shape": "__string",
+          "locationName": "destination"
+        },
+        "Encryption": {
+          "shape": "UpdateEncryption",
+          "locationName": "encryption"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "MaxLatency": {
+          "shape": "__integer",
+          "locationName": "maxLatency"
+        },
+        "OutputArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "outputArn"
+        },
+        "Port": {
+          "shape": "__integer",
+          "locationName": "port"
+        },
+        "Protocol": {
+          "shape": "Protocol",
+          "locationName": "protocol"
+        },
+        "RemoteId": {
+          "shape": "__string",
+          "locationName": "remoteId"
+        },
+        "SmoothingLatency": {
+          "shape": "__integer",
+          "locationName": "smoothingLatency"
+        },
+        "StreamId": {
+          "shape": "__string",
+          "locationName": "streamId"
+        },
+        "VpcInterfaceAttachment": {
+          "shape": "VpcInterfaceAttachment",
+          "locationName": "vpcInterfaceAttachment"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "OutputArn"
+      ]
+    },
+    "UpdateFlowOutputResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Output": {
+          "shape": "Output",
+          "locationName": "output"
+        }
+      }
+    },
+    "UpdateFlowRequest": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "SourceFailoverConfig": {
+          "shape": "UpdateFailoverConfig",
+          "locationName": "sourceFailoverConfig"
+        }
+      },
+      "required": [
+        "FlowArn"
+      ]
+    },
+    "UpdateFlowResponse": {
+      "type": "structure",
+      "members": {
+        "Flow": {
+          "shape": "Flow",
+          "locationName": "flow"
+        }
+      }
+    },
+    "UpdateFlowSourceRequest": {
+      "type": "structure",
+      "members": {
+        "Decryption": {
+          "shape": "UpdateEncryption",
+          "locationName": "decryption"
+        },
+        "Description": {
+          "shape": "__string",
+          "locationName": "description"
+        },
+        "EntitlementArn": {
+          "shape": "__string",
+          "locationName": "entitlementArn"
+        },
+        "FlowArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "flowArn"
+        },
+        "IngestPort": {
+          "shape": "__integer",
+          "locationName": "ingestPort"
+        },
+        "MaxBitrate": {
+          "shape": "__integer",
+          "locationName": "maxBitrate"
+        },
+        "MaxLatency": {
+          "shape": "__integer",
+          "locationName": "maxLatency"
+        },
+        "Protocol": {
+          "shape": "Protocol",
+          "locationName": "protocol"
+        },
+        "SourceArn": {
+          "shape": "__string",
+          "location": "uri",
+          "locationName": "sourceArn"
+        },
+        "StreamId": {
+          "shape": "__string",
+          "locationName": "streamId"
+        },
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "locationName": "vpcInterfaceName"
+        },
+        "WhitelistCidr": {
+          "shape": "__string",
+          "locationName": "whitelistCidr"
+        }
+      },
+      "required": [
+        "FlowArn",
+        "SourceArn"
+      ]
+    },
+    "UpdateFlowSourceResponse": {
+      "type": "structure",
+      "members": {
+        "FlowArn": {
+          "shape": "__string",
+          "locationName": "flowArn"
+        },
+        "Source": {
+          "shape": "Source",
+          "locationName": "source"
+        }
+      }
+    },
+    "VpcInterface": {
+      "type": "structure",
+      "members": {
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "NetworkInterfaceIds": {
+          "shape": "__listOf__string",
+          "locationName": "networkInterfaceIds"
+        },
+        "RoleArn": {
+          "shape": "__string",
+          "locationName": "roleArn"
+        },
+        "SecurityGroupIds": {
+          "shape": "__listOf__string",
+          "locationName": "securityGroupIds"
+        },
+        "SubnetId": {
+          "shape": "__string",
+          "locationName": "subnetId"
+        }
+      },
+      "required": [
+        "NetworkInterfaceIds",
+        "SubnetId",
+        "SecurityGroupIds",
+        "RoleArn",
+        "Name"
+      ]
+    },
+    "VpcInterfaceAttachment": {
+      "type": "structure",
+      "members": {
+        "VpcInterfaceName": {
+          "shape": "__string",
+          "locationName": "vpcInterfaceName"
+        }
+      }
+    },
+    "VpcInterfaceRequest": {
+      "type": "structure",
+      "members": {
+        "Name": {
+          "shape": "__string",
+          "locationName": "name"
+        },
+        "RoleArn": {
+          "shape": "__string",
+          "locationName": "roleArn"
+        },
+        "SecurityGroupIds": {
+          "shape": "__listOf__string",
+          "locationName": "securityGroupIds"
+        },
+        "SubnetId": {
+          "shape": "__string",
+          "locationName": "subnetId"
+        }
+      },
+      "required": [
+        "SubnetId",
+        "SecurityGroupIds",
+        "RoleArn",
+        "Name"
+      ]
+    },
+    "__boolean": {
+      "type": "boolean"
+    },
+    "__double": {
+      "type": "double"
+    },
+    "__integer": {
+      "type": "integer"
+    },
+    "__listOfAddOutputRequest": {
+      "type": "list",
+      "member": {
+        "shape": "AddOutputRequest"
+      }
+    },
+    "__listOfEntitlement": {
+      "type": "list",
+      "member": {
+        "shape": "Entitlement"
+      }
+    },
+    "__listOfGrantEntitlementRequest": {
+      "type": "list",
+      "member": {
+        "shape": "GrantEntitlementRequest"
+      }
+    },
+    "__listOfListedEntitlement": {
+      "type": "list",
+      "member": {
+        "shape": "ListedEntitlement"
+      }
+    },
+    "__listOfListedFlow": {
+      "type": "list",
+      "member": {
+        "shape": "ListedFlow"
+      }
+    },
+    "__listOfOffering": {
+      "type": "list",
+      "member": {
+        "shape": "Offering"
+      }
+    },
+    "__listOfOutput": {
+      "type": "list",
+      "member": {
+        "shape": "Output"
+      }
+    },
+    "__listOfReservation": {
+      "type": "list",
+      "member": {
+        "shape": "Reservation"
+      }
+    },
+    "__listOfSetSourceRequest": {
+      "type": "list",
+      "member": {
+        "shape": "SetSourceRequest"
+      }
+    },
+    "__listOfSource": {
+      "type": "list",
+      "member": {
+        "shape": "Source"
+      }
+    },
+    "__listOfVpcInterface": {
+      "type": "list",
+      "member": {
+        "shape": "VpcInterface"
+      }
+    },
+    "__listOfVpcInterfaceRequest": {
+      "type": "list",
+      "member": {
+        "shape": "VpcInterfaceRequest"
+      }
+    },
+    "__listOf__integer": {
+      "type": "list",
+      "member": {
+        "shape": "__integer"
+      }
+    },
+    "__listOf__string": {
+      "type": "list",
+      "member": {
+        "shape": "__string"
+      }
+    },
+    "__long": {
+      "type": "long"
+    },
+    "__mapOf__string": {
+      "type": "map",
+      "key": {
+        "shape": "__string"
+      },
+      "value": {
+        "shape": "__string"
+      }
+    },
+    "__string": {
+      "type": "string"
+    },
+    "__timestampIso8601": {
+      "type": "timestamp",
+      "timestampFormat": "iso8601"
+    },
+    "__timestampUnix": {
+      "type": "timestamp",
+      "timestampFormat": "unixTimestamp"
+    }
+  }
+}

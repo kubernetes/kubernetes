@@ -1,0 +1,267 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Connect is a cloud-based contact center solution that makes it easy to set up and manage a customer contact center and provide reliable customer engagement at any scale.</p> <p>Amazon Connect enables customer contacts through voice or chat.</p> <p>The APIs described here are used by chat participants, such as agents and customers.</p>",
+  "operations": {
+    "CreateParticipantConnection": "<p>Creates the participant's connection. Note that ParticipantToken is used for invoking this API instead of ConnectionToken.</p> <p>The participant token is valid for the lifetime of the participant – until the they are part of a contact.</p> <p>The response URL for <code>WEBSOCKET</code> Type has a connect expiry timeout of 100s. Clients must manually connect to the returned websocket URL and subscribe to the desired topic. </p> <p>For chat, you need to publish the following on the established websocket connection:</p> <p> <code>{\"topic\":\"aws/subscribe\",\"content\":{\"topics\":[\"aws/chat\"]}}</code> </p> <p>Upon websocket URL expiry, as specified in the response ConnectionExpiry parameter, clients need to call this API again to obtain a new websocket URL and perform the same steps as before.</p>",
+    "DisconnectParticipant": "<p>Disconnects a participant. Note that ConnectionToken is used for invoking this API instead of ParticipantToken.</p>",
+    "GetTranscript": "<p>Retrieves a transcript of the session. Note that ConnectionToken is used for invoking this API instead of ParticipantToken.</p>",
+    "SendEvent": "<p>Sends an event. Note that ConnectionToken is used for invoking this API instead of ParticipantToken.</p>",
+    "SendMessage": "<p>Sends a message. Note that ConnectionToken is used for invoking this API instead of ParticipantToken.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "ChatContent": {
+      "base": null,
+      "refs": {
+        "Item$Content": "<p>The content of the message or event.</p>",
+        "SendEventRequest$Content": "<p>The content of the event to be sent (for example, message text). This is not yet supported.</p>",
+        "SendMessageRequest$Content": "<p>The content of the message.</p>"
+      }
+    },
+    "ChatContentType": {
+      "base": null,
+      "refs": {
+        "Item$ContentType": "<p>The type of content of the item.</p>",
+        "SendEventRequest$ContentType": "<p>The content type of the request. Supported types are:</p> <ul> <li> <p>application/vnd.amazonaws.connect.event.typing</p> </li> <li> <p>application/vnd.amazonaws.connect.event.connection.acknowledged</p> </li> </ul>",
+        "SendMessageRequest$ContentType": "<p>The type of the content. Supported types are text/plain.</p>"
+      }
+    },
+    "ChatItemId": {
+      "base": null,
+      "refs": {
+        "Item$Id": "<p>The ID of the item.</p>",
+        "SendEventResponse$Id": "<p>The ID of the response.</p>",
+        "SendMessageResponse$Id": "<p>The ID of the message.</p>",
+        "StartPosition$Id": "<p>The ID of the message or event where to start. </p>"
+      }
+    },
+    "ChatItemType": {
+      "base": null,
+      "refs": {
+        "Item$Type": "<p>Type of the item: message or event. </p>"
+      }
+    },
+    "ClientToken": {
+      "base": null,
+      "refs": {
+        "DisconnectParticipantRequest$ClientToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "SendEventRequest$ClientToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "SendMessageRequest$ClientToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>"
+      }
+    },
+    "ConnectionCredentials": {
+      "base": "<p>Connection credentials. </p>",
+      "refs": {
+        "CreateParticipantConnectionResponse$ConnectionCredentials": "<p>Creates the participant's connection credentials. The authentication token associated with the participant's connection.</p>"
+      }
+    },
+    "ConnectionType": {
+      "base": null,
+      "refs": {
+        "ConnectionTypeList$member": null
+      }
+    },
+    "ConnectionTypeList": {
+      "base": null,
+      "refs": {
+        "CreateParticipantConnectionRequest$Type": "<p>Type of connection information required.</p>"
+      }
+    },
+    "ContactId": {
+      "base": null,
+      "refs": {
+        "GetTranscriptRequest$ContactId": "<p>The contactId from the current contact chain for which transcript is needed.</p>",
+        "GetTranscriptResponse$InitialContactId": "<p>The initial contact ID for the contact. </p>"
+      }
+    },
+    "CreateParticipantConnectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateParticipantConnectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisconnectParticipantRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisconnectParticipantResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisplayName": {
+      "base": null,
+      "refs": {
+        "Item$DisplayName": "<p>The chat display name of the sender.</p>"
+      }
+    },
+    "GetTranscriptRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTranscriptResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ISO8601Datetime": {
+      "base": null,
+      "refs": {
+        "ConnectionCredentials$Expiry": "<p>The expiration of the token.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>",
+        "Websocket$ConnectionExpiry": "<p>The URL expiration timestamp in ISO date format.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>"
+      }
+    },
+    "Instant": {
+      "base": null,
+      "refs": {
+        "Item$AbsoluteTime": "<p>The time when the message or event was sent.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>",
+        "SendEventResponse$AbsoluteTime": "<p>The time when the event was sent.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>",
+        "SendMessageResponse$AbsoluteTime": "<p>The time when the message was sent.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>",
+        "StartPosition$AbsoluteTime": "<p>The time in ISO format where to start.</p> <p>It's specified in ISO 8601 format: yyyy-MM-ddThh:mm:ss.SSSZ. For example, 2019-11-08T02:41:28.172Z.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>This exception occurs when there is an internal failure in the Amazon Connect service.</p>",
+      "refs": {
+      }
+    },
+    "Item": {
+      "base": "<p>An item - message or event - that has been sent. </p>",
+      "refs": {
+        "Transcript$member": null
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetTranscriptRequest$MaxResults": "<p>The maximum number of results to return in the page. Default: 10. </p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "InternalServerException$Message": null,
+        "ThrottlingException$Message": null
+      }
+    },
+    "MostRecent": {
+      "base": null,
+      "refs": {
+        "StartPosition$MostRecent": "<p>The start position of the most recent message where you want to start. </p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "GetTranscriptRequest$NextToken": "<p>The pagination token. Use the value returned previously in the next subsequent request to retrieve the next set of results.</p>",
+        "GetTranscriptResponse$NextToken": "<p>The pagination token. Use the value returned previously in the next subsequent request to retrieve the next set of results.</p>"
+      }
+    },
+    "ParticipantId": {
+      "base": null,
+      "refs": {
+        "Item$ParticipantId": "<p>The ID of the sender in the session.</p>"
+      }
+    },
+    "ParticipantRole": {
+      "base": null,
+      "refs": {
+        "Item$ParticipantRole": "<p>The role of the sender. For example, is it a customer, agent, or system.</p>"
+      }
+    },
+    "ParticipantToken": {
+      "base": null,
+      "refs": {
+        "ConnectionCredentials$ConnectionToken": "<p>The connection token.</p>",
+        "CreateParticipantConnectionRequest$ParticipantToken": "<p>Participant Token as obtained from <a href=\"https://docs.aws.amazon.com/connect/latest/APIReference/API_StartChatContactResponse.html\">StartChatContact</a> API response.</p>",
+        "DisconnectParticipantRequest$ConnectionToken": "<p>The authentication token associated with the participant's connection.</p>",
+        "GetTranscriptRequest$ConnectionToken": "<p>The authentication token associated with the participant's connection.</p>",
+        "SendEventRequest$ConnectionToken": "<p>The authentication token associated with the participant's connection.</p>",
+        "SendMessageRequest$ConnectionToken": "<p>The authentication token associated with the connection.</p>"
+      }
+    },
+    "PreSignedConnectionUrl": {
+      "base": null,
+      "refs": {
+        "Websocket$Url": "<p>The URL of the websocket.</p>"
+      }
+    },
+    "Reason": {
+      "base": null,
+      "refs": {
+        "ValidationException$Message": null
+      }
+    },
+    "ScanDirection": {
+      "base": null,
+      "refs": {
+        "GetTranscriptRequest$ScanDirection": "<p>The direction from StartPosition from which to retrieve message. Default: BACKWARD when no StartPosition is provided, FORWARD with StartPosition. </p>"
+      }
+    },
+    "SendEventRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendEventResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendMessageRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendMessageResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SortKey": {
+      "base": null,
+      "refs": {
+        "GetTranscriptRequest$SortOrder": "<p>The sort order for the records. Default: DESCENDING.</p>"
+      }
+    },
+    "StartPosition": {
+      "base": "<p>A filtering option for where to start. For example, if you sent 100 messages, start with message 50. </p>",
+      "refs": {
+        "GetTranscriptRequest$StartPosition": "<p>A filtering option for where to start.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request was denied due to request throttling.</p>",
+      "refs": {
+      }
+    },
+    "Transcript": {
+      "base": null,
+      "refs": {
+        "GetTranscriptResponse$Transcript": "<p>The list of messages in the session.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The input fails to satisfy the constraints specified by Amazon Connect.</p>",
+      "refs": {
+      }
+    },
+    "Websocket": {
+      "base": "<p>The websocket for the participant's connection.</p>",
+      "refs": {
+        "CreateParticipantConnectionResponse$Websocket": "<p>Creates the participant's websocket connection.</p>"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+[ default ]
+region = "foo-region"
+output = json
+
+[ foo ]
+bar = baz
+[bar]
+baz=qux

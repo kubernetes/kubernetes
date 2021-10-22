@@ -1,0 +1,38 @@
+# Assumes steps in deploy-test-resources.yml was run previously. Requires
+# environment variable: AZURE_RESOURCEGROUP_NAME and Az PowerShell module
+
+parameters:
+  ServiceDirectory: ''
+  SubscriptionConfiguration: $(sub-config-azure-cloud-test-resources)
+
+# SubscriptionConfiguration will be splat into the parameters of the test
+# resources script. It should be JSON in the form:
+# {
+#   "SubscriptionId": "<subscription id>",
+#   "TenantId": "<tenant id>",
+#   "TestApplicationId": "<test app id>",
+#   "TestApplicationSecret": "<test app secret>",
+#   "ProvisionerApplicationId": "<provisioner app id>",
+#   "ProvisionerApplicationSecret": "<provisioner app secret>",
+#   "Environment": "AzureCloud | AzureGov | AzureChina | <other environment>"
+# }
+# The Remove-TestResources.ps1 script accommodates extra parameters so it will
+# not error when parameters are provided which the script doesn't use.
+
+steps:
+  - pwsh: |
+      eng/common/scripts/Import-AzModules.ps1
+
+      $subscriptionConfiguration = @"
+        ${{ parameters.SubscriptionConfiguration }}
+      "@ | ConvertFrom-Json -AsHashtable;
+
+      eng/common/TestResources/Remove-TestResources.ps1 `
+        -ResourceGroupName "${env:AZURE_RESOURCEGROUP_NAME}" `
+        -ServiceDirectory "${{ parameters.ServiceDirectory }}" `
+        @subscriptionConfiguration `
+        -Force `
+        -Verbose
+    displayName: Remove test resources
+    condition: ne(variables['AZURE_RESOURCEGROUP_NAME'], '')
+    continueOnError: true

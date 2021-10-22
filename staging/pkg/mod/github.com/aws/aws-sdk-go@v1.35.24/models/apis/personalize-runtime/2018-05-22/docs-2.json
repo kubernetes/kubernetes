@@ -1,0 +1,128 @@
+{
+  "version": "2.0",
+  "service": "<p/>",
+  "operations": {
+    "GetPersonalizedRanking": "<p>Re-ranks a list of recommended items for the given user. The first item in the list is deemed the most likely item to be of interest to the user.</p> <note> <p>The solution backing the campaign must have been created using a recipe of type PERSONALIZED_RANKING.</p> </note>",
+    "GetRecommendations": "<p>Returns a list of recommended items. The required input depends on the recipe type used to create the solution backing the campaign, as follows:</p> <ul> <li> <p>RELATED_ITEMS - <code>itemId</code> required, <code>userId</code> not used</p> </li> <li> <p>USER_PERSONALIZATION - <code>itemId</code> optional, <code>userId</code> required</p> </li> </ul> <note> <p>Campaigns that are backed by a solution created using a recipe of type PERSONALIZED_RANKING use the API.</p> </note>"
+  },
+  "shapes": {
+    "Arn": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingRequest$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign to use for generating the personalized ranking.</p>",
+        "GetPersonalizedRankingRequest$filterArn": "<p>The Amazon Resource Name (ARN) of a filter you created to include or exclude items from recommendations for a given user.</p>",
+        "GetRecommendationsRequest$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign to use for getting recommendations.</p>",
+        "GetRecommendationsRequest$filterArn": "<p>The ARN of the filter to apply to the returned recommendations. For more information, see <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/filters.html\">Using Filters with Amazon Personalize</a>.</p> <p>When using this parameter, be sure the filter resource is <code>ACTIVE</code>.</p>"
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "Context$key": null
+      }
+    },
+    "AttributeValue": {
+      "base": null,
+      "refs": {
+        "Context$value": null
+      }
+    },
+    "Context": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingRequest$context": "<p>The contextual metadata to use when getting recommendations. Contextual metadata includes any interaction information that might be relevant when getting a user's recommendations, such as the user's current location or device type.</p>",
+        "GetRecommendationsRequest$context": "<p>The contextual metadata to use when getting recommendations. Contextual metadata includes any interaction information that might be relevant when getting a user's recommendations, such as the user's current location or device type.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InvalidInputException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "GetPersonalizedRankingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPersonalizedRankingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRecommendationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRecommendationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InputList": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingRequest$inputList": "<p>A list of items (by <code>itemId</code>) to rank. If an item was not included in the training dataset, the item is appended to the end of the reranked list. The maximum is 500.</p>"
+      }
+    },
+    "InvalidInputException": {
+      "base": "<p>Provide a valid value for the field or parameter.</p>",
+      "refs": {
+      }
+    },
+    "ItemID": {
+      "base": null,
+      "refs": {
+        "GetRecommendationsRequest$itemId": "<p>The item ID to provide recommendations for.</p> <p>Required for <code>RELATED_ITEMS</code> recipe type.</p>",
+        "InputList$member": null,
+        "PredictedItem$itemId": "<p>The recommended item ID.</p>"
+      }
+    },
+    "ItemList": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingResponse$personalizedRanking": "<p>A list of items in order of most likely interest to the user. The maximum is 500.</p>",
+        "GetRecommendationsResponse$itemList": "<p>A list of recommendations sorted in ascending order by prediction score. There can be a maximum of 500 items in the list.</p>"
+      }
+    },
+    "NumResults": {
+      "base": null,
+      "refs": {
+        "GetRecommendationsRequest$numResults": "<p>The number of results to return. The default is 25. The maximum is 500.</p>"
+      }
+    },
+    "PredictedItem": {
+      "base": "<p>An object that identifies an item.</p> <p>The and APIs return a list of <code>PredictedItem</code>s.</p>",
+      "refs": {
+        "ItemList$member": null
+      }
+    },
+    "RecommendationID": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingResponse$recommendationId": "<p>The ID of the recommendation.</p>",
+        "GetRecommendationsResponse$recommendationId": "<p>The ID of the recommendation.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "Score": {
+      "base": null,
+      "refs": {
+        "PredictedItem$score": "<p>A numeric representation of the model's certainty that the item will be the next user selection. For more information on scoring logic, see <a>how-scores-work</a>.</p>"
+      }
+    },
+    "UserID": {
+      "base": null,
+      "refs": {
+        "GetPersonalizedRankingRequest$userId": "<p>The user for which you want the campaign to provide a personalized ranking.</p>",
+        "GetRecommendationsRequest$userId": "<p>The user ID to provide recommendations for.</p> <p>Required for <code>USER_PERSONALIZATION</code> recipe type.</p>"
+      }
+    }
+  }
+}

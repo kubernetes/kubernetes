@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "defaultRegion": "us-east-1",
+    "testCases": [
+        {
+            "operationName": "GetAccountBalance",
+            "input": {},
+            "errorExpectedFromService": false
+        }
+    ]
+}

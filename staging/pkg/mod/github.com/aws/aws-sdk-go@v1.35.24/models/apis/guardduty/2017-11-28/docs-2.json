@@ -1,0 +1,1870 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon GuardDuty is a continuous security monitoring service that analyzes and processes the following data sources: VPC Flow Logs, AWS CloudTrail event logs, and DNS logs. It uses threat intelligence feeds (such as lists of malicious IPs and domains) and machine learning to identify unexpected, potentially unauthorized, and malicious activity within your AWS environment. This can include issues like escalations of privileges, uses of exposed credentials, or communication with malicious IPs, URLs, or domains. For example, GuardDuty can detect compromised EC2 instances that serve malware or mine bitcoin. </p> <p>GuardDuty also monitors AWS account access behavior for signs of compromise. Some examples of this are unauthorized infrastructure deployments such as EC2 instances deployed in a Region that has never been used, or unusual API calls like a password policy change to reduce password strength. </p> <p>GuardDuty informs you of the status of your AWS environment by producing security findings that you can view in the GuardDuty console or through Amazon CloudWatch events. For more information, see the <i> <a href=\"https://docs.aws.amazon.com/guardduty/latest/ug/what-is-guardduty.html\">Amazon GuardDuty User Guide</a> </i>. </p>",
+  "operations": {
+    "AcceptInvitation": "<p>Accepts the invitation to be monitored by a master GuardDuty account.</p>",
+    "ArchiveFindings": "<p>Archives GuardDuty findings that are specified by the list of finding IDs.</p> <note> <p>Only the master account can archive findings. Member accounts don't have permission to archive findings from their accounts.</p> </note>",
+    "CreateDetector": "<p>Creates a single Amazon GuardDuty detector. A detector is a resource that represents the GuardDuty service. To start using GuardDuty, you must create a detector in each Region where you enable the service. You can have only one detector per account per Region. All data sources are enabled in a new detector by default.</p>",
+    "CreateFilter": "<p>Creates a filter using the specified finding criteria.</p>",
+    "CreateIPSet": "<p>Creates a new IPSet, which is called a trusted IP list in the console user interface. An IPSet is a list of IP addresses that are trusted for secure communication with AWS infrastructure and applications. GuardDuty doesn't generate findings for IP addresses that are included in IPSets. Only users from the master account can use this operation.</p>",
+    "CreateMembers": "<p>Creates member accounts of the current AWS account by specifying a list of AWS account IDs. This step is a prerequisite for managing the associated member accounts either by invitation or through an organization.</p> <p>When using <code>Create Members</code> as an organizations delegated administrator this action will enable GuardDuty in the added member accounts, with the exception of the organization master account, which must enable GuardDuty prior to being added as a member.</p> <p>If you are adding accounts by invitation use this action after GuardDuty has been enabled in potential member accounts and before using <a href=\"https://docs.aws.amazon.com/guardduty/latest/APIReference/API_InviteMembers.html\"> <code>Invite Members</code> </a>.</p>",
+    "CreatePublishingDestination": "<p>Creates a publishing destination to export findings to. The resource to export findings to must exist before you use this operation.</p>",
+    "CreateSampleFindings": "<p>Generates example findings of types specified by the list of finding types. If 'NULL' is specified for <code>findingTypes</code>, the API generates example findings of all supported finding types.</p>",
+    "CreateThreatIntelSet": "<p>Creates a new ThreatIntelSet. ThreatIntelSets consist of known malicious IP addresses. GuardDuty generates findings based on ThreatIntelSets. Only users of the master account can use this operation.</p>",
+    "DeclineInvitations": "<p>Declines invitations sent to the current member account by AWS accounts specified by their account IDs.</p>",
+    "DeleteDetector": "<p>Deletes an Amazon GuardDuty detector that is specified by the detector ID.</p>",
+    "DeleteFilter": "<p>Deletes the filter specified by the filter name.</p>",
+    "DeleteIPSet": "<p>Deletes the IPSet specified by the <code>ipSetId</code>. IPSets are called trusted IP lists in the console user interface.</p>",
+    "DeleteInvitations": "<p>Deletes invitations sent to the current member account by AWS accounts specified by their account IDs.</p>",
+    "DeleteMembers": "<p>Deletes GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>",
+    "DeletePublishingDestination": "<p>Deletes the publishing definition with the specified <code>destinationId</code>.</p>",
+    "DeleteThreatIntelSet": "<p>Deletes the ThreatIntelSet specified by the ThreatIntelSet ID.</p>",
+    "DescribeOrganizationConfiguration": "<p>Returns information about the account selected as the delegated administrator for GuardDuty.</p>",
+    "DescribePublishingDestination": "<p>Returns information about the publishing destination specified by the provided <code>destinationId</code>.</p>",
+    "DisableOrganizationAdminAccount": "<p>Disables an AWS account within the Organization as the GuardDuty delegated administrator.</p>",
+    "DisassociateFromMasterAccount": "<p>Disassociates the current GuardDuty member account from its master account.</p>",
+    "DisassociateMembers": "<p>Disassociates GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>",
+    "EnableOrganizationAdminAccount": "<p>Enables an AWS account within the organization as the GuardDuty delegated administrator.</p>",
+    "GetDetector": "<p>Retrieves an Amazon GuardDuty detector specified by the detectorId.</p>",
+    "GetFilter": "<p>Returns the details of the filter specified by the filter name.</p>",
+    "GetFindings": "<p>Describes Amazon GuardDuty findings specified by finding IDs.</p>",
+    "GetFindingsStatistics": "<p>Lists Amazon GuardDuty findings statistics for the specified detector ID.</p>",
+    "GetIPSet": "<p>Retrieves the IPSet specified by the <code>ipSetId</code>.</p>",
+    "GetInvitationsCount": "<p>Returns the count of all GuardDuty membership invitations that were sent to the current member account except the currently accepted invitation.</p>",
+    "GetMasterAccount": "<p>Provides the details for the GuardDuty master account associated with the current GuardDuty member account.</p>",
+    "GetMemberDetectors": "<p>Describes which data sources are enabled for the member account's detector.</p>",
+    "GetMembers": "<p>Retrieves GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>",
+    "GetThreatIntelSet": "<p>Retrieves the ThreatIntelSet that is specified by the ThreatIntelSet ID.</p>",
+    "GetUsageStatistics": "<p>Lists Amazon GuardDuty usage statistics over the last 30 days for the specified detector ID. For newly enabled detectors or data sources the cost returned will include only the usage so far under 30 days, this may differ from the cost metrics in the console, which projects usage over 30 days to provide a monthly cost estimate. For more information see <a href=\"https://docs.aws.amazon.com/guardduty/latest/ug/monitoring_costs.html#usage-calculations\">Understanding How Usage Costs are Calculated</a>.</p>",
+    "InviteMembers": "<p>Invites other AWS accounts (created as members of the current AWS account by CreateMembers) to enable GuardDuty, and allow the current AWS account to view and manage these accounts' GuardDuty findings on their behalf as the master account.</p>",
+    "ListDetectors": "<p>Lists detectorIds of all the existing Amazon GuardDuty detector resources.</p>",
+    "ListFilters": "<p>Returns a paginated list of the current filters.</p>",
+    "ListFindings": "<p>Lists Amazon GuardDuty findings for the specified detector ID.</p>",
+    "ListIPSets": "<p>Lists the IPSets of the GuardDuty service specified by the detector ID. If you use this operation from a member account, the IPSets returned are the IPSets from the associated master account.</p>",
+    "ListInvitations": "<p>Lists all GuardDuty membership invitations that were sent to the current AWS account.</p>",
+    "ListMembers": "<p>Lists details about all member accounts for the current GuardDuty master account.</p>",
+    "ListOrganizationAdminAccounts": "<p>Lists the accounts configured as GuardDuty delegated administrators.</p>",
+    "ListPublishingDestinations": "<p>Returns a list of publishing destinations associated with the specified <code>dectectorId</code>.</p>",
+    "ListTagsForResource": "<p>Lists tags for a resource. Tagging is currently supported for detectors, finding filters, IP sets, and threat intel sets, with a limit of 50 tags per resource. When invoked, this operation returns all assigned tags for a given resource.</p>",
+    "ListThreatIntelSets": "<p>Lists the ThreatIntelSets of the GuardDuty service specified by the detector ID. If you use this operation from a member account, the ThreatIntelSets associated with the master account are returned.</p>",
+    "StartMonitoringMembers": "<p>Turns on GuardDuty monitoring of the specified member accounts. Use this operation to restart monitoring of accounts that you stopped monitoring with the <code>StopMonitoringMembers</code> operation.</p>",
+    "StopMonitoringMembers": "<p>Stops GuardDuty monitoring for the specified member accounts. Use the <code>StartMonitoringMembers</code> operation to restart monitoring for those accounts.</p>",
+    "TagResource": "<p>Adds tags to a resource.</p>",
+    "UnarchiveFindings": "<p>Unarchives GuardDuty findings specified by the <code>findingIds</code>.</p>",
+    "UntagResource": "<p>Removes tags from a resource.</p>",
+    "UpdateDetector": "<p>Updates the Amazon GuardDuty detector specified by the detectorId.</p>",
+    "UpdateFilter": "<p>Updates the filter specified by the filter name.</p>",
+    "UpdateFindingsFeedback": "<p>Marks the specified GuardDuty findings as useful or not useful.</p>",
+    "UpdateIPSet": "<p>Updates the IPSet specified by the IPSet ID.</p>",
+    "UpdateMemberDetectors": "<p>Contains information on member accounts to be updated.</p>",
+    "UpdateOrganizationConfiguration": "<p>Updates the delegated administrator account with the values provided.</p>",
+    "UpdatePublishingDestination": "<p>Updates information about the publishing destination specified by the <code>destinationId</code>.</p>",
+    "UpdateThreatIntelSet": "<p>Updates the ThreatIntelSet specified by the ThreatIntelSet ID.</p>"
+  },
+  "shapes": {
+    "AcceptInvitationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AcceptInvitationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AccessControlList": {
+      "base": "<p>Contains information on the current access control policies for the bucket.</p>",
+      "refs": {
+        "BucketLevelPermissions$AccessControlList": "<p>Contains information on how Access Control Policies are applied to the bucket.</p>"
+      }
+    },
+    "AccessKeyDetails": {
+      "base": "<p>Contains information about the access keys.</p>",
+      "refs": {
+        "Resource$AccessKeyDetails": "<p>The IAM access key details (IAM user information) of a user that engaged in the activity that prompted GuardDuty to generate a finding.</p>"
+      }
+    },
+    "AccountDetail": {
+      "base": "<p>Contains information about the account.</p>",
+      "refs": {
+        "AccountDetails$member": null
+      }
+    },
+    "AccountDetails": {
+      "base": null,
+      "refs": {
+        "CreateMembersRequest$AccountDetails": "<p>A list of account ID and email address pairs of the accounts that you want to associate with the master GuardDuty account.</p>"
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "AccountDetail$AccountId": "<p>The member account ID.</p>",
+        "AccountIds$member": null,
+        "Invitation$AccountId": "<p>The ID of the account that the invitation was sent from.</p>",
+        "Master$AccountId": "<p>The ID of the account used as the master account.</p>",
+        "Member$AccountId": "<p>The ID of the member account.</p>",
+        "MemberDataSourceConfiguration$AccountId": "<p>The account ID for the member account.</p>",
+        "UnprocessedAccount$AccountId": "<p>The AWS account ID.</p>",
+        "UsageAccountResult$AccountId": "<p>The Account ID that generated usage.</p>"
+      }
+    },
+    "AccountIds": {
+      "base": null,
+      "refs": {
+        "DeclineInvitationsRequest$AccountIds": "<p>A list of account IDs of the AWS accounts that sent invitations to the current member account that you want to decline invitations from.</p>",
+        "DeleteInvitationsRequest$AccountIds": "<p>A list of account IDs of the AWS accounts that sent invitations to the current member account that you want to delete invitations from.</p>",
+        "DeleteMembersRequest$AccountIds": "<p>A list of account IDs of the GuardDuty member accounts that you want to delete.</p>",
+        "DisassociateMembersRequest$AccountIds": "<p>A list of account IDs of the GuardDuty member accounts that you want to disassociate from the master account.</p>",
+        "GetMemberDetectorsRequest$AccountIds": "<p>The account ID of the member account.</p>",
+        "GetMembersRequest$AccountIds": "<p>A list of account IDs of the GuardDuty member accounts that you want to describe.</p>",
+        "InviteMembersRequest$AccountIds": "<p>A list of account IDs of the accounts that you want to invite to GuardDuty as members.</p>",
+        "StartMonitoringMembersRequest$AccountIds": "<p>A list of account IDs of the GuardDuty member accounts to start monitoring.</p>",
+        "StopMonitoringMembersRequest$AccountIds": "<p>A list of account IDs for the member accounts to stop monitoring.</p>",
+        "UpdateMemberDetectorsRequest$AccountIds": "<p>A list of member account IDs to be updated.</p>",
+        "UsageCriteria$AccountIds": "<p>The account IDs to aggregate usage statistics from.</p>"
+      }
+    },
+    "AccountLevelPermissions": {
+      "base": "<p>Contains information about the account level permissions on the S3 bucket.</p>",
+      "refs": {
+        "PermissionConfiguration$AccountLevelPermissions": "<p>Contains information about the account level permissions on the S3 bucket.</p>"
+      }
+    },
+    "Action": {
+      "base": "<p>Contains information about actions.</p>",
+      "refs": {
+        "Service$Action": "<p>Information about the activity that is described in a finding.</p>"
+      }
+    },
+    "AdminAccount": {
+      "base": "<p>The account within the organization specified as the GuardDuty delegated administrator.</p>",
+      "refs": {
+        "AdminAccounts$member": null
+      }
+    },
+    "AdminAccounts": {
+      "base": null,
+      "refs": {
+        "ListOrganizationAdminAccountsResponse$AdminAccounts": "<p>An AdminAccounts object that includes a list of accounts configured as GuardDuty delegated administrators.</p>"
+      }
+    },
+    "AdminStatus": {
+      "base": null,
+      "refs": {
+        "AdminAccount$AdminStatus": "<p>Indicates whether the account is enabled as the delegated administrator.</p>"
+      }
+    },
+    "ArchiveFindingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ArchiveFindingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AwsApiCallAction": {
+      "base": "<p>Contains information about the API action.</p>",
+      "refs": {
+        "Action$AwsApiCallAction": "<p>Information about the AWS_API_CALL action described in this finding.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>A bad request exception object.</p>",
+      "refs": {
+      }
+    },
+    "BlockPublicAccess": {
+      "base": "<p>Contains information on how the bucker owner's S3 Block Public Access settings are being applied to the S3 bucket. See <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/access-control-block-public-access.html\">S3 Block Public Access</a> for more information. </p>",
+      "refs": {
+        "AccountLevelPermissions$BlockPublicAccess": "<p>Describes the S3 Block Public Access settings of the bucket's parent account.</p>",
+        "BucketLevelPermissions$BlockPublicAccess": "<p>Contains information on which account level S3 Block Public Access settings are applied to the S3 bucket.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "AccessControlList$AllowsPublicReadAccess": "<p>A value that indicates whether public read access for the bucket is enabled through an Access Control List (ACL).</p>",
+        "AccessControlList$AllowsPublicWriteAccess": "<p>A value that indicates whether public write access for the bucket is enabled through an Access Control List (ACL).</p>",
+        "BlockPublicAccess$IgnorePublicAcls": "<p>Indicates if S3 Block Public Access is set to <code>IgnorePublicAcls</code>.</p>",
+        "BlockPublicAccess$RestrictPublicBuckets": "<p>Indicates if S3 Block Public Access is set to <code>RestrictPublicBuckets</code>.</p>",
+        "BlockPublicAccess$BlockPublicAcls": "<p>Indicates if S3 Block Public Access is set to <code>BlockPublicAcls</code>.</p>",
+        "BlockPublicAccess$BlockPublicPolicy": "<p>Indicates if S3 Block Public Access is set to <code>BlockPublicPolicy</code>.</p>",
+        "BucketPolicy$AllowsPublicReadAccess": "<p>A value that indicates whether public read access for the bucket is enabled through a bucket policy.</p>",
+        "BucketPolicy$AllowsPublicWriteAccess": "<p>A value that indicates whether public write access for the bucket is enabled through a bucket policy.</p>",
+        "CreateDetectorRequest$Enable": "<p>A Boolean value that specifies whether the detector is to be enabled.</p>",
+        "CreateIPSetRequest$Activate": "<p>A Boolean value that indicates whether GuardDuty is to start using the uploaded IPSet.</p>",
+        "CreateThreatIntelSetRequest$Activate": "<p>A Boolean value that indicates whether GuardDuty is to start using the uploaded ThreatIntelSet.</p>",
+        "DescribeOrganizationConfigurationResponse$AutoEnable": "<p>Indicates whether GuardDuty is automatically enabled for accounts added to the organization.</p>",
+        "DescribeOrganizationConfigurationResponse$MemberAccountLimitReached": "<p>Indicates whether the maximum number of allowed member accounts are already associated with the delegated administrator master account.</p>",
+        "InviteMembersRequest$DisableEmailNotification": "<p>A Boolean value that specifies whether you want to disable email notification to the accounts that you are inviting to GuardDuty as members.</p>",
+        "NetworkConnectionAction$Blocked": "<p>Indicates whether EC2 blocked the network connection to your instance.</p>",
+        "OrganizationS3LogsConfiguration$AutoEnable": "<p>A value that contains information on whether S3 data event logs will be enabled automatically as a data source for the organization.</p>",
+        "OrganizationS3LogsConfigurationResult$AutoEnable": "<p>A value that describes whether S3 data event logs are automatically enabled for new members of the organization.</p>",
+        "PortProbeAction$Blocked": "<p>Indicates whether EC2 blocked the port probe to the instance, such as with an ACL.</p>",
+        "S3LogsConfiguration$Enable": "<p> The status of S3 data event logs as a data source.</p>",
+        "Service$Archived": "<p>Indicates whether this finding is archived.</p>",
+        "UpdateDetectorRequest$Enable": "<p>Specifies whether the detector is enabled or not enabled.</p>",
+        "UpdateIPSetRequest$Activate": "<p>The updated Boolean value that specifies whether the IPSet is active or not.</p>",
+        "UpdateOrganizationConfigurationRequest$AutoEnable": "<p>Indicates whether to automatically enable member accounts in the organization.</p>",
+        "UpdateThreatIntelSetRequest$Activate": "<p>The updated Boolean value that specifies whether the ThreateIntelSet is active or not.</p>"
+      }
+    },
+    "BucketLevelPermissions": {
+      "base": "<p>Contains information about the bucket level permissions for the S3 bucket.</p>",
+      "refs": {
+        "PermissionConfiguration$BucketLevelPermissions": "<p>Contains information about the bucket level permissions for the S3 bucket.</p>"
+      }
+    },
+    "BucketPolicy": {
+      "base": "<p>Contains information on the current bucket policies for the S3 bucket.</p>",
+      "refs": {
+        "BucketLevelPermissions$BucketPolicy": "<p>Contains information on the bucket policies for the S3 bucket.</p>"
+      }
+    },
+    "City": {
+      "base": "<p>Contains information about the city associated with the IP address.</p>",
+      "refs": {
+        "RemoteIpDetails$City": "<p>The city information of the remote IP address.</p>"
+      }
+    },
+    "ClientToken": {
+      "base": null,
+      "refs": {
+        "CreateDetectorRequest$ClientToken": "<p>The idempotency token for the create request.</p>",
+        "CreateFilterRequest$ClientToken": "<p>The idempotency token for the create request.</p>",
+        "CreateIPSetRequest$ClientToken": "<p>The idempotency token for the create request.</p>",
+        "CreatePublishingDestinationRequest$ClientToken": "<p>The idempotency token for the request.</p>",
+        "CreateThreatIntelSetRequest$ClientToken": "<p>The idempotency token for the create request.</p>"
+      }
+    },
+    "CloudTrailConfigurationResult": {
+      "base": "<p>Contains information on the status of CloudTrail as a data source for the detector.</p>",
+      "refs": {
+        "DataSourceConfigurationsResult$CloudTrail": "<p>An object that contains information on the status of CloudTrail as a data source.</p>"
+      }
+    },
+    "Condition": {
+      "base": "<p>Contains information about the condition.</p>",
+      "refs": {
+        "Criterion$value": null
+      }
+    },
+    "CountBySeverity": {
+      "base": null,
+      "refs": {
+        "FindingStatistics$CountBySeverity": "<p>Represents a map of severity to count statistics for a set of findings.</p>"
+      }
+    },
+    "Country": {
+      "base": "<p>Contains information about the country where the remote IP address is located.</p>",
+      "refs": {
+        "RemoteIpDetails$Country": "<p>The country code of the remote IP address.</p>"
+      }
+    },
+    "CreateDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDetectorResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIPSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIPSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePublishingDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePublishingDestinationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSampleFindingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSampleFindingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateThreatIntelSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateThreatIntelSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Criterion": {
+      "base": null,
+      "refs": {
+        "FindingCriteria$Criterion": "<p>Represents a map of finding properties that match specified conditions and values when querying findings.</p>"
+      }
+    },
+    "DNSLogsConfigurationResult": {
+      "base": "<p>Contains information on the status of DNS logs as a data source.</p>",
+      "refs": {
+        "DataSourceConfigurationsResult$DNSLogs": "<p>An object that contains information on the status of DNS logs as a data source.</p>"
+      }
+    },
+    "DataSource": {
+      "base": null,
+      "refs": {
+        "DataSourceList$member": null,
+        "UsageDataSourceResult$DataSource": "<p>The data source type that generated usage.</p>"
+      }
+    },
+    "DataSourceConfigurations": {
+      "base": "<p>Contains information about which data sources are enabled.</p>",
+      "refs": {
+        "CreateDetectorRequest$DataSources": "<p>An object that describes which data sources will be enabled for the detector.</p>",
+        "UpdateDetectorRequest$DataSources": "<p>An object that describes which data sources will be updated.</p>",
+        "UpdateMemberDetectorsRequest$DataSources": "<p>An object describes which data sources will be updated.</p>"
+      }
+    },
+    "DataSourceConfigurationsResult": {
+      "base": "<p>Contains information on the status of data sources for the detector.</p>",
+      "refs": {
+        "GetDetectorResponse$DataSources": "<p>An object that describes which data sources are enabled for the detector.</p>",
+        "MemberDataSourceConfiguration$DataSources": "<p>Contains information on the status of data sources for the account.</p>"
+      }
+    },
+    "DataSourceList": {
+      "base": null,
+      "refs": {
+        "UsageCriteria$DataSources": "<p>The data sources to aggregate usage statistics from.</p>"
+      }
+    },
+    "DataSourceStatus": {
+      "base": null,
+      "refs": {
+        "CloudTrailConfigurationResult$Status": "<p>Describes whether CloudTrail is enabled as a data source for the detector.</p>",
+        "DNSLogsConfigurationResult$Status": "<p>Denotes whether DNS logs is enabled as a data source.</p>",
+        "FlowLogsConfigurationResult$Status": "<p>Denotes whether VPC flow logs is enabled as a data source.</p>",
+        "S3LogsConfigurationResult$Status": "<p>A value that describes whether S3 data event logs are automatically enabled for new members of the organization.</p>"
+      }
+    },
+    "DeclineInvitationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeclineInvitationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DefaultServerSideEncryption": {
+      "base": "<p>Contains information on the server side encryption method used in the S3 bucket. See <a href=\"https://docs.aws.amazon.com/AmazonS3/latest/dev/serv-side-encryption.html\">S3 Server-Side Encryption</a> for more information.</p>",
+      "refs": {
+        "S3BucketDetail$DefaultServerSideEncryption": "<p>Describes the server side encryption method used in the S3 bucket.</p>"
+      }
+    },
+    "DeleteDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDetectorResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteIPSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteIPSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInvitationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteInvitationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePublishingDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePublishingDestinationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteThreatIntelSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteThreatIntelSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOrganizationConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOrganizationConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePublishingDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePublishingDestinationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Destination": {
+      "base": "<p>Contains information about the publishing destination, including the ID, type, and status.</p>",
+      "refs": {
+        "Destinations$member": null
+      }
+    },
+    "DestinationProperties": {
+      "base": "<p>Contains the Amazon Resource Name (ARN) of the resource to publish to, such as an S3 bucket, and the ARN of the KMS key to use to encrypt published findings.</p>",
+      "refs": {
+        "CreatePublishingDestinationRequest$DestinationProperties": "<p>The properties of the publishing destination, including the ARNs for the destination and the KMS key used for encryption.</p>",
+        "DescribePublishingDestinationResponse$DestinationProperties": "<p>A <code>DestinationProperties</code> object that includes the <code>DestinationArn</code> and <code>KmsKeyArn</code> of the publishing destination.</p>",
+        "UpdatePublishingDestinationRequest$DestinationProperties": "<p>A <code>DestinationProperties</code> object that includes the <code>DestinationArn</code> and <code>KmsKeyArn</code> of the publishing destination.</p>"
+      }
+    },
+    "DestinationType": {
+      "base": null,
+      "refs": {
+        "CreatePublishingDestinationRequest$DestinationType": "<p>The type of resource for the publishing destination. Currently only Amazon S3 buckets are supported.</p>",
+        "DescribePublishingDestinationResponse$DestinationType": "<p>The type of publishing destination. Currently, only Amazon S3 buckets are supported.</p>",
+        "Destination$DestinationType": "<p>The type of resource used for the publishing destination. Currently, only Amazon S3 buckets are supported.</p>"
+      }
+    },
+    "Destinations": {
+      "base": null,
+      "refs": {
+        "ListPublishingDestinationsResponse$Destinations": "<p>A <code>Destinations</code> object that includes information about each publishing destination returned.</p>"
+      }
+    },
+    "DetectorId": {
+      "base": null,
+      "refs": {
+        "AcceptInvitationRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty member account.</p>",
+        "ArchiveFindingsRequest$DetectorId": "<p>The ID of the detector that specifies the GuardDuty service whose findings you want to archive.</p>",
+        "CreateDetectorResponse$DetectorId": "<p>The unique ID of the created detector.</p>",
+        "CreateFilterRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account that you want to create a filter for.</p>",
+        "CreateIPSetRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account that you want to create an IPSet for.</p>",
+        "CreateMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account that you want to associate member accounts with.</p>",
+        "CreatePublishingDestinationRequest$DetectorId": "<p>The ID of the GuardDuty detector associated with the publishing destination.</p>",
+        "CreateSampleFindingsRequest$DetectorId": "<p>The ID of the detector to create sample findings for.</p>",
+        "CreateThreatIntelSetRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account that you want to create a threatIntelSet for.</p>",
+        "DeleteDetectorRequest$DetectorId": "<p>The unique ID of the detector that you want to delete.</p>",
+        "DeleteFilterRequest$DetectorId": "<p>The unique ID of the detector that the filter is associated with.</p>",
+        "DeleteIPSetRequest$DetectorId": "<p>The unique ID of the detector associated with the IPSet.</p>",
+        "DeleteMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account whose members you want to delete.</p>",
+        "DeletePublishingDestinationRequest$DetectorId": "<p>The unique ID of the detector associated with the publishing destination to delete.</p>",
+        "DeleteThreatIntelSetRequest$DetectorId": "<p>The unique ID of the detector that the threatIntelSet is associated with.</p>",
+        "DescribeOrganizationConfigurationRequest$DetectorId": "<p>The ID of the detector to retrieve information about the delegated administrator from.</p>",
+        "DescribePublishingDestinationRequest$DetectorId": "<p>The unique ID of the detector associated with the publishing destination to retrieve.</p>",
+        "DetectorIds$member": null,
+        "DisassociateFromMasterAccountRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty member account.</p>",
+        "DisassociateMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account whose members you want to disassociate from the master account.</p>",
+        "GetDetectorRequest$DetectorId": "<p>The unique ID of the detector that you want to get.</p>",
+        "GetFilterRequest$DetectorId": "<p>The unique ID of the detector that the filter is associated with.</p>",
+        "GetFindingsRequest$DetectorId": "<p>The ID of the detector that specifies the GuardDuty service whose findings you want to retrieve.</p>",
+        "GetFindingsStatisticsRequest$DetectorId": "<p>The ID of the detector that specifies the GuardDuty service whose findings' statistics you want to retrieve.</p>",
+        "GetIPSetRequest$DetectorId": "<p>The unique ID of the detector that the IPSet is associated with.</p>",
+        "GetMasterAccountRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty member account.</p>",
+        "GetMemberDetectorsRequest$DetectorId": "<p>The detector ID for the master account.</p>",
+        "GetMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account whose members you want to retrieve.</p>",
+        "GetThreatIntelSetRequest$DetectorId": "<p>The unique ID of the detector that the threatIntelSet is associated with.</p>",
+        "GetUsageStatisticsRequest$DetectorId": "<p>The ID of the detector that specifies the GuardDuty service whose usage statistics you want to retrieve.</p>",
+        "InviteMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty account that you want to invite members with.</p>",
+        "ListFiltersRequest$DetectorId": "<p>The unique ID of the detector that the filter is associated with.</p>",
+        "ListFindingsRequest$DetectorId": "<p>The ID of the detector that specifies the GuardDuty service whose findings you want to list.</p>",
+        "ListIPSetsRequest$DetectorId": "<p>The unique ID of the detector that the IPSet is associated with.</p>",
+        "ListMembersRequest$DetectorId": "<p>The unique ID of the detector the member is associated with.</p>",
+        "ListPublishingDestinationsRequest$DetectorId": "<p>The ID of the detector to retrieve publishing destinations for.</p>",
+        "ListThreatIntelSetsRequest$DetectorId": "<p>The unique ID of the detector that the threatIntelSet is associated with.</p>",
+        "Member$DetectorId": "<p>The detector ID of the member account.</p>",
+        "Service$DetectorId": "<p>The detector ID for the GuardDuty service.</p>",
+        "StartMonitoringMembersRequest$DetectorId": "<p>The unique ID of the detector of the GuardDuty master account associated with the member accounts to monitor.</p>",
+        "StopMonitoringMembersRequest$DetectorId": "<p>The unique ID of the detector associated with the GuardDuty master account that is monitoring member accounts.</p>",
+        "UnarchiveFindingsRequest$DetectorId": "<p>The ID of the detector associated with the findings to unarchive.</p>",
+        "UpdateDetectorRequest$DetectorId": "<p>The unique ID of the detector to update.</p>",
+        "UpdateFilterRequest$DetectorId": "<p>The unique ID of the detector that specifies the GuardDuty service where you want to update a filter.</p>",
+        "UpdateFindingsFeedbackRequest$DetectorId": "<p>The ID of the detector associated with the findings to update feedback for.</p>",
+        "UpdateIPSetRequest$DetectorId": "<p>The detectorID that specifies the GuardDuty service whose IPSet you want to update.</p>",
+        "UpdateMemberDetectorsRequest$DetectorId": "<p>The detector ID of the master account.</p>",
+        "UpdateOrganizationConfigurationRequest$DetectorId": "<p>The ID of the detector to update the delegated administrator for.</p>",
+        "UpdatePublishingDestinationRequest$DetectorId": "<p>The ID of the detector associated with the publishing destinations to update.</p>",
+        "UpdateThreatIntelSetRequest$DetectorId": "<p>The detectorID that specifies the GuardDuty service whose ThreatIntelSet you want to update.</p>"
+      }
+    },
+    "DetectorIds": {
+      "base": null,
+      "refs": {
+        "ListDetectorsResponse$DetectorIds": "<p>A list of detector IDs.</p>"
+      }
+    },
+    "DetectorStatus": {
+      "base": null,
+      "refs": {
+        "GetDetectorResponse$Status": "<p>The detector status.</p>"
+      }
+    },
+    "DisableOrganizationAdminAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableOrganizationAdminAccountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateFromMasterAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateFromMasterAccountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DnsRequestAction": {
+      "base": "<p>Contains information about the DNS_REQUEST action described in this finding.</p>",
+      "refs": {
+        "Action$DnsRequestAction": "<p>Information about the DNS_REQUEST action described in this finding.</p>"
+      }
+    },
+    "DomainDetails": {
+      "base": "<p>Contains information about the domain.</p>",
+      "refs": {
+        "AwsApiCallAction$DomainDetails": "<p>The domain information for the AWS API call.</p>"
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "Finding$Confidence": "<p>The confidence score for the finding.</p>",
+        "Finding$Severity": "<p>The severity of the finding.</p>",
+        "GeoLocation$Lat": "<p>The latitude information of the remote IP address.</p>",
+        "GeoLocation$Lon": "<p>The longitude information of the remote IP address.</p>"
+      }
+    },
+    "Email": {
+      "base": null,
+      "refs": {
+        "AccountDetail$Email": "<p>The email address of the member account.</p>",
+        "Member$Email": "<p>The email address of the member account.</p>"
+      }
+    },
+    "EnableOrganizationAdminAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnableOrganizationAdminAccountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Eq": {
+      "base": null,
+      "refs": {
+        "Condition$Eq": "<p>Represents the <i>equal</i> condition to be applied to a single field when querying for findings.</p>"
+      }
+    },
+    "Equals": {
+      "base": null,
+      "refs": {
+        "Condition$Equals": "<p>Represents an <i>equal</i> <b/> condition to be applied to a single field when querying for findings.</p>"
+      }
+    },
+    "Evidence": {
+      "base": "<p>Contains information about the reason that the finding was generated.</p>",
+      "refs": {
+        "Service$Evidence": "<p>An evidence object associated with the service.</p>"
+      }
+    },
+    "Feedback": {
+      "base": null,
+      "refs": {
+        "UpdateFindingsFeedbackRequest$Feedback": "<p>The feedback for the finding.</p>"
+      }
+    },
+    "FilterAction": {
+      "base": null,
+      "refs": {
+        "CreateFilterRequest$Action": "<p>Specifies the action that is to be applied to the findings that match the filter.</p>",
+        "GetFilterResponse$Action": "<p>Specifies the action that is to be applied to the findings that match the filter.</p>",
+        "UpdateFilterRequest$Action": "<p>Specifies the action that is to be applied to the findings that match the filter.</p>"
+      }
+    },
+    "FilterDescription": {
+      "base": null,
+      "refs": {
+        "CreateFilterRequest$Description": "<p>The description of the filter.</p>",
+        "GetFilterResponse$Description": "<p>The description of the filter.</p>",
+        "UpdateFilterRequest$Description": "<p>The description of the filter.</p>"
+      }
+    },
+    "FilterName": {
+      "base": null,
+      "refs": {
+        "CreateFilterRequest$Name": "<p>The name of the filter.</p>",
+        "CreateFilterResponse$Name": "<p>The name of the successfully created filter.</p>",
+        "FilterNames$member": null,
+        "GetFilterResponse$Name": "<p>The name of the filter.</p>",
+        "UpdateFilterResponse$Name": "<p>The name of the filter.</p>"
+      }
+    },
+    "FilterNames": {
+      "base": null,
+      "refs": {
+        "ListFiltersResponse$FilterNames": "<p>A list of filter names.</p>"
+      }
+    },
+    "FilterRank": {
+      "base": null,
+      "refs": {
+        "CreateFilterRequest$Rank": "<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>",
+        "GetFilterResponse$Rank": "<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>",
+        "UpdateFilterRequest$Rank": "<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>"
+      }
+    },
+    "Finding": {
+      "base": "<p>Contains information about the finding, which is generated when abnormal or suspicious activity is detected.</p>",
+      "refs": {
+        "Findings$member": null
+      }
+    },
+    "FindingCriteria": {
+      "base": "<p>Contains information about the criteria used for querying findings.</p>",
+      "refs": {
+        "CreateFilterRequest$FindingCriteria": "<p>Represents the criteria to be used in the filter for querying findings.</p> <p>You can only use the following attributes to query findings:</p> <ul> <li> <p>accountId</p> </li> <li> <p>region</p> </li> <li> <p>confidence</p> </li> <li> <p>id</p> </li> <li> <p>resource.accessKeyDetails.accessKeyId</p> </li> <li> <p>resource.accessKeyDetails.principalId</p> </li> <li> <p>resource.accessKeyDetails.userName</p> </li> <li> <p>resource.accessKeyDetails.userType</p> </li> <li> <p>resource.instanceDetails.iamInstanceProfile.id</p> </li> <li> <p>resource.instanceDetails.imageId</p> </li> <li> <p>resource.instanceDetails.instanceId</p> </li> <li> <p>resource.instanceDetails.outpostArn</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.ipv6Addresses</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.privateIpAddresses.privateIpAddress</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.publicDnsName</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.publicIp</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.securityGroups.groupId</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.securityGroups.groupName</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.subnetId</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.vpcId</p> </li> <li> <p>resource.instanceDetails.tags.key</p> </li> <li> <p>resource.instanceDetails.tags.value</p> </li> <li> <p>resource.resourceType</p> </li> <li> <p>service.action.actionType</p> </li> <li> <p>service.action.awsApiCallAction.api</p> </li> <li> <p>service.action.awsApiCallAction.callerType</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.city.cityName</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.country.countryName</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.ipAddressV4</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.organization.asn</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.organization.asnOrg</p> </li> <li> <p>service.action.awsApiCallAction.serviceName</p> </li> <li> <p>service.action.dnsRequestAction.domain</p> </li> <li> <p>service.action.networkConnectionAction.blocked</p> </li> <li> <p>service.action.networkConnectionAction.connectionDirection</p> </li> <li> <p>service.action.networkConnectionAction.localPortDetails.port</p> </li> <li> <p>service.action.networkConnectionAction.protocol</p> </li> <li> <p>service.action.networkConnectionAction.localIpDetails.ipAddressV4</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.city.cityName</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.country.countryName</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.ipAddressV4</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.organization.asn</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.organization.asnOrg</p> </li> <li> <p>service.action.networkConnectionAction.remotePortDetails.port</p> </li> <li> <p>service.additionalInfo.threatListName</p> </li> <li> <p>service.archived</p> <p>When this attribute is set to TRUE, only archived findings are listed. When it's set to FALSE, only unarchived findings are listed. When this attribute is not set, all existing findings are listed.</p> </li> <li> <p>service.resourceRole</p> </li> <li> <p>severity</p> </li> <li> <p>type</p> </li> <li> <p>updatedAt</p> <p>Type: ISO 8601 string format: YYYY-MM-DDTHH:MM:SS.SSSZ or YYYY-MM-DDTHH:MM:SSZ depending on whether the value contains milliseconds.</p> </li> </ul>",
+        "GetFilterResponse$FindingCriteria": "<p>Represents the criteria to be used in the filter for querying findings.</p>",
+        "GetFindingsStatisticsRequest$FindingCriteria": "<p>Represents the criteria that is used for querying findings.</p>",
+        "ListFindingsRequest$FindingCriteria": "<p>Represents the criteria used for querying findings. Valid values include:</p> <ul> <li> <p>JSON field name</p> </li> <li> <p>accountId</p> </li> <li> <p>region</p> </li> <li> <p>confidence</p> </li> <li> <p>id</p> </li> <li> <p>resource.accessKeyDetails.accessKeyId</p> </li> <li> <p>resource.accessKeyDetails.principalId</p> </li> <li> <p>resource.accessKeyDetails.userName</p> </li> <li> <p>resource.accessKeyDetails.userType</p> </li> <li> <p>resource.instanceDetails.iamInstanceProfile.id</p> </li> <li> <p>resource.instanceDetails.imageId</p> </li> <li> <p>resource.instanceDetails.instanceId</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.ipv6Addresses</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.privateIpAddresses.privateIpAddress</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.publicDnsName</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.publicIp</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.securityGroups.groupId</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.securityGroups.groupName</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.subnetId</p> </li> <li> <p>resource.instanceDetails.networkInterfaces.vpcId</p> </li> <li> <p>resource.instanceDetails.tags.key</p> </li> <li> <p>resource.instanceDetails.tags.value</p> </li> <li> <p>resource.resourceType</p> </li> <li> <p>service.action.actionType</p> </li> <li> <p>service.action.awsApiCallAction.api</p> </li> <li> <p>service.action.awsApiCallAction.callerType</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.city.cityName</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.country.countryName</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.ipAddressV4</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.organization.asn</p> </li> <li> <p>service.action.awsApiCallAction.remoteIpDetails.organization.asnOrg</p> </li> <li> <p>service.action.awsApiCallAction.serviceName</p> </li> <li> <p>service.action.dnsRequestAction.domain</p> </li> <li> <p>service.action.networkConnectionAction.blocked</p> </li> <li> <p>service.action.networkConnectionAction.connectionDirection</p> </li> <li> <p>service.action.networkConnectionAction.localPortDetails.port</p> </li> <li> <p>service.action.networkConnectionAction.protocol</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.city.cityName</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.country.countryName</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.ipAddressV4</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.organization.asn</p> </li> <li> <p>service.action.networkConnectionAction.remoteIpDetails.organization.asnOrg</p> </li> <li> <p>service.action.networkConnectionAction.remotePortDetails.port</p> </li> <li> <p>service.additionalInfo.threatListName</p> </li> <li> <p>service.archived</p> <p>When this attribute is set to 'true', only archived findings are listed. When it's set to 'false', only unarchived findings are listed. When this attribute is not set, all existing findings are listed.</p> </li> <li> <p>service.resourceRole</p> </li> <li> <p>severity</p> </li> <li> <p>type</p> </li> <li> <p>updatedAt</p> <p>Type: Timestamp in Unix Epoch millisecond format: 1486685375000</p> </li> </ul>",
+        "UpdateFilterRequest$FindingCriteria": "<p>Represents the criteria to be used in the filter for querying findings.</p>"
+      }
+    },
+    "FindingId": {
+      "base": null,
+      "refs": {
+        "FindingIds$member": null
+      }
+    },
+    "FindingIds": {
+      "base": null,
+      "refs": {
+        "ArchiveFindingsRequest$FindingIds": "<p>The IDs of the findings that you want to archive.</p>",
+        "GetFindingsRequest$FindingIds": "<p>The IDs of the findings that you want to retrieve.</p>",
+        "ListFindingsResponse$FindingIds": "<p>The IDs of the findings that you're listing.</p>",
+        "UnarchiveFindingsRequest$FindingIds": "<p>The IDs of the findings to unarchive.</p>",
+        "UpdateFindingsFeedbackRequest$FindingIds": "<p>The IDs of the findings that you want to mark as useful or not useful.</p>"
+      }
+    },
+    "FindingPublishingFrequency": {
+      "base": null,
+      "refs": {
+        "CreateDetectorRequest$FindingPublishingFrequency": "<p>An enum value that specifies how frequently updated findings are exported.</p>",
+        "GetDetectorResponse$FindingPublishingFrequency": "<p>The publishing frequency of the finding.</p>",
+        "UpdateDetectorRequest$FindingPublishingFrequency": "<p>An enum value that specifies how frequently findings are exported, such as to CloudWatch Events.</p>"
+      }
+    },
+    "FindingStatisticType": {
+      "base": null,
+      "refs": {
+        "FindingStatisticTypes$member": null
+      }
+    },
+    "FindingStatisticTypes": {
+      "base": null,
+      "refs": {
+        "GetFindingsStatisticsRequest$FindingStatisticTypes": "<p>The types of finding statistics to retrieve.</p>"
+      }
+    },
+    "FindingStatistics": {
+      "base": "<p>Contains information about finding statistics.</p>",
+      "refs": {
+        "GetFindingsStatisticsResponse$FindingStatistics": "<p>The finding statistics object.</p>"
+      }
+    },
+    "FindingType": {
+      "base": null,
+      "refs": {
+        "Finding$Type": "<p>The type of finding.</p>",
+        "FindingTypes$member": null
+      }
+    },
+    "FindingTypes": {
+      "base": null,
+      "refs": {
+        "CreateSampleFindingsRequest$FindingTypes": "<p>The types of sample findings to generate.</p>"
+      }
+    },
+    "Findings": {
+      "base": null,
+      "refs": {
+        "GetFindingsResponse$Findings": "<p>A list of findings.</p>"
+      }
+    },
+    "FlowLogsConfigurationResult": {
+      "base": "<p>Contains information on the status of VPC flow logs as a data source.</p>",
+      "refs": {
+        "DataSourceConfigurationsResult$FlowLogs": "<p>An object that contains information on the status of VPC flow logs as a data source.</p>"
+      }
+    },
+    "GeoLocation": {
+      "base": "<p>Contains information about the location of the remote IP address.</p>",
+      "refs": {
+        "RemoteIpDetails$GeoLocation": "<p>The location information of the remote IP address.</p>"
+      }
+    },
+    "GetDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDetectorResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFindingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFindingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFindingsStatisticsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFindingsStatisticsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetIPSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetIPSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetInvitationsCountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetInvitationsCountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMasterAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMasterAccountResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMemberDetectorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMemberDetectorsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetThreatIntelSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetThreatIntelSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetUsageStatisticsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetUsageStatisticsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GuardDutyArn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the given GuardDuty resource. </p>",
+        "TagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the GuardDuty resource to apply a tag to.</p>",
+        "UntagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) for the resource to remove tags from.</p>"
+      }
+    },
+    "IamInstanceProfile": {
+      "base": "<p>Contains information about the EC2 instance profile.</p>",
+      "refs": {
+        "InstanceDetails$IamInstanceProfile": "<p>The profile information of the EC2 instance.</p>"
+      }
+    },
+    "InstanceDetails": {
+      "base": "<p>Contains information about the details of an instance.</p>",
+      "refs": {
+        "Resource$InstanceDetails": "<p>The information about the EC2 instance associated with the activity that prompted GuardDuty to generate a finding.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Condition$Gt": "<p>Represents a <i>greater than</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$Gte": "<p>Represents a <i>greater than or equal</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$Lt": "<p>Represents a <i>less than</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$Lte": "<p>Represents a <i>less than or equal</i> condition to be applied to a single field when querying for findings.</p>",
+        "CountBySeverity$value": null,
+        "GetInvitationsCountResponse$InvitationsCount": "<p>The number of received invitations.</p>",
+        "LocalPortDetails$Port": "<p>The port number of the local connection.</p>",
+        "RemotePortDetails$Port": "<p>The port number of the remote connection.</p>",
+        "Service$Count": "<p>The total count of the occurrences of this finding type.</p>"
+      }
+    },
+    "InternalServerErrorException": {
+      "base": "<p>An internal server error exception object.</p>",
+      "refs": {
+      }
+    },
+    "Invitation": {
+      "base": "<p>Contains information about the invitation to become a member account.</p>",
+      "refs": {
+        "Invitations$member": null
+      }
+    },
+    "Invitations": {
+      "base": null,
+      "refs": {
+        "ListInvitationsResponse$Invitations": "<p>A list of invitation descriptions.</p>"
+      }
+    },
+    "InviteMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InviteMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IpSetFormat": {
+      "base": null,
+      "refs": {
+        "CreateIPSetRequest$Format": "<p>The format of the file that contains the IPSet.</p>",
+        "GetIPSetResponse$Format": "<p>The format of the file that contains the IPSet.</p>"
+      }
+    },
+    "IpSetIds": {
+      "base": null,
+      "refs": {
+        "ListIPSetsResponse$IpSetIds": "<p>The IDs of the IPSet resources.</p>"
+      }
+    },
+    "IpSetStatus": {
+      "base": null,
+      "refs": {
+        "GetIPSetResponse$Status": "<p>The status of IPSet file that was uploaded.</p>"
+      }
+    },
+    "Ipv6Addresses": {
+      "base": null,
+      "refs": {
+        "NetworkInterface$Ipv6Addresses": "<p>A list of IPv6 addresses for the EC2 instance.</p>"
+      }
+    },
+    "ListDetectorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDetectorsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFiltersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFiltersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFindingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFindingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIPSetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIPSetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInvitationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListInvitationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOrganizationAdminAccountsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOrganizationAdminAccountsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPublishingDestinationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPublishingDestinationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListThreatIntelSetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListThreatIntelSetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LocalIpDetails": {
+      "base": "<p>Contains information about the local IP address of the connection.</p>",
+      "refs": {
+        "NetworkConnectionAction$LocalIpDetails": "<p>The local IP information of the connection.</p>",
+        "PortProbeDetail$LocalIpDetails": "<p>The local IP information of the connection.</p>"
+      }
+    },
+    "LocalPortDetails": {
+      "base": "<p>Contains information about the port for the local connection.</p>",
+      "refs": {
+        "NetworkConnectionAction$LocalPortDetails": "<p>The local port information of the connection.</p>",
+        "PortProbeDetail$LocalPortDetails": "<p>The local port information of the connection.</p>"
+      }
+    },
+    "Location": {
+      "base": null,
+      "refs": {
+        "CreateIPSetRequest$Location": "<p>The URI of the file that contains the IPSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>",
+        "CreateThreatIntelSetRequest$Location": "<p>The URI of the file that contains the ThreatIntelSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>",
+        "GetIPSetResponse$Location": "<p>The URI of the file that contains the IPSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>",
+        "GetThreatIntelSetResponse$Location": "<p>The URI of the file that contains the ThreatIntelSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>",
+        "UpdateIPSetRequest$Location": "<p>The updated URI of the file that contains the IPSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>",
+        "UpdateThreatIntelSetRequest$Location": "<p>The updated URI of the file that contains the ThreateIntelSet. For example: https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "Condition$GreaterThan": "<p>Represents a <i>greater than</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$GreaterThanOrEqual": "<p>Represents a <i>greater than or equal</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$LessThan": "<p>Represents a <i>less than</i> condition to be applied to a single field when querying for findings.</p>",
+        "Condition$LessThanOrEqual": "<p>Represents a <i>less than or equal</i> condition to be applied to a single field when querying for findings.</p>",
+        "DescribePublishingDestinationResponse$PublishingFailureStartTimestamp": "<p>The time, in epoch millisecond format, at which GuardDuty was first unable to publish findings to the destination.</p>"
+      }
+    },
+    "Master": {
+      "base": "<p>Contains information about the master account and invitation.</p>",
+      "refs": {
+        "GetMasterAccountResponse$Master": "<p>The master account details.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetUsageStatisticsRequest$MaxResults": "<p>The maximum number of results to return in the response.</p>",
+        "ListDetectorsRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items that you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListFiltersRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items that you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListFindingsRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListIPSetsRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListInvitationsRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items that you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListMembersRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+        "ListOrganizationAdminAccountsRequest$MaxResults": "<p>The maximum number of results to return in the response.</p>",
+        "ListPublishingDestinationsRequest$MaxResults": "<p>The maximum number of results to return in the response.</p>",
+        "ListThreatIntelSetsRequest$MaxResults": "<p>You can use this parameter to indicate the maximum number of items that you want in the response. The default value is 50. The maximum value is 50.</p>"
+      }
+    },
+    "Member": {
+      "base": "<p>Contains information about the member account. </p>",
+      "refs": {
+        "Members$member": null
+      }
+    },
+    "MemberDataSourceConfiguration": {
+      "base": "<p>Contains information on which data sources are enabled for a member account.</p>",
+      "refs": {
+        "MemberDataSourceConfigurations$member": null
+      }
+    },
+    "MemberDataSourceConfigurations": {
+      "base": null,
+      "refs": {
+        "GetMemberDetectorsResponse$MemberDataSourceConfigurations": "<p>An object that describes which data sources are enabled for a member account.</p>"
+      }
+    },
+    "Members": {
+      "base": null,
+      "refs": {
+        "GetMembersResponse$Members": "<p>A list of members.</p>",
+        "ListMembersResponse$Members": "<p>A list of members.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "CreateIPSetRequest$Name": "<p>The user-friendly name to identify the IPSet.</p> <p> Allowed characters are alphanumerics, spaces, hyphens (-), and underscores (_).</p>",
+        "CreateThreatIntelSetRequest$Name": "<p>A user-friendly ThreatIntelSet name displayed in all findings that are generated by activity that involves IP addresses included in this ThreatIntelSet.</p>",
+        "GetIPSetResponse$Name": "<p>The user-friendly name for the IPSet.</p>",
+        "GetThreatIntelSetResponse$Name": "<p>A user-friendly ThreatIntelSet name displayed in all findings that are generated by activity that involves IP addresses included in this ThreatIntelSet.</p>",
+        "UpdateIPSetRequest$Name": "<p>The unique ID that specifies the IPSet that you want to update.</p>",
+        "UpdateThreatIntelSetRequest$Name": "<p>The unique ID that specifies the ThreatIntelSet that you want to update.</p>"
+      }
+    },
+    "Neq": {
+      "base": null,
+      "refs": {
+        "Condition$Neq": "<p>Represents the <i>not equal</i> condition to be applied to a single field when querying for findings.</p>"
+      }
+    },
+    "NetworkConnectionAction": {
+      "base": "<p>Contains information about the NETWORK_CONNECTION action described in the finding.</p>",
+      "refs": {
+        "Action$NetworkConnectionAction": "<p>Information about the NETWORK_CONNECTION action described in this finding.</p>"
+      }
+    },
+    "NetworkInterface": {
+      "base": "<p>Contains information about the elastic network interface of the EC2 instance.</p>",
+      "refs": {
+        "NetworkInterfaces$member": null
+      }
+    },
+    "NetworkInterfaces": {
+      "base": null,
+      "refs": {
+        "InstanceDetails$NetworkInterfaces": "<p>The elastic network interface information of the EC2 instance.</p>"
+      }
+    },
+    "NotEquals": {
+      "base": null,
+      "refs": {
+        "Condition$NotEquals": "<p>Represents a <i>not equal</i> <b/> condition to be applied to a single field when querying for findings.</p>"
+      }
+    },
+    "OrderBy": {
+      "base": null,
+      "refs": {
+        "SortCriteria$OrderBy": "<p>The order by which the sorted findings are to be displayed.</p>"
+      }
+    },
+    "Organization": {
+      "base": "<p>Contains information about the ISP organization of the remote IP address.</p>",
+      "refs": {
+        "RemoteIpDetails$Organization": "<p>The ISP organization information of the remote IP address.</p>"
+      }
+    },
+    "OrganizationDataSourceConfigurations": {
+      "base": "<p>An object that contains information on which data sources will be configured to be automatically enabled for new members within the organization.</p>",
+      "refs": {
+        "UpdateOrganizationConfigurationRequest$DataSources": "<p>An object describes which data sources will be updated.</p>"
+      }
+    },
+    "OrganizationDataSourceConfigurationsResult": {
+      "base": "<p>An object that contains information on which data sources are automatically enabled for new members within the organization.</p>",
+      "refs": {
+        "DescribeOrganizationConfigurationResponse$DataSources": "<p>An object that describes which data sources are enabled automatically for member accounts.</p>"
+      }
+    },
+    "OrganizationS3LogsConfiguration": {
+      "base": "<p>Describes whether S3 data event logs will be automatically enabled for new members of the organization.</p>",
+      "refs": {
+        "OrganizationDataSourceConfigurations$S3Logs": "<p>Describes whether S3 data event logs are enabled for new members of the organization.</p>"
+      }
+    },
+    "OrganizationS3LogsConfigurationResult": {
+      "base": "<p>The current configuration of S3 data event logs as a data source for the organization.</p>",
+      "refs": {
+        "OrganizationDataSourceConfigurationsResult$S3Logs": "<p>Describes whether S3 data event logs are enabled as a data source.</p>"
+      }
+    },
+    "Owner": {
+      "base": "<p>Contains information on the owner of the bucket.</p>",
+      "refs": {
+        "S3BucketDetail$Owner": "<p>The owner of the S3 bucket.</p>"
+      }
+    },
+    "PermissionConfiguration": {
+      "base": "<p>Contains information about how permissions are configured for the S3 bucket.</p>",
+      "refs": {
+        "PublicAccess$PermissionConfiguration": "<p>Contains information about how permissions are configured for the S3 bucket.</p>"
+      }
+    },
+    "PortProbeAction": {
+      "base": "<p>Contains information about the PORT_PROBE action described in the finding.</p>",
+      "refs": {
+        "Action$PortProbeAction": "<p>Information about the PORT_PROBE action described in this finding.</p>"
+      }
+    },
+    "PortProbeDetail": {
+      "base": "<p>Contains information about the port probe details.</p>",
+      "refs": {
+        "PortProbeDetails$member": null
+      }
+    },
+    "PortProbeDetails": {
+      "base": null,
+      "refs": {
+        "PortProbeAction$PortProbeDetails": "<p>A list of objects related to port probe details.</p>"
+      }
+    },
+    "PrivateIpAddressDetails": {
+      "base": "<p>Contains other private IP address information of the EC2 instance.</p>",
+      "refs": {
+        "PrivateIpAddresses$member": null
+      }
+    },
+    "PrivateIpAddresses": {
+      "base": null,
+      "refs": {
+        "NetworkInterface$PrivateIpAddresses": "<p>Other private IP address information of the EC2 instance.</p>"
+      }
+    },
+    "ProductCode": {
+      "base": "<p>Contains information about the product code for the EC2 instance.</p>",
+      "refs": {
+        "ProductCodes$member": null
+      }
+    },
+    "ProductCodes": {
+      "base": null,
+      "refs": {
+        "InstanceDetails$ProductCodes": "<p>The product code of the EC2 instance.</p>"
+      }
+    },
+    "PublicAccess": {
+      "base": "<p>Describes the public access policies that apply to the S3 bucket.</p>",
+      "refs": {
+        "S3BucketDetail$PublicAccess": "<p>Describes the public access policies that apply to the S3 bucket.</p>"
+      }
+    },
+    "PublishingStatus": {
+      "base": null,
+      "refs": {
+        "DescribePublishingDestinationResponse$Status": "<p>The status of the publishing destination.</p>",
+        "Destination$Status": "<p>The status of the publishing destination.</p>"
+      }
+    },
+    "RemoteIpDetails": {
+      "base": "<p>Contains information about the remote IP address of the connection.</p>",
+      "refs": {
+        "AwsApiCallAction$RemoteIpDetails": "<p>The remote IP information of the connection that initiated the AWS API call.</p>",
+        "NetworkConnectionAction$RemoteIpDetails": "<p>The remote IP information of the connection.</p>",
+        "PortProbeDetail$RemoteIpDetails": "<p>The remote IP information of the connection.</p>"
+      }
+    },
+    "RemotePortDetails": {
+      "base": "<p>Contains information about the remote port.</p>",
+      "refs": {
+        "NetworkConnectionAction$RemotePortDetails": "<p>The remote port information of the connection.</p>"
+      }
+    },
+    "Resource": {
+      "base": "<p>Contains information about the AWS resource associated with the activity that prompted GuardDuty to generate a finding.</p>",
+      "refs": {
+        "Finding$Resource": null
+      }
+    },
+    "ResourceList": {
+      "base": null,
+      "refs": {
+        "UsageCriteria$Resources": "<p>The resources to aggregate usage statistics from. Only accepts exact resource names.</p>"
+      }
+    },
+    "S3BucketDetail": {
+      "base": "<p>Contains information on the S3 bucket.</p>",
+      "refs": {
+        "S3BucketDetails$member": null
+      }
+    },
+    "S3BucketDetails": {
+      "base": null,
+      "refs": {
+        "Resource$S3BucketDetails": "<p>Contains information on the S3 bucket.</p>"
+      }
+    },
+    "S3LogsConfiguration": {
+      "base": "<p>Describes whether S3 data event logs will be enabled as a data source.</p>",
+      "refs": {
+        "DataSourceConfigurations$S3Logs": "<p>Describes whether S3 data event logs are enabled as a data source.</p>"
+      }
+    },
+    "S3LogsConfigurationResult": {
+      "base": "<p>Describes whether S3 data event logs will be enabled as a data source.</p>",
+      "refs": {
+        "DataSourceConfigurationsResult$S3Logs": "<p>An object that contains information on the status of S3 Data event logs as a data source.</p>"
+      }
+    },
+    "SecurityGroup": {
+      "base": "<p>Contains information about the security groups associated with the EC2 instance.</p>",
+      "refs": {
+        "SecurityGroups$member": null
+      }
+    },
+    "SecurityGroups": {
+      "base": null,
+      "refs": {
+        "NetworkInterface$SecurityGroups": "<p>The security groups associated with the EC2 instance.</p>"
+      }
+    },
+    "Service": {
+      "base": "<p>Contains additional information about the generated finding.</p>",
+      "refs": {
+        "Finding$Service": null
+      }
+    },
+    "SortCriteria": {
+      "base": "<p>Contains information about the criteria used for sorting findings.</p>",
+      "refs": {
+        "GetFindingsRequest$SortCriteria": "<p>Represents the criteria used for sorting findings.</p>",
+        "ListFindingsRequest$SortCriteria": "<p>Represents the criteria used for sorting findings.</p>"
+      }
+    },
+    "StartMonitoringMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartMonitoringMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopMonitoringMembersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopMonitoringMembersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AcceptInvitationRequest$MasterId": "<p>The account ID of the master GuardDuty account whose invitation you're accepting.</p>",
+        "AcceptInvitationRequest$InvitationId": "<p>The value that is used to validate the master account to the member account.</p>",
+        "AccessKeyDetails$AccessKeyId": "<p>The access key ID of the user.</p>",
+        "AccessKeyDetails$PrincipalId": "<p>The principal ID of the user.</p>",
+        "AccessKeyDetails$UserName": "<p>The name of the user.</p>",
+        "AccessKeyDetails$UserType": "<p>The type of the user.</p>",
+        "Action$ActionType": "<p>The GuardDuty finding activity type.</p>",
+        "AdminAccount$AdminAccountId": "<p>The AWS account ID for the account.</p>",
+        "AwsApiCallAction$Api": "<p>The AWS API name.</p>",
+        "AwsApiCallAction$CallerType": "<p>The AWS API caller type.</p>",
+        "AwsApiCallAction$ErrorCode": "<p>The error code of the failed AWS API action.</p>",
+        "AwsApiCallAction$ServiceName": "<p>The AWS service name whose API was invoked.</p>",
+        "BadRequestException$Message": "<p>The error message.</p>",
+        "BadRequestException$Type": "<p>The error type.</p>",
+        "City$CityName": "<p>The city name of the remote IP address.</p>",
+        "CountBySeverity$key": null,
+        "Country$CountryCode": "<p>The country code of the remote IP address.</p>",
+        "Country$CountryName": "<p>The country name of the remote IP address.</p>",
+        "CreateIPSetResponse$IpSetId": "<p>The ID of the IPSet resource.</p>",
+        "CreatePublishingDestinationResponse$DestinationId": "<p>The ID of the publishing destination that is created.</p>",
+        "CreateThreatIntelSetResponse$ThreatIntelSetId": "<p>The ID of the ThreatIntelSet resource.</p>",
+        "Criterion$key": null,
+        "DefaultServerSideEncryption$EncryptionType": "<p>The type of encryption used for objects within the S3 bucket.</p>",
+        "DefaultServerSideEncryption$KmsMasterKeyArn": "<p>The Amazon Resource Name (ARN) of the KMS encryption key. Only available if the bucket <code>EncryptionType</code> is <code>aws:kms</code>.</p>",
+        "DeleteFilterRequest$FilterName": "<p>The name of the filter that you want to delete.</p>",
+        "DeleteIPSetRequest$IpSetId": "<p>The unique ID of the IPSet to delete.</p>",
+        "DeletePublishingDestinationRequest$DestinationId": "<p>The ID of the publishing destination to delete.</p>",
+        "DeleteThreatIntelSetRequest$ThreatIntelSetId": "<p>The unique ID of the threatIntelSet that you want to delete.</p>",
+        "DescribePublishingDestinationRequest$DestinationId": "<p>The ID of the publishing destination to retrieve.</p>",
+        "DescribePublishingDestinationResponse$DestinationId": "<p>The ID of the publishing destination.</p>",
+        "Destination$DestinationId": "<p>The unique ID of the publishing destination.</p>",
+        "DestinationProperties$DestinationArn": "<p>The ARN of the resource to publish to.</p>",
+        "DestinationProperties$KmsKeyArn": "<p>The ARN of the KMS key to use for encryption.</p>",
+        "DisableOrganizationAdminAccountRequest$AdminAccountId": "<p>The AWS Account ID for the organizations account to be disabled as a GuardDuty delegated administrator.</p>",
+        "DnsRequestAction$Domain": "<p>The domain information for the API request.</p>",
+        "DomainDetails$Domain": "<p>The domain information for the AWS API call.</p>",
+        "EnableOrganizationAdminAccountRequest$AdminAccountId": "<p>The AWS Account ID for the organization account to be enabled as a GuardDuty delegated administrator.</p>",
+        "Eq$member": null,
+        "Equals$member": null,
+        "Finding$AccountId": "<p>The ID of the account in which the finding was generated.</p>",
+        "Finding$Arn": "<p>The ARN of the finding.</p>",
+        "Finding$CreatedAt": "<p>The time and date when the finding was created.</p>",
+        "Finding$Description": "<p>The description of the finding.</p>",
+        "Finding$Id": "<p>The ID of the finding.</p>",
+        "Finding$Partition": "<p>The partition associated with the finding.</p>",
+        "Finding$Region": "<p>The Region where the finding was generated.</p>",
+        "Finding$SchemaVersion": "<p>The version of the schema used for the finding.</p>",
+        "Finding$Title": "<p>The title of the finding.</p>",
+        "Finding$UpdatedAt": "<p>The time and date when the finding was last updated.</p>",
+        "GetDetectorResponse$CreatedAt": "<p>The timestamp of when the detector was created.</p>",
+        "GetDetectorResponse$ServiceRole": "<p>The GuardDuty service role.</p>",
+        "GetDetectorResponse$UpdatedAt": "<p>The last-updated timestamp for the detector.</p>",
+        "GetFilterRequest$FilterName": "<p>The name of the filter you want to get.</p>",
+        "GetIPSetRequest$IpSetId": "<p>The unique ID of the IPSet to retrieve.</p>",
+        "GetThreatIntelSetRequest$ThreatIntelSetId": "<p>The unique ID of the threatIntelSet that you want to get.</p>",
+        "GetUsageStatisticsRequest$Unit": "<p>The currency unit you would like to view your usage statistics in. Current valid values are USD.</p>",
+        "GetUsageStatisticsRequest$NextToken": "<p>A token to use for paginating results that are returned in the response. Set the value of this parameter to null for the first request to a list action. For subsequent calls, use the NextToken value returned from the previous request to continue listing results after the first page.</p>",
+        "GetUsageStatisticsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "IamInstanceProfile$Arn": "<p>The profile ARN of the EC2 instance.</p>",
+        "IamInstanceProfile$Id": "<p>The profile ID of the EC2 instance.</p>",
+        "InstanceDetails$AvailabilityZone": "<p>The Availability Zone of the EC2 instance.</p>",
+        "InstanceDetails$ImageDescription": "<p>The image description of the EC2 instance.</p>",
+        "InstanceDetails$ImageId": "<p>The image ID of the EC2 instance.</p>",
+        "InstanceDetails$InstanceId": "<p>The ID of the EC2 instance.</p>",
+        "InstanceDetails$InstanceState": "<p>The state of the EC2 instance.</p>",
+        "InstanceDetails$InstanceType": "<p>The type of the EC2 instance.</p>",
+        "InstanceDetails$OutpostArn": "<p>The Amazon Resource Name (ARN) of the AWS Outpost. Only applicable to AWS Outposts instances.</p>",
+        "InstanceDetails$LaunchTime": "<p>The launch time of the EC2 instance.</p>",
+        "InstanceDetails$Platform": "<p>The platform of the EC2 instance.</p>",
+        "InternalServerErrorException$Message": "<p>The error message.</p>",
+        "InternalServerErrorException$Type": "<p>The error type.</p>",
+        "Invitation$InvitationId": "<p>The ID of the invitation. This value is used to validate the inviter account to the member account.</p>",
+        "Invitation$RelationshipStatus": "<p>The status of the relationship between the inviter and invitee accounts.</p>",
+        "Invitation$InvitedAt": "<p>The timestamp when the invitation was sent.</p>",
+        "InviteMembersRequest$Message": "<p>The invitation message that you want to send to the accounts that you're inviting to GuardDuty as members.</p>",
+        "IpSetIds$member": null,
+        "Ipv6Addresses$member": null,
+        "ListDetectorsRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListDetectorsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListFiltersRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListFiltersResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListFindingsRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListFindingsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListIPSetsRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListIPSetsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListInvitationsRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListInvitationsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListMembersRequest$NextToken": "<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListMembersRequest$OnlyAssociated": "<p>Specifies whether to only return associated members or to return all members (including members who haven't been invited yet or have been disassociated).</p>",
+        "ListMembersResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListOrganizationAdminAccountsRequest$NextToken": "<p>A token to use for paginating results that are returned in the response. Set the value of this parameter to null for the first request to a list action. For subsequent calls, use the <code>NextToken</code> value returned from the previous request to continue listing results after the first page.</p>",
+        "ListOrganizationAdminAccountsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "ListPublishingDestinationsRequest$NextToken": "<p>A token to use for paginating results that are returned in the response. Set the value of this parameter to null for the first request to a list action. For subsequent calls, use the <code>NextToken</code> value returned from the previous request to continue listing results after the first page.</p>",
+        "ListPublishingDestinationsResponse$NextToken": "<p>A token to use for paginating results that are returned in the response. Set the value of this parameter to null for the first request to a list action. For subsequent calls, use the <code>NextToken</code> value returned from the previous request to continue listing results after the first page.</p>",
+        "ListThreatIntelSetsRequest$NextToken": "<p>You can use this parameter to paginate results in the response. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action, fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+        "ListThreatIntelSetsResponse$NextToken": "<p>The pagination parameter to be used on the next list operation to retrieve more items.</p>",
+        "LocalIpDetails$IpAddressV4": "<p>The IPv4 local address of the connection.</p>",
+        "LocalPortDetails$PortName": "<p>The port name of the local connection.</p>",
+        "Master$InvitationId": "<p>The value used to validate the master account to the member account.</p>",
+        "Master$RelationshipStatus": "<p>The status of the relationship between the master and member accounts.</p>",
+        "Master$InvitedAt": "<p>The timestamp when the invitation was sent.</p>",
+        "Member$MasterId": "<p>The master account ID.</p>",
+        "Member$RelationshipStatus": "<p>The status of the relationship between the member and the master.</p>",
+        "Member$InvitedAt": "<p>The timestamp when the invitation was sent.</p>",
+        "Member$UpdatedAt": "<p>The last-updated timestamp of the member.</p>",
+        "Neq$member": null,
+        "NetworkConnectionAction$ConnectionDirection": "<p>The network connection direction.</p>",
+        "NetworkConnectionAction$Protocol": "<p>The network connection protocol.</p>",
+        "NetworkInterface$NetworkInterfaceId": "<p>The ID of the network interface.</p>",
+        "NetworkInterface$PrivateDnsName": "<p>The private DNS name of the EC2 instance.</p>",
+        "NetworkInterface$PrivateIpAddress": "<p>The private IP address of the EC2 instance.</p>",
+        "NetworkInterface$PublicDnsName": "<p>The public DNS name of the EC2 instance.</p>",
+        "NetworkInterface$PublicIp": "<p>The public IP address of the EC2 instance.</p>",
+        "NetworkInterface$SubnetId": "<p>The subnet ID of the EC2 instance.</p>",
+        "NetworkInterface$VpcId": "<p>The VPC ID of the EC2 instance.</p>",
+        "NotEquals$member": null,
+        "Organization$Asn": "<p>The Autonomous System Number (ASN) of the internet provider of the remote IP address.</p>",
+        "Organization$AsnOrg": "<p>The organization that registered this ASN.</p>",
+        "Organization$Isp": "<p>The ISP information for the internet provider.</p>",
+        "Organization$Org": "<p>The name of the internet provider.</p>",
+        "Owner$Id": "<p>The canonical user ID of the bucket owner. For information about locating your canonical user ID see <a href=\"https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId\">Finding Your Account Canonical User ID.</a> </p>",
+        "PrivateIpAddressDetails$PrivateDnsName": "<p>The private DNS name of the EC2 instance.</p>",
+        "PrivateIpAddressDetails$PrivateIpAddress": "<p>The private IP address of the EC2 instance.</p>",
+        "ProductCode$Code": "<p>The product code information.</p>",
+        "ProductCode$ProductType": "<p>The product code type.</p>",
+        "PublicAccess$EffectivePermission": "<p>Describes the effective permission on this bucket after factoring all attached policies.</p>",
+        "RemoteIpDetails$IpAddressV4": "<p>The IPv4 remote address of the connection.</p>",
+        "RemotePortDetails$PortName": "<p>The port name of the remote connection.</p>",
+        "Resource$ResourceType": "<p>The type of AWS resource.</p>",
+        "ResourceList$member": null,
+        "S3BucketDetail$Arn": "<p>The Amazon Resource Name (ARN) of the S3 bucket.</p>",
+        "S3BucketDetail$Name": "<p>The name of the S3 bucket.</p>",
+        "S3BucketDetail$Type": "<p>Describes whether the bucket is a source or destination bucket.</p>",
+        "SecurityGroup$GroupId": "<p>The security group ID of the EC2 instance.</p>",
+        "SecurityGroup$GroupName": "<p>The security group name of the EC2 instance.</p>",
+        "Service$EventFirstSeen": "<p>The first-seen timestamp of the activity that prompted GuardDuty to generate this finding.</p>",
+        "Service$EventLastSeen": "<p>The last-seen timestamp of the activity that prompted GuardDuty to generate this finding.</p>",
+        "Service$ResourceRole": "<p>The resource role information for this finding.</p>",
+        "Service$ServiceName": "<p>The name of the AWS service (GuardDuty) that generated a finding.</p>",
+        "Service$UserFeedback": "<p>Feedback that was submitted about the finding.</p>",
+        "SortCriteria$AttributeName": "<p>Represents the finding attribute (for example, accountId) to sort findings by.</p>",
+        "Tag$Key": "<p>The EC2 instance tag key.</p>",
+        "Tag$Value": "<p>The EC2 instance tag value.</p>",
+        "ThreatIntelSetIds$member": null,
+        "ThreatIntelligenceDetail$ThreatListName": "<p>The name of the threat intelligence list that triggered the finding.</p>",
+        "ThreatNames$member": null,
+        "Total$Amount": "<p>The total usage.</p>",
+        "Total$Unit": "<p>The currency unit that the amount is given in.</p>",
+        "UnprocessedAccount$Result": "<p>A reason why the account hasn't been processed.</p>",
+        "UpdateFilterRequest$FilterName": "<p>The name of the filter.</p>",
+        "UpdateFindingsFeedbackRequest$Comments": "<p>Additional feedback about the GuardDuty findings.</p>",
+        "UpdateIPSetRequest$IpSetId": "<p>The unique ID that specifies the IPSet that you want to update.</p>",
+        "UpdatePublishingDestinationRequest$DestinationId": "<p>The ID of the publishing destination to update.</p>",
+        "UpdateThreatIntelSetRequest$ThreatIntelSetId": "<p>The unique ID that specifies the ThreatIntelSet that you want to update.</p>",
+        "UsageResourceResult$Resource": "<p>The AWS resource that generated usage.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Contains information about a tag associated with the EC2 instance.</p>",
+      "refs": {
+        "Tags$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tag keys to remove from the resource.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateDetectorRequest$Tags": "<p>The tags to be added to a new detector resource.</p>",
+        "CreateFilterRequest$Tags": "<p>The tags to be added to a new filter resource.</p>",
+        "CreateIPSetRequest$Tags": "<p>The tags to be added to a new IP set resource.</p>",
+        "CreateThreatIntelSetRequest$Tags": "<p>The tags to be added to a new threat list resource.</p>",
+        "GetDetectorResponse$Tags": "<p>The tags of the detector resource.</p>",
+        "GetFilterResponse$Tags": "<p>The tags of the filter resource.</p>",
+        "GetIPSetResponse$Tags": "<p>The tags of the IPSet resource.</p>",
+        "GetThreatIntelSetResponse$Tags": "<p>The tags of the threat list resource.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>The tags associated with the resource.</p>",
+        "TagResourceRequest$Tags": "<p>The tags to be added to a resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "InstanceDetails$Tags": "<p>The tags of the EC2 instance.</p>",
+        "S3BucketDetail$Tags": "<p>All tags attached to the S3 bucket</p>"
+      }
+    },
+    "ThreatIntelSetFormat": {
+      "base": null,
+      "refs": {
+        "CreateThreatIntelSetRequest$Format": "<p>The format of the file that contains the ThreatIntelSet.</p>",
+        "GetThreatIntelSetResponse$Format": "<p>The format of the threatIntelSet.</p>"
+      }
+    },
+    "ThreatIntelSetIds": {
+      "base": null,
+      "refs": {
+        "ListThreatIntelSetsResponse$ThreatIntelSetIds": "<p>The IDs of the ThreatIntelSet resources.</p>"
+      }
+    },
+    "ThreatIntelSetStatus": {
+      "base": null,
+      "refs": {
+        "GetThreatIntelSetResponse$Status": "<p>The status of threatIntelSet file uploaded.</p>"
+      }
+    },
+    "ThreatIntelligenceDetail": {
+      "base": "<p>An instance of a threat intelligence detail that constitutes evidence for the finding.</p>",
+      "refs": {
+        "ThreatIntelligenceDetails$member": null
+      }
+    },
+    "ThreatIntelligenceDetails": {
+      "base": null,
+      "refs": {
+        "Evidence$ThreatIntelligenceDetails": "<p>A list of threat intelligence details related to the evidence.</p>"
+      }
+    },
+    "ThreatNames": {
+      "base": null,
+      "refs": {
+        "ThreatIntelligenceDetail$ThreatNames": "<p>A list of names of the threats in the threat intelligence list that triggered the finding.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "S3BucketDetail$CreatedAt": "<p>The date and time the bucket was created at.</p>"
+      }
+    },
+    "Total": {
+      "base": "<p>Contains the total usage with the corresponding currency unit for that value.</p>",
+      "refs": {
+        "UsageAccountResult$Total": "<p>Represents the total of usage for the Account ID.</p>",
+        "UsageDataSourceResult$Total": "<p>Represents the total of usage for the specified data source.</p>",
+        "UsageResourceResult$Total": "<p>Represents the sum total of usage for the specified resource type.</p>"
+      }
+    },
+    "UnarchiveFindingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnarchiveFindingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnprocessedAccount": {
+      "base": "<p>Contains information about the accounts that weren't processed.</p>",
+      "refs": {
+        "UnprocessedAccounts$member": null
+      }
+    },
+    "UnprocessedAccounts": {
+      "base": null,
+      "refs": {
+        "CreateMembersResponse$UnprocessedAccounts": "<p>A list of objects that include the <code>accountIds</code> of the unprocessed accounts and a result string that explains why each was unprocessed.</p>",
+        "DeclineInvitationsResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "DeleteInvitationsResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "DeleteMembersResponse$UnprocessedAccounts": "<p>The accounts that could not be processed.</p>",
+        "DisassociateMembersResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "GetMemberDetectorsResponse$UnprocessedAccounts": "<p>A list of member account IDs that were unable to be processed along with an explanation for why they were not processed.</p>",
+        "GetMembersResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "InviteMembersResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "StartMonitoringMembersResponse$UnprocessedAccounts": "<p>A list of objects that contain the unprocessed account and a result string that explains why it was unprocessed.</p>",
+        "StopMonitoringMembersResponse$UnprocessedAccounts": "<p>A list of objects that contain an accountId for each account that could not be processed, and a result string that indicates why the account was not processed. </p>",
+        "UpdateMemberDetectorsResponse$UnprocessedAccounts": "<p>A list of member account IDs that were unable to be processed along with an explanation for why they were not processed.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFindingsFeedbackRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFindingsFeedbackResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateIPSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateIPSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMemberDetectorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMemberDetectorsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateOrganizationConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateOrganizationConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePublishingDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePublishingDestinationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateThreatIntelSetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateThreatIntelSetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UsageAccountResult": {
+      "base": "<p>Contains information on the total of usage based on account IDs.</p>",
+      "refs": {
+        "UsageAccountResultList$member": null
+      }
+    },
+    "UsageAccountResultList": {
+      "base": null,
+      "refs": {
+        "UsageStatistics$SumByAccount": "<p>The usage statistic sum organized by account ID.</p>"
+      }
+    },
+    "UsageCriteria": {
+      "base": "<p>Contains information about the criteria used to query usage statistics.</p>",
+      "refs": {
+        "GetUsageStatisticsRequest$UsageCriteria": "<p>Represents the criteria used for querying usage.</p>"
+      }
+    },
+    "UsageDataSourceResult": {
+      "base": "<p>Contains information on the result of usage based on data source type.</p>",
+      "refs": {
+        "UsageDataSourceResultList$member": null
+      }
+    },
+    "UsageDataSourceResultList": {
+      "base": null,
+      "refs": {
+        "UsageStatistics$SumByDataSource": "<p>The usage statistic sum organized by on data source.</p>"
+      }
+    },
+    "UsageResourceResult": {
+      "base": "<p>Contains information on the sum of usage based on an AWS resource.</p>",
+      "refs": {
+        "UsageResourceResultList$member": null
+      }
+    },
+    "UsageResourceResultList": {
+      "base": null,
+      "refs": {
+        "UsageStatistics$SumByResource": "<p>The usage statistic sum organized by resource.</p>",
+        "UsageStatistics$TopResources": "<p>Lists the top 50 resources that have generated the most GuardDuty usage, in order from most to least expensive.</p>"
+      }
+    },
+    "UsageStatisticType": {
+      "base": null,
+      "refs": {
+        "GetUsageStatisticsRequest$UsageStatisticType": "<p>The type of usage statistics to retrieve.</p>"
+      }
+    },
+    "UsageStatistics": {
+      "base": "<p>Contains the result of GuardDuty usage. If a UsageStatisticType is provided the result for other types will be null. </p>",
+      "refs": {
+        "GetUsageStatisticsResponse$UsageStatistics": "<p>The usage statistics object. If a UsageStatisticType was provided, the objects representing other types will be null.</p>"
+      }
+    }
+  }
+}

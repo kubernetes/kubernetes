@@ -1,0 +1,45 @@
+parameters: 
+  TargetVariable: ''
+  ServiceDirectory: ''
+
+steps:
+  - pwsh: |
+      git clone https://github.com/Azure/azure-sdk-tools.git $(Build.SourcesDirectory)/tools_repo
+      cd $(Build.SourcesDirectory)/tools_repo
+      git checkout azure-sdk-tools_20210114.1
+    displayName: Setup Identity Resolver
+
+  - pwsh: |
+      dotnet run -v q -- `
+        --aad-app-id-var APP_ID `
+        --aad-app-secret-var APP_SECRET `
+        --aad-tenant-var AAD_TENANT `
+        --kusto-url-var KUSTO_URL `
+        --kusto-database-var KUSTO_DB `
+        --kusto-table-var KUSTO_TABLE `
+        --identity "$(Build.QueuedBy)" `
+        --targetvar "${{ parameters.TargetVariable }}"
+    displayName: 'Resolving Queuing User'
+    continueOnError: true
+    workingDirectory: $(Build.SourcesDirectory)/tools_repo/tools/notification-configuration/identity-resolver
+    env:
+      APP_ID: $(notification-aad-app-id)
+      APP_SECRET: $(notification-aad-secret)
+      AAD_TENANT: $(notification-aad-tenant)
+      KUSTO_URL: $(notification-kusto-url)
+      KUSTO_DB: $(notification-kusto-db)
+      KUSTO_TABLE: $(notification-kusto-table)
+
+  - pwsh: |
+      Remove-Item -Force -Recurse $(Build.SourcesDirectory)/tools_repo
+    displayName: Clean Up Cloned Tools Repo
+
+  - task: PowerShell@2
+    displayName: Add CodeOwners if Present
+    inputs:
+      pwsh: true
+      filePath: $(Build.SourcesDirectory)/eng/common/scripts/get-codeowners.ps1
+      arguments: >
+        -TargetDirectory "/sdk/${{ parameters.ServiceDirectory }}/"
+        -RootDirectory "$(Build.SourcesDirectory)"
+        -VsoVariable "${{ parameters.TargetVariable }}"

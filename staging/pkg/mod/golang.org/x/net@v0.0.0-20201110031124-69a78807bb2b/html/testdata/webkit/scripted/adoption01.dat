@@ -1,0 +1,16 @@
+#data
+<p><b id="A"><script>document.getElementById("A").id = "B"</script></p>TEXT</b>
+#errors
+#script-on
+#document
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <b>
+|         id="B"
+|         <script>
+|           "document.getElementById("A").id = "B""
+|     <b>
+|       id="A"
+|       "TEXT"

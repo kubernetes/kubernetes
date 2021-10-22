@@ -1,0 +1,202 @@
+// Copyright 2017 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// An integration test service that covers all the method signature permutations
+// of unary/streaming requests/responses.
+syntax = "proto3";
+
+package grpc.testing;
+
+message Empty {}
+
+// The type of payload that should be returned.
+enum PayloadType {
+  // Compressable text format.
+  COMPRESSABLE = 0;
+
+  // Uncompressable binary format.
+  UNCOMPRESSABLE = 1;
+
+  // Randomly chosen from all other formats defined in this enum.
+  RANDOM = 2;
+}
+
+// A block of data, to simply increase gRPC message size.
+message Payload {
+  // The type of data in body.
+  PayloadType type = 1;
+  // Primary contents of payload.
+  bytes body = 2;
+}
+
+// A protobuf representation for grpc status. This is used by test
+// clients to specify a status that the server should attempt to return.
+message EchoStatus {
+  int32 code = 1;
+  string message = 2;
+}
+
+// The type of route that a client took to reach a server w.r.t. gRPCLB.
+// The server must fill in "fallback" if it detects that the RPC reached
+// the server via the "gRPCLB fallback" path, and "backend" if it detects
+// that the RPC reached the server via "gRPCLB backend" path (i.e. if it got
+// the address of this server from the gRPCLB server BalanceLoad RPC). Exactly
+// how this detection is done is context and server dependant.
+enum GrpclbRouteType {
+  // Server didn't detect the route that a client took to reach it.
+  GRPCLB_ROUTE_TYPE_UNKNOWN = 0;
+  // Indicates that a client reached a server via gRPCLB fallback.
+  GRPCLB_ROUTE_TYPE_FALLBACK = 1;
+  // Indicates that a client reached a server as a gRPCLB-given backend.
+  GRPCLB_ROUTE_TYPE_BACKEND = 2;
+}
+
+// Unary request.
+message SimpleRequest {
+  // Desired payload type in the response from the server.
+  // If response_type is RANDOM, server randomly chooses one from other formats.
+  PayloadType response_type = 1;
+
+  // Desired payload size in the response from the server.
+  // If response_type is COMPRESSABLE, this denotes the size before compression.
+  int32 response_size = 2;
+
+  // Optional input payload sent along with the request.
+  Payload payload = 3;
+
+  // Whether SimpleResponse should include username.
+  bool fill_username = 4;
+
+  // Whether SimpleResponse should include OAuth scope.
+  bool fill_oauth_scope = 5;
+
+  // Whether server should return a given status
+  EchoStatus response_status = 7;
+
+  // Whether SimpleResponse should include server_id.
+  bool fill_server_id = 9;
+
+  // Whether SimpleResponse should include grpclb_route_type.
+  bool fill_grpclb_route_type = 10;
+}
+
+// Unary response, as configured by the request.
+message SimpleResponse {
+  // Payload to increase message size.
+  Payload payload = 1;
+
+  // The user the request came from, for verifying authentication was
+  // successful when the client expected it.
+  string username = 2;
+
+  // OAuth scope.
+  string oauth_scope = 3;
+
+  // Server ID. This must be unique among different server instances,
+  // but the same across all RPC's made to a particular server instance.
+  string server_id = 4;
+
+  // gRPCLB Path.
+  GrpclbRouteType grpclb_route_type = 5;
+}
+
+// Client-streaming request.
+message StreamingInputCallRequest {
+  // Optional input payload sent along with the request.
+  Payload payload = 1;
+
+  // Not expecting any payload from the response.
+}
+
+// Client-streaming response.
+message StreamingInputCallResponse {
+  // Aggregated size of payloads received from the client.
+  int32 aggregated_payload_size = 1;
+}
+
+// Configuration for a particular response.
+message ResponseParameters {
+  // Desired payload sizes in responses from the server.
+  // If response_type is COMPRESSABLE, this denotes the size before compression.
+  int32 size = 1;
+
+  // Desired interval between consecutive responses in the response stream in
+  // microseconds.
+  int32 interval_us = 2;
+}
+
+// Server-streaming request.
+message StreamingOutputCallRequest {
+  // Desired payload type in the response from the server.
+  // If response_type is RANDOM, the payload from each response in the stream
+  // might be of different types. This is to simulate a mixed type of payload
+  // stream.
+  PayloadType response_type = 1;
+
+  // Configuration for each expected response message.
+  repeated ResponseParameters response_parameters = 2;
+
+  // Optional input payload sent along with the request.
+  Payload payload = 3;
+
+  // Whether server should return a given status
+  EchoStatus response_status = 7;
+}
+
+// Server-streaming response, as configured by the request and parameters.
+message StreamingOutputCallResponse {
+  // Payload to increase response size.
+  Payload payload = 1;
+}
+
+// A simple service to test the various types of RPCs and experiment with
+// performance with various types of payload.
+service TestService {
+  // One empty request followed by one empty response.
+  rpc EmptyCall(Empty) returns (Empty);
+
+  // One request followed by one response.
+  // The server returns the client payload as-is.
+  rpc UnaryCall(SimpleRequest) returns (SimpleResponse);
+
+  // One request followed by a sequence of responses (streamed download).
+  // The server returns the payload with client desired type and sizes.
+  rpc StreamingOutputCall(StreamingOutputCallRequest)
+      returns (stream StreamingOutputCallResponse);
+
+  // A sequence of requests followed by one response (streamed upload).
+  // The server returns the aggregated size of client payload as the result.
+  rpc StreamingInputCall(stream StreamingInputCallRequest)
+      returns (StreamingInputCallResponse);
+
+  // A sequence of requests with each request served by the server immediately.
+  // As one request could lead to multiple responses, this interface
+  // demonstrates the idea of full duplexing.
+  rpc FullDuplexCall(stream StreamingOutputCallRequest)
+      returns (stream StreamingOutputCallResponse);
+
+  // A sequence of requests followed by a sequence of responses.
+  // The server buffers all the client requests and then serves them in order. A
+  // stream of responses are returned to the client when the server starts with
+  // first request.
+  rpc HalfDuplexCall(stream StreamingOutputCallRequest)
+      returns (stream StreamingOutputCallResponse);
+}
+
+// A simple service NOT implemented at servers so clients can test for
+// that case.
+service UnimplementedService {
+  // A call that no server should implement
+  rpc UnimplementedCall(grpc.testing.Empty) returns (grpc.testing.Empty);
+}

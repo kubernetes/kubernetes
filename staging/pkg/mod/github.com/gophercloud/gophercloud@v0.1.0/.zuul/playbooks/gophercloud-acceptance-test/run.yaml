@@ -1,0 +1,27 @@
+- hosts: all
+  become: yes
+  roles:
+    - config-golang
+    - clone-devstack-gate-to-workspace
+    - role: create-devstack-local-conf
+      enable_services:
+        - 'manila'
+        - 'designate'
+        - 'zun'
+        - 'octavia'
+        - 'neutron-ext'
+    - install-devstack
+  tasks:
+    - name: Run acceptance tests with gophercloud
+      shell:
+        cmd: |
+          set -e
+          set -o pipefail
+          set -x
+          echo $(export |grep OS_BRANCH)
+
+          go get ./... || true
+          ./script/acceptancetest -v 2>&1 | tee $TEST_RESULTS_TXT
+        executable: /bin/bash
+        chdir: '{{ zuul.project.src_dir }}'
+      environment: '{{ global_env }}'

@@ -1,0 +1,30 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "wrapnewlines:v1",
+ "name": "wrapnewlines",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates wrapping of descriptions containing newlines.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+  "Thing": {
+   "id": "Thing",
+   "type": "object",
+   "description": "don't care",
+   "properties": {
+    "oneline": {
+     "type": "string",
+     "description": "First sentence. Second sentence. Description is long enough to be wrapped."
+    },
+    "twoline": {
+     "type": "string",
+     "description": "First sentence.\nSecond sentence. Description is long enough to be wrapped."
+    }
+   }
+  }
+ }
+}

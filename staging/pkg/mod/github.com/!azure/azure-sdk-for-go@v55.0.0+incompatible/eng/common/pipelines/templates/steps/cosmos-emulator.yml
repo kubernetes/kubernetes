@@ -1,0 +1,95 @@
+parameters:
+  EmulatorMsiUrl: "https://aka.ms/cosmosdb-emulator"
+  StartParameters: ''
+
+steps:
+  - powershell: |
+      $targetDir = $env:temp
+      Write-Host "Downloading and extracting Cosmos DB Emulator - ${{ parameters.EmulatorMsiUrl }}"
+      Write-Host "Target Dir: $targetDir"
+      msiexec /a ${{ parameters.EmulatorMsiUrl }} TARGETDIR=$targetDir /qn | wait-process
+    displayName: Download and Extract Public Cosmos DB Emulator
+  - powershell: |
+      Write-Host "Deleting Cosmos DB Emulator data"
+      if (Test-Path $Env:LOCALAPPDATA\CosmosDbEmulator) { Remove-Item -Recurse -Force $Env:LOCALAPPDATA\CosmosDbEmulator }
+    displayName: Delete Cosmos DB Emulator data
+  - powershell: |
+      Write-Host "Getting Cosmos DB Emulator Version"
+      $ProductName = "Azure Cosmos DB Emulator"
+      $Emulator = (Join-Path $env:temp (Join-Path $ProductName "Microsoft.Azure.Cosmos.Emulator.exe"))
+      $fileVersion = Get-ChildItem $Emulator
+      Write-Host $Emulator $fileVersion.VersionInfo
+    displayName: Get Cosmos DB Emulator Version
+  - powershell: |
+      Write-Host "Launching Cosmos DB Emulator"
+      $ProductName = "Azure Cosmos DB Emulator"
+      $Emulator = (Join-Path $env:temp (Join-Path $ProductName "Microsoft.Azure.Cosmos.Emulator.exe"))
+      if (!(Test-Path $Emulator)) {
+        Write-Error "The emulator is not installed where expected at '$Emulator'"
+        return
+      }
+      $process = Start-Process $Emulator -ArgumentList "/getstatus" -PassThru -Wait
+      switch ($process.ExitCode) {
+        1 {
+          Write-Host "The emulator is already starting"
+          return
+        }
+        2 {
+          Write-Host "The emulator is already running"
+          return
+        }
+        3 {
+          Write-Host "The emulator is stopped"
+        }
+        default {
+          Write-Host "Unrecognized exit code $process.ExitCode"
+          return
+        }
+      }
+      $argumentList = ""
+      if (-not [string]::IsNullOrEmpty("${{ parameters.StartParameters }}")) {
+          $argumentList += , "${{ parameters.StartParameters }}"
+      } else {
+        # Use the default params if none provided
+        $argumentList = "/noexplorer /noui /enablepreview /disableratelimiting /enableaadauthentication"
+      }
+      Write-Host "Starting emulator process: $Emulator $argumentList"
+      $process=Start-Process $Emulator -ArgumentList $argumentList -ErrorAction Stop -PassThru
+      Write-Host "Emulator process started: $($process.Name), $($process.FileVersion)"
+      $Timeout = 600
+      $result="NotYetStarted"
+      $complete = if ($Timeout -gt 0) {
+        $start = [DateTimeOffset]::Now
+        $stop = $start.AddSeconds($Timeout)
+        {
+          $result -eq "Running" -or [DateTimeOffset]::Now -ge $stop
+        }
+      }
+      else {
+        {
+          $result -eq "Running"
+        }
+      }
+      do {
+        $process = Start-Process $Emulator -ArgumentList "/getstatus" -PassThru -Wait
+        switch ($process.ExitCode) {
+          1 {
+            Write-Host "The emulator is starting"
+          }
+          2 {
+            Write-Host "The emulator is running"
+            $result="Running"
+            return
+          }
+          3 {
+            Write-Host "The emulator is stopped"
+          }
+          default {
+            Write-Host "Unrecognized exit code $process.ExitCode"
+          }
+        }
+        Start-Sleep -Seconds 5
+      }
+      until ($complete.Invoke())
+      Write-Error "The emulator failed to reach Running status within ${Timeout} seconds"
+    displayName: Start Cosmos DB Emulator

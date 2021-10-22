@@ -1,0 +1,1996 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS App Mesh is a service mesh based on the Envoy proxy that makes it easy to monitor and control microservices. App Mesh standardizes how your microservices communicate, giving you end-to-end visibility and helping to ensure high availability for your applications.</p> <p>App Mesh gives you consistent visibility and network traffic controls for every microservice in an application. You can use App Mesh with AWS Fargate, Amazon ECS, Amazon EKS, Kubernetes on AWS, and Amazon EC2.</p> <note> <p>App Mesh supports microservice applications that use service discovery naming for their components. For more information about service discovery on Amazon ECS, see <a href=\"https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-discovery.html\">Service Discovery</a> in the <i>Amazon Elastic Container Service Developer Guide</i>. Kubernetes <code>kube-dns</code> and <code>coredns</code> are supported. For more information, see <a href=\"https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/\">DNS for Services and Pods</a> in the Kubernetes documentation.</p> </note>",
+  "operations": {
+    "CreateGatewayRoute": "<p>Creates a gateway route.</p> <p>A gateway route is attached to a virtual gateway and routes traffic to an existing virtual service. If a route matches a request, it can distribute traffic to a target virtual service.</p> <p>For more information about gateway routes, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/gateway-routes.html\">Gateway routes</a>.</p>",
+    "CreateMesh": "<p>Creates a service mesh.</p> <p> A service mesh is a logical boundary for network traffic between services that are represented by resources within the mesh. After you create your service mesh, you can create virtual services, virtual nodes, virtual routers, and routes to distribute traffic between the applications in your mesh.</p> <p>For more information about service meshes, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/meshes.html\">Service meshes</a>.</p>",
+    "CreateRoute": "<p>Creates a route that is associated with a virtual router.</p> <p> You can route several different protocols and define a retry policy for a route. Traffic can be routed to one or more virtual nodes.</p> <p>For more information about routes, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/routes.html\">Routes</a>.</p>",
+    "CreateVirtualGateway": "<p>Creates a virtual gateway.</p> <p>A virtual gateway allows resources outside your mesh to communicate to resources that are inside your mesh. The virtual gateway represents an Envoy proxy running in an Amazon ECS task, in a Kubernetes service, or on an Amazon EC2 instance. Unlike a virtual node, which represents an Envoy running with an application, a virtual gateway represents Envoy deployed by itself.</p> <p>For more information about virtual gateways, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/virtual_gateways.html\">Virtual gateways</a>. </p>",
+    "CreateVirtualNode": "<p>Creates a virtual node within a service mesh.</p> <p> A virtual node acts as a logical pointer to a particular task group, such as an Amazon ECS service or a Kubernetes deployment. When you create a virtual node, you can specify the service discovery information for your task group, and whether the proxy running in a task group will communicate with other proxies using Transport Layer Security (TLS).</p> <p>You define a <code>listener</code> for any inbound traffic that your virtual node expects. Any virtual service that your virtual node expects to communicate to is specified as a <code>backend</code>.</p> <p>The response metadata for your new virtual node contains the <code>arn</code> that is associated with the virtual node. Set this value to the full ARN; for example, <code>arn:aws:appmesh:us-west-2:123456789012:myMesh/default/virtualNode/myApp</code>) as the <code>APPMESH_RESOURCE_ARN</code> environment variable for your task group's Envoy proxy container in your task definition or pod spec. This is then mapped to the <code>node.id</code> and <code>node.cluster</code> Envoy parameters.</p> <note> <p>By default, App Mesh uses the name of the resource you specified in <code>APPMESH_RESOURCE_ARN</code> when Envoy is referring to itself in metrics and traces. You can override this behavior by setting the <code>APPMESH_RESOURCE_CLUSTER</code> environment variable with your own name.</p> <p>AWS Cloud Map is not available in the eu-south-1 Region.</p> </note> <p>For more information about virtual nodes, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/virtual_nodes.html\">Virtual nodes</a>. You must be using <code>1.15.0</code> or later of the Envoy image when setting these variables. For more information about App Mesh Envoy variables, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/envoy.html\">Envoy image</a> in the AWS App Mesh User Guide.</p>",
+    "CreateVirtualRouter": "<p>Creates a virtual router within a service mesh.</p> <p>Specify a <code>listener</code> for any inbound traffic that your virtual router receives. Create a virtual router for each protocol and port that you need to route. Virtual routers handle traffic for one or more virtual services within your mesh. After you create your virtual router, create and associate routes for your virtual router that direct incoming requests to different virtual nodes.</p> <p>For more information about virtual routers, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/virtual_routers.html\">Virtual routers</a>.</p>",
+    "CreateVirtualService": "<p>Creates a virtual service within a service mesh.</p> <p>A virtual service is an abstraction of a real service that is provided by a virtual node directly or indirectly by means of a virtual router. Dependent services call your virtual service by its <code>virtualServiceName</code>, and those requests are routed to the virtual node or virtual router that is specified as the provider for the virtual service.</p> <p>For more information about virtual services, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/virtual_services.html\">Virtual services</a>.</p>",
+    "DeleteGatewayRoute": "<p>Deletes an existing gateway route.</p>",
+    "DeleteMesh": "<p>Deletes an existing service mesh.</p> <p>You must delete all resources (virtual services, routes, virtual routers, and virtual nodes) in the service mesh before you can delete the mesh itself.</p>",
+    "DeleteRoute": "<p>Deletes an existing route.</p>",
+    "DeleteVirtualGateway": "<p>Deletes an existing virtual gateway. You cannot delete a virtual gateway if any gateway routes are associated to it.</p>",
+    "DeleteVirtualNode": "<p>Deletes an existing virtual node.</p> <p>You must delete any virtual services that list a virtual node as a service provider before you can delete the virtual node itself.</p>",
+    "DeleteVirtualRouter": "<p>Deletes an existing virtual router.</p> <p>You must delete any routes associated with the virtual router before you can delete the router itself.</p>",
+    "DeleteVirtualService": "<p>Deletes an existing virtual service.</p>",
+    "DescribeGatewayRoute": "<p>Describes an existing gateway route.</p>",
+    "DescribeMesh": "<p>Describes an existing service mesh.</p>",
+    "DescribeRoute": "<p>Describes an existing route.</p>",
+    "DescribeVirtualGateway": "<p>Describes an existing virtual gateway.</p>",
+    "DescribeVirtualNode": "<p>Describes an existing virtual node.</p>",
+    "DescribeVirtualRouter": "<p>Describes an existing virtual router.</p>",
+    "DescribeVirtualService": "<p>Describes an existing virtual service.</p>",
+    "ListGatewayRoutes": "<p>Returns a list of existing gateway routes that are associated to a virtual gateway.</p>",
+    "ListMeshes": "<p>Returns a list of existing service meshes.</p>",
+    "ListRoutes": "<p>Returns a list of existing routes in a service mesh.</p>",
+    "ListTagsForResource": "<p>List the tags for an App Mesh resource.</p>",
+    "ListVirtualGateways": "<p>Returns a list of existing virtual gateways in a service mesh.</p>",
+    "ListVirtualNodes": "<p>Returns a list of existing virtual nodes.</p>",
+    "ListVirtualRouters": "<p>Returns a list of existing virtual routers in a service mesh.</p>",
+    "ListVirtualServices": "<p>Returns a list of existing virtual services in a service mesh.</p>",
+    "TagResource": "<p>Associates the specified tags to a resource with the specified <code>resourceArn</code>. If existing tags on a resource aren't specified in the request parameters, they aren't changed. When a resource is deleted, the tags associated with that resource are also deleted.</p>",
+    "UntagResource": "<p>Deletes specified tags from a resource.</p>",
+    "UpdateGatewayRoute": "<p>Updates an existing gateway route that is associated to a specified virtual gateway in a service mesh.</p>",
+    "UpdateMesh": "<p>Updates an existing service mesh.</p>",
+    "UpdateRoute": "<p>Updates an existing route for a specified service mesh and virtual router.</p>",
+    "UpdateVirtualGateway": "<p>Updates an existing virtual gateway in a specified service mesh.</p>",
+    "UpdateVirtualNode": "<p>Updates an existing virtual node in a specified service mesh.</p>",
+    "UpdateVirtualRouter": "<p>Updates an existing virtual router in a specified service mesh.</p>",
+    "UpdateVirtualService": "<p>Updates an existing virtual service in a specified service mesh.</p>"
+  },
+  "shapes": {
+    "AccessLog": {
+      "base": "<p>An object that represents the access logging information for a virtual node.</p>",
+      "refs": {
+        "Logging$accessLog": "<p>The access log configuration for a virtual node.</p>"
+      }
+    },
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "CreateGatewayRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "CreateRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "CreateVirtualGatewayInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "CreateVirtualNodeInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "CreateVirtualRouterInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "CreateVirtualServiceInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then the account that you specify must share the mesh with your account before you can create the resource in the service mesh. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteGatewayRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteVirtualGatewayInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteVirtualNodeInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteVirtualRouterInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DeleteVirtualServiceInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeGatewayRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeMeshInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeVirtualGatewayInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeVirtualNodeInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeVirtualRouterInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "DescribeVirtualServiceInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "GatewayRouteRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "GatewayRouteRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListGatewayRoutesInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListRoutesInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListVirtualGatewaysInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListVirtualNodesInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListVirtualRoutersInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ListVirtualServicesInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "MeshRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "MeshRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ResourceMetadata$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "ResourceMetadata$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "RouteRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "RouteRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateGatewayRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateRouteInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateVirtualGatewayInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateVirtualNodeInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateVirtualRouterInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "UpdateVirtualServiceInput$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualGatewayRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualGatewayRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualNodeRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualNodeRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualRouterRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualRouterRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualServiceRef$meshOwner": "<p>The AWS IAM account ID of the service mesh owner. If the account ID is not your own, then it's the ID of the account that shared the mesh with your account. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>",
+        "VirtualServiceRef$resourceOwner": "<p>The AWS IAM account ID of the resource owner. If the account ID is not your own, then it's the ID of the mesh owner or of another account that the mesh is shared with. For more information about mesh sharing, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/sharing.html\">Working with shared meshes</a>.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "CertificateAuthorityArns$member": null,
+        "GatewayRouteRef$arn": "<p>The full Amazon Resource Name (ARN) for the gateway route.</p>",
+        "ListTagsForResourceInput$resourceArn": "<p>The Amazon Resource Name (ARN) that identifies the resource to list the tags for.</p>",
+        "ListenerTlsAcmCertificate$certificateArn": "<p>The Amazon Resource Name (ARN) for the certificate. The certificate must meet specific requirements and you must have proxy authorization enabled. For more information, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/tls.html#virtual-node-tls-prerequisites\">Transport Layer Security (TLS)</a>.</p>",
+        "MeshRef$arn": "<p>The full Amazon Resource Name (ARN) of the service mesh.</p>",
+        "ResourceMetadata$arn": "<p>The full Amazon Resource Name (ARN) for the resource.</p>",
+        "RouteRef$arn": "<p>The full Amazon Resource Name (ARN) for the route.</p>",
+        "TagResourceInput$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource to add tags to.</p>",
+        "UntagResourceInput$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource to delete tags from.</p>",
+        "VirtualGatewayCertificateAuthorityArns$member": null,
+        "VirtualGatewayListenerTlsAcmCertificate$certificateArn": "<p>The Amazon Resource Name (ARN) for the certificate. The certificate must meet specific requirements and you must have proxy authorization enabled. For more information, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/tls.html#virtual-node-tls-prerequisites\">Transport Layer Security (TLS)</a>.</p>",
+        "VirtualGatewayRef$arn": "<p>The full Amazon Resource Name (ARN) for the resource.</p>",
+        "VirtualNodeRef$arn": "<p>The full Amazon Resource Name (ARN) for the virtual node.</p>",
+        "VirtualRouterRef$arn": "<p>The full Amazon Resource Name (ARN) for the virtual router.</p>",
+        "VirtualServiceRef$arn": "<p>The full Amazon Resource Name (ARN) for the virtual service.</p>"
+      }
+    },
+    "AwsCloudMapInstanceAttribute": {
+      "base": "<p>An object that represents the AWS Cloud Map attribute information for your virtual node.</p> <note> <p>AWS Cloud Map is not available in the eu-south-1 Region.</p> </note>",
+      "refs": {
+        "AwsCloudMapInstanceAttributes$member": null
+      }
+    },
+    "AwsCloudMapInstanceAttributeKey": {
+      "base": null,
+      "refs": {
+        "AwsCloudMapInstanceAttribute$key": "<p>The name of an AWS Cloud Map service instance attribute key. Any AWS Cloud Map service instance that contains the specified key and value is returned.</p>"
+      }
+    },
+    "AwsCloudMapInstanceAttributeValue": {
+      "base": null,
+      "refs": {
+        "AwsCloudMapInstanceAttribute$value": "<p>The value of an AWS Cloud Map service instance attribute key. Any AWS Cloud Map service instance that contains the specified key and value is returned.</p>"
+      }
+    },
+    "AwsCloudMapInstanceAttributes": {
+      "base": null,
+      "refs": {
+        "AwsCloudMapServiceDiscovery$attributes": "<p>A string map that contains attributes with values that you can use to filter instances by any custom attribute that you specified when you registered the instance. Only instances that match all of the specified key/value pairs will be returned.</p>"
+      }
+    },
+    "AwsCloudMapName": {
+      "base": null,
+      "refs": {
+        "AwsCloudMapServiceDiscovery$namespaceName": "<p>The name of the AWS Cloud Map namespace to use.</p>",
+        "AwsCloudMapServiceDiscovery$serviceName": "<p>The name of the AWS Cloud Map service to use.</p>"
+      }
+    },
+    "AwsCloudMapServiceDiscovery": {
+      "base": "<p>An object that represents the AWS Cloud Map service discovery information for your virtual node.</p> <note> <p>AWS Cloud Map is not available in the eu-south-1 Region.</p> </note>",
+      "refs": {
+        "ServiceDiscovery$awsCloudMap": "<p>Specifies any AWS Cloud Map information for the virtual node.</p>"
+      }
+    },
+    "Backend": {
+      "base": "<p>An object that represents the backends that a virtual node is expected to send outbound traffic to.</p>",
+      "refs": {
+        "Backends$member": null
+      }
+    },
+    "BackendDefaults": {
+      "base": "<p>An object that represents the default properties for a backend.</p>",
+      "refs": {
+        "VirtualNodeSpec$backendDefaults": "<p>A reference to an object that represents the defaults for backends.</p>"
+      }
+    },
+    "Backends": {
+      "base": null,
+      "refs": {
+        "VirtualNodeSpec$backends": "<p>The backends that the virtual node is expected to send outbound traffic to.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>The request syntax was malformed. Check your request syntax and try again.</p>",
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "ClientPolicyTls$enforce": "<p>Whether the policy is enforced. The default is <code>True</code>, if a value isn't specified.</p>",
+        "GrpcRouteMetadata$invert": "<p>Specify <code>True</code> to match anything except the match criteria. The default value is <code>False</code>.</p>",
+        "HttpRouteHeader$invert": "<p>Specify <code>True</code> to match anything except the match criteria. The default value is <code>False</code>.</p>",
+        "VirtualGatewayClientPolicyTls$enforce": "<p>Whether the policy is enforced. The default is <code>True</code>, if a value isn't specified.</p>"
+      }
+    },
+    "CertificateAuthorityArns": {
+      "base": null,
+      "refs": {
+        "TlsValidationContextAcmTrust$certificateAuthorityArns": "<p>One or more ACM Amazon Resource Name (ARN)s.</p>"
+      }
+    },
+    "ClientPolicy": {
+      "base": "<p>An object that represents a client policy.</p>",
+      "refs": {
+        "BackendDefaults$clientPolicy": "<p>A reference to an object that represents a client policy.</p>",
+        "VirtualServiceBackend$clientPolicy": "<p>A reference to an object that represents the client policy for a backend.</p>"
+      }
+    },
+    "ClientPolicyTls": {
+      "base": "<p>A reference to an object that represents a Transport Layer Security (TLS) client policy.</p>",
+      "refs": {
+        "ClientPolicy$tls": "<p>A reference to an object that represents a Transport Layer Security (TLS) client policy.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>The request contains a client token that was used for a previous update resource call with different specifications. Try the request again with a new client token.</p>",
+      "refs": {
+      }
+    },
+    "CreateGatewayRouteInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGatewayRouteOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateMeshInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateMeshOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateRouteInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateRouteOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualGatewayInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateVirtualGatewayOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateVirtualNodeInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualNodeOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualRouterInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualRouterOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualServiceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "CreateVirtualServiceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteGatewayRouteInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGatewayRouteOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMeshInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteMeshOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteRouteInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteRouteOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualGatewayInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVirtualGatewayOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVirtualNodeInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualNodeOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualRouterInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualRouterOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualServiceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DeleteVirtualServiceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeGatewayRouteInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGatewayRouteOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeMeshInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeMeshOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeRouteInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeRouteOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualGatewayInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeVirtualGatewayOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeVirtualNodeInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualNodeOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualRouterInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualRouterOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualServiceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DescribeVirtualServiceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "DnsServiceDiscovery": {
+      "base": "<p>An object that represents the DNS service discovery information for your virtual node.</p>",
+      "refs": {
+        "ServiceDiscovery$dns": "<p>Specifies the DNS information for the virtual node.</p>"
+      }
+    },
+    "Duration": {
+      "base": "<p>An object that represents a duration of time.</p>",
+      "refs": {
+        "GrpcRetryPolicy$perRetryTimeout": "<p>The timeout for each retry attempt.</p>",
+        "GrpcTimeout$idle": "<p>An object that represents an idle timeout. An idle timeout bounds the amount of time that a connection may be idle. The default value is none.</p>",
+        "GrpcTimeout$perRequest": "<p>An object that represents a per request timeout. The default value is 15 seconds. If you set a higher timeout, then make sure that the higher value is set for each App Mesh resource in a conversation. For example, if a virtual node backend uses a virtual router provider to route to another virtual node, then the timeout should be greater than 15 seconds for the source and destination virtual node and the route.</p>",
+        "HttpRetryPolicy$perRetryTimeout": "<p>The timeout for each retry attempt.</p>",
+        "HttpTimeout$idle": "<p>An object that represents an idle timeout. An idle timeout bounds the amount of time that a connection may be idle. The default value is none.</p>",
+        "HttpTimeout$perRequest": "<p>An object that represents a per request timeout. The default value is 15 seconds. If you set a higher timeout, then make sure that the higher value is set for each App Mesh resource in a conversation. For example, if a virtual node backend uses a virtual router provider to route to another virtual node, then the timeout should be greater than 15 seconds for the source and destination virtual node and the route.</p>",
+        "OutlierDetection$baseEjectionDuration": "<p>The base amount of time for which a host is ejected.</p>",
+        "OutlierDetection$interval": "<p>The time interval between ejection sweep analysis.</p>",
+        "TcpTimeout$idle": "<p>An object that represents an idle timeout. An idle timeout bounds the amount of time that a connection may be idle. The default value is none.</p>"
+      }
+    },
+    "DurationUnit": {
+      "base": null,
+      "refs": {
+        "Duration$unit": "<p>A unit of time.</p>"
+      }
+    },
+    "DurationValue": {
+      "base": null,
+      "refs": {
+        "Duration$value": "<p>A number of time units.</p>"
+      }
+    },
+    "EgressFilter": {
+      "base": "<p>An object that represents the egress filter rules for a service mesh.</p>",
+      "refs": {
+        "MeshSpec$egressFilter": "<p>The egress filter rules for the service mesh.</p>"
+      }
+    },
+    "EgressFilterType": {
+      "base": null,
+      "refs": {
+        "EgressFilter$type": "<p>The egress filter type. By default, the type is <code>DROP_ALL</code>, which allows egress only from virtual nodes to other defined resources in the service mesh (and any traffic to <code>*.amazonaws.com</code> for AWS API calls). You can set the egress filter type to <code>ALLOW_ALL</code> to allow egress to any endpoint inside or outside of the service mesh.</p>"
+      }
+    },
+    "FileAccessLog": {
+      "base": "<p>An object that represents an access log file.</p>",
+      "refs": {
+        "AccessLog$file": "<p>The file object to send virtual node access logs to.</p>"
+      }
+    },
+    "FilePath": {
+      "base": null,
+      "refs": {
+        "FileAccessLog$path": "<p>The file path to write access logs to. You can use <code>/dev/stdout</code> to send access logs to standard out and configure your Envoy container to use a log driver, such as <code>awslogs</code>, to export the access logs to a log storage service such as Amazon CloudWatch Logs. You can also specify a path in the Envoy container's file system to write the files to disk.</p> <note> <p>The Envoy process must have write permissions to the path that you specify here. Otherwise, Envoy fails to bootstrap properly.</p> </note>",
+        "ListenerTlsFileCertificate$certificateChain": "<p>The certificate chain for the certificate.</p>",
+        "ListenerTlsFileCertificate$privateKey": "<p>The private key for a certificate stored on the file system of the virtual node that the proxy is running on.</p>",
+        "TlsValidationContextFileTrust$certificateChain": "<p>The certificate trust chain for a certificate stored on the file system of the virtual node that the proxy is running on.</p>",
+        "VirtualGatewayFileAccessLog$path": "<p>The file path to write access logs to. You can use <code>/dev/stdout</code> to send access logs to standard out and configure your Envoy container to use a log driver, such as <code>awslogs</code>, to export the access logs to a log storage service such as Amazon CloudWatch Logs. You can also specify a path in the Envoy container's file system to write the files to disk.</p>",
+        "VirtualGatewayListenerTlsFileCertificate$certificateChain": "<p>The certificate chain for the certificate.</p>",
+        "VirtualGatewayListenerTlsFileCertificate$privateKey": "<p>The private key for a certificate stored on the file system of the mesh endpoint that the proxy is running on.</p>",
+        "VirtualGatewayTlsValidationContextFileTrust$certificateChain": "<p>The certificate trust chain for a certificate stored on the file system of the virtual node that the proxy is running on.</p>"
+      }
+    },
+    "ForbiddenException": {
+      "base": "<p>You don't have permissions to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "GatewayRouteData": {
+      "base": "<p>An object that represents a gateway route returned by a describe operation.</p>",
+      "refs": {
+        "CreateGatewayRouteOutput$gatewayRoute": "<p>The full description of your gateway route following the create call.</p>",
+        "DeleteGatewayRouteOutput$gatewayRoute": "<p>The gateway route that was deleted.</p>",
+        "DescribeGatewayRouteOutput$gatewayRoute": "<p>The full description of your gateway route.</p>",
+        "UpdateGatewayRouteOutput$gatewayRoute": "<p>A full description of the gateway route that was updated.</p>"
+      }
+    },
+    "GatewayRouteList": {
+      "base": null,
+      "refs": {
+        "ListGatewayRoutesOutput$gatewayRoutes": "<p>The list of existing gateway routes for the specified service mesh and virtual gateway.</p>"
+      }
+    },
+    "GatewayRouteRef": {
+      "base": "<p>An object that represents a gateway route returned by a list operation.</p>",
+      "refs": {
+        "GatewayRouteList$member": null
+      }
+    },
+    "GatewayRouteSpec": {
+      "base": "<p>An object that represents a gateway route specification. Specify one gateway route type.</p>",
+      "refs": {
+        "CreateGatewayRouteInput$spec": "<p>The gateway route specification to apply.</p>",
+        "GatewayRouteData$spec": "<p>The specifications of the gateway route.</p>",
+        "UpdateGatewayRouteInput$spec": "<p>The new gateway route specification to apply. This overwrites the existing data.</p>"
+      }
+    },
+    "GatewayRouteStatus": {
+      "base": "<p>An object that represents the current status of a gateway route.</p>",
+      "refs": {
+        "GatewayRouteData$status": "<p>The status of the gateway route.</p>"
+      }
+    },
+    "GatewayRouteStatusCode": {
+      "base": null,
+      "refs": {
+        "GatewayRouteStatus$status": "<p>The current status for the gateway route.</p>"
+      }
+    },
+    "GatewayRouteTarget": {
+      "base": "<p>An object that represents a gateway route target.</p>",
+      "refs": {
+        "GrpcGatewayRouteAction$target": "<p>An object that represents the target that traffic is routed to when a request matches the gateway route.</p>",
+        "HttpGatewayRouteAction$target": "<p>An object that represents the target that traffic is routed to when a request matches the gateway route.</p>"
+      }
+    },
+    "GatewayRouteVirtualService": {
+      "base": "<p>An object that represents the virtual service that traffic is routed to.</p>",
+      "refs": {
+        "GatewayRouteTarget$virtualService": "<p>An object that represents a virtual service gateway route target.</p>"
+      }
+    },
+    "GrpcGatewayRoute": {
+      "base": "<p>An object that represents a gRPC gateway route.</p>",
+      "refs": {
+        "GatewayRouteSpec$grpcRoute": "<p>An object that represents the specification of a gRPC gateway route.</p>"
+      }
+    },
+    "GrpcGatewayRouteAction": {
+      "base": "<p>An object that represents the action to take if a match is determined.</p>",
+      "refs": {
+        "GrpcGatewayRoute$action": "<p>An object that represents the action to take if a match is determined.</p>"
+      }
+    },
+    "GrpcGatewayRouteMatch": {
+      "base": "<p>An object that represents the criteria for determining a request match.</p>",
+      "refs": {
+        "GrpcGatewayRoute$match": "<p>An object that represents the criteria for determining a request match.</p>"
+      }
+    },
+    "GrpcRetryPolicy": {
+      "base": "<p>An object that represents a retry policy. Specify at least one value for at least one of the types of <code>RetryEvents</code>, a value for <code>maxRetries</code>, and a value for <code>perRetryTimeout</code>.</p>",
+      "refs": {
+        "GrpcRoute$retryPolicy": "<p>An object that represents a retry policy.</p>"
+      }
+    },
+    "GrpcRetryPolicyEvent": {
+      "base": null,
+      "refs": {
+        "GrpcRetryPolicyEvents$member": null
+      }
+    },
+    "GrpcRetryPolicyEvents": {
+      "base": null,
+      "refs": {
+        "GrpcRetryPolicy$grpcRetryEvents": "<p>Specify at least one of the valid values.</p>"
+      }
+    },
+    "GrpcRoute": {
+      "base": "<p>An object that represents a gRPC route type.</p>",
+      "refs": {
+        "RouteSpec$grpcRoute": "<p>An object that represents the specification of a gRPC route.</p>"
+      }
+    },
+    "GrpcRouteAction": {
+      "base": "<p>An object that represents the action to take if a match is determined.</p>",
+      "refs": {
+        "GrpcRoute$action": "<p>An object that represents the action to take if a match is determined.</p>"
+      }
+    },
+    "GrpcRouteMatch": {
+      "base": "<p>An object that represents the criteria for determining a request match.</p>",
+      "refs": {
+        "GrpcRoute$match": "<p>An object that represents the criteria for determining a request match.</p>"
+      }
+    },
+    "GrpcRouteMetadata": {
+      "base": "<p>An object that represents the match metadata for the route.</p>",
+      "refs": {
+        "GrpcRouteMetadataList$member": null
+      }
+    },
+    "GrpcRouteMetadataList": {
+      "base": null,
+      "refs": {
+        "GrpcRouteMatch$metadata": "<p>An object that represents the data to match from the request.</p>"
+      }
+    },
+    "GrpcRouteMetadataMatchMethod": {
+      "base": "<p>An object that represents the match method. Specify one of the match values.</p>",
+      "refs": {
+        "GrpcRouteMetadata$match": "<p>An object that represents the data to match from the request.</p>"
+      }
+    },
+    "GrpcTimeout": {
+      "base": "<p>An object that represents types of timeouts. </p>",
+      "refs": {
+        "GrpcRoute$timeout": "<p>An object that represents types of timeouts. </p>",
+        "ListenerTimeout$grpc": null
+      }
+    },
+    "HeaderMatch": {
+      "base": null,
+      "refs": {
+        "GrpcRouteMetadataMatchMethod$exact": "<p>The value sent by the client must match the specified value exactly.</p>",
+        "GrpcRouteMetadataMatchMethod$prefix": "<p>The value sent by the client must begin with the specified characters.</p>",
+        "GrpcRouteMetadataMatchMethod$regex": "<p>The value sent by the client must include the specified characters.</p>",
+        "GrpcRouteMetadataMatchMethod$suffix": "<p>The value sent by the client must end with the specified characters.</p>",
+        "HeaderMatchMethod$exact": "<p>The value sent by the client must match the specified value exactly.</p>",
+        "HeaderMatchMethod$prefix": "<p>The value sent by the client must begin with the specified characters.</p>",
+        "HeaderMatchMethod$regex": "<p>The value sent by the client must include the specified characters.</p>",
+        "HeaderMatchMethod$suffix": "<p>The value sent by the client must end with the specified characters.</p>"
+      }
+    },
+    "HeaderMatchMethod": {
+      "base": "<p>An object that represents the method and value to match with the header value sent in a request. Specify one match method.</p>",
+      "refs": {
+        "HttpRouteHeader$match": "<p>The <code>HeaderMatchMethod</code> object.</p>"
+      }
+    },
+    "HeaderName": {
+      "base": null,
+      "refs": {
+        "GrpcRouteMetadata$name": "<p>The name of the route.</p>",
+        "HttpRouteHeader$name": "<p>A name for the HTTP header in the client request that will be matched on.</p>"
+      }
+    },
+    "HealthCheckIntervalMillis": {
+      "base": null,
+      "refs": {
+        "HealthCheckPolicy$intervalMillis": "<p>The time period in milliseconds between each health check execution.</p>"
+      }
+    },
+    "HealthCheckPolicy": {
+      "base": "<p>An object that represents the health check policy for a virtual node's listener.</p>",
+      "refs": {
+        "Listener$healthCheck": "<p>The health check information for the listener.</p>"
+      }
+    },
+    "HealthCheckThreshold": {
+      "base": null,
+      "refs": {
+        "HealthCheckPolicy$healthyThreshold": "<p>The number of consecutive successful health checks that must occur before declaring listener healthy.</p>",
+        "HealthCheckPolicy$unhealthyThreshold": "<p>The number of consecutive failed health checks that must occur before declaring a virtual node unhealthy. </p>"
+      }
+    },
+    "HealthCheckTimeoutMillis": {
+      "base": null,
+      "refs": {
+        "HealthCheckPolicy$timeoutMillis": "<p>The amount of time to wait when receiving a response from the health check, in milliseconds.</p>"
+      }
+    },
+    "Hostname": {
+      "base": null,
+      "refs": {
+        "DnsServiceDiscovery$hostname": "<p>Specifies the DNS service discovery hostname for the virtual node. </p>"
+      }
+    },
+    "HttpGatewayRoute": {
+      "base": "<p>An object that represents an HTTP gateway route.</p>",
+      "refs": {
+        "GatewayRouteSpec$http2Route": "<p>An object that represents the specification of an HTTP/2 gateway route.</p>",
+        "GatewayRouteSpec$httpRoute": "<p>An object that represents the specification of an HTTP gateway route.</p>"
+      }
+    },
+    "HttpGatewayRouteAction": {
+      "base": "<p>An object that represents the action to take if a match is determined.</p>",
+      "refs": {
+        "HttpGatewayRoute$action": "<p>An object that represents the action to take if a match is determined.</p>"
+      }
+    },
+    "HttpGatewayRouteMatch": {
+      "base": "<p>An object that represents the criteria for determining a request match.</p>",
+      "refs": {
+        "HttpGatewayRoute$match": "<p>An object that represents the criteria for determining a request match.</p>"
+      }
+    },
+    "HttpMethod": {
+      "base": null,
+      "refs": {
+        "HttpRouteMatch$method": "<p>The client request method to match on. Specify only one.</p>"
+      }
+    },
+    "HttpRetryPolicy": {
+      "base": "<p>An object that represents a retry policy. Specify at least one value for at least one of the types of <code>RetryEvents</code>, a value for <code>maxRetries</code>, and a value for <code>perRetryTimeout</code>.</p>",
+      "refs": {
+        "HttpRoute$retryPolicy": "<p>An object that represents a retry policy.</p>"
+      }
+    },
+    "HttpRetryPolicyEvent": {
+      "base": null,
+      "refs": {
+        "HttpRetryPolicyEvents$member": null
+      }
+    },
+    "HttpRetryPolicyEvents": {
+      "base": null,
+      "refs": {
+        "GrpcRetryPolicy$httpRetryEvents": "<p>Specify at least one of the following values.</p> <ul> <li> <p> <b>server-error</b> – HTTP status codes 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, and 511</p> </li> <li> <p> <b>gateway-error</b> – HTTP status codes 502, 503, and 504</p> </li> <li> <p> <b>client-error</b> – HTTP status code 409</p> </li> <li> <p> <b>stream-error</b> – Retry on refused stream</p> </li> </ul>",
+        "HttpRetryPolicy$httpRetryEvents": "<p>Specify at least one of the following values.</p> <ul> <li> <p> <b>server-error</b> – HTTP status codes 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, and 511</p> </li> <li> <p> <b>gateway-error</b> – HTTP status codes 502, 503, and 504</p> </li> <li> <p> <b>client-error</b> – HTTP status code 409</p> </li> <li> <p> <b>stream-error</b> – Retry on refused stream</p> </li> </ul>"
+      }
+    },
+    "HttpRoute": {
+      "base": "<p>An object that represents an HTTP or HTTP/2 route type.</p>",
+      "refs": {
+        "RouteSpec$http2Route": "<p>An object that represents the specification of an HTTP/2 route.</p>",
+        "RouteSpec$httpRoute": "<p>An object that represents the specification of an HTTP route.</p>"
+      }
+    },
+    "HttpRouteAction": {
+      "base": "<p>An object that represents the action to take if a match is determined.</p>",
+      "refs": {
+        "HttpRoute$action": "<p>An object that represents the action to take if a match is determined.</p>"
+      }
+    },
+    "HttpRouteHeader": {
+      "base": "<p>An object that represents the HTTP header in the request.</p>",
+      "refs": {
+        "HttpRouteHeaders$member": null
+      }
+    },
+    "HttpRouteHeaders": {
+      "base": null,
+      "refs": {
+        "HttpRouteMatch$headers": "<p>An object that represents the client request headers to match on.</p>"
+      }
+    },
+    "HttpRouteMatch": {
+      "base": "<p>An object that represents the requirements for a route to match HTTP requests for a virtual router.</p>",
+      "refs": {
+        "HttpRoute$match": "<p>An object that represents the criteria for determining a request match.</p>"
+      }
+    },
+    "HttpScheme": {
+      "base": null,
+      "refs": {
+        "HttpRouteMatch$scheme": "<p>The client request scheme to match on. Specify only one.</p>"
+      }
+    },
+    "HttpTimeout": {
+      "base": "<p>An object that represents types of timeouts. </p>",
+      "refs": {
+        "HttpRoute$timeout": "<p>An object that represents types of timeouts. </p>",
+        "ListenerTimeout$http": "<p>An object that represents types of timeouts. </p>",
+        "ListenerTimeout$http2": "<p>An object that represents types of timeouts. </p>"
+      }
+    },
+    "InternalServerErrorException": {
+      "base": "<p>The request processing has failed because of an unknown error, exception, or failure.</p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>You have exceeded a service limit for your account. For more information, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/service-quotas.html\">Service Limits</a> in the <i>AWS App Mesh User Guide</i>.</p>",
+      "refs": {
+      }
+    },
+    "ListGatewayRoutesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGatewayRoutesLimit": {
+      "base": null,
+      "refs": {
+        "ListGatewayRoutesInput$limit": "<p>The maximum number of results returned by <code>ListGatewayRoutes</code> in paginated output. When you use this parameter, <code>ListGatewayRoutes</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListGatewayRoutes</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListGatewayRoutes</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListGatewayRoutesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListMeshesInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListMeshesLimit": {
+      "base": null,
+      "refs": {
+        "ListMeshesInput$limit": "<p>The maximum number of results returned by <code>ListMeshes</code> in paginated output. When you use this parameter, <code>ListMeshes</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListMeshes</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListMeshes</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListMeshesOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListRoutesInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListRoutesLimit": {
+      "base": null,
+      "refs": {
+        "ListRoutesInput$limit": "<p>The maximum number of results returned by <code>ListRoutes</code> in paginated output. When you use this parameter, <code>ListRoutes</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListRoutes</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListRoutes</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListRoutesOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListTagsForResourceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListTagsForResourceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualGatewaysInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVirtualGatewaysLimit": {
+      "base": null,
+      "refs": {
+        "ListVirtualGatewaysInput$limit": "<p>The maximum number of results returned by <code>ListVirtualGateways</code> in paginated output. When you use this parameter, <code>ListVirtualGateways</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListVirtualGateways</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListVirtualGateways</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListVirtualGatewaysOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVirtualNodesInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualNodesLimit": {
+      "base": null,
+      "refs": {
+        "ListVirtualNodesInput$limit": "<p>The maximum number of results returned by <code>ListVirtualNodes</code> in paginated output. When you use this parameter, <code>ListVirtualNodes</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListVirtualNodes</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListVirtualNodes</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListVirtualNodesOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualRoutersInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualRoutersLimit": {
+      "base": null,
+      "refs": {
+        "ListVirtualRoutersInput$limit": "<p>The maximum number of results returned by <code>ListVirtualRouters</code> in paginated output. When you use this parameter, <code>ListVirtualRouters</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListVirtualRouters</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListVirtualRouters</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListVirtualRoutersOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualServicesInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "ListVirtualServicesLimit": {
+      "base": null,
+      "refs": {
+        "ListVirtualServicesInput$limit": "<p>The maximum number of results returned by <code>ListVirtualServices</code> in paginated output. When you use this parameter, <code>ListVirtualServices</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListVirtualServices</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListVirtualServices</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "ListVirtualServicesOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "Listener": {
+      "base": "<p>An object that represents a listener for a virtual node.</p>",
+      "refs": {
+        "Listeners$member": null
+      }
+    },
+    "ListenerTimeout": {
+      "base": "<p>An object that represents timeouts for different protocols.</p>",
+      "refs": {
+        "Listener$timeout": "<p>An object that represents timeouts for different protocols.</p>"
+      }
+    },
+    "ListenerTls": {
+      "base": "<p>An object that represents the Transport Layer Security (TLS) properties for a listener.</p>",
+      "refs": {
+        "Listener$tls": "<p>A reference to an object that represents the Transport Layer Security (TLS) properties for a listener.</p>"
+      }
+    },
+    "ListenerTlsAcmCertificate": {
+      "base": "<p>An object that represents an AWS Certicate Manager (ACM) certificate.</p>",
+      "refs": {
+        "ListenerTlsCertificate$acm": "<p>A reference to an object that represents an AWS Certicate Manager (ACM) certificate.</p>"
+      }
+    },
+    "ListenerTlsCertificate": {
+      "base": "<p>An object that represents a listener's Transport Layer Security (TLS) certificate.</p>",
+      "refs": {
+        "ListenerTls$certificate": "<p>A reference to an object that represents a listener's TLS certificate.</p>"
+      }
+    },
+    "ListenerTlsFileCertificate": {
+      "base": "<p>An object that represents a local file certificate. The certificate must meet specific requirements and you must have proxy authorization enabled. For more information, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/tls.html#virtual-node-tls-prerequisites\">Transport Layer Security (TLS)</a>.</p>",
+      "refs": {
+        "ListenerTlsCertificate$file": "<p>A reference to an object that represents a local file certificate.</p>"
+      }
+    },
+    "ListenerTlsMode": {
+      "base": null,
+      "refs": {
+        "ListenerTls$mode": "<p>Specify one of the following modes.</p> <ul> <li> <p> <b/>STRICT – Listener only accepts connections with TLS enabled. </p> </li> <li> <p> <b/>PERMISSIVE – Listener accepts connections with or without TLS enabled.</p> </li> <li> <p> <b/>DISABLED – Listener only accepts connections without TLS. </p> </li> </ul>"
+      }
+    },
+    "Listeners": {
+      "base": null,
+      "refs": {
+        "VirtualNodeSpec$listeners": "<p>The listener that the virtual node is expected to receive inbound traffic from. You can specify one listener.</p>"
+      }
+    },
+    "Logging": {
+      "base": "<p>An object that represents the logging information for a virtual node.</p>",
+      "refs": {
+        "VirtualNodeSpec$logging": "<p>The inbound and outbound access logging information for the virtual node.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "GatewayRouteRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "MatchRange$end": "<p>The end of the range.</p>",
+        "MatchRange$start": "<p>The start of the range.</p>",
+        "MeshRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "ResourceMetadata$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "RouteRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "VirtualGatewayRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "VirtualNodeRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "VirtualRouterRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>",
+        "VirtualServiceRef$version": "<p>The version of the resource. Resources are created at version 1, and this version is incremented each time that they're updated.</p>"
+      }
+    },
+    "MatchRange": {
+      "base": "<p>An object that represents the range of values to match on. The first character of the range is included in the range, though the last character is not. For example, if the range specified were 1-100, only values 1-99 would be matched.</p>",
+      "refs": {
+        "GrpcRouteMetadataMatchMethod$range": "<p>An object that represents the range of values to match on.</p>",
+        "HeaderMatchMethod$range": "<p>An object that represents the range of values to match on.</p>"
+      }
+    },
+    "MaxConnections": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHttpConnectionPool$maxConnections": "<p>Maximum number of outbound TCP connections Envoy can establish concurrently with all hosts in upstream cluster.</p>",
+        "VirtualNodeHttpConnectionPool$maxConnections": "<p>Maximum number of outbound TCP connections Envoy can establish concurrently with all hosts in upstream cluster.</p>",
+        "VirtualNodeTcpConnectionPool$maxConnections": "<p>Maximum number of outbound TCP connections Envoy can establish concurrently with all hosts in upstream cluster.</p>"
+      }
+    },
+    "MaxPendingRequests": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHttpConnectionPool$maxPendingRequests": "<p>Number of overflowing requests after <code>max_connections</code> Envoy will queue to upstream cluster.</p>",
+        "VirtualNodeHttpConnectionPool$maxPendingRequests": "<p>Number of overflowing requests after <code>max_connections</code> Envoy will queue to upstream cluster.</p>"
+      }
+    },
+    "MaxRequests": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayGrpcConnectionPool$maxRequests": "<p>Maximum number of inflight requests Envoy can concurrently support across hosts in upstream cluster.</p>",
+        "VirtualGatewayHttp2ConnectionPool$maxRequests": "<p>Maximum number of inflight requests Envoy can concurrently support across hosts in upstream cluster.</p>",
+        "VirtualNodeGrpcConnectionPool$maxRequests": "<p>Maximum number of inflight requests Envoy can concurrently support across hosts in upstream cluster.</p>",
+        "VirtualNodeHttp2ConnectionPool$maxRequests": "<p>Maximum number of inflight requests Envoy can concurrently support across hosts in upstream cluster.</p>"
+      }
+    },
+    "MaxRetries": {
+      "base": null,
+      "refs": {
+        "GrpcRetryPolicy$maxRetries": "<p>The maximum number of retry attempts.</p>",
+        "HttpRetryPolicy$maxRetries": "<p>The maximum number of retry attempts.</p>"
+      }
+    },
+    "MeshData": {
+      "base": "<p>An object that represents a service mesh returned by a describe operation.</p>",
+      "refs": {
+        "CreateMeshOutput$mesh": "<p>The full description of your service mesh following the create call.</p>",
+        "DeleteMeshOutput$mesh": "<p>The service mesh that was deleted.</p>",
+        "DescribeMeshOutput$mesh": "<p>The full description of your service mesh.</p>",
+        "UpdateMeshOutput$mesh": null
+      }
+    },
+    "MeshList": {
+      "base": null,
+      "refs": {
+        "ListMeshesOutput$meshes": "<p>The list of existing service meshes.</p>"
+      }
+    },
+    "MeshRef": {
+      "base": "<p>An object that represents a service mesh returned by a list operation.</p>",
+      "refs": {
+        "MeshList$member": null
+      }
+    },
+    "MeshSpec": {
+      "base": "<p>An object that represents the specification of a service mesh.</p>",
+      "refs": {
+        "CreateMeshInput$spec": "<p>The service mesh specification to apply.</p>",
+        "MeshData$spec": "<p>The associated specification for the service mesh.</p>",
+        "UpdateMeshInput$spec": "<p>The service mesh specification to apply.</p>"
+      }
+    },
+    "MeshStatus": {
+      "base": "<p>An object that represents the status of a service mesh.</p>",
+      "refs": {
+        "MeshData$status": "<p>The status of the service mesh.</p>"
+      }
+    },
+    "MeshStatusCode": {
+      "base": null,
+      "refs": {
+        "MeshStatus$status": "<p>The current mesh status.</p>"
+      }
+    },
+    "MethodName": {
+      "base": null,
+      "refs": {
+        "GrpcRouteMatch$methodName": "<p>The method name to match from the request. If you specify a name, you must also specify a <code>serviceName</code>.</p>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The specified resource doesn't exist. Check your request syntax and try again.</p>",
+      "refs": {
+      }
+    },
+    "OutlierDetection": {
+      "base": "<p>An object that represents the outlier detection for a virtual node's listener.</p>",
+      "refs": {
+        "Listener$outlierDetection": "<p>The outlier detection information for the listener.</p>"
+      }
+    },
+    "OutlierDetectionMaxEjectionPercent": {
+      "base": null,
+      "refs": {
+        "OutlierDetection$maxEjectionPercent": "<p>Maximum percentage of hosts in load balancing pool for upstream service that can be ejected. Will eject at least one host regardless of the value.</p>"
+      }
+    },
+    "OutlierDetectionMaxServerErrors": {
+      "base": null,
+      "refs": {
+        "OutlierDetection$maxServerErrors": "<p>Number of consecutive <code>5xx</code> errors required for ejection. </p>"
+      }
+    },
+    "PercentInt": {
+      "base": null,
+      "refs": {
+        "WeightedTarget$weight": "<p>The relative weight of the weighted target.</p>"
+      }
+    },
+    "PortMapping": {
+      "base": "<p>An object that represents a port mapping.</p>",
+      "refs": {
+        "Listener$portMapping": "<p>The port mapping information for the listener.</p>",
+        "VirtualRouterListener$portMapping": null
+      }
+    },
+    "PortNumber": {
+      "base": null,
+      "refs": {
+        "HealthCheckPolicy$port": "<p>The destination port for the health check request. This port must match the port defined in the <a>PortMapping</a> for the listener.</p>",
+        "PortMapping$port": "<p>The port used for the port mapping.</p>",
+        "PortSet$member": null,
+        "VirtualGatewayHealthCheckPolicy$port": "<p>The destination port for the health check request. This port must match the port defined in the <a>PortMapping</a> for the listener.</p>",
+        "VirtualGatewayPortMapping$port": "<p>The port used for the port mapping. Specify one protocol.</p>"
+      }
+    },
+    "PortProtocol": {
+      "base": null,
+      "refs": {
+        "HealthCheckPolicy$protocol": "<p>The protocol for the health check request. If you specify <code>grpc</code>, then your service must conform to the <a href=\"https://github.com/grpc/grpc/blob/master/doc/health-checking.md\">GRPC Health Checking Protocol</a>.</p>",
+        "PortMapping$protocol": "<p>The protocol used for the port mapping. Specify one protocol.</p>"
+      }
+    },
+    "PortSet": {
+      "base": null,
+      "refs": {
+        "ClientPolicyTls$ports": "<p>One or more ports that the policy is enforced for.</p>",
+        "VirtualGatewayClientPolicyTls$ports": "<p>One or more ports that the policy is enforced for.</p>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>You can't delete the specified resource because it's in use or required by another resource.</p>",
+      "refs": {
+      }
+    },
+    "ResourceMetadata": {
+      "base": "<p>An object that represents metadata for a resource.</p>",
+      "refs": {
+        "GatewayRouteData$metadata": null,
+        "MeshData$metadata": "<p>The associated metadata for the service mesh.</p>",
+        "RouteData$metadata": "<p>The associated metadata for the route.</p>",
+        "VirtualGatewayData$metadata": null,
+        "VirtualNodeData$metadata": "<p>The associated metadata for the virtual node.</p>",
+        "VirtualRouterData$metadata": "<p>The associated metadata for the virtual router.</p>",
+        "VirtualServiceData$metadata": null
+      }
+    },
+    "ResourceName": {
+      "base": null,
+      "refs": {
+        "CreateGatewayRouteInput$gatewayRouteName": "<p>The name to use for the gateway route.</p>",
+        "CreateGatewayRouteInput$meshName": "<p>The name of the service mesh to create the gateway route in.</p>",
+        "CreateGatewayRouteInput$virtualGatewayName": "<p>The name of the virtual gateway to associate the gateway route with. If the virtual gateway is in a shared mesh, then you must be the owner of the virtual gateway resource.</p>",
+        "CreateMeshInput$meshName": "<p>The name to use for the service mesh.</p>",
+        "CreateRouteInput$meshName": "<p>The name of the service mesh to create the route in.</p>",
+        "CreateRouteInput$routeName": "<p>The name to use for the route.</p>",
+        "CreateRouteInput$virtualRouterName": "<p>The name of the virtual router in which to create the route. If the virtual router is in a shared mesh, then you must be the owner of the virtual router resource.</p>",
+        "CreateVirtualGatewayInput$meshName": "<p>The name of the service mesh to create the virtual gateway in.</p>",
+        "CreateVirtualGatewayInput$virtualGatewayName": "<p>The name to use for the virtual gateway.</p>",
+        "CreateVirtualNodeInput$meshName": "<p>The name of the service mesh to create the virtual node in.</p>",
+        "CreateVirtualNodeInput$virtualNodeName": "<p>The name to use for the virtual node.</p>",
+        "CreateVirtualRouterInput$meshName": "<p>The name of the service mesh to create the virtual router in.</p>",
+        "CreateVirtualRouterInput$virtualRouterName": "<p>The name to use for the virtual router.</p>",
+        "CreateVirtualServiceInput$meshName": "<p>The name of the service mesh to create the virtual service in.</p>",
+        "DeleteGatewayRouteInput$gatewayRouteName": "<p>The name of the gateway route to delete.</p>",
+        "DeleteGatewayRouteInput$meshName": "<p>The name of the service mesh to delete the gateway route from.</p>",
+        "DeleteGatewayRouteInput$virtualGatewayName": "<p>The name of the virtual gateway to delete the route from.</p>",
+        "DeleteMeshInput$meshName": "<p>The name of the service mesh to delete.</p>",
+        "DeleteRouteInput$meshName": "<p>The name of the service mesh to delete the route in.</p>",
+        "DeleteRouteInput$routeName": "<p>The name of the route to delete.</p>",
+        "DeleteRouteInput$virtualRouterName": "<p>The name of the virtual router to delete the route in.</p>",
+        "DeleteVirtualGatewayInput$meshName": "<p>The name of the service mesh to delete the virtual gateway from.</p>",
+        "DeleteVirtualGatewayInput$virtualGatewayName": "<p>The name of the virtual gateway to delete.</p>",
+        "DeleteVirtualNodeInput$meshName": "<p>The name of the service mesh to delete the virtual node in.</p>",
+        "DeleteVirtualNodeInput$virtualNodeName": "<p>The name of the virtual node to delete.</p>",
+        "DeleteVirtualRouterInput$meshName": "<p>The name of the service mesh to delete the virtual router in.</p>",
+        "DeleteVirtualRouterInput$virtualRouterName": "<p>The name of the virtual router to delete.</p>",
+        "DeleteVirtualServiceInput$meshName": "<p>The name of the service mesh to delete the virtual service in.</p>",
+        "DescribeGatewayRouteInput$gatewayRouteName": "<p>The name of the gateway route to describe.</p>",
+        "DescribeGatewayRouteInput$meshName": "<p>The name of the service mesh that the gateway route resides in.</p>",
+        "DescribeGatewayRouteInput$virtualGatewayName": "<p>The name of the virtual gateway that the gateway route is associated with.</p>",
+        "DescribeMeshInput$meshName": "<p>The name of the service mesh to describe.</p>",
+        "DescribeRouteInput$meshName": "<p>The name of the service mesh that the route resides in.</p>",
+        "DescribeRouteInput$routeName": "<p>The name of the route to describe.</p>",
+        "DescribeRouteInput$virtualRouterName": "<p>The name of the virtual router that the route is associated with.</p>",
+        "DescribeVirtualGatewayInput$meshName": "<p>The name of the service mesh that the gateway route resides in.</p>",
+        "DescribeVirtualGatewayInput$virtualGatewayName": "<p>The name of the virtual gateway to describe.</p>",
+        "DescribeVirtualNodeInput$meshName": "<p>The name of the service mesh that the virtual node resides in.</p>",
+        "DescribeVirtualNodeInput$virtualNodeName": "<p>The name of the virtual node to describe.</p>",
+        "DescribeVirtualRouterInput$meshName": "<p>The name of the service mesh that the virtual router resides in.</p>",
+        "DescribeVirtualRouterInput$virtualRouterName": "<p>The name of the virtual router to describe.</p>",
+        "DescribeVirtualServiceInput$meshName": "<p>The name of the service mesh that the virtual service resides in.</p>",
+        "GatewayRouteData$gatewayRouteName": "<p>The name of the gateway route.</p>",
+        "GatewayRouteData$meshName": "<p>The name of the service mesh that the resource resides in. </p>",
+        "GatewayRouteData$virtualGatewayName": "<p>The virtual gateway that the gateway route is associated with.</p>",
+        "GatewayRouteRef$gatewayRouteName": "<p>The name of the gateway route.</p>",
+        "GatewayRouteRef$meshName": "<p>The name of the service mesh that the resource resides in. </p>",
+        "GatewayRouteRef$virtualGatewayName": "<p>The virtual gateway that the gateway route is associated with.</p>",
+        "GatewayRouteVirtualService$virtualServiceName": "<p>The name of the virtual service that traffic is routed to.</p>",
+        "ListGatewayRoutesInput$meshName": "<p>The name of the service mesh to list gateway routes in.</p>",
+        "ListGatewayRoutesInput$virtualGatewayName": "<p>The name of the virtual gateway to list gateway routes in.</p>",
+        "ListRoutesInput$meshName": "<p>The name of the service mesh to list routes in.</p>",
+        "ListRoutesInput$virtualRouterName": "<p>The name of the virtual router to list routes in.</p>",
+        "ListVirtualGatewaysInput$meshName": "<p>The name of the service mesh to list virtual gateways in.</p>",
+        "ListVirtualNodesInput$meshName": "<p>The name of the service mesh to list virtual nodes in.</p>",
+        "ListVirtualRoutersInput$meshName": "<p>The name of the service mesh to list virtual routers in.</p>",
+        "ListVirtualServicesInput$meshName": "<p>The name of the service mesh to list virtual services in.</p>",
+        "MeshData$meshName": "<p>The name of the service mesh.</p>",
+        "MeshRef$meshName": "<p>The name of the service mesh.</p>",
+        "RouteData$meshName": "<p>The name of the service mesh that the route resides in.</p>",
+        "RouteData$routeName": "<p>The name of the route.</p>",
+        "RouteData$virtualRouterName": "<p>The virtual router that the route is associated with.</p>",
+        "RouteRef$meshName": "<p>The name of the service mesh that the route resides in.</p>",
+        "RouteRef$routeName": "<p>The name of the route.</p>",
+        "RouteRef$virtualRouterName": "<p>The virtual router that the route is associated with.</p>",
+        "UpdateGatewayRouteInput$gatewayRouteName": "<p>The name of the gateway route to update.</p>",
+        "UpdateGatewayRouteInput$meshName": "<p>The name of the service mesh that the gateway route resides in.</p>",
+        "UpdateGatewayRouteInput$virtualGatewayName": "<p>The name of the virtual gateway that the gateway route is associated with.</p>",
+        "UpdateMeshInput$meshName": "<p>The name of the service mesh to update.</p>",
+        "UpdateRouteInput$meshName": "<p>The name of the service mesh that the route resides in.</p>",
+        "UpdateRouteInput$routeName": "<p>The name of the route to update.</p>",
+        "UpdateRouteInput$virtualRouterName": "<p>The name of the virtual router that the route is associated with.</p>",
+        "UpdateVirtualGatewayInput$meshName": "<p>The name of the service mesh that the virtual gateway resides in.</p>",
+        "UpdateVirtualGatewayInput$virtualGatewayName": "<p>The name of the virtual gateway to update.</p>",
+        "UpdateVirtualNodeInput$meshName": "<p>The name of the service mesh that the virtual node resides in.</p>",
+        "UpdateVirtualNodeInput$virtualNodeName": "<p>The name of the virtual node to update.</p>",
+        "UpdateVirtualRouterInput$meshName": "<p>The name of the service mesh that the virtual router resides in.</p>",
+        "UpdateVirtualRouterInput$virtualRouterName": "<p>The name of the virtual router to update.</p>",
+        "UpdateVirtualServiceInput$meshName": "<p>The name of the service mesh that the virtual service resides in.</p>",
+        "VirtualGatewayData$meshName": "<p>The name of the service mesh that the virtual gateway resides in.</p>",
+        "VirtualGatewayData$virtualGatewayName": "<p>The name of the virtual gateway.</p>",
+        "VirtualGatewayRef$meshName": "<p>The name of the service mesh that the resource resides in.</p>",
+        "VirtualGatewayRef$virtualGatewayName": "<p>The name of the resource.</p>",
+        "VirtualNodeData$meshName": "<p>The name of the service mesh that the virtual node resides in.</p>",
+        "VirtualNodeData$virtualNodeName": "<p>The name of the virtual node.</p>",
+        "VirtualNodeRef$meshName": "<p>The name of the service mesh that the virtual node resides in.</p>",
+        "VirtualNodeRef$virtualNodeName": "<p>The name of the virtual node.</p>",
+        "VirtualNodeServiceProvider$virtualNodeName": "<p>The name of the virtual node that is acting as a service provider.</p>",
+        "VirtualRouterData$meshName": "<p>The name of the service mesh that the virtual router resides in.</p>",
+        "VirtualRouterData$virtualRouterName": "<p>The name of the virtual router.</p>",
+        "VirtualRouterRef$meshName": "<p>The name of the service mesh that the virtual router resides in.</p>",
+        "VirtualRouterRef$virtualRouterName": "<p>The name of the virtual router.</p>",
+        "VirtualRouterServiceProvider$virtualRouterName": "<p>The name of the virtual router that is acting as a service provider.</p>",
+        "VirtualServiceData$meshName": "<p>The name of the service mesh that the virtual service resides in.</p>",
+        "VirtualServiceRef$meshName": "<p>The name of the service mesh that the virtual service resides in.</p>",
+        "WeightedTarget$virtualNode": "<p>The virtual node to associate with the weighted target.</p>"
+      }
+    },
+    "RouteData": {
+      "base": "<p>An object that represents a route returned by a describe operation.</p>",
+      "refs": {
+        "CreateRouteOutput$route": "<p>The full description of your mesh following the create call.</p>",
+        "DeleteRouteOutput$route": "<p>The route that was deleted.</p>",
+        "DescribeRouteOutput$route": "<p>The full description of your route.</p>",
+        "UpdateRouteOutput$route": "<p>A full description of the route that was updated.</p>"
+      }
+    },
+    "RouteList": {
+      "base": null,
+      "refs": {
+        "ListRoutesOutput$routes": "<p>The list of existing routes for the specified service mesh and virtual router.</p>"
+      }
+    },
+    "RoutePriority": {
+      "base": null,
+      "refs": {
+        "RouteSpec$priority": "<p>The priority for the route. Routes are matched based on the specified value, where 0 is the highest priority.</p>"
+      }
+    },
+    "RouteRef": {
+      "base": "<p>An object that represents a route returned by a list operation.</p>",
+      "refs": {
+        "RouteList$member": null
+      }
+    },
+    "RouteSpec": {
+      "base": "<p>An object that represents a route specification. Specify one route type.</p>",
+      "refs": {
+        "CreateRouteInput$spec": "<p>The route specification to apply.</p>",
+        "RouteData$spec": "<p>The specifications of the route.</p>",
+        "UpdateRouteInput$spec": "<p>The new route specification to apply. This overwrites the existing data.</p>"
+      }
+    },
+    "RouteStatus": {
+      "base": "<p>An object that represents the current status of a route.</p>",
+      "refs": {
+        "RouteData$status": "<p>The status of the route.</p>"
+      }
+    },
+    "RouteStatusCode": {
+      "base": null,
+      "refs": {
+        "RouteStatus$status": "<p>The current status for the route.</p>"
+      }
+    },
+    "ServiceDiscovery": {
+      "base": "<p>An object that represents the service discovery information for a virtual node.</p>",
+      "refs": {
+        "VirtualNodeSpec$serviceDiscovery": "<p>The service discovery information for the virtual node. If your virtual node does not expect ingress traffic, you can omit this parameter. If you specify a <code>listener</code>, then you must specify service discovery information.</p>"
+      }
+    },
+    "ServiceName": {
+      "base": null,
+      "refs": {
+        "CreateVirtualServiceInput$virtualServiceName": "<p>The name to use for the virtual service.</p>",
+        "DeleteVirtualServiceInput$virtualServiceName": "<p>The name of the virtual service to delete.</p>",
+        "DescribeVirtualServiceInput$virtualServiceName": "<p>The name of the virtual service to describe.</p>",
+        "GrpcGatewayRouteMatch$serviceName": "<p>The fully qualified domain name for the service to match from the request.</p>",
+        "GrpcRouteMatch$serviceName": "<p>The fully qualified domain name for the service to match from the request.</p>",
+        "UpdateVirtualServiceInput$virtualServiceName": "<p>The name of the virtual service to update.</p>",
+        "VirtualServiceBackend$virtualServiceName": "<p>The name of the virtual service that is acting as a virtual node backend.</p>",
+        "VirtualServiceData$virtualServiceName": "<p>The name of the virtual service.</p>",
+        "VirtualServiceRef$virtualServiceName": "<p>The name of the virtual service.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The request has failed due to a temporary failure of the service.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "BadRequestException$message": null,
+        "ConflictException$message": null,
+        "CreateGatewayRouteInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateMeshInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateRouteInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateVirtualGatewayInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateVirtualNodeInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateVirtualRouterInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "CreateVirtualServiceInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "ForbiddenException$message": null,
+        "HealthCheckPolicy$path": "<p>The destination path for the health check request. This value is only used if the specified protocol is HTTP or HTTP/2. For any other protocol, this value is ignored.</p>",
+        "HttpGatewayRouteMatch$prefix": "<p>Specifies the path to match requests with. This parameter must always start with <code>/</code>, which by itself matches all requests to the virtual service name. You can also match for path-based routing of requests. For example, if your virtual service name is <code>my-service.local</code> and you want the route to match requests to <code>my-service.local/metrics</code>, your prefix should be <code>/metrics</code>.</p>",
+        "HttpRouteMatch$prefix": "<p>Specifies the path to match requests with. This parameter must always start with <code>/</code>, which by itself matches all requests to the virtual service name. You can also match for path-based routing of requests. For example, if your virtual service name is <code>my-service.local</code> and you want the route to match requests to <code>my-service.local/metrics</code>, your prefix should be <code>/metrics</code>.</p>",
+        "InternalServerErrorException$message": null,
+        "LimitExceededException$message": null,
+        "ListGatewayRoutesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListGatewayRoutes</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListGatewayRoutesOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListGatewayRoutes</code> request. When the results of a <code>ListGatewayRoutes</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListMeshesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListMeshes</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p> <note> <p>This token should be treated as an opaque identifier that is used only to retrieve the next items in a list and not for other programmatic purposes.</p> </note>",
+        "ListMeshesOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListMeshes</code> request. When the results of a <code>ListMeshes</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListRoutesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListRoutes</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListRoutesOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListRoutes</code> request. When the results of a <code>ListRoutes</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTagsForResourceInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListTagsForResource</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListTagsForResourceOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListTagsForResource</code> request. When the results of a <code>ListTagsForResource</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListVirtualGatewaysInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListVirtualGateways</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListVirtualGatewaysOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListVirtualGateways</code> request. When the results of a <code>ListVirtualGateways</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListVirtualNodesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListVirtualNodes</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListVirtualNodesOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListVirtualNodes</code> request. When the results of a <code>ListVirtualNodes</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListVirtualRoutersInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListVirtualRouters</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListVirtualRoutersOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListVirtualRouters</code> request. When the results of a <code>ListVirtualRouters</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListVirtualServicesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListVirtualServices</code> request where <code>limit</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value.</p>",
+        "ListVirtualServicesOutput$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListVirtualServices</code> request. When the results of a <code>ListVirtualServices</code> request exceed <code>limit</code>, you can use this value to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "NotFoundException$message": null,
+        "ResourceInUseException$message": null,
+        "ResourceMetadata$uid": "<p>The unique identifier for the resource.</p>",
+        "ServiceUnavailableException$message": null,
+        "TooManyRequestsException$message": null,
+        "TooManyTagsException$message": null,
+        "UpdateGatewayRouteInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateMeshInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateRouteInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateVirtualGatewayInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateVirtualNodeInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateVirtualRouterInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "UpdateVirtualServiceInput$clientToken": "<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request. Up to 36 letters, numbers, hyphens, and underscores are allowed.</p>",
+        "VirtualGatewayHealthCheckPolicy$path": "<p>The destination path for the health check request. This value is only used if the specified protocol is HTTP or HTTP/2. For any other protocol, this value is ignored.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagRef$key": "<p>One part of a key-value pair that make up a tag. A <code>key</code> is a general label that acts like a category for more specific tag values.</p>"
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceInput$tagKeys": "<p>The keys of the tags to be removed.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateGatewayRouteInput$tags": "<p>Optional metadata that you can apply to the gateway route to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateMeshInput$tags": "<p>Optional metadata that you can apply to the service mesh to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateRouteInput$tags": "<p>Optional metadata that you can apply to the route to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateVirtualGatewayInput$tags": "<p>Optional metadata that you can apply to the virtual gateway to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateVirtualNodeInput$tags": "<p>Optional metadata that you can apply to the virtual node to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateVirtualRouterInput$tags": "<p>Optional metadata that you can apply to the virtual router to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "CreateVirtualServiceInput$tags": "<p>Optional metadata that you can apply to the virtual service to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+        "ListTagsForResourceOutput$tags": "<p>The tags for the resource.</p>",
+        "TagResourceInput$tags": "<p>The tags to add to the resource. A tag is an array of key-value pairs. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>"
+      }
+    },
+    "TagRef": {
+      "base": "<p>Optional metadata that you apply to a resource to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define. Tag keys can have a maximum character length of 128 characters, and tag values can have a maximum length of 256 characters.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagResourceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "TagResourceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagRef$value": "<p>The optional part of a key-value pair that make up a tag. A <code>value</code> acts as a descriptor within a tag category (key).</p>"
+      }
+    },
+    "TagsLimit": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceInput$limit": "<p>The maximum number of tag results returned by <code>ListTagsForResource</code> in paginated output. When this parameter is used, <code>ListTagsForResource</code> returns only <code>limit</code> results in a single page along with a <code>nextToken</code> response element. You can see the remaining results of the initial request by sending another <code>ListTagsForResource</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If you don't use this parameter, <code>ListTagsForResource</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>"
+      }
+    },
+    "TcpRetryPolicyEvent": {
+      "base": null,
+      "refs": {
+        "TcpRetryPolicyEvents$member": null
+      }
+    },
+    "TcpRetryPolicyEvents": {
+      "base": null,
+      "refs": {
+        "GrpcRetryPolicy$tcpRetryEvents": "<p>Specify a valid value. The event occurs before any processing of a request has started and is encountered when the upstream is temporarily or permanently unavailable.</p>",
+        "HttpRetryPolicy$tcpRetryEvents": "<p>Specify a valid value. The event occurs before any processing of a request has started and is encountered when the upstream is temporarily or permanently unavailable.</p>"
+      }
+    },
+    "TcpRoute": {
+      "base": "<p>An object that represents a TCP route type.</p>",
+      "refs": {
+        "RouteSpec$tcpRoute": "<p>An object that represents the specification of a TCP route.</p>"
+      }
+    },
+    "TcpRouteAction": {
+      "base": "<p>An object that represents the action to take if a match is determined.</p>",
+      "refs": {
+        "TcpRoute$action": "<p>The action to take if a match is determined.</p>"
+      }
+    },
+    "TcpTimeout": {
+      "base": "<p>An object that represents types of timeouts. </p>",
+      "refs": {
+        "ListenerTimeout$tcp": "<p>An object that represents types of timeouts. </p>",
+        "TcpRoute$timeout": "<p>An object that represents types of timeouts. </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "GatewayRouteRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "GatewayRouteRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "MeshRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "MeshRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "ResourceMetadata$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "ResourceMetadata$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "RouteRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "RouteRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "VirtualGatewayRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "VirtualGatewayRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "VirtualNodeRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "VirtualNodeRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "VirtualRouterRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "VirtualRouterRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>",
+        "VirtualServiceRef$createdAt": "<p>The Unix epoch timestamp in seconds for when the resource was created.</p>",
+        "VirtualServiceRef$lastUpdatedAt": "<p>The Unix epoch timestamp in seconds for when the resource was last updated.</p>"
+      }
+    },
+    "TlsValidationContext": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context.</p>",
+      "refs": {
+        "ClientPolicyTls$validation": "<p>A reference to an object that represents a TLS validation context.</p>"
+      }
+    },
+    "TlsValidationContextAcmTrust": {
+      "base": "<p>An object that represents a TLS validation context trust for an AWS Certicate Manager (ACM) certificate.</p>",
+      "refs": {
+        "TlsValidationContextTrust$acm": "<p>A reference to an object that represents a TLS validation context trust for an AWS Certicate Manager (ACM) certificate.</p>"
+      }
+    },
+    "TlsValidationContextFileTrust": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context trust for a local file.</p>",
+      "refs": {
+        "TlsValidationContextTrust$file": "<p>An object that represents a TLS validation context trust for a local file.</p>"
+      }
+    },
+    "TlsValidationContextTrust": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context trust.</p>",
+      "refs": {
+        "TlsValidationContext$trust": "<p>A reference to an object that represents a TLS validation context trust.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p>The maximum request rate permitted by the App Mesh APIs has been exceeded for your account. For best results, use an increasing or variable sleep interval between requests.</p>",
+      "refs": {
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>The request exceeds the maximum allowed number of tags allowed per resource. The current limit is 50 user tags per resource. You must reduce the number of tags in the request. None of the tags in this request were applied.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UntagResourceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateGatewayRouteInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGatewayRouteOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateMeshInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateMeshOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateRouteInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateRouteOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualGatewayInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVirtualGatewayOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVirtualNodeInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualNodeOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualRouterInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualRouterOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualServiceInput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "UpdateVirtualServiceOutput": {
+      "base": "<zonbook></zonbook><xhtml></xhtml>",
+      "refs": {
+      }
+    },
+    "VirtualGatewayAccessLog": {
+      "base": "<p>The access log configuration for a virtual gateway.</p>",
+      "refs": {
+        "VirtualGatewayLogging$accessLog": "<p>The access log configuration.</p>"
+      }
+    },
+    "VirtualGatewayBackendDefaults": {
+      "base": "<p>An object that represents the default properties for a backend.</p>",
+      "refs": {
+        "VirtualGatewaySpec$backendDefaults": "<p>A reference to an object that represents the defaults for backends.</p>"
+      }
+    },
+    "VirtualGatewayCertificateAuthorityArns": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayTlsValidationContextAcmTrust$certificateAuthorityArns": "<p>One or more ACM Amazon Resource Name (ARN)s.</p>"
+      }
+    },
+    "VirtualGatewayClientPolicy": {
+      "base": "<p>An object that represents a client policy.</p>",
+      "refs": {
+        "VirtualGatewayBackendDefaults$clientPolicy": "<p>A reference to an object that represents a client policy.</p>"
+      }
+    },
+    "VirtualGatewayClientPolicyTls": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) client policy.</p>",
+      "refs": {
+        "VirtualGatewayClientPolicy$tls": "<p>A reference to an object that represents a Transport Layer Security (TLS) client policy.</p>"
+      }
+    },
+    "VirtualGatewayConnectionPool": {
+      "base": "<p>An object that represents the type of virtual gateway connection pool.</p> <p>Only one protocol is used at a time and should be the same protocol as the one chosen under port mapping.</p> <p>If not present the default value for <code>maxPendingRequests</code> is <code>2147483647</code>.</p>",
+      "refs": {
+        "VirtualGatewayListener$connectionPool": "<p>The connection pool information for the virtual gateway listener.</p>"
+      }
+    },
+    "VirtualGatewayData": {
+      "base": "<p>An object that represents a virtual gateway returned by a describe operation.</p>",
+      "refs": {
+        "CreateVirtualGatewayOutput$virtualGateway": "<p>The full description of your virtual gateway following the create call.</p>",
+        "DeleteVirtualGatewayOutput$virtualGateway": "<p>The virtual gateway that was deleted.</p>",
+        "DescribeVirtualGatewayOutput$virtualGateway": "<p>The full description of your virtual gateway.</p>",
+        "UpdateVirtualGatewayOutput$virtualGateway": "<p>A full description of the virtual gateway that was updated.</p>"
+      }
+    },
+    "VirtualGatewayFileAccessLog": {
+      "base": "<p>An object that represents an access log file.</p>",
+      "refs": {
+        "VirtualGatewayAccessLog$file": "<p>The file object to send virtual gateway access logs to.</p>"
+      }
+    },
+    "VirtualGatewayGrpcConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualGatewayConnectionPool$grpc": "<p>An object that represents a type of connection pool. </p>"
+      }
+    },
+    "VirtualGatewayHealthCheckIntervalMillis": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHealthCheckPolicy$intervalMillis": "<p>The time period in milliseconds between each health check execution.</p>"
+      }
+    },
+    "VirtualGatewayHealthCheckPolicy": {
+      "base": "<p>An object that represents the health check policy for a virtual gateway's listener.</p>",
+      "refs": {
+        "VirtualGatewayListener$healthCheck": "<p>The health check information for the listener.</p>"
+      }
+    },
+    "VirtualGatewayHealthCheckThreshold": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHealthCheckPolicy$healthyThreshold": "<p>The number of consecutive successful health checks that must occur before declaring the listener healthy.</p>",
+        "VirtualGatewayHealthCheckPolicy$unhealthyThreshold": "<p>The number of consecutive failed health checks that must occur before declaring a virtual gateway unhealthy.</p>"
+      }
+    },
+    "VirtualGatewayHealthCheckTimeoutMillis": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHealthCheckPolicy$timeoutMillis": "<p>The amount of time to wait when receiving a response from the health check, in milliseconds.</p>"
+      }
+    },
+    "VirtualGatewayHttp2ConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualGatewayConnectionPool$http2": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualGatewayHttpConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualGatewayConnectionPool$http": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualGatewayList": {
+      "base": null,
+      "refs": {
+        "ListVirtualGatewaysOutput$virtualGateways": "<p>The list of existing virtual gateways for the specified service mesh.</p>"
+      }
+    },
+    "VirtualGatewayListener": {
+      "base": "<p>An object that represents a listener for a virtual gateway.</p>",
+      "refs": {
+        "VirtualGatewayListeners$member": null
+      }
+    },
+    "VirtualGatewayListenerTls": {
+      "base": "<p>An object that represents the Transport Layer Security (TLS) properties for a listener.</p>",
+      "refs": {
+        "VirtualGatewayListener$tls": "<p>A reference to an object that represents the Transport Layer Security (TLS) properties for the listener.</p>"
+      }
+    },
+    "VirtualGatewayListenerTlsAcmCertificate": {
+      "base": "<p>An object that represents an AWS Certicate Manager (ACM) certificate.</p>",
+      "refs": {
+        "VirtualGatewayListenerTlsCertificate$acm": "<p>A reference to an object that represents an AWS Certicate Manager (ACM) certificate.</p>"
+      }
+    },
+    "VirtualGatewayListenerTlsCertificate": {
+      "base": "<p>An object that represents a listener's Transport Layer Security (TLS) certificate.</p>",
+      "refs": {
+        "VirtualGatewayListenerTls$certificate": "<p>An object that represents a Transport Layer Security (TLS) certificate.</p>"
+      }
+    },
+    "VirtualGatewayListenerTlsFileCertificate": {
+      "base": "<p>An object that represents a local file certificate. The certificate must meet specific requirements and you must have proxy authorization enabled. For more information, see <a href=\"https://docs.aws.amazon.com/app-mesh/latest/userguide/tls.html#virtual-node-tls-prerequisites\">Transport Layer Security (TLS)</a>.</p>",
+      "refs": {
+        "VirtualGatewayListenerTlsCertificate$file": "<p>A reference to an object that represents a local file certificate.</p>"
+      }
+    },
+    "VirtualGatewayListenerTlsMode": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayListenerTls$mode": "<p>Specify one of the following modes.</p> <ul> <li> <p> <b/>STRICT – Listener only accepts connections with TLS enabled. </p> </li> <li> <p> <b/>PERMISSIVE – Listener accepts connections with or without TLS enabled.</p> </li> <li> <p> <b/>DISABLED – Listener only accepts connections without TLS. </p> </li> </ul>"
+      }
+    },
+    "VirtualGatewayListeners": {
+      "base": null,
+      "refs": {
+        "VirtualGatewaySpec$listeners": "<p>The listeners that the mesh endpoint is expected to receive inbound traffic from. You can specify one listener.</p>"
+      }
+    },
+    "VirtualGatewayLogging": {
+      "base": "<p>An object that represents logging information.</p>",
+      "refs": {
+        "VirtualGatewaySpec$logging": null
+      }
+    },
+    "VirtualGatewayPortMapping": {
+      "base": "<p>An object that represents a port mapping.</p>",
+      "refs": {
+        "VirtualGatewayListener$portMapping": "<p>The port mapping information for the listener.</p>"
+      }
+    },
+    "VirtualGatewayPortProtocol": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayHealthCheckPolicy$protocol": "<p>The protocol for the health check request. If you specify <code>grpc</code>, then your service must conform to the <a href=\"https://github.com/grpc/grpc/blob/master/doc/health-checking.md\">GRPC Health Checking Protocol</a>.</p>",
+        "VirtualGatewayPortMapping$protocol": "<p>The protocol used for the port mapping.</p>"
+      }
+    },
+    "VirtualGatewayRef": {
+      "base": "<p>An object that represents a virtual gateway returned by a list operation.</p>",
+      "refs": {
+        "VirtualGatewayList$member": null
+      }
+    },
+    "VirtualGatewaySpec": {
+      "base": "<p>An object that represents the specification of a service mesh resource.</p>",
+      "refs": {
+        "CreateVirtualGatewayInput$spec": "<p>The virtual gateway specification to apply.</p>",
+        "UpdateVirtualGatewayInput$spec": "<p>The new virtual gateway specification to apply. This overwrites the existing data.</p>",
+        "VirtualGatewayData$spec": "<p>The specifications of the virtual gateway.</p>"
+      }
+    },
+    "VirtualGatewayStatus": {
+      "base": "<p>An object that represents the status of the mesh resource.</p>",
+      "refs": {
+        "VirtualGatewayData$status": "<p>The current status of the virtual gateway.</p>"
+      }
+    },
+    "VirtualGatewayStatusCode": {
+      "base": null,
+      "refs": {
+        "VirtualGatewayStatus$status": "<p>The current status.</p>"
+      }
+    },
+    "VirtualGatewayTlsValidationContext": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context.</p>",
+      "refs": {
+        "VirtualGatewayClientPolicyTls$validation": "<p>A reference to an object that represents a TLS validation context.</p>"
+      }
+    },
+    "VirtualGatewayTlsValidationContextAcmTrust": {
+      "base": "<p>An object that represents a TLS validation context trust for an AWS Certicate Manager (ACM) certificate.</p>",
+      "refs": {
+        "VirtualGatewayTlsValidationContextTrust$acm": "<p>A reference to an object that represents a TLS validation context trust for an AWS Certicate Manager (ACM) certificate.</p>"
+      }
+    },
+    "VirtualGatewayTlsValidationContextFileTrust": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context trust for a local file.</p>",
+      "refs": {
+        "VirtualGatewayTlsValidationContextTrust$file": "<p>An object that represents a TLS validation context trust for a local file.</p>"
+      }
+    },
+    "VirtualGatewayTlsValidationContextTrust": {
+      "base": "<p>An object that represents a Transport Layer Security (TLS) validation context trust.</p>",
+      "refs": {
+        "VirtualGatewayTlsValidationContext$trust": "<p>A reference to an object that represents a TLS validation context trust.</p>"
+      }
+    },
+    "VirtualNodeConnectionPool": {
+      "base": "<p>An object that represents the type of virtual node connection pool.</p> <p>Only one protocol is used at a time and should be the same protocol as the one chosen under port mapping.</p> <p>If not present the default value for <code>maxPendingRequests</code> is <code>2147483647</code>.</p> <p/>",
+      "refs": {
+        "Listener$connectionPool": "<p>The connection pool information for the listener.</p>"
+      }
+    },
+    "VirtualNodeData": {
+      "base": "<p>An object that represents a virtual node returned by a describe operation.</p>",
+      "refs": {
+        "CreateVirtualNodeOutput$virtualNode": "<p>The full description of your virtual node following the create call.</p>",
+        "DeleteVirtualNodeOutput$virtualNode": "<p>The virtual node that was deleted.</p>",
+        "DescribeVirtualNodeOutput$virtualNode": "<p>The full description of your virtual node.</p>",
+        "UpdateVirtualNodeOutput$virtualNode": "<p>A full description of the virtual node that was updated.</p>"
+      }
+    },
+    "VirtualNodeGrpcConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualNodeConnectionPool$grpc": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualNodeHttp2ConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualNodeConnectionPool$http2": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualNodeHttpConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualNodeConnectionPool$http": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualNodeList": {
+      "base": null,
+      "refs": {
+        "ListVirtualNodesOutput$virtualNodes": "<p>The list of existing virtual nodes for the specified service mesh.</p>"
+      }
+    },
+    "VirtualNodeRef": {
+      "base": "<p>An object that represents a virtual node returned by a list operation.</p>",
+      "refs": {
+        "VirtualNodeList$member": null
+      }
+    },
+    "VirtualNodeServiceProvider": {
+      "base": "<p>An object that represents a virtual node service provider.</p>",
+      "refs": {
+        "VirtualServiceProvider$virtualNode": "<p>The virtual node associated with a virtual service.</p>"
+      }
+    },
+    "VirtualNodeSpec": {
+      "base": "<p>An object that represents the specification of a virtual node.</p>",
+      "refs": {
+        "CreateVirtualNodeInput$spec": "<p>The virtual node specification to apply.</p>",
+        "UpdateVirtualNodeInput$spec": "<p>The new virtual node specification to apply. This overwrites the existing data.</p>",
+        "VirtualNodeData$spec": "<p>The specifications of the virtual node.</p>"
+      }
+    },
+    "VirtualNodeStatus": {
+      "base": "<p>An object that represents the current status of the virtual node.</p>",
+      "refs": {
+        "VirtualNodeData$status": "<p>The current status for the virtual node.</p>"
+      }
+    },
+    "VirtualNodeStatusCode": {
+      "base": null,
+      "refs": {
+        "VirtualNodeStatus$status": "<p>The current status of the virtual node.</p>"
+      }
+    },
+    "VirtualNodeTcpConnectionPool": {
+      "base": "<p>An object that represents a type of connection pool.</p>",
+      "refs": {
+        "VirtualNodeConnectionPool$tcp": "<p>An object that represents a type of connection pool.</p>"
+      }
+    },
+    "VirtualRouterData": {
+      "base": "<p>An object that represents a virtual router returned by a describe operation.</p>",
+      "refs": {
+        "CreateVirtualRouterOutput$virtualRouter": "<p>The full description of your virtual router following the create call.</p>",
+        "DeleteVirtualRouterOutput$virtualRouter": "<p>The virtual router that was deleted.</p>",
+        "DescribeVirtualRouterOutput$virtualRouter": "<p>The full description of your virtual router.</p>",
+        "UpdateVirtualRouterOutput$virtualRouter": "<p>A full description of the virtual router that was updated.</p>"
+      }
+    },
+    "VirtualRouterList": {
+      "base": null,
+      "refs": {
+        "ListVirtualRoutersOutput$virtualRouters": "<p>The list of existing virtual routers for the specified service mesh.</p>"
+      }
+    },
+    "VirtualRouterListener": {
+      "base": "<p>An object that represents a virtual router listener.</p>",
+      "refs": {
+        "VirtualRouterListeners$member": null
+      }
+    },
+    "VirtualRouterListeners": {
+      "base": null,
+      "refs": {
+        "VirtualRouterSpec$listeners": "<p>The listeners that the virtual router is expected to receive inbound traffic from. You can specify one listener.</p>"
+      }
+    },
+    "VirtualRouterRef": {
+      "base": "<p>An object that represents a virtual router returned by a list operation.</p>",
+      "refs": {
+        "VirtualRouterList$member": null
+      }
+    },
+    "VirtualRouterServiceProvider": {
+      "base": "<p>An object that represents a virtual node service provider.</p>",
+      "refs": {
+        "VirtualServiceProvider$virtualRouter": "<p>The virtual router associated with a virtual service.</p>"
+      }
+    },
+    "VirtualRouterSpec": {
+      "base": "<p>An object that represents the specification of a virtual router.</p>",
+      "refs": {
+        "CreateVirtualRouterInput$spec": "<p>The virtual router specification to apply.</p>",
+        "UpdateVirtualRouterInput$spec": "<p>The new virtual router specification to apply. This overwrites the existing data.</p>",
+        "VirtualRouterData$spec": "<p>The specifications of the virtual router.</p>"
+      }
+    },
+    "VirtualRouterStatus": {
+      "base": "<p>An object that represents the status of a virtual router. </p>",
+      "refs": {
+        "VirtualRouterData$status": "<p>The current status of the virtual router.</p>"
+      }
+    },
+    "VirtualRouterStatusCode": {
+      "base": null,
+      "refs": {
+        "VirtualRouterStatus$status": "<p>The current status of the virtual router.</p>"
+      }
+    },
+    "VirtualServiceBackend": {
+      "base": "<p>An object that represents a virtual service backend for a virtual node.</p>",
+      "refs": {
+        "Backend$virtualService": "<p>Specifies a virtual service to use as a backend. </p>"
+      }
+    },
+    "VirtualServiceData": {
+      "base": "<p>An object that represents a virtual service returned by a describe operation.</p>",
+      "refs": {
+        "CreateVirtualServiceOutput$virtualService": "<p>The full description of your virtual service following the create call.</p>",
+        "DeleteVirtualServiceOutput$virtualService": "<p>The virtual service that was deleted.</p>",
+        "DescribeVirtualServiceOutput$virtualService": "<p>The full description of your virtual service.</p>",
+        "UpdateVirtualServiceOutput$virtualService": "<p>A full description of the virtual service that was updated.</p>"
+      }
+    },
+    "VirtualServiceList": {
+      "base": null,
+      "refs": {
+        "ListVirtualServicesOutput$virtualServices": "<p>The list of existing virtual services for the specified service mesh.</p>"
+      }
+    },
+    "VirtualServiceProvider": {
+      "base": "<p>An object that represents the provider for a virtual service.</p>",
+      "refs": {
+        "VirtualServiceSpec$provider": "<p>The App Mesh object that is acting as the provider for a virtual service. You can specify a single virtual node or virtual router.</p>"
+      }
+    },
+    "VirtualServiceRef": {
+      "base": "<p>An object that represents a virtual service returned by a list operation.</p>",
+      "refs": {
+        "VirtualServiceList$member": null
+      }
+    },
+    "VirtualServiceSpec": {
+      "base": "<p>An object that represents the specification of a virtual service.</p>",
+      "refs": {
+        "CreateVirtualServiceInput$spec": "<p>The virtual service specification to apply.</p>",
+        "UpdateVirtualServiceInput$spec": "<p>The new virtual service specification to apply. This overwrites the existing data.</p>",
+        "VirtualServiceData$spec": "<p>The specifications of the virtual service.</p>"
+      }
+    },
+    "VirtualServiceStatus": {
+      "base": "<p>An object that represents the status of a virtual service.</p>",
+      "refs": {
+        "VirtualServiceData$status": "<p>The current status of the virtual service.</p>"
+      }
+    },
+    "VirtualServiceStatusCode": {
+      "base": null,
+      "refs": {
+        "VirtualServiceStatus$status": "<p>The current status of the virtual service.</p>"
+      }
+    },
+    "WeightedTarget": {
+      "base": "<p>An object that represents a target and its relative weight. Traffic is distributed across targets according to their relative weight. For example, a weighted target with a relative weight of 50 receives five times as much traffic as one with a relative weight of 10. The total weight for all targets combined must be less than or equal to 100.</p>",
+      "refs": {
+        "WeightedTargets$member": null
+      }
+    },
+    "WeightedTargets": {
+      "base": null,
+      "refs": {
+        "GrpcRouteAction$weightedTargets": "<p>An object that represents the targets that traffic is routed to when a request matches the route.</p>",
+        "HttpRouteAction$weightedTargets": "<p>An object that represents the targets that traffic is routed to when a request matches the route.</p>",
+        "TcpRouteAction$weightedTargets": "<p>An object that represents the targets that traffic is routed to when a request matches the route.</p>"
+      }
+    }
+  }
+}

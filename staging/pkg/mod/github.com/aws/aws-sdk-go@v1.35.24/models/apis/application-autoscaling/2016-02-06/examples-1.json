@@ -1,0 +1,221 @@
+{
+  "version": "1.0",
+  "examples": {
+    "DeleteScalingPolicy": [
+      {
+        "input": {
+          "PolicyName": "web-app-cpu-lt-25",
+          "ResourceId": "service/default/web-app",
+          "ScalableDimension": "ecs:service:DesiredCount",
+          "ServiceNamespace": "ecs"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes a scaling policy for the Amazon ECS service called web-app, which is running in the default cluster.",
+        "id": "to-delete-a-scaling-policy-1470863892689",
+        "title": "To delete a scaling policy"
+      }
+    ],
+    "DeregisterScalableTarget": [
+      {
+        "input": {
+          "ResourceId": "service/default/web-app",
+          "ScalableDimension": "ecs:service:DesiredCount",
+          "ServiceNamespace": "ecs"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deregisters a scalable target for an Amazon ECS service called web-app that is running in the default cluster.",
+        "id": "to-deregister-a-scalable-target-1470864164895",
+        "title": "To deregister a scalable target"
+      }
+    ],
+    "DescribeScalableTargets": [
+      {
+        "input": {
+          "ServiceNamespace": "ecs"
+        },
+        "output": {
+          "ScalableTargets": [
+            {
+              "CreationTime": "2019-05-06T11:21:46.199Z",
+              "MaxCapacity": 10,
+              "MinCapacity": 1,
+              "ResourceId": "service/default/web-app",
+              "RoleARN": "arn:aws:iam::012345678910:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService",
+              "ScalableDimension": "ecs:service:DesiredCount",
+              "ServiceNamespace": "ecs",
+              "SuspendedState": {
+                "DynamicScalingInSuspended": false,
+                "DynamicScalingOutSuspended": false,
+                "ScheduledScalingSuspended": false
+              }
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example describes the scalable targets for the ECS service namespace.",
+        "id": "to-describe-scalable-targets-1470864286961",
+        "title": "To describe scalable targets"
+      }
+    ],
+    "DescribeScalingActivities": [
+      {
+        "input": {
+          "ResourceId": "service/default/web-app",
+          "ScalableDimension": "ecs:service:DesiredCount",
+          "ServiceNamespace": "ecs"
+        },
+        "output": {
+          "ScalingActivities": [
+            {
+              "ActivityId": "e6c5f7d1-dbbb-4a3f-89b2-51f33e766399",
+              "Cause": "monitor alarm web-app-cpu-lt-25 in state ALARM triggered policy web-app-cpu-lt-25",
+              "Description": "Setting desired count to 1.",
+              "EndTime": "2019-05-06T16:04:32.111Z",
+              "ResourceId": "service/default/web-app",
+              "ScalableDimension": "ecs:service:DesiredCount",
+              "ServiceNamespace": "ecs",
+              "StartTime": "2019-05-06T16:03:58.171Z",
+              "StatusCode": "Successful",
+              "StatusMessage": "Successfully set desired count to 1. Change successfully fulfilled by ecs."
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example describes the scaling activities for an Amazon ECS service called web-app that is running in the default cluster.",
+        "id": "to-describe-scaling-activities-for-a-scalable-target-1470864398629",
+        "title": "To describe scaling activities for a scalable target"
+      }
+    ],
+    "DescribeScalingPolicies": [
+      {
+        "input": {
+          "ServiceNamespace": "ecs"
+        },
+        "output": {
+          "NextToken": "",
+          "ScalingPolicies": [
+            {
+              "Alarms": [
+                {
+                  "AlarmARN": "arn:aws:cloudwatch:us-west-2:012345678910:alarm:web-app-cpu-gt-75",
+                  "AlarmName": "web-app-cpu-gt-75"
+                }
+              ],
+              "CreationTime": "2019-05-06T12:11:39.230Z",
+              "PolicyARN": "arn:aws:autoscaling:us-west-2:012345678910:scalingPolicy:6d8972f3-efc8-437c-92d1-6270f29a66e7:resource/ecs/service/default/web-app:policyName/web-app-cpu-gt-75",
+              "PolicyName": "web-app-cpu-gt-75",
+              "PolicyType": "StepScaling",
+              "ResourceId": "service/default/web-app",
+              "ScalableDimension": "ecs:service:DesiredCount",
+              "ServiceNamespace": "ecs",
+              "StepScalingPolicyConfiguration": {
+                "AdjustmentType": "PercentChangeInCapacity",
+                "Cooldown": 60,
+                "StepAdjustments": [
+                  {
+                    "MetricIntervalLowerBound": 0,
+                    "ScalingAdjustment": 200
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example describes the scaling policies for the ECS service namespace.",
+        "id": "to-describe-scaling-policies-1470864609734",
+        "title": "To describe scaling policies"
+      }
+    ],
+    "PutScalingPolicy": [
+      {
+        "input": {
+          "PolicyName": "cpu75-target-tracking-scaling-policy",
+          "PolicyType": "TargetTrackingScaling",
+          "ResourceId": "service/default/web-app",
+          "ScalableDimension": "ecs:service:DesiredCount",
+          "ServiceNamespace": "ecs",
+          "TargetTrackingScalingPolicyConfiguration": {
+            "PredefinedMetricSpecification": {
+              "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+            },
+            "ScaleInCooldown": 60,
+            "ScaleOutCooldown": 60,
+            "TargetValue": 75
+          }
+        },
+        "output": {
+          "Alarms": [
+            {
+              "AlarmARN": "arn:aws:cloudwatch:us-west-2:012345678910:alarm:TargetTracking-service/default/web-app-AlarmHigh-d4f0770c-b46e-434a-a60f-3b36d653feca",
+              "AlarmName": "TargetTracking-service/default/web-app-AlarmHigh-d4f0770c-b46e-434a-a60f-3b36d653feca"
+            },
+            {
+              "AlarmARN": "arn:aws:cloudwatch:us-west-2:012345678910:alarm:TargetTracking-service/default/web-app-AlarmLow-1b437334-d19b-4a63-a812-6c67aaf2910d",
+              "AlarmName": "TargetTracking-service/default/web-app-AlarmLow-1b437334-d19b-4a63-a812-6c67aaf2910d"
+            }
+          ],
+          "PolicyARN": "arn:aws:autoscaling:us-west-2:012345678910:scalingPolicy:6d8972f3-efc8-437c-92d1-6270f29a66e7:resource/ecs/service/default/web-app:policyName/cpu75-target-tracking-scaling-policy"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example applies a target tracking scaling policy with a predefined metric specification to an Amazon ECS service called web-app in the default cluster. The policy keeps the average CPU utilization of the service at 75 percent, with scale-out and scale-in cooldown periods of 60 seconds.",
+        "id": "to-apply-a-target-tracking-scaling-policy-with-a-predefined-metric-specification-1569364247984",
+        "title": "To apply a target tracking scaling policy with a predefined metric specification"
+      }
+    ],
+    "RegisterScalableTarget": [
+      {
+        "input": {
+          "MaxCapacity": 10,
+          "MinCapacity": 1,
+          "ResourceId": "service/default/web-app",
+          "ScalableDimension": "ecs:service:DesiredCount",
+          "ServiceNamespace": "ecs"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example registers a scalable target from an Amazon ECS service called web-app that is running on the default cluster, with a minimum desired count of 1 task and a maximum desired count of 10 tasks.",
+        "id": "to-register-a-new-scalable-target-1470864910380",
+        "title": "To register an ECS service as a scalable target"
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+steps:
+  # steps after this one (and in the same job) will have access to the variable
+  # GO_WORKSPACE_PATH
+  # GO_PATH
+  # all further steps should utilize these values through $(GO_PATH) or $(GO_WORKSPACE_PATH)
+  - pwsh: |
+      $target = "$(Build.SourcesDirectory)/../go"
+      $createdWorkspaceInfo = (./eng/scripts/create_go_workspace.ps1 -goWorkSpaceDir $target)
+
+      # set the output variables for further jobs. 
+      Write-Host "##vso[task.setvariable variable=GOPATH]$($createdWorkspaceInfo.GO_PATH)"
+      Write-Host "##vso[task.setvariable variable=GO_WORKSPACE_PATH]$($createdWorkspaceInfo.GO_WORKSPACE_PATH)"
+
+      Write-Host "Prepending Path with $($createdWorkspaceInfo.GO_PATH)/bin"
+
+      # also prepend the path permanently to ensure access the newly installed tools
+      Write-Host "##vso[task.prependpath]$($createdWorkspaceInfo.GO_PATH)/bin"
+    displayName: "Create Go Workspace"

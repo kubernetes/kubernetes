@@ -1,0 +1,15 @@
+parameters:
+  PackageName: ''
+  ServiceDirectory: ''
+  TestPipeline: false
+
+steps:
+- ${{if eq(parameters.TestPipeline, 'true')}}:
+    - task: PowerShell@2
+      displayName: Prep template pipeline for release
+      condition: succeeded()
+      inputs:
+        pwsh: true
+        workingDirectory: $(Build.SourcesDirectory)
+        filePath: $(Build.SourcesDirectory)/eng/common/scripts/SetTestPipelineVersion.ps1
+        arguments: '-BuildID $(Build.BuildId) -PackageName ${{ parameters.PackageName }} -ServiceDirectory ${{ parameters.ServiceDirectory }}'

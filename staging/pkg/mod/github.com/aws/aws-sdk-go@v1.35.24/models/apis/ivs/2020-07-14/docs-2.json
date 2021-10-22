@@ -1,0 +1,670 @@
+{
+  "version": "2.0",
+  "service": "<p> <b>Introduction</b> </p> <p>The Amazon Interactive Video Service (IVS) API is REST compatible, using a standard HTTP API and an <a href=\"http://aws.amazon.com/sns\">AWS SNS</a> event stream for responses. JSON is used for both requests and responses, including errors.</p> <p>The API is an AWS regional service, currently in these regions: us-west-2, us-east-1, and eu-west-1.</p> <p> <i> <b>All API request parameters and URLs are case sensitive. </b> </i> </p> <p>For a summary of notable documentation changes in each release, see <a href=\"https://docs.aws.amazon.com/ivs/latest/userguide/doc-history.html\"> Document History</a>.</p> <p> <b>Service Endpoints</b> </p> <p>The following are the Amazon IVS service endpoints (all HTTPS): </p> <p>Region name: US West (Oregon)</p> <ul> <li> <p>Region: <code>us-west-2</code> </p> </li> <li> <p>Endpoint: <code>ivs.us-west-2.amazonaws.com</code> </p> </li> </ul> <p>Region name: US East (Virginia)</p> <ul> <li> <p>Region: <code>us-east-1</code> </p> </li> <li> <p>Endpoint: <code>ivs.us-east-1.amazonaws.com</code> </p> </li> </ul> <p>Region name: EU West (Dublin)</p> <ul> <li> <p>Region: <code>eu-west-1</code> </p> </li> <li> <p>Endpoint: <code>ivs.eu-west-1.amazonaws.com</code> </p> </li> </ul> <p> <b>Allowed Header Values</b> </p> <ul> <li> <p> <code> <b>Accept:</b> </code> application/json</p> </li> <li> <p> <code> <b>Accept-Encoding:</b> </code> gzip, deflate</p> </li> <li> <p> <code> <b>Content-Type:</b> </code>application/json</p> </li> </ul> <p> <b>Resources</b> </p> <p>The following resources contain information about your IVS live stream (see <a href=\"https://docs.aws.amazon.com/ivs/latest/userguide/GSIVS.html\"> Getting Started with Amazon IVS</a>):</p> <ul> <li> <p>Channel — Stores configuration data related to your live stream. You first create a channel and then use the channel’s stream key to start your live stream. See the Channel endpoints for more information. </p> </li> <li> <p>Stream key — An identifier assigned by Amazon IVS when you create a channel, which is then used to authorize streaming. See the StreamKey endpoints for more information. <i> <b>Treat the stream key like a secret, since it allows anyone to stream to the channel.</b> </i> </p> </li> <li> <p>Playback key pair — Video playback may be restricted using playback-authorization tokens, which use public-key encryption. A playback key pair is the public-private pair of keys used to sign and validate the playback-authorization token. See the PlaybackKeyPair endpoints for more information.</p> </li> </ul> <p> <b>Tagging</b> </p> <p>A <i>tag</i> is a metadata label that you assign to an AWS resource. A tag comprises a <i>key</i> and a <i>value</i>, both set by you. For example, you might set a tag as <code>topic:nature</code> to label a particular video category. See <a href=\"https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html\">Tagging AWS Resources</a> for more information, including restrictions that apply to tags.</p> <p>Tags can help you identify and organize your AWS resources. For example, you can use the same tag for different resources to indicate that they are related. You can also use tags to manage access (see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/access_tags.html\"> Access Tags</a>). </p> <p>The Amazon IVS API has these tag-related endpoints: <a>TagResource</a>, <a>UntagResource</a>, and <a>ListTagsForResource</a>. The following resources support tagging: Channels, Stream Keys, and Playback Key Pairs.</p> <p> <b>Channel Endpoints</b> </p> <ul> <li> <p> <a>CreateChannel</a> — Creates a new channel and an associated stream key to start streaming.</p> </li> <li> <p> <a>GetChannel</a> — Gets the channel configuration for the specified channel ARN (Amazon Resource Name).</p> </li> <li> <p> <a>BatchGetChannel</a> — Performs <a>GetChannel</a> on multiple ARNs simultaneously.</p> </li> <li> <p> <a>ListChannels</a> — Gets summary information about all channels in your account, in the AWS region where the API request is processed. This list can be filtered to match a specified string.</p> </li> <li> <p> <a>UpdateChannel</a> — Updates a channel's configuration. This does not affect an ongoing stream of this channel. You must stop and restart the stream for the changes to take effect.</p> </li> <li> <p> <a>DeleteChannel</a> — Deletes the specified channel.</p> </li> </ul> <p> <b>StreamKey Endpoints</b> </p> <ul> <li> <p> <a>CreateStreamKey</a> — Creates a stream key, used to initiate a stream, for the specified channel ARN.</p> </li> <li> <p> <a>GetStreamKey</a> — Gets stream key information for the specified ARN.</p> </li> <li> <p> <a>BatchGetStreamKey</a> — Performs <a>GetStreamKey</a> on multiple ARNs simultaneously.</p> </li> <li> <p> <a>ListStreamKeys</a> — Gets summary information about stream keys for the specified channel.</p> </li> <li> <p> <a>DeleteStreamKey</a> — Deletes the stream key for the specified ARN, so it can no longer be used to stream.</p> </li> </ul> <p> <b>Stream Endpoints</b> </p> <ul> <li> <p> <a>GetStream</a> — Gets information about the active (live) stream on a specified channel.</p> </li> <li> <p> <a>ListStreams</a> — Gets summary information about live streams in your account, in the AWS region where the API request is processed.</p> </li> <li> <p> <a>StopStream</a> — Disconnects the incoming RTMPS stream for the specified channel. Can be used in conjunction with <a>DeleteStreamKey</a> to prevent further streaming to a channel.</p> </li> <li> <p> <a>PutMetadata</a> — Inserts metadata into an RTMPS stream for the specified channel. A maximum of 5 requests per second per channel is allowed, each with a maximum 1KB payload.</p> </li> </ul> <p> <b>PlaybackKeyPair Endpoints</b> </p> <ul> <li> <p> <a>ImportPlaybackKeyPair</a> — Imports the public portion of a new key pair and returns its <code>arn</code> and <code>fingerprint</code>. The <code>privateKey</code> can then be used to generate viewer authorization tokens, to grant viewers access to authorized channels.</p> </li> <li> <p> <a>GetPlaybackKeyPair</a> — Gets a specified playback authorization key pair and returns the <code>arn</code> and <code>fingerprint</code>. The <code>privateKey</code> held by the caller can be used to generate viewer authorization tokens, to grant viewers access to authorized channels.</p> </li> <li> <p> <a>ListPlaybackKeyPairs</a> — Gets summary information about playback key pairs.</p> </li> <li> <p> <a>DeletePlaybackKeyPair</a> — Deletes a specified authorization key pair. This invalidates future viewer tokens generated using the key pair’s <code>privateKey</code>.</p> </li> </ul> <p> <b>AWS Tags Endpoints</b> </p> <ul> <li> <p> <a>TagResource</a> — Adds or updates tags for the AWS resource with the specified ARN.</p> </li> <li> <p> <a>UntagResource</a> — Removes tags from the resource with the specified ARN.</p> </li> <li> <p> <a>ListTagsForResource</a> — Gets information about AWS tags for the specified ARN.</p> </li> </ul>",
+  "operations": {
+    "BatchGetChannel": "<p>Performs <a>GetChannel</a> on multiple ARNs simultaneously.</p>",
+    "BatchGetStreamKey": "<p>Performs <a>GetStreamKey</a> on multiple ARNs simultaneously.</p>",
+    "CreateChannel": "<p>Creates a new channel and an associated stream key to start streaming.</p>",
+    "CreateStreamKey": "<p>Creates a stream key, used to initiate a stream, for the specified channel ARN.</p> <p>Note that <a>CreateChannel</a> creates a stream key. If you subsequently use CreateStreamKey on the same channel, it will fail because a stream key already exists and there is a limit of 1 stream key per channel. To reset the stream key on a channel, use <a>DeleteStreamKey</a> and then CreateStreamKey.</p>",
+    "DeleteChannel": "<p>Deletes the specified channel and its associated stream keys.</p>",
+    "DeletePlaybackKeyPair": "<p>Deletes a specified authorization key pair. This invalidates future viewer tokens generated using the key pair’s <code>privateKey</code>.</p>",
+    "DeleteStreamKey": "<p>Deletes the stream key for the specified ARN, so it can no longer be used to stream.</p>",
+    "GetChannel": "<p>Gets the channel configuration for the specified channel ARN. See also <a>BatchGetChannel</a>.</p>",
+    "GetPlaybackKeyPair": "<p>Gets a specified playback authorization key pair and returns the <code>arn</code> and <code>fingerprint</code>. The <code>privateKey</code> held by the caller can be used to generate viewer authorization tokens, to grant viewers access to authorized channels.</p>",
+    "GetStream": "<p>Gets information about the active (live) stream on a specified channel.</p>",
+    "GetStreamKey": "<p>Gets stream-key information for a specified ARN.</p>",
+    "ImportPlaybackKeyPair": "<p>Imports the public portion of a new key pair and returns its <code>arn</code> and <code>fingerprint</code>. The <code>privateKey</code> can then be used to generate viewer authorization tokens, to grant viewers access to authorized channels.</p>",
+    "ListChannels": "<p>Gets summary information about all channels in your account, in the AWS region where the API request is processed. This list can be filtered to match a specified string.</p>",
+    "ListPlaybackKeyPairs": "<p>Gets summary information about playback key pairs.</p>",
+    "ListStreamKeys": "<p>Gets summary information about stream keys for the specified channel.</p>",
+    "ListStreams": "<p>Gets summary information about live streams in your account, in the AWS region where the API request is processed.</p>",
+    "ListTagsForResource": "<p>Gets information about AWS tags for the specified ARN.</p>",
+    "PutMetadata": "<p>Inserts metadata into an RTMPS stream for the specified channel. A maximum of 5 requests per second per channel is allowed, each with a maximum 1KB payload.</p>",
+    "StopStream": "<p>Disconnects the incoming RTMPS stream for the specified channel. Can be used in conjunction with <a>DeleteStreamKey</a> to prevent further streaming to a channel.</p> <note> <p>Many streaming client-software libraries automatically reconnect a dropped RTMPS session, so to stop the stream permanently, you may want to first revoke the <code>streamKey</code> attached to the channel.</p> </note>",
+    "TagResource": "<p>Adds or updates tags for the AWS resource with the specified ARN.</p>",
+    "UntagResource": "<p>Removes tags from the resource with the specified ARN.</p>",
+    "UpdateChannel": "<p>Updates a channel's configuration. This does not affect an ongoing stream of this channel. You must stop and restart the stream for the changes to take effect.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchError": {
+      "base": "<p>Error related to a specific channel, specified by its ARN.</p>",
+      "refs": {
+        "BatchErrors$member": null
+      }
+    },
+    "BatchErrors": {
+      "base": null,
+      "refs": {
+        "BatchGetChannelResponse$errors": "<p>Each error object is related to a specific ARN in the request.</p>",
+        "BatchGetStreamKeyResponse$errors": null
+      }
+    },
+    "BatchGetChannelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetChannelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetStreamKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetStreamKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CreateChannelRequest$authorized": "<p>Whether the channel is authorized. Default: <code>false</code>.</p>",
+        "UpdateChannelRequest$authorized": "<p>Whether the channel is authorized. Default: <code>false</code>.</p>"
+      }
+    },
+    "Channel": {
+      "base": "<p>Object specifying a channel.</p>",
+      "refs": {
+        "Channels$member": null,
+        "CreateChannelResponse$channel": null,
+        "GetChannelResponse$channel": null,
+        "UpdateChannelResponse$channel": null
+      }
+    },
+    "ChannelArn": {
+      "base": null,
+      "refs": {
+        "Channel$arn": "<p>Channel ARN.</p>",
+        "ChannelArnList$member": null,
+        "ChannelSummary$arn": "<p>Channel ARN.</p>",
+        "CreateStreamKeyRequest$channelArn": "<p>ARN of the channel for which to create the stream key.</p>",
+        "DeleteChannelRequest$arn": "<p>ARN of the channel to be deleted.</p>",
+        "GetChannelRequest$arn": "<p>ARN of the channel for which the configuration is to be retrieved.</p>",
+        "GetStreamRequest$channelArn": "<p>Channel ARN for stream to be accessed.</p>",
+        "ListStreamKeysRequest$channelArn": "<p>Channel ARN used to filter the list.</p>",
+        "PutMetadataRequest$channelArn": "<p>ARN of the channel into which metadata is inserted. This channel must have an active stream.</p>",
+        "StopStreamRequest$channelArn": "<p>ARN of the channel for which the stream is to be stopped.</p>",
+        "Stream$channelArn": "<p>Channel ARN for the stream.</p>",
+        "StreamKey$channelArn": "<p>Channel ARN for the stream.</p>",
+        "StreamKeySummary$channelArn": "<p>Channel ARN for the stream.</p>",
+        "StreamSummary$channelArn": "<p>Channel ARN for the stream.</p>",
+        "UpdateChannelRequest$arn": "<p>ARN of the channel to be updated.</p>"
+      }
+    },
+    "ChannelArnList": {
+      "base": null,
+      "refs": {
+        "BatchGetChannelRequest$arns": "<p>Array of ARNs, one per channel.</p>"
+      }
+    },
+    "ChannelLatencyMode": {
+      "base": null,
+      "refs": {
+        "Channel$latencyMode": "<p>Channel latency mode. Default: <code>LOW</code>.</p>",
+        "ChannelSummary$latencyMode": "<p>Channel latency mode. Default: <code>LOW</code>.</p>",
+        "CreateChannelRequest$latencyMode": "<p>Channel latency mode. Default: <code>LOW</code>.</p>",
+        "UpdateChannelRequest$latencyMode": "<p>Channel latency mode. Default: <code>LOW</code>.</p>"
+      }
+    },
+    "ChannelList": {
+      "base": null,
+      "refs": {
+        "ListChannelsResponse$channels": "<p>List of the matching channels.</p>"
+      }
+    },
+    "ChannelName": {
+      "base": null,
+      "refs": {
+        "Channel$name": "<p>Channel name.</p>",
+        "ChannelSummary$name": "<p>Channel name.</p>",
+        "CreateChannelRequest$name": "<p>Channel name.</p>",
+        "ListChannelsRequest$filterByName": "<p>Filters the channel list to match the specified name.</p>",
+        "UpdateChannelRequest$name": "<p>Channel name.</p>"
+      }
+    },
+    "ChannelNotBroadcasting": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ChannelSummary": {
+      "base": "<p>Summary information about a channel.</p>",
+      "refs": {
+        "ChannelList$member": null
+      }
+    },
+    "ChannelType": {
+      "base": null,
+      "refs": {
+        "Channel$type": "<p>Channel type, which determines the allowable resolution and bitrate. <i>If you exceed the allowable resolution or bitrate, the stream probably will disconnect immediately.</i> Valid values:</p> <ul> <li> <p> <code>STANDARD</code>: Multiple qualities are generated from the original input, to automatically give viewers the best experience for their devices and network conditions. Vertical resolution can be up to 1080 and bitrate can be up to 8.5 Mbps.</p> </li> <li> <p> <code>BASIC</code>: Amazon IVS delivers the original input to viewers. The viewer’s video-quality choice is limited to the original input. Vertical resolution can be up to 480 and bitrate can be up to 1.5 Mbps.</p> </li> </ul> <p>Default: <code>STANDARD</code>.</p>",
+        "CreateChannelRequest$type": "<p>Channel type, which determines the allowable resolution and bitrate. <i>If you exceed the allowable resolution or bitrate, the stream probably will disconnect immediately.</i> Valid values:</p> <ul> <li> <p> <code>STANDARD</code>: Multiple qualities are generated from the original input, to automatically give viewers the best experience for their devices and network conditions. Vertical resolution can be up to 1080 and bitrate can be up to 8.5 Mbps.</p> </li> <li> <p> <code>BASIC</code>: Amazon IVS delivers the original input to viewers. The viewer’s video-quality choice is limited to the original input. Vertical resolution can be up to 480 and bitrate can be up to 1.5 Mbps.</p> </li> </ul> <p>Default: <code>STANDARD</code>.</p>",
+        "UpdateChannelRequest$type": "<p>Channel type, which determines the allowable resolution and bitrate. <i>If you exceed the allowable resolution or bitrate, the stream probably will disconnect immediately.</i> Valid values:</p> <ul> <li> <p> <code>STANDARD</code>: Multiple qualities are generated from the original input, to automatically give viewers the best experience for their devices and network conditions. Vertical resolution can be up to 1080 and bitrate can be up to 8.5 Mbps.</p> </li> <li> <p> <code>BASIC</code>: Amazon IVS delivers the original input to viewers. The viewer’s video-quality choice is limited to the original input. Vertical resolution can be up to 480 and bitrate can be up to 1.5 Mbps.</p> </li> </ul> <p>Default: <code>STANDARD</code>.</p>"
+      }
+    },
+    "Channels": {
+      "base": null,
+      "refs": {
+        "BatchGetChannelResponse$channels": null
+      }
+    },
+    "ConflictException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateChannelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateChannelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateStreamKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateStreamKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteChannelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePlaybackKeyPairRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePlaybackKeyPairResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteStreamKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetChannelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetChannelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPlaybackKeyPairRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPlaybackKeyPairResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetStreamKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetStreamKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetStreamRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetStreamResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportPlaybackKeyPairRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportPlaybackKeyPairResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IngestEndpoint": {
+      "base": null,
+      "refs": {
+        "Channel$ingestEndpoint": "<p>Channel ingest endpoint, part of the definition of an ingest server, used when you set up streaming software.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IsAuthorized": {
+      "base": null,
+      "refs": {
+        "Channel$authorized": "<p>Whether the channel is authorized.</p>",
+        "ChannelSummary$authorized": "<p>Whether the channel is authorized.</p>"
+      }
+    },
+    "ListChannelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListChannelsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPlaybackKeyPairsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPlaybackKeyPairsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListStreamKeysRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListStreamKeysResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListStreamsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListStreamsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxChannelResults": {
+      "base": null,
+      "refs": {
+        "ListChannelsRequest$maxResults": "<p>Maximum number of channels to return.</p>"
+      }
+    },
+    "MaxPlaybackKeyPairResults": {
+      "base": null,
+      "refs": {
+        "ListPlaybackKeyPairsRequest$maxResults": "<p>The first key pair to retrieve. This is used for pagination; see the <code>nextToken</code> response field.</p>"
+      }
+    },
+    "MaxStreamKeyResults": {
+      "base": null,
+      "refs": {
+        "ListStreamKeysRequest$maxResults": "<p>Maximum number of streamKeys to return.</p>"
+      }
+    },
+    "MaxStreamResults": {
+      "base": null,
+      "refs": {
+        "ListStreamsRequest$maxResults": "<p>Maximum number of streams to return.</p>"
+      }
+    },
+    "MaxTagResults": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$maxResults": "<p>Maximum number of tags to return.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListChannelsRequest$nextToken": "<p>The first channel to retrieve. This is used for pagination; see the <code>nextToken</code> response field.</p>",
+        "ListChannelsResponse$nextToken": "<p>If there are more channels than <code>maxResults</code>, use <code>nextToken</code> in the request to get the next set.</p>",
+        "ListPlaybackKeyPairsRequest$nextToken": "<p>Maximum number of key pairs to return.</p>",
+        "ListPlaybackKeyPairsResponse$nextToken": "<p>If there are more key pairs than <code>maxResults</code>, use <code>nextToken</code> in the request to get the next set.</p>",
+        "ListStreamKeysRequest$nextToken": "<p>The first stream key to retrieve. This is used for pagination; see the <code>nextToken</code> response field.</p>",
+        "ListStreamKeysResponse$nextToken": "<p>If there are more stream keys than <code>maxResults</code>, use <code>nextToken</code> in the request to get the next set.</p>",
+        "ListStreamsRequest$nextToken": "<p>The first stream to retrieve. This is used for pagination; see the <code>nextToken</code> response field.</p>",
+        "ListStreamsResponse$nextToken": "<p>If there are more streams than <code>maxResults</code>, use <code>nextToken</code> in the request to get the next set.</p>"
+      }
+    },
+    "PendingVerification": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PlaybackKeyPair": {
+      "base": "<p>A key pair used to sign and validate a playback authorization token.</p>",
+      "refs": {
+        "GetPlaybackKeyPairResponse$keyPair": null,
+        "ImportPlaybackKeyPairResponse$keyPair": null
+      }
+    },
+    "PlaybackKeyPairArn": {
+      "base": null,
+      "refs": {
+        "DeletePlaybackKeyPairRequest$arn": "<p>ARN of the key pair to be deleted.</p>",
+        "GetPlaybackKeyPairRequest$arn": "<p>ARN of the key pair to be returned.</p>",
+        "PlaybackKeyPair$arn": "<p>Key-pair ARN.</p>",
+        "PlaybackKeyPairSummary$arn": "<p>Key-pair ARN.</p>"
+      }
+    },
+    "PlaybackKeyPairFingerprint": {
+      "base": null,
+      "refs": {
+        "PlaybackKeyPair$fingerprint": "<p>Key-pair identifier.</p>"
+      }
+    },
+    "PlaybackKeyPairList": {
+      "base": null,
+      "refs": {
+        "ListPlaybackKeyPairsResponse$keyPairs": "<p>List of key pairs.</p>"
+      }
+    },
+    "PlaybackKeyPairName": {
+      "base": null,
+      "refs": {
+        "ImportPlaybackKeyPairRequest$name": "<p>An arbitrary string (a nickname) assigned to a playback key pair that helps the customer identify that resource. The value does not need to be unique.</p>",
+        "PlaybackKeyPair$name": "<p>Key-pair name.</p>",
+        "PlaybackKeyPairSummary$name": "<p>Key-pair name.</p>"
+      }
+    },
+    "PlaybackKeyPairSummary": {
+      "base": "<p>Summary information about a playback key pair.</p>",
+      "refs": {
+        "PlaybackKeyPairList$member": null
+      }
+    },
+    "PlaybackPublicKeyMaterial": {
+      "base": null,
+      "refs": {
+        "ImportPlaybackKeyPairRequest$publicKeyMaterial": "<p>The public portion of a customer-generated key pair.</p>"
+      }
+    },
+    "PlaybackURL": {
+      "base": null,
+      "refs": {
+        "Channel$playbackUrl": "<p>Channel playback URL.</p>",
+        "Stream$playbackUrl": "<p>URL of the video master manifest, required by the video player to play the HLS stream.</p>"
+      }
+    },
+    "PutMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "BatchError$arn": "<p>Channel ARN.</p>",
+        "ListTagsForResourceRequest$resourceArn": "<p>The ARN of the resource to be retrieved.</p>",
+        "TagResourceRequest$resourceArn": "<p>ARN of the resource for which tags are to be added or updated.</p>",
+        "UntagResourceRequest$resourceArn": "<p>ARN of the resource for which tags are to be removed.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopStreamRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopStreamResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Stream": {
+      "base": "<p>Specifies a live video stream that has been ingested and distributed.</p>",
+      "refs": {
+        "GetStreamResponse$stream": null
+      }
+    },
+    "StreamHealth": {
+      "base": null,
+      "refs": {
+        "Stream$health": "<p>The stream’s health.</p>",
+        "StreamSummary$health": "<p>The stream’s health.</p>"
+      }
+    },
+    "StreamKey": {
+      "base": "<p>Object specifying a stream key.</p>",
+      "refs": {
+        "CreateChannelResponse$streamKey": null,
+        "CreateStreamKeyResponse$streamKey": "<p>Stream key used to authenticate an RTMPS stream for ingestion.</p>",
+        "GetStreamKeyResponse$streamKey": null,
+        "StreamKeys$member": null
+      }
+    },
+    "StreamKeyArn": {
+      "base": null,
+      "refs": {
+        "DeleteStreamKeyRequest$arn": "<p>ARN of the stream key to be deleted.</p>",
+        "GetStreamKeyRequest$arn": "<p>ARN for the stream key to be retrieved.</p>",
+        "StreamKey$arn": "<p>Stream-key ARN.</p>",
+        "StreamKeyArnList$member": null,
+        "StreamKeySummary$arn": "<p>Stream-key ARN.</p>"
+      }
+    },
+    "StreamKeyArnList": {
+      "base": null,
+      "refs": {
+        "BatchGetStreamKeyRequest$arns": "<p>Array of ARNs, one per channel.</p>"
+      }
+    },
+    "StreamKeyList": {
+      "base": null,
+      "refs": {
+        "ListStreamKeysResponse$streamKeys": "<p>List of stream keys.</p>"
+      }
+    },
+    "StreamKeySummary": {
+      "base": "<p>Summary information about a stream key.</p>",
+      "refs": {
+        "StreamKeyList$member": null
+      }
+    },
+    "StreamKeyValue": {
+      "base": null,
+      "refs": {
+        "StreamKey$value": "<p>Stream-key value.</p>"
+      }
+    },
+    "StreamKeys": {
+      "base": null,
+      "refs": {
+        "BatchGetStreamKeyResponse$streamKeys": null
+      }
+    },
+    "StreamList": {
+      "base": null,
+      "refs": {
+        "ListStreamsResponse$streams": "<p>List of streams.</p>"
+      }
+    },
+    "StreamMetadata": {
+      "base": null,
+      "refs": {
+        "PutMetadataRequest$metadata": "<p>Metadata to insert into the stream. Maximum: 1 KB per request.</p>"
+      }
+    },
+    "StreamStartTime": {
+      "base": null,
+      "refs": {
+        "Stream$startTime": "<p>ISO-8601 formatted timestamp of the stream’s start.</p>",
+        "StreamSummary$startTime": "<p>ISO-8601 formatted timestamp of the stream’s start.</p>"
+      }
+    },
+    "StreamState": {
+      "base": null,
+      "refs": {
+        "Stream$state": "<p>The stream’s state.</p>",
+        "StreamSummary$state": "<p>The stream’s state.</p>"
+      }
+    },
+    "StreamSummary": {
+      "base": "<p>Summary information about a stream.</p>",
+      "refs": {
+        "StreamList$member": null
+      }
+    },
+    "StreamUnavailable": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StreamViewerCount": {
+      "base": null,
+      "refs": {
+        "Stream$viewerCount": "<p>Number of current viewers of the stream.</p>",
+        "StreamSummary$viewerCount": "<p>Number of current viewers of the stream.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$nextToken": "<p>The first tag to retrieve. This is used for pagination; see the <code>nextToken</code> response field.</p>",
+        "ListTagsForResourceResponse$nextToken": "<p>If there are more tags than <code>maxResults</code>, use <code>nextToken</code> in the request to get the next set.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "Tags$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>Array of tags to be removed.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tags$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "Channel$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code>.</p>",
+        "ChannelSummary$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code>.</p>",
+        "CreateChannelRequest$tags": "<p>See <a>Channel$tags</a>.</p>",
+        "CreateStreamKeyRequest$tags": "<p>See <a>Channel$tags</a>.</p>",
+        "ImportPlaybackKeyPairRequest$tags": "<p>Any tags provided with the request are added to the playback key pair tags.</p>",
+        "ListTagsForResourceResponse$tags": null,
+        "PlaybackKeyPair$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code>.</p>",
+        "PlaybackKeyPairSummary$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code> </p>",
+        "StreamKey$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code>.</p>",
+        "StreamKeySummary$tags": "<p>Array of 1-50 maps, each of the form <code>string:string (key:value)</code>.</p>",
+        "TagResourceRequest$tags": "<p>Array of tags to be added or updated.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateChannelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateChannelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "errorCode": {
+      "base": null,
+      "refs": {
+        "BatchError$code": "<p>Error code.</p>"
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$exceptionMessage": "<p>User does not have sufficient access to perform this action.</p>",
+        "BatchError$message": "<p>Error message, determined by the application.</p>",
+        "ChannelNotBroadcasting$exceptionMessage": "<p>The stream is offline for the given channel ARN.</p>",
+        "ConflictException$exceptionMessage": "<p>Updating or deleting a resource can cause an inconsistent state.</p>",
+        "InternalServerException$exceptionMessage": "<p>Unexpected error during processing of request.</p>",
+        "PendingVerification$exceptionMessage": "<p> Your account is pending verification. </p>",
+        "ResourceNotFoundException$exceptionMessage": "<p>Request references a resource which does not exist.</p>",
+        "ServiceQuotaExceededException$exceptionMessage": "<p>Request would cause a service quota to be exceeded.</p>",
+        "StreamUnavailable$exceptionMessage": "<p>The stream is temporarily unavailable.</p>",
+        "ThrottlingException$exceptionMessage": "<p>Request was denied due to request throttling.</p>",
+        "ValidationException$exceptionMessage": "<p>The input fails to satisfy the constraints specified by an AWS service.</p>"
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RetrievePropertiesResponse xmlns="urn:vim25" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <returnval>
+  <obj type="ClusterComputeResource">domain-c7</obj>
+  <propSet>
+   <name>host</name>
+   <val xsi:type="ArrayOfManagedObjectReference">
+    <ManagedObjectReference type="HostSystem" xsi:type="ManagedObjectReference">host-14</ManagedObjectReference>
+    <ManagedObjectReference type="HostSystem" xsi:type="ManagedObjectReference">host-17</ManagedObjectReference>
+    <ManagedObjectReference type="HostSystem" xsi:type="ManagedObjectReference">host-19</ManagedObjectReference>
+    <ManagedObjectReference type="HostSystem" xsi:type="ManagedObjectReference">host-52</ManagedObjectReference>
+   </val>
+  </propSet>
+ </returnval>
+</RetrievePropertiesResponse>

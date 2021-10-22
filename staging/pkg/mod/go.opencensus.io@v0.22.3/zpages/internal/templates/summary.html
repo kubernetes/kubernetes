@@ -1,0 +1,43 @@
+<table style="border-spacing: 0">
+    <tr>
+        <td colspan=1 align=left><b>Span Name</b></td>
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td><td colspan=1 align="center"><b>Running</b></td>
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+        <td colspan=9 align="center"><b>Latency Samples</b></td>
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+        <td colspan=1 align="center"><b>Error Samples</b></td>
+    </tr>
+    <tr>
+        <td colspan=1></td>
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+        <td colspan=1></td>
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+    {{range .LatencyBucketNames}}<th colspan=1 align="center"><b>[{{.}}]</b></th>{{end}}
+        <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+        <td colspan=1></td>
+    </tr>
+{{$a := .TracesEndpoint}}
+{{$links := .Links}}
+{{range $rowindex, $row := .Rows}}
+{{- $name := .Name}}
+{{- if even $rowindex}}<tr style="background: #eee">{{else}}<tr>{{end -}}
+    <td>{{.Name}}</td><td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+{{- if $links -}}
+    <td align="center"><a href="{{$a}}?zspanname={{$name}}&ztype=0">{{.Active}}</a></td>
+{{- else -}}
+    <td>{{.Active}}</td>
+{{- end -}}
+    <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+{{- if $links -}}
+{{range $index, $value := .Latency}}<td align="center"><a href="{{$a}}?zspanname={{$name}}&ztype=1&zsubtype={{$index}}">{{$value}}</a></td>{{end}}
+{{- else -}}
+{{range .Latency}}<td>{{.}}</td>{{end}}
+{{- end -}}
+    <td>&nbsp;&nbsp;|&nbsp;&nbsp;</td>
+{{- if $links -}}
+    <td align="center"><a href="{{$a}}?zspanname={{$name}}&ztype=2&zsubtype=0">{{.Errors}}</td>
+{{- else -}}
+    <td>{{.Errors}}</td>
+{{- end -}}
+</tr>
+{{end}}</table>

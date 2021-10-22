@@ -1,0 +1,16 @@
+---
+name: Semgrep
+on: [push, pull_request]
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Semgrep
+      id: semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: p/dgryski.semgrep-go

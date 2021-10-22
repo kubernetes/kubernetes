@@ -1,0 +1,119 @@
+# intended to be used as part of a release process
+parameters:
+  - name: ArtifactLocation
+    type: string
+    default: 'not-specified'
+  - name: PackageRepository
+    type: string
+    default: 'not-specified'
+  - name: ReleaseSha
+    type: string
+    default: 'not-specified'
+  - name: RepoId
+    type: string
+    default: $(Build.Repository.Name)
+  - name: WorkingDirectory
+    type: string
+    default: ''
+  - name: ScriptDirectory
+    type: string
+    default: eng/common/scripts
+  - name: TargetDocRepoName
+    type: string
+    default: ''
+  - name: TargetDocRepoOwner
+    type: string
+    default: ''
+  - name: PRBranchName
+    type: string
+    default: 'master-rdme'
+  - name: PRLabels
+    type: string
+    default: 'auto-merge'
+  - name: ArtifactName
+    type: string
+    default: ''
+  - name: Language
+    type: string
+    default: ''
+  - name: DocRepoDestinationPath
+    type: string
+    default: '' #usually docs-ref-services/
+  - name: CIConfigs
+    type: string
+    default: '[]'
+  - name: GHReviewersVariable
+    type: string
+    default: ''
+  - name: GHTeamReviewersVariable
+    type: string
+    default: ''  # externally set, as eng-common does not have the identity-resolver. Run as pre-step
+  - name: OnboardingBranch
+    type: string
+    default: ''
+  - name: CloseAfterOpenForTesting
+    type: boolean
+    default: false
+  - name: SkipPackageJson
+    type: object
+    default: false
+  - name: SparseCheckoutPaths
+    type: object
+    default: null
+
+steps:
+- pwsh: |
+    if ($IsWindows) {
+      REG ADD HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /f /v LongPathsEnabled /t REG_DWORD /d 1
+      git config --system core.longpaths true
+    }
+    else {
+      Write-Host "This script is not executing on Windows, skipping registry modification."
+    }
+  displayName: Enable Long Paths if Necessary
+
+- ${{ if not(parameters.SparseCheckoutPaths) }}:
+  - pwsh: |
+      git clone https://github.com/${{ parameters.TargetDocRepoOwner }}/${{ parameters.TargetDocRepoName }} ${{ parameters.WorkingDirectory }}/repo
+    displayName: Clone Documentation Repository
+    ignoreLASTEXITCODE: false
+
+- ${{ if parameters.SparseCheckoutPaths }}:
+  - template: /eng/common/pipelines/templates/steps/sparse-checkout.yml
+    parameters:
+      SkipDefaultCheckout: true
+      Repositories:
+        - Name: ${{ parameters.TargetDocRepoOwner }}/${{ parameters.TargetDocRepoName }}
+          WorkingDirectory: ${{ parameters.WorkingDirectory }}/repo
+      Paths: ${{ parameters.SparseCheckoutPaths }}
+
+- template: /eng/common/pipelines/templates/steps/set-default-branch.yml
+  parameters:
+    WorkingDirectory: ${{ parameters.WorkingDirectory }}/repo
+- task: PowerShell@2
+  displayName: 'Apply Documentation Updates From Artifact'
+  inputs:
+    targetType: filePath
+    filePath: ${{ parameters.ScriptDirectory }}/update-docs-metadata.ps1
+    arguments: >
+      -ArtifactLocation ${{ parameters.ArtifactLocation }}
+      -Repository ${{ parameters.PackageRepository }}
+      -ReleaseSHA ${{ parameters.ReleaseSha }}
+      -RepoId ${{ parameters.RepoId }}
+      -WorkDirectory "${{ parameters.WorkingDirectory }}"
+      -DocRepoLocation "${{ parameters.WorkingDirectory }}/repo"
+      -Language "${{parameters.Language}}"
+      -Configs "${{ parameters.CIConfigs }}"
+    pwsh: true
+  env:
+    GH_TOKEN: $(azuresdk-github-pat)
+
+- template: /eng/common/pipelines/templates/steps/git-push-changes.yml
+  parameters:
+    BaseRepoBranch: $(DefaultBranch)
+    BaseRepoOwner: ${{ parameters.TargetDocRepoOwner }}
+    CommitMsg: "Update docs metadata and targeting for release of ${{ parameters.ArtifactName }}"
+    TargetRepoName: ${{ parameters.TargetDocRepoName }}
+    TargetRepoOwner: ${{ parameters.TargetDocRepoOwner }}
+    WorkingDirectory: ${{ parameters.WorkingDirectory }}/repo
+    ScriptDirectory: ${{ parameters.WorkingDirectory }}/${{ parameters.ScriptDirectory }}

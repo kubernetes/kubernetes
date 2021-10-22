@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListTables",
+            "input": {
+                "Limit": 1
+            },
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeTable",
+            "input": {
+                "TableName": "fake-table"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

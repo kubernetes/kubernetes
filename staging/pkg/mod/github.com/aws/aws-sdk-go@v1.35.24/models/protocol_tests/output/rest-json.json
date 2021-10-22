@@ -1,0 +1,839 @@
+[
+  {
+    "description": "Scalar members",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ImaHeader": {
+            "shape": "HeaderShape"
+          },
+          "ImaHeaderLocation": {
+            "shape": "HeaderShape",
+            "locationName": "X-Foo"
+          },
+          "Status": {
+            "shape": "StatusShape",
+            "location": "statusCode"
+          },
+          "Str": {
+            "shape": "StringType"
+          },
+          "Num": {
+            "shape": "IntegerType"
+          },
+          "FalseBool": {
+            "shape": "BooleanType"
+          },
+          "TrueBool": {
+            "shape": "BooleanType"
+          },
+          "Float": {
+            "shape": "FloatType"
+          },
+          "Double": {
+            "shape": "DoubleType"
+          },
+          "Long": {
+            "shape": "LongType"
+          },
+          "Char": {
+            "shape": "CharType"
+          },
+          "Timestamp": {
+            "shape": "TimestampType"
+          },
+          "BlobHeader": {
+            "shape": "BlobType",
+            "location": "header"
+          },
+          "Blob": {
+            "shape": "BlobType"
+          }
+        }
+      },
+      "HeaderShape": {
+        "type": "string",
+        "location": "header"
+      },
+      "StatusShape": {
+        "type": "integer"
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "IntegerType": {
+        "type": "integer"
+      },
+      "BooleanType": {
+        "type": "boolean"
+      },
+      "FloatType": {
+        "type": "float"
+      },
+      "DoubleType": {
+        "type": "double"
+      },
+      "LongType": {
+        "type": "long"
+      },
+      "CharType": {
+        "type": "character"
+      },
+      "TimestampType": {
+        "type": "timestamp"
+      },
+      "BlobType": {
+        "type": "blob"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ImaHeader": "test",
+          "ImaHeaderLocation": "abc",
+          "Status": 200,
+          "Str": "myname",
+          "Num": 123,
+          "FalseBool": false,
+          "TrueBool": true,
+          "Float": 1.2,
+          "Double": 1.3,
+          "Long": 200,
+          "Char": "a",
+          "Timestamp": 1422172800,
+          "BlobHeader": "hello",
+          "Blob": "hello"
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "ImaHeader": "test",
+            "BlobHeader": "aGVsbG8=",
+            "X-Foo": "abc"
+          },
+          "body": "{\"Str\": \"myname\", \"Num\": 123, \"FalseBool\": false, \"TrueBool\": true, \"Float\": 1.2, \"Double\": 1.3, \"Long\": 200, \"Char\": \"a\", \"Timestamp\": \"2015-01-25T08:00:00Z\", \"Blob\": \"aGVsbG8=\"}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Blob members",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "BlobMember": {
+            "shape": "BlobType"
+          },
+          "StructMember": {
+            "shape": "BlobContainer"
+          }
+        }
+      },
+      "BlobType": {
+        "type": "blob"
+      },
+      "BlobContainer": {
+        "type": "structure",
+        "members": {
+          "foo": {
+            "shape": "BlobType"
+          }
+        }
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "BlobMember": "hi!",
+          "StructMember": {
+            "foo": "there!"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"BlobMember\": \"aGkh\", \"StructMember\": {\"foo\": \"dGhlcmUh\"}}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Timestamp members",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "TimeArg": {
+            "shape": "TimestampType"
+          },
+          "TimeArgInHeader": {
+            "shape": "TimestampType",
+            "location": "header",
+            "locationName": "x-amz-timearg"
+          },
+          "TimeCustom": {
+            "timestampFormat": "rfc822",
+            "shape": "TimestampType"
+          },
+          "TimeCustomInHeader": {
+            "timestampFormat": "unixTimestamp",
+            "shape": "TimestampType",
+            "location": "header",
+            "locationName": "x-amz-timecustom"
+          },
+          "TimeFormat": {
+            "shape": "TimestampFormatType"
+          },
+          "TimeFormatInHeader": {
+            "shape": "TimestampFormatType",
+            "location": "header",
+            "locationName": "x-amz-timeformat"
+          },
+          "StructMember": {
+            "shape": "TimeContainer"
+          }
+        }
+      },
+      "TimeContainer": {
+        "type": "structure",
+        "members": {
+          "foo": {
+            "shape": "TimestampType"
+          },
+          "bar": {
+            "shape": "TimestampFormatType"
+          }
+        }
+      },
+      "TimestampFormatType": {
+        "timestampFormat": "iso8601",
+        "type": "timestamp"
+      },
+      "TimestampType": {
+        "type": "timestamp"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "TimeArg": 1398796238,
+          "TimeArgInHeader": 1398796238,
+          "TimeCustom": 1398796238,
+          "TimeCustomInHeader": 1398796238,
+          "TimeFormat": 1398796238,
+          "TimeFormatInHeader": 1398796238,
+          "StructMember": {
+            "foo": 1398796238,
+            "bar": 1398796238
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "x-amz-timearg": "Tue, 29 Apr 2014 18:30:38 GMT",
+            "x-amz-timecustom": "1398796238",
+            "x-amz-timeformat": "2014-04-29T18:30:38Z"
+          },
+          "body": "{\"TimeArg\": 1398796238, \"TimeCustom\": \"Tue, 29 Apr 2014 18:30:38 GMT\", \"TimeFormat\": \"2014-04-29T18:30:38Z\", \"StructMember\": {\"foo\": 1398796238, \"bar\": \"2014-04-29T18:30:38Z\"}}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Lists",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "member": {
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": ["a", "b"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"ListMember\": [\"a\", \"b\"]}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Lists with structure member",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "ListMember": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "member": {
+          "shape": "SingleStruct"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "SingleStruct": {
+        "type": "structure",
+        "members": {
+            "Foo": {
+              "shape": "StringType"
+            }
+        }
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "ListMember": [{"Foo": "a"}, {"Foo": "b"}]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"ListMember\": [{\"Foo\": \"a\"}, {\"Foo\": \"b\"}]}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Maps",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "MapMember": {
+            "shape": "MapType"
+          }
+        }
+      },
+      "MapType": {
+        "type": "map",
+        "key": {
+          "shape": "StringType"
+        },
+        "value": {
+          "shape": "ListType"
+        }
+      },
+      "ListType": {
+        "type": "list",
+        "member": {
+          "shape": "IntegerType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "IntegerType": {
+        "type": "integer"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "MapMember": {
+            "a": [1, 2],
+            "b": [3, 4]
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"MapMember\": {\"a\": [1, 2], \"b\": [3, 4]}}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Complex Map Values",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "MapMember": {
+            "shape": "MapType"
+          }
+        }
+      },
+      "MapType": {
+        "type": "map",
+        "key": {
+          "shape": "StringType"
+        },
+        "value": {
+          "shape": "TimeType"
+        }
+      },
+      "TimeType": {
+        "type": "timestamp"
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "MapMember": {
+            "a": 1398796238,
+            "b": 1398796238
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"MapMember\": {\"a\": 1398796238, \"b\": 1398796238}}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Ignores extra data",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "StrType": {
+            "shape": "StrType"
+          }
+        }
+      },
+      "StrType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {},
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"foo\": \"bar\"}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Ignores undefined output",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {},
+    "cases": [
+      {
+        "given": {
+          "name": "OperationName"
+        },
+        "result": {},
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "OK"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Supports header maps",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "AllHeaders": {
+            "shape": "HeaderMap",
+            "location": "headers"
+          },
+          "PrefixedHeaders": {
+            "shape": "HeaderMap",
+            "location": "headers",
+            "locationName": "X-"
+          }
+        }
+      },
+      "HeaderMap": {
+        "type": "map",
+        "key": {
+          "shape": "StringType"
+        },
+        "value": {
+          "shape": "StringType"
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "AllHeaders": {
+            "Content-Length": "10",
+            "X-Foo": "bar",
+            "X-Bam": "boo"
+          },
+          "PrefixedHeaders": {
+            "Foo": "bar",
+            "Bam": "boo"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "Content-Length": "10",
+            "X-Foo": "bar",
+            "X-Bam": "boo"
+          },
+          "body": "{}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "JSON payload",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "payload": "Data",
+        "members": {
+          "Header": {
+            "shape": "StringType",
+            "location": "header",
+            "locationName": "X-Foo"
+          },
+          "Data": {
+            "shape": "BodyStructure"
+          }
+        }
+      },
+      "BodyStructure": {
+        "type": "structure",
+        "members": {
+          "Foo": {
+            "shape": "StringType"
+          }
+        }
+      },
+      "StringType": {
+        "type": "string"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Header": "baz",
+          "Data": {
+            "Foo": "abc"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "X-Foo": "baz"
+          },
+          "body": "{\"Foo\": \"abc\"}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Streaming payload",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "payload": "Stream",
+        "members": {
+          "Stream": {
+            "shape": "Stream"
+          }
+        }
+      },
+      "Stream": {
+        "type": "blob"
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "Stream": "abc"
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "abc"
+        }
+      }
+    ]
+  },
+  {
+    "description": "JSON value trait",
+    "metadata": {
+      "protocol": "rest-json"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "HeaderField": {
+            "shape": "StringType",
+            "jsonvalue": true,
+            "location": "header",
+            "locationName": "X-Amz-Foo"
+          },
+          "BodyField":{
+            "shape": "StringType",
+            "jsonvalue": true
+          },
+          "BodyListField": {
+            "shape": "ListType"
+          }
+        }
+      },
+      "StringType": {
+        "type": "string"
+      },
+      "ListType": {
+        "type": "list",
+        "member": {
+          "shape": "StringType",
+          "jsonvalue": true
+        }
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "HeaderField": {"Foo":"Bar"},
+          "BodyField": {"Foo":"Bar"}
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {"X-Amz-Foo": "eyJGb28iOiJCYXIifQ=="},
+          "body": "{\"BodyField\":\"{\\\"Foo\\\":\\\"Bar\\\"}\"}"
+        }
+      },
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "BodyListField": [{"Foo":"Bar"}]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {},
+          "body": "{\"BodyListField\":[\"{\\\"Foo\\\":\\\"Bar\\\"}\"]}"
+        }
+      }
+    ]
+  },
+  {
+    "description": "Enum",
+    "metadata": {
+      "protocol": "rest-json",
+      "apiVersion": "2014-01-01"
+    },
+    "shapes": {
+      "OutputShape": {
+        "type": "structure",
+        "members": {
+          "HeaderEnum": {
+            "shape": "RESTJSONEnumType",
+            "location": "header",
+            "locationName": "x-amz-enum"
+          },
+          "FooEnum": {
+            "shape": "RESTJSONEnumType"
+          },
+          "ListEnums": {
+            "shape": "EnumList"
+          }
+        }
+      },
+      "RESTJSONEnumType":{
+        "type":"string",
+        "enum":[
+          "foo",
+          "bar",
+          "0",
+          "1"
+        ]
+      },
+      "EnumList":{
+        "type":"list",
+        "member": {"shape": "RESTJSONEnumType"}
+      }
+    },
+    "cases": [
+      {
+        "given": {
+          "output": {
+            "shape": "OutputShape"
+          },
+          "http": {
+            "method": "POST",
+            "requestUri": "/path"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+          "HeaderEnum": "baz",
+          "FooEnum": "foo",
+          "ListEnums": ["foo", "bar"]
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {"x-amz-enum": "baz"},
+          "body": "{\"FooEnum\": \"foo\", \"ListEnums\": [\"foo\", \"bar\"]}"
+        }
+      },
+      {
+        "given": {
+          "input": {
+            "shape": "OutputShape"
+          },
+          "http": {
+            "method": "POST",
+            "requestUri": "/path"
+          },
+          "name": "OperationName"
+        },
+        "result": {
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {}
+        }
+      }
+    ]
+  }
+]

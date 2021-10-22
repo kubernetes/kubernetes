@@ -1,0 +1,34 @@
+{
+  "pagination": {
+    "DescribeEndpoints": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Endpoints"
+    },
+    "ListJobs": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Jobs"
+    },
+    "ListPresets": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Presets"
+    },
+    "ListJobTemplates": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "JobTemplates"
+    },
+    "ListQueues": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Queues"
+    }
+  }
+}

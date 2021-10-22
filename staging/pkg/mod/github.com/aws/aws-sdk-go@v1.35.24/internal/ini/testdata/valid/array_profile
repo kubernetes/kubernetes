@@ -1,0 +1,8 @@
+[ foo ]
+bar = "one","two", "three"
+baz = 123
+qux =
+	moo = 123,456
+	cow = 1
+	milk = 123,456
+zed = "zee"

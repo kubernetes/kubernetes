@@ -1,0 +1,78 @@
+---
+version: 2.1
+
+orbs:
+  go: circleci/go@0.2.0
+
+jobs:
+  test:
+    parameters:
+      go_version:
+        type: string
+      run_style:
+        type: boolean
+        default: false
+      run_lint:
+        type: boolean
+        default: false
+      use_gomod_cache:
+        type: boolean
+        default: true
+    docker:
+    - image: circleci/golang:<< parameters.go_version >>
+    working_directory: /go/src/github.com/prometheus/client_golang
+    steps:
+    - checkout
+    - when:
+        condition: << parameters.use_gomod_cache >>
+        steps:
+        - go/load-cache:
+            key: v1-go<< parameters.go_version >>
+    - run: make check_license unused test
+    - when:
+        condition: << parameters.run_lint >>
+        steps:
+        - run: make lint
+    - when:
+        condition: << parameters.run_style >>
+        steps:
+        - run: make style
+    - when:
+        condition: << parameters.use_gomod_cache >>
+        steps:
+        - go/save-cache:
+            key: v1-go<< parameters.go_version >>
+    - store_test_results:
+        path: test-results
+
+workflows:
+  version: 2
+  client_golang:
+    jobs:
+    # Refer to README.md for the currently supported versions.
+    - test:
+        name: go-1-9
+        go_version: "1.9"
+        use_gomod_cache: false
+    - test:
+        name: go-1-10
+        go_version: "1.10"
+        use_gomod_cache: false
+    - test:
+        name: go-1-11
+        go_version: "1.11"
+        run_lint: true
+    - test:
+        name: go-1-12
+        go_version: "1.12"
+        run_lint: true
+    - test:
+        name: go-1-13
+        go_version: "1.13"
+        run_lint: true
+    - test:
+        name: go-1-14
+        go_version: "1.14"
+        run_lint: true
+        # Style is only checked against the latest supported Go version.
+        run_style: true

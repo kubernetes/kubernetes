@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListSecrets",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeSecret",
+            "input": {
+                "SecretId": "fake-secret-id"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

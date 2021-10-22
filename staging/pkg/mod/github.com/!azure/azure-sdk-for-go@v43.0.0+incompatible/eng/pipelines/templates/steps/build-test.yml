@@ -1,0 +1,54 @@
+parameters:
+  ServiceDirectory: ''
+  GoWorkspace: ''
+  Scope: 'sdk/...'
+  Image: ''
+  GoVersion: ''
+
+steps:
+
+  - pwsh: |
+      go get github.com/jstemmer/go-junit-report
+      go get github.com/axw/gocov/gocov
+      go get github.com/AlekSi/gocov-xml
+      go get github.com/matm/gocov-html
+    displayName: "Install Coverage and Junit Dependencies"
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      go vet $(go list $(SCOPE))
+    displayName: 'Vet'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      go build -v $(go list $(SCOPE))
+    displayName: 'Build'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      go test -race -v -coverprofile coverage.txt -covermode atomic $(SCOPE) | go-junit-report > $(Build.SourcesDirectory)/report.xml
+    displayName: 'Run Tests'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      gocov convert ./coverage.txt > ./coverage.json
+      
+      # gocov converts rely on standard input
+      Get-Content ./coverage.json | gocov-xml > $(Build.SourcesDirectory)/coverage.xml
+      Get-Content ./coverage.json | gocov-html > $(Build.SourcesDirectory)/coverage.html
+    displayName: 'Generate Coverage XML'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      testResultsFiles: '$(Build.SourcesDirectory)/report.xml'
+      testRunTitle: 'Go ${{ parameters.GoVersion }} on ${{ parameters.Image }}'
+
+  - task: PublishCodeCoverageResults@1
+    condition: succeededOrFailed()
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: '$(Build.SourcesDirectory)/coverage.xml'
+      additionalCodeCoverageFiles: '$(Build.SourcesDirectory)/coverage.html'

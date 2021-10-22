@@ -1,0 +1,321 @@
+---
+version: 1
+interactions:
+- request:
+    body: |
+      {"TableName":"table29storageentitysuitetestdel"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:wu+zudodIjydbdHsuNWBMegJngOMd9axBsb4hfEc13U=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table29storageentitysuitetestdel')
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table29storageentitysuitetestdel')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810aac-6002-0062-32a5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: '{"PartitionKey":"pkey1","RowKey":"rowkey1"}'
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=fullmetadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:68dqESLnhryHPUe+AUAkvp2fiDQtfME+O6cZZ3wr+Y0=
+      Content-Length:
+      - "43"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel
+    method: POST
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#table29storageentitysuitetestdel/@Element","odata.type":"golangrocksonazure.table29storageentitysuitetestdel","odata.id":"https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel(PartitionKey=''pkey1'',RowKey=''rowkey1'')","odata.etag":"W/\"datetime''2019-05-28T22%3A36%3A03.691092Z''\"","odata.editLink":"table29storageentitysuitetestdel(PartitionKey=''pkey1'',RowKey=''rowkey1'')","PartitionKey":"pkey1","RowKey":"rowkey1","Timestamp@odata.type":"Edm.DateTime","Timestamp":"2019-05-28T22:36:03.691092Z"}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=fullmetadata;streaming=true;charset=utf-8
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Etag:
+      - W/"datetime'2019-05-28T22%3A36%3A03.691092Z'"
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel(PartitionKey='pkey1',RowKey='rowkey1')
+      Preference-Applied:
+      - return-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ab2-6002-0062-36a5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:VJEZMYRsYSTGWnkdA7ELlag9HUgjhqIsoOAe9qZTzDQ=
+      If-Match:
+      - W/"datetime'2019-05-28T22%3A36%3A03.691092Z'"
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel%28PartitionKey=%27pkey1%27,RowKey=%27rowkey1%27%29
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ab6-6002-0062-3aa5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: '{"PartitionKey":"pkey2","RowKey":"rowkey2"}'
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:68dqESLnhryHPUe+AUAkvp2fiDQtfME+O6cZZ3wr+Y0=
+      Content-Length:
+      - "43"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel(PartitionKey='pkey2',RowKey='rowkey2')
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Etag:
+      - W/"datetime'2019-05-28T22%3A36%3A03.7171098Z'"
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel(PartitionKey='pkey2',RowKey='rowkey2')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ab9-6002-0062-3da5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:LKb5Pyf4q0ckp0ZI26DVQVJpWP0tOo5Dg8wqQuIdyMo=
+      If-Match:
+      - GolangRocksOnAzure
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel%28PartitionKey=%27pkey2%27,RowKey=%27rowkey2%27%29
+    method: DELETE
+  response:
+    body: '{"odata.error":{"code":"InvalidInput","message":{"lang":"en-US","value":"The
+      etag value ''GolangRocksOnAzure'' specified in one of the request headers is
+      not valid. Please make sure only one etag value is specified and is valid.\nRequestId:ac810ac0-6002-0062-44a5-153a2a000000\nTime:2019-05-28T22:36:03.7541359Z"}}}'
+    headers:
+      Content-Type:
+      - application/json;odata=nometadata;streaming=true;charset=utf-8
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ac0-6002-0062-44a5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 400 Bad Request
+    code: 400
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:LKb5Pyf4q0ckp0ZI26DVQVJpWP0tOo5Dg8wqQuIdyMo=
+      If-Match:
+      - '*'
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/table29storageentitysuitetestdel%28PartitionKey=%27pkey2%27,RowKey=%27rowkey2%27%29
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ac8-6002-0062-4ca5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:/N70J8Z4c7wHfwACnOfKO9V+oNIi/7gpMPpMwiiHYNI=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        table
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table29storageentitysuitetestdel%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:03 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - ac810ac9-6002-0062-4da5-153a2a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""

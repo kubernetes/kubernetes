@@ -1,0 +1,1723 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Lambda</fullname> <p> <b>Overview</b> </p> <p>This is the <i>AWS Lambda API Reference</i>. The AWS Lambda Developer Guide provides additional information. For the service overview, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/welcome.html\">What is AWS Lambda</a>, and for information about how the service works, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-introduction.html\">AWS Lambda: How it Works</a> in the <b>AWS Lambda Developer Guide</b>.</p>",
+  "operations": {
+    "AddLayerVersionPermission": "<p>Adds permissions to the resource-based policy of a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. Use this action to grant layer usage permission to other accounts. You can grant permission to a single account, all AWS accounts, or all accounts in an organization.</p> <p>To revoke permission, call <a>RemoveLayerVersionPermission</a> with the statement ID that you specified when you added it.</p>",
+    "AddPermission": "<p>Grants an AWS service or another account permission to use a function. You can apply the policy at the function level, or specify a qualifier to restrict access to a single version or alias. If you use a qualifier, the invoker must use the full Amazon Resource Name (ARN) of that version or alias to invoke the function.</p> <p>To grant permission to another account, specify the account ID as the <code>Principal</code>. For AWS services, the principal is a domain-style identifier defined by the service, like <code>s3.amazonaws.com</code> or <code>sns.amazonaws.com</code>. For AWS services, you can also specify the ARN of the associated resource as the <code>SourceArn</code>. If you grant permission to a service principal without specifying the source, other accounts could potentially configure resources in their account to invoke your Lambda function.</p> <p>This action adds a statement to a resource-based permissions policy for the function. For more information about function policies, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/access-control-resource-based.html\">Lambda Function Policies</a>. </p>",
+    "CreateAlias": "<p>Creates an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">alias</a> for a Lambda function version. Use aliases to provide clients with a function identifier that you can update to invoke a different version.</p> <p>You can also map an alias to split invocation requests between two versions. Use the <code>RoutingConfig</code> parameter to specify a second version and the percentage of invocation requests that it receives.</p>",
+    "CreateEventSourceMapping": "<p>Creates a mapping between an event source and an AWS Lambda function. Lambda reads items from the event source and triggers the function.</p> <p>For details about each event source type, see the following topics.</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html\">Using AWS Lambda with Amazon DynamoDB</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html\">Using AWS Lambda with Amazon Kinesis</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html\">Using AWS Lambda with Amazon SQS</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/with-msk.html\">Using AWS Lambda with Amazon MSK</a> </p> </li> </ul> <p>The following error handling options are only available for stream sources (DynamoDB and Kinesis):</p> <ul> <li> <p> <code>BisectBatchOnFunctionError</code> - If the function returns an error, split the batch in two and retry.</p> </li> <li> <p> <code>DestinationConfig</code> - Send discarded records to an Amazon SQS queue or Amazon SNS topic.</p> </li> <li> <p> <code>MaximumRecordAgeInSeconds</code> - Discard records older than the specified age. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires</p> </li> <li> <p> <code>MaximumRetryAttempts</code> - Discard records after the specified number of retries. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires.</p> </li> <li> <p> <code>ParallelizationFactor</code> - Process multiple batches from each shard concurrently.</p> </li> </ul>",
+    "CreateFunction": "<p>Creates a Lambda function. To create a function, you need a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/deployment-package-v2.html\">deployment package</a> and an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/intro-permission-model.html#lambda-intro-execution-role\">execution role</a>. The deployment package contains your function code. The execution role grants the function permission to use AWS services, such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for request tracing.</p> <p>When you create a function, Lambda provisions an instance of the function and its supporting resources. If your function connects to a VPC, this process can take a minute or so. During this time, you can't invoke or modify the function. The <code>State</code>, <code>StateReason</code>, and <code>StateReasonCode</code> fields in the response from <a>GetFunctionConfiguration</a> indicate when the function is ready to invoke. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/functions-states.html\">Function States</a>.</p> <p>A function has an unpublished version, and can have published versions and aliases. The unpublished version changes when you update your function's code and configuration. A published version is a snapshot of your function code and configuration that can't be changed. An alias is a named resource that maps to a version, and can be changed to map to a different version. Use the <code>Publish</code> parameter to create version <code>1</code> of your function from its initial configuration.</p> <p>The other parameters let you configure version-specific and function-level settings. You can modify version-specific settings later with <a>UpdateFunctionConfiguration</a>. Function-level settings apply to both the unpublished and published versions of the function, and include tags (<a>TagResource</a>) and per-function concurrency limits (<a>PutFunctionConcurrency</a>).</p> <p>If another account or an AWS service invokes your function, use <a>AddPermission</a> to grant permission by creating a resource-based IAM policy. You can grant permissions at the function level, on a version, or on an alias.</p> <p>To invoke your function directly, use <a>Invoke</a>. To invoke your function in response to events in other AWS services, create an event source mapping (<a>CreateEventSourceMapping</a>), or configure a function trigger in the other service. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-invocation.html\">Invoking Functions</a>.</p>",
+    "DeleteAlias": "<p>Deletes a Lambda function <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">alias</a>.</p>",
+    "DeleteEventSourceMapping": "<p>Deletes an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/intro-invocation-modes.html\">event source mapping</a>. You can get the identifier of a mapping from the output of <a>ListEventSourceMappings</a>.</p> <p>When you delete an event source mapping, it enters a <code>Deleting</code> state and might not be completely deleted for several seconds.</p>",
+    "DeleteFunction": "<p>Deletes a Lambda function. To delete a specific function version, use the <code>Qualifier</code> parameter. Otherwise, all versions and aliases are deleted.</p> <p>To delete Lambda event source mappings that invoke a function, use <a>DeleteEventSourceMapping</a>. For AWS services and resources that invoke your function directly, delete the trigger in the service where you originally configured it.</p>",
+    "DeleteFunctionConcurrency": "<p>Removes a concurrent execution limit from a function.</p>",
+    "DeleteFunctionEventInvokeConfig": "<p>Deletes the configuration for asynchronous invocation for a function, version, or alias.</p> <p>To configure options for asynchronous invocation, use <a>PutFunctionEventInvokeConfig</a>.</p>",
+    "DeleteLayerVersion": "<p>Deletes a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. Deleted versions can no longer be viewed or added to functions. To avoid breaking functions, a copy of the version remains in Lambda until no functions refer to it.</p>",
+    "DeleteProvisionedConcurrencyConfig": "<p>Deletes the provisioned concurrency configuration for a function.</p>",
+    "GetAccountSettings": "<p>Retrieves details about your account's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/limits.html\">limits</a> and usage in an AWS Region.</p>",
+    "GetAlias": "<p>Returns details about a Lambda function <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">alias</a>.</p>",
+    "GetEventSourceMapping": "<p>Returns details about an event source mapping. You can get the identifier of a mapping from the output of <a>ListEventSourceMappings</a>.</p>",
+    "GetFunction": "<p>Returns information about the function or function version, with a link to download the deployment package that's valid for 10 minutes. If you specify a function version, only details that are specific to that version are returned.</p>",
+    "GetFunctionConcurrency": "<p>Returns details about the reserved concurrency configuration for a function. To set a concurrency limit for a function, use <a>PutFunctionConcurrency</a>.</p>",
+    "GetFunctionConfiguration": "<p>Returns the version-specific settings of a Lambda function or version. The output includes only options that can vary between versions of a function. To modify these settings, use <a>UpdateFunctionConfiguration</a>.</p> <p>To get all of a function's details, including function-level settings, use <a>GetFunction</a>.</p>",
+    "GetFunctionEventInvokeConfig": "<p>Retrieves the configuration for asynchronous invocation for a function, version, or alias.</p> <p>To configure options for asynchronous invocation, use <a>PutFunctionEventInvokeConfig</a>.</p>",
+    "GetLayerVersion": "<p>Returns information about a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>, with a link to download the layer archive that's valid for 10 minutes.</p>",
+    "GetLayerVersionByArn": "<p>Returns information about a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>, with a link to download the layer archive that's valid for 10 minutes.</p>",
+    "GetLayerVersionPolicy": "<p>Returns the permission policy for a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. For more information, see <a>AddLayerVersionPermission</a>.</p>",
+    "GetPolicy": "<p>Returns the <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/access-control-resource-based.html\">resource-based IAM policy</a> for a function, version, or alias.</p>",
+    "GetProvisionedConcurrencyConfig": "<p>Retrieves the provisioned concurrency configuration for a function's alias or version.</p>",
+    "Invoke": "<p>Invokes a Lambda function. You can invoke a function synchronously (and wait for the response), or asynchronously. To invoke a function asynchronously, set <code>InvocationType</code> to <code>Event</code>.</p> <p>For <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-sync.html\">synchronous invocation</a>, details about the function response, including errors, are included in the response body and headers. For either invocation type, you can find more information in the <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/monitoring-functions.html\">execution log</a> and <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html\">trace</a>.</p> <p>When an error occurs, your function may be invoked multiple times. Retry behavior varies by error type, client, event source, and invocation type. For example, if you invoke a function asynchronously and it returns an error, Lambda executes the function up to two more times. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/retries-on-errors.html\">Retry Behavior</a>.</p> <p>For <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html\">asynchronous invocation</a>, Lambda adds events to a queue before sending them to your function. If your function does not have enough capacity to keep up with the queue, events may be lost. Occasionally, your function may receive the same event multiple times, even if no error occurs. To retain events that were not processed, configure your function with a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq\">dead-letter queue</a>.</p> <p>The status code in the API response doesn't reflect function errors. Error codes are reserved for errors that prevent your function from executing, such as permissions errors, <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/limits.html\">limit errors</a>, or issues with your function's code and configuration. For example, Lambda returns <code>TooManyRequestsException</code> if executing the function would cause you to exceed a concurrency limit at either the account level (<code>ConcurrentInvocationLimitExceeded</code>) or function level (<code>ReservedFunctionConcurrentInvocationLimitExceeded</code>).</p> <p>For functions with a long timeout, your client might be disconnected during synchronous invocation while it waits for a response. Configure your HTTP client, SDK, firewall, proxy, or operating system to allow for long connections with timeout or keep-alive settings.</p> <p>This operation requires permission for the <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_awslambda.html\">lambda:InvokeFunction</a> action.</p>",
+    "InvokeAsync": "<important> <p>For asynchronous function invocation, use <a>Invoke</a>.</p> </important> <p>Invokes a function asynchronously.</p>",
+    "ListAliases": "<p>Returns a list of <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">aliases</a> for a Lambda function.</p>",
+    "ListEventSourceMappings": "<p>Lists event source mappings. Specify an <code>EventSourceArn</code> to only show event source mappings for a single event source.</p>",
+    "ListFunctionEventInvokeConfigs": "<p>Retrieves a list of configurations for asynchronous invocation for a function.</p> <p>To configure options for asynchronous invocation, use <a>PutFunctionEventInvokeConfig</a>.</p>",
+    "ListFunctions": "<p>Returns a list of Lambda functions, with the version-specific configuration of each. Lambda returns up to 50 functions per call.</p> <p>Set <code>FunctionVersion</code> to <code>ALL</code> to include all published versions of each function in addition to the unpublished version. To get more information about a function or version, use <a>GetFunction</a>.</p>",
+    "ListLayerVersions": "<p>Lists the versions of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. Versions that have been deleted aren't listed. Specify a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html\">runtime identifier</a> to list only versions that indicate that they're compatible with that runtime.</p>",
+    "ListLayers": "<p>Lists <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layers</a> and shows information about the latest version of each. Specify a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html\">runtime identifier</a> to list only layers that indicate that they're compatible with that runtime.</p>",
+    "ListProvisionedConcurrencyConfigs": "<p>Retrieves a list of provisioned concurrency configurations for a function.</p>",
+    "ListTags": "<p>Returns a function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/tagging.html\">tags</a>. You can also view tags with <a>GetFunction</a>.</p>",
+    "ListVersionsByFunction": "<p>Returns a list of <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">versions</a>, with the version-specific configuration of each. Lambda returns up to 50 versions per call.</p>",
+    "PublishLayerVersion": "<p>Creates an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a> from a ZIP archive. Each time you call <code>PublishLayerVersion</code> with the same layer name, a new version is created.</p> <p>Add layers to your function with <a>CreateFunction</a> or <a>UpdateFunctionConfiguration</a>.</p>",
+    "PublishVersion": "<p>Creates a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">version</a> from the current code and configuration of a function. Use versions to create a snapshot of your function code and configuration that doesn't change.</p> <p>AWS Lambda doesn't publish a version if the function's configuration and code haven't changed since the last version. Use <a>UpdateFunctionCode</a> or <a>UpdateFunctionConfiguration</a> to update the function before publishing a version.</p> <p>Clients can invoke versions directly or with an alias. To create an alias, use <a>CreateAlias</a>.</p>",
+    "PutFunctionConcurrency": "<p>Sets the maximum number of simultaneous executions for a function, and reserves capacity for that concurrency level.</p> <p>Concurrency settings apply to the function as a whole, including all published versions and the unpublished version. Reserving concurrency both ensures that your function has capacity to process the specified number of events simultaneously, and prevents it from scaling beyond that level. Use <a>GetFunction</a> to see the current setting for a function.</p> <p>Use <a>GetAccountSettings</a> to see your Regional concurrency limit. You can reserve concurrency for as many functions as you like, as long as you leave at least 100 simultaneous executions unreserved for functions that aren't configured with a per-function limit. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html\">Managing Concurrency</a>.</p>",
+    "PutFunctionEventInvokeConfig": "<p>Configures options for <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html\">asynchronous invocation</a> on a function, version, or alias. If a configuration already exists for a function, version, or alias, this operation overwrites it. If you exclude any settings, they are removed. To set one option without affecting existing settings for other options, use <a>UpdateFunctionEventInvokeConfig</a>.</p> <p>By default, Lambda retries an asynchronous invocation twice if the function returns an error. It retains events in a queue for up to six hours. When an event fails all processing attempts or stays in the asynchronous invocation queue for too long, Lambda discards it. To retain discarded events, configure a dead-letter queue with <a>UpdateFunctionConfiguration</a>.</p> <p>To send an invocation record to a queue, topic, function, or event bus, specify a <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#invocation-async-destinations\">destination</a>. You can configure separate destinations for successful invocations (on-success) and events that fail all processing attempts (on-failure). You can configure destinations in addition to or instead of a dead-letter queue.</p>",
+    "PutProvisionedConcurrencyConfig": "<p>Adds a provisioned concurrency configuration to a function's alias or version.</p>",
+    "RemoveLayerVersionPermission": "<p>Removes a statement from the permissions policy for a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. For more information, see <a>AddLayerVersionPermission</a>.</p>",
+    "RemovePermission": "<p>Revokes function-use permission from an AWS service or another account. You can get the ID of the statement from the output of <a>GetPolicy</a>.</p>",
+    "TagResource": "<p>Adds <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/tagging.html\">tags</a> to a function.</p>",
+    "UntagResource": "<p>Removes <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/tagging.html\">tags</a> from a function.</p>",
+    "UpdateAlias": "<p>Updates the configuration of a Lambda function <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">alias</a>.</p>",
+    "UpdateEventSourceMapping": "<p>Updates an event source mapping. You can change the function that AWS Lambda invokes, or pause invocation and resume later from the same location.</p> <p>The following error handling options are only available for stream sources (DynamoDB and Kinesis):</p> <ul> <li> <p> <code>BisectBatchOnFunctionError</code> - If the function returns an error, split the batch in two and retry.</p> </li> <li> <p> <code>DestinationConfig</code> - Send discarded records to an Amazon SQS queue or Amazon SNS topic.</p> </li> <li> <p> <code>MaximumRecordAgeInSeconds</code> - Discard records older than the specified age. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires</p> </li> <li> <p> <code>MaximumRetryAttempts</code> - Discard records after the specified number of retries. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires.</p> </li> <li> <p> <code>ParallelizationFactor</code> - Process multiple batches from each shard concurrently.</p> </li> </ul>",
+    "UpdateFunctionCode": "<p>Updates a Lambda function's code.</p> <p>The function's code is locked when you publish a version. You can't modify the code of a published version, only the unpublished version.</p>",
+    "UpdateFunctionConfiguration": "<p>Modify the version-specific settings of a Lambda function.</p> <p>When you update a function, Lambda provisions an instance of the function and its supporting resources. If your function connects to a VPC, this process can take a minute. During this time, you can't modify the function, but you can still invoke it. The <code>LastUpdateStatus</code>, <code>LastUpdateStatusReason</code>, and <code>LastUpdateStatusReasonCode</code> fields in the response from <a>GetFunctionConfiguration</a> indicate when the update is complete and the function is processing events with the new configuration. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/functions-states.html\">Function States</a>.</p> <p>These settings can vary between versions of a function and are locked when you publish a version. You can't modify the configuration of a published version, only the unpublished version.</p> <p>To configure function concurrency, use <a>PutFunctionConcurrency</a>. To grant invoke permissions to an account or AWS service, use <a>AddPermission</a>.</p>",
+    "UpdateFunctionEventInvokeConfig": "<p>Updates the configuration for asynchronous invocation for a function, version, or alias.</p> <p>To configure options for asynchronous invocation, use <a>PutFunctionEventInvokeConfig</a>.</p>"
+  },
+  "shapes": {
+    "AccountLimit": {
+      "base": "<p>Limits that are related to concurrency and storage. All file and storage sizes are in bytes.</p>",
+      "refs": {
+        "GetAccountSettingsResponse$AccountLimit": "<p>Limits that are related to concurrency and code storage.</p>"
+      }
+    },
+    "AccountUsage": {
+      "base": "<p>The number of functions and amount of storage in use.</p>",
+      "refs": {
+        "GetAccountSettingsResponse$AccountUsage": "<p>The number of functions and amount of storage in use.</p>"
+      }
+    },
+    "Action": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$Action": "<p>The action that the principal can use on the function. For example, <code>lambda:InvokeFunction</code> or <code>lambda:GetFunction</code>.</p>"
+      }
+    },
+    "AddLayerVersionPermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddLayerVersionPermissionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddPermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddPermissionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AdditionalVersion": {
+      "base": null,
+      "refs": {
+        "AdditionalVersionWeights$key": null
+      }
+    },
+    "AdditionalVersionWeights": {
+      "base": null,
+      "refs": {
+        "AliasRoutingConfiguration$AdditionalVersionWeights": "<p>The second version, and the percentage of traffic that's routed to it.</p>"
+      }
+    },
+    "Alias": {
+      "base": null,
+      "refs": {
+        "AliasConfiguration$Name": "<p>The name of the alias.</p>",
+        "CreateAliasRequest$Name": "<p>The name of the alias.</p>",
+        "DeleteAliasRequest$Name": "<p>The name of the alias.</p>",
+        "GetAliasRequest$Name": "<p>The name of the alias.</p>",
+        "UpdateAliasRequest$Name": "<p>The name of the alias.</p>"
+      }
+    },
+    "AliasConfiguration": {
+      "base": "<p>Provides configuration information about a Lambda function <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases.html\">alias</a>.</p>",
+      "refs": {
+        "AliasList$member": null
+      }
+    },
+    "AliasList": {
+      "base": null,
+      "refs": {
+        "ListAliasesResponse$Aliases": "<p>A list of aliases.</p>"
+      }
+    },
+    "AliasRoutingConfiguration": {
+      "base": "<p>The <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-traffic-shifting-using-aliases.html\">traffic-shifting</a> configuration of a Lambda function alias.</p>",
+      "refs": {
+        "AliasConfiguration$RoutingConfig": "<p>The <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-traffic-shifting-using-aliases.html\">routing configuration</a> of the alias.</p>",
+        "CreateAliasRequest$RoutingConfig": "<p>The <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-aliases.html#configuring-alias-routing\">routing configuration</a> of the alias.</p>",
+        "UpdateAliasRequest$RoutingConfig": "<p>The <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-aliases.html#configuring-alias-routing\">routing configuration</a> of the alias.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$SourceArn": "<p>For AWS services, the ARN of the AWS resource that invokes the function. For example, an Amazon S3 bucket or Amazon SNS topic.</p>",
+        "CreateEventSourceMappingRequest$EventSourceArn": "<p>The Amazon Resource Name (ARN) of the event source.</p> <ul> <li> <p> <b>Amazon Kinesis</b> - The ARN of the data stream or a stream consumer.</p> </li> <li> <p> <b>Amazon DynamoDB Streams</b> - The ARN of the stream.</p> </li> <li> <p> <b>Amazon Simple Queue Service</b> - The ARN of the queue.</p> </li> <li> <p> <b>Amazon Managed Streaming for Apache Kafka</b> - The ARN of the cluster.</p> </li> </ul>",
+        "EventSourceMappingConfiguration$EventSourceArn": "<p>The Amazon Resource Name (ARN) of the event source.</p>",
+        "ListEventSourceMappingsRequest$EventSourceArn": "<p>The Amazon Resource Name (ARN) of the event source.</p> <ul> <li> <p> <b>Amazon Kinesis</b> - The ARN of the data stream or a stream consumer.</p> </li> <li> <p> <b>Amazon DynamoDB Streams</b> - The ARN of the stream.</p> </li> <li> <p> <b>Amazon Simple Queue Service</b> - The ARN of the queue.</p> </li> <li> <p> <b>Amazon Managed Streaming for Apache Kafka</b> - The ARN of the cluster.</p> </li> </ul>",
+        "SourceAccessConfiguration$URI": "<p>To reference the secret, use the following format: <code>[ { \"Type\": \"BASIC_AUTH\", \"URI\": \"secretARN\" } ]</code> </p> <p>The value of <code>Type</code> is always <code>BASIC_AUTH</code>. To encrypt the secret, you can use customer or service managed keys. When using a customer managed KMS key, the Lambda execution role requires <code>kms:Decrypt</code> permissions.</p>"
+      }
+    },
+    "BatchSize": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$BatchSize": "<p>The maximum number of items to retrieve in a single batch.</p> <ul> <li> <p> <b>Amazon Kinesis</b> - Default 100. Max 10,000.</p> </li> <li> <p> <b>Amazon DynamoDB Streams</b> - Default 100. Max 1,000.</p> </li> <li> <p> <b>Amazon Simple Queue Service</b> - Default 10. Max 10.</p> </li> <li> <p> <b>Amazon Managed Streaming for Apache Kafka</b> - Default 100. Max 10,000.</p> </li> </ul>",
+        "EventSourceMappingConfiguration$BatchSize": "<p>The maximum number of items to retrieve in a single batch.</p>",
+        "UpdateEventSourceMappingRequest$BatchSize": "<p>The maximum number of items to retrieve in a single batch.</p> <ul> <li> <p> <b>Amazon Kinesis</b> - Default 100. Max 10,000.</p> </li> <li> <p> <b>Amazon DynamoDB Streams</b> - Default 100. Max 1,000.</p> </li> <li> <p> <b>Amazon Simple Queue Service</b> - Default 10. Max 10.</p> </li> <li> <p> <b>Amazon Managed Streaming for Apache Kafka</b> - Default 100. Max 10,000.</p> </li> </ul>"
+      }
+    },
+    "BisectBatchOnFunctionError": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$BisectBatchOnFunctionError": "<p>(Streams) If the function returns an error, split the batch in two and retry.</p>",
+        "EventSourceMappingConfiguration$BisectBatchOnFunctionError": "<p>(Streams) If the function returns an error, split the batch in two and retry. The default value is false.</p>",
+        "UpdateEventSourceMappingRequest$BisectBatchOnFunctionError": "<p>(Streams) If the function returns an error, split the batch in two and retry.</p>"
+      }
+    },
+    "Blob": {
+      "base": null,
+      "refs": {
+        "FunctionCode$ZipFile": "<p>The base64-encoded contents of the deployment package. AWS SDK and AWS CLI clients handle the encoding for you.</p>",
+        "InvocationRequest$Payload": "<p>The JSON that you want to provide to your Lambda function as input.</p>",
+        "InvocationResponse$Payload": "<p>The response from the function, or an error object.</p>",
+        "LayerVersionContentInput$ZipFile": "<p>The base64-encoded contents of the layer archive. AWS SDK and AWS CLI clients handle the encoding for you.</p>",
+        "UpdateFunctionCodeRequest$ZipFile": "<p>The base64-encoded contents of the deployment package. AWS SDK and AWS CLI clients handle the encoding for you.</p>"
+      }
+    },
+    "BlobStream": {
+      "base": null,
+      "refs": {
+        "InvokeAsyncRequest$InvokeArgs": "<p>The JSON that you want to provide to your Lambda function as input.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Publish": "<p>Set to true to publish the first version of the function during creation.</p>",
+        "UpdateFunctionCodeRequest$Publish": "<p>Set to true to publish a new version of the function after updating the code. This has the same effect as calling <a>PublishVersion</a> separately.</p>",
+        "UpdateFunctionCodeRequest$DryRun": "<p>Set to true to validate the request parameters and access permissions without modifying the function code.</p>"
+      }
+    },
+    "CodeStorageExceededException": {
+      "base": "<p>You have exceeded your maximum total code size per account. <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/limits.html\">Learn more</a> </p>",
+      "refs": {
+      }
+    },
+    "CompatibleRuntimes": {
+      "base": null,
+      "refs": {
+        "GetLayerVersionResponse$CompatibleRuntimes": "<p>The layer's compatible runtimes.</p>",
+        "LayerVersionsListItem$CompatibleRuntimes": "<p>The layer's compatible runtimes.</p>",
+        "PublishLayerVersionRequest$CompatibleRuntimes": "<p>A list of compatible <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html\">function runtimes</a>. Used for filtering with <a>ListLayers</a> and <a>ListLayerVersions</a>.</p>",
+        "PublishLayerVersionResponse$CompatibleRuntimes": "<p>The layer's compatible runtimes.</p>"
+      }
+    },
+    "Concurrency": {
+      "base": null,
+      "refs": {
+        "GetFunctionResponse$Concurrency": "<p>The function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html\">reserved concurrency</a>.</p>"
+      }
+    },
+    "CreateAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEventSourceMappingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFunctionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$StartingPositionTimestamp": "<p>With <code>StartingPosition</code> set to <code>AT_TIMESTAMP</code>, the time from which to start reading.</p>",
+        "EventSourceMappingConfiguration$LastModified": "<p>The date that the event source mapping was last updated, or its state changed.</p>",
+        "FunctionEventInvokeConfig$LastModified": "<p>The date and time that the configuration was last updated.</p>"
+      }
+    },
+    "DeadLetterConfig": {
+      "base": "<p>The <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq\">dead-letter queue</a> for failed asynchronous invocations.</p>",
+      "refs": {
+        "CreateFunctionRequest$DeadLetterConfig": "<p>A dead letter queue configuration that specifies the queue or topic where Lambda sends asynchronous events when they fail processing. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq\">Dead Letter Queues</a>.</p>",
+        "FunctionConfiguration$DeadLetterConfig": "<p>The function's dead letter queue.</p>",
+        "UpdateFunctionConfigurationRequest$DeadLetterConfig": "<p>A dead letter queue configuration that specifies the queue or topic where Lambda sends asynchronous events when they fail processing. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq\">Dead Letter Queues</a>.</p>"
+      }
+    },
+    "DeleteAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventSourceMappingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFunctionConcurrencyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFunctionEventInvokeConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFunctionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLayerVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProvisionedConcurrencyConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "AliasConfiguration$Description": "<p>A description of the alias.</p>",
+        "CreateAliasRequest$Description": "<p>A description of the alias.</p>",
+        "CreateFunctionRequest$Description": "<p>A description of the function.</p>",
+        "FunctionConfiguration$Description": "<p>The function's description.</p>",
+        "GetLayerVersionResponse$Description": "<p>The description of the version.</p>",
+        "LayerVersionsListItem$Description": "<p>The description of the version.</p>",
+        "PublishLayerVersionRequest$Description": "<p>The description of the version.</p>",
+        "PublishLayerVersionResponse$Description": "<p>The description of the version.</p>",
+        "PublishVersionRequest$Description": "<p>A description for the version to override the description in the function configuration.</p>",
+        "UpdateAliasRequest$Description": "<p>A description of the alias.</p>",
+        "UpdateFunctionConfigurationRequest$Description": "<p>A description of the function.</p>"
+      }
+    },
+    "DestinationArn": {
+      "base": null,
+      "refs": {
+        "OnFailure$Destination": "<p>The Amazon Resource Name (ARN) of the destination resource.</p>",
+        "OnSuccess$Destination": "<p>The Amazon Resource Name (ARN) of the destination resource.</p>"
+      }
+    },
+    "DestinationConfig": {
+      "base": "<p>A configuration object that specifies the destination of an event after Lambda processes it.</p>",
+      "refs": {
+        "CreateEventSourceMappingRequest$DestinationConfig": "<p>(Streams) An Amazon SQS queue or Amazon SNS topic destination for discarded records.</p>",
+        "EventSourceMappingConfiguration$DestinationConfig": "<p>(Streams) An Amazon SQS queue or Amazon SNS topic destination for discarded records.</p>",
+        "FunctionEventInvokeConfig$DestinationConfig": "<p>A destination for events after they have been sent to a function for processing.</p> <p class=\"title\"> <b>Destinations</b> </p> <ul> <li> <p> <b>Function</b> - The Amazon Resource Name (ARN) of a Lambda function.</p> </li> <li> <p> <b>Queue</b> - The ARN of an SQS queue.</p> </li> <li> <p> <b>Topic</b> - The ARN of an SNS topic.</p> </li> <li> <p> <b>Event Bus</b> - The ARN of an Amazon EventBridge event bus.</p> </li> </ul>",
+        "PutFunctionEventInvokeConfigRequest$DestinationConfig": "<p>A destination for events after they have been sent to a function for processing.</p> <p class=\"title\"> <b>Destinations</b> </p> <ul> <li> <p> <b>Function</b> - The Amazon Resource Name (ARN) of a Lambda function.</p> </li> <li> <p> <b>Queue</b> - The ARN of an SQS queue.</p> </li> <li> <p> <b>Topic</b> - The ARN of an SNS topic.</p> </li> <li> <p> <b>Event Bus</b> - The ARN of an Amazon EventBridge event bus.</p> </li> </ul>",
+        "UpdateEventSourceMappingRequest$DestinationConfig": "<p>(Streams) An Amazon SQS queue or Amazon SNS topic destination for discarded records.</p>",
+        "UpdateFunctionEventInvokeConfigRequest$DestinationConfig": "<p>A destination for events after they have been sent to a function for processing.</p> <p class=\"title\"> <b>Destinations</b> </p> <ul> <li> <p> <b>Function</b> - The Amazon Resource Name (ARN) of a Lambda function.</p> </li> <li> <p> <b>Queue</b> - The ARN of an SQS queue.</p> </li> <li> <p> <b>Topic</b> - The ARN of an SNS topic.</p> </li> <li> <p> <b>Event Bus</b> - The ARN of an Amazon EventBridge event bus.</p> </li> </ul>"
+      }
+    },
+    "EC2AccessDeniedException": {
+      "base": "<p>Need additional permissions to configure VPC settings.</p>",
+      "refs": {
+      }
+    },
+    "EC2ThrottledException": {
+      "base": "<p>AWS Lambda was throttled by Amazon EC2 during Lambda function initialization using the execution role provided for the Lambda function.</p>",
+      "refs": {
+      }
+    },
+    "EC2UnexpectedException": {
+      "base": "<p>AWS Lambda received an unexpected EC2 client exception while setting up for the Lambda function.</p>",
+      "refs": {
+      }
+    },
+    "EFSIOException": {
+      "base": "<p>An error occured when reading from or writing to a connected file system.</p>",
+      "refs": {
+      }
+    },
+    "EFSMountConnectivityException": {
+      "base": "<p>The function couldn't make a network connection to the configured file system.</p>",
+      "refs": {
+      }
+    },
+    "EFSMountFailureException": {
+      "base": "<p>The function couldn't mount the configured file system due to a permission or configuration issue.</p>",
+      "refs": {
+      }
+    },
+    "EFSMountTimeoutException": {
+      "base": "<p>The function was able to make a network connection to the configured file system, but the mount operation timed out.</p>",
+      "refs": {
+      }
+    },
+    "ENILimitReachedException": {
+      "base": "<p>AWS Lambda was not able to create an elastic network interface in the VPC, specified as part of Lambda function configuration, because the limit for network interfaces has been reached.</p>",
+      "refs": {
+      }
+    },
+    "Enabled": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$Enabled": "<p>If true, the event source mapping is active. Set to false to pause polling and invocation.</p>",
+        "UpdateEventSourceMappingRequest$Enabled": "<p>If true, the event source mapping is active. Set to false to pause polling and invocation.</p>"
+      }
+    },
+    "Environment": {
+      "base": "<p>A function's environment variable settings.</p>",
+      "refs": {
+        "CreateFunctionRequest$Environment": "<p>Environment variables that are accessible from function code during execution.</p>",
+        "UpdateFunctionConfigurationRequest$Environment": "<p>Environment variables that are accessible from function code during execution.</p>"
+      }
+    },
+    "EnvironmentError": {
+      "base": "<p>Error messages for environment variables that couldn't be applied.</p>",
+      "refs": {
+        "EnvironmentResponse$Error": "<p>Error messages for environment variables that couldn't be applied.</p>"
+      }
+    },
+    "EnvironmentResponse": {
+      "base": "<p>The results of an operation to update or read environment variables. If the operation is successful, the response contains the environment variables. If it failed, the response contains details about the error.</p>",
+      "refs": {
+        "FunctionConfiguration$Environment": "<p>The function's environment variables.</p>"
+      }
+    },
+    "EnvironmentVariableName": {
+      "base": null,
+      "refs": {
+        "EnvironmentVariables$key": null
+      }
+    },
+    "EnvironmentVariableValue": {
+      "base": null,
+      "refs": {
+        "EnvironmentVariables$value": null
+      }
+    },
+    "EnvironmentVariables": {
+      "base": null,
+      "refs": {
+        "Environment$Variables": "<p>Environment variable key-value pairs.</p>",
+        "EnvironmentResponse$Variables": "<p>Environment variable key-value pairs.</p>"
+      }
+    },
+    "EventSourceMappingConfiguration": {
+      "base": "<p>A mapping between an AWS resource and an AWS Lambda function. See <a>CreateEventSourceMapping</a> for details.</p>",
+      "refs": {
+        "EventSourceMappingsList$member": null
+      }
+    },
+    "EventSourceMappingsList": {
+      "base": null,
+      "refs": {
+        "ListEventSourceMappingsResponse$EventSourceMappings": "<p>A list of event source mappings.</p>"
+      }
+    },
+    "EventSourcePosition": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$StartingPosition": "<p>The position in a stream from which to start reading. Required for Amazon Kinesis, Amazon DynamoDB, and Amazon MSK Streams sources. <code>AT_TIMESTAMP</code> is only supported for Amazon Kinesis streams.</p>"
+      }
+    },
+    "EventSourceToken": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$EventSourceToken": "<p>For Alexa Smart Home functions, a token that must be supplied by the invoker.</p>"
+      }
+    },
+    "FileSystemArn": {
+      "base": null,
+      "refs": {
+        "FileSystemConfig$Arn": "<p>The Amazon Resource Name (ARN) of the Amazon EFS access point that provides access to the file system.</p>"
+      }
+    },
+    "FileSystemConfig": {
+      "base": "<p>Details about the connection between a Lambda function and an Amazon EFS file system.</p>",
+      "refs": {
+        "FileSystemConfigList$member": null
+      }
+    },
+    "FileSystemConfigList": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$FileSystemConfigs": "<p>Connection settings for an Amazon EFS file system.</p>",
+        "FunctionConfiguration$FileSystemConfigs": "<p>Connection settings for an Amazon EFS file system.</p>",
+        "UpdateFunctionConfigurationRequest$FileSystemConfigs": "<p>Connection settings for an Amazon EFS file system.</p>"
+      }
+    },
+    "FunctionArn": {
+      "base": null,
+      "refs": {
+        "AliasConfiguration$AliasArn": "<p>The Amazon Resource Name (ARN) of the alias.</p>",
+        "EventSourceMappingConfiguration$FunctionArn": "<p>The ARN of the Lambda function.</p>",
+        "FunctionConfiguration$MasterArn": "<p>For Lambda@Edge functions, the ARN of the master function.</p>",
+        "FunctionEventInvokeConfig$FunctionArn": "<p>The Amazon Resource Name (ARN) of the function.</p>",
+        "ListTagsRequest$Resource": "<p>The function's Amazon Resource Name (ARN).</p>",
+        "ProvisionedConcurrencyConfigListItem$FunctionArn": "<p>The Amazon Resource Name (ARN) of the alias or version.</p>",
+        "TagResourceRequest$Resource": "<p>The function's Amazon Resource Name (ARN).</p>",
+        "UntagResourceRequest$Resource": "<p>The function's Amazon Resource Name (ARN).</p>"
+      }
+    },
+    "FunctionCode": {
+      "base": "<p>The code for the Lambda function. You can specify either an object in Amazon S3, or upload a deployment package directly.</p>",
+      "refs": {
+        "CreateFunctionRequest$Code": "<p>The code for the function.</p>"
+      }
+    },
+    "FunctionCodeLocation": {
+      "base": "<p>Details about a function's deployment package.</p>",
+      "refs": {
+        "GetFunctionResponse$Code": "<p>The deployment package of the function or version.</p>"
+      }
+    },
+    "FunctionConfiguration": {
+      "base": "<p>Details about a function's configuration.</p>",
+      "refs": {
+        "FunctionList$member": null,
+        "GetFunctionResponse$Configuration": "<p>The configuration of the function or version.</p>"
+      }
+    },
+    "FunctionEventInvokeConfig": {
+      "base": null,
+      "refs": {
+        "FunctionEventInvokeConfigList$member": null
+      }
+    },
+    "FunctionEventInvokeConfigList": {
+      "base": null,
+      "refs": {
+        "ListFunctionEventInvokeConfigsResponse$FunctionEventInvokeConfigs": "<p>A list of configurations.</p>"
+      }
+    },
+    "FunctionList": {
+      "base": null,
+      "refs": {
+        "ListFunctionsResponse$Functions": "<p>A list of Lambda functions.</p>",
+        "ListVersionsByFunctionResponse$Versions": "<p>A list of Lambda function versions.</p>"
+      }
+    },
+    "FunctionName": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "CreateAliasRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "CreateEventSourceMappingRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Version or Alias ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction:PROD</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it's limited to 64 characters in length.</p>",
+        "CreateFunctionRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "DeleteAliasRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "DeleteFunctionConcurrencyRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "DeleteFunctionEventInvokeConfigRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "DeleteFunctionRequest$FunctionName": "<p>The name of the Lambda function or version.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:1</code> (with version).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "DeleteProvisionedConcurrencyConfigRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetAliasRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetFunctionConcurrencyRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetFunctionEventInvokeConfigRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetProvisionedConcurrencyConfigRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "ListAliasesRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "ListEventSourceMappingsRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Version or Alias ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction:PROD</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it's limited to 64 characters in length.</p>",
+        "ListFunctionEventInvokeConfigsRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "ListProvisionedConcurrencyConfigsRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "PublishVersionRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "PutFunctionConcurrencyRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "PutFunctionEventInvokeConfigRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "PutProvisionedConcurrencyConfigRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "RemovePermissionRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "UpdateAliasRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "UpdateEventSourceMappingRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Version or Alias ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction:PROD</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it's limited to 64 characters in length.</p>",
+        "UpdateFunctionCodeRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "UpdateFunctionConfigurationRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "UpdateFunctionEventInvokeConfigRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>"
+      }
+    },
+    "FunctionVersion": {
+      "base": null,
+      "refs": {
+        "ListFunctionsRequest$FunctionVersion": "<p>Set to <code>ALL</code> to include entries for all published versions of each function.</p>"
+      }
+    },
+    "GetAccountSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccountSettingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEventSourceMappingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionConcurrencyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionConcurrencyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionEventInvokeConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFunctionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLayerVersionByArnRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLayerVersionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLayerVersionPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLayerVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLayerVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetProvisionedConcurrencyConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetProvisionedConcurrencyConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Handler": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Handler": "<p>The name of the method within your code that Lambda calls to execute your function. The format includes the file name. It can also include namespaces and other qualifiers, depending on the runtime. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/programming-model-v2.html\">Programming Model</a>.</p>",
+        "FunctionConfiguration$Handler": "<p>The function that Lambda calls to begin executing your function.</p>",
+        "UpdateFunctionConfigurationRequest$Handler": "<p>The name of the method within your code that Lambda calls to execute your function. The format includes the file name. It can also include namespaces and other qualifiers, depending on the runtime. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/programming-model-v2.html\">Programming Model</a>.</p>"
+      }
+    },
+    "HttpStatus": {
+      "base": null,
+      "refs": {
+        "InvokeAsyncResponse$Status": "<p>The status code.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "AccountLimit$ConcurrentExecutions": "<p>The maximum number of simultaneous function executions.</p>",
+        "InvocationResponse$StatusCode": "<p>The HTTP status code is in the 200 range for a successful request. For the <code>RequestResponse</code> invocation type, this status code is 200. For the <code>Event</code> invocation type, this status code is 202. For the <code>DryRun</code> invocation type, the status code is 204.</p>"
+      }
+    },
+    "InvalidParameterValueException": {
+      "base": "<p>One of the parameters in the request is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestContentException": {
+      "base": "<p>The request body could not be parsed as JSON.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRuntimeException": {
+      "base": "<p>The runtime or runtime version specified is not supported.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSecurityGroupIDException": {
+      "base": "<p>The Security Group ID provided in the Lambda function VPC configuration is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSubnetIDException": {
+      "base": "<p>The Subnet ID provided in the Lambda function VPC configuration is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidZipFileException": {
+      "base": "<p>AWS Lambda could not unzip the deployment package.</p>",
+      "refs": {
+      }
+    },
+    "InvocationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvocationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvocationType": {
+      "base": null,
+      "refs": {
+        "InvocationRequest$InvocationType": "<p>Choose from the following options.</p> <ul> <li> <p> <code>RequestResponse</code> (default) - Invoke the function synchronously. Keep the connection open until the function returns a response or times out. The API response includes the function response and additional data.</p> </li> <li> <p> <code>Event</code> - Invoke the function asynchronously. Send events that fail multiple times to the function's dead-letter queue (if it's configured). The API response only includes a status code.</p> </li> <li> <p> <code>DryRun</code> - Validate parameter values and verify that the user or role has permission to invoke the function.</p> </li> </ul>"
+      }
+    },
+    "InvokeAsyncRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvokeAsyncResponse": {
+      "base": "<p>A success response (<code>202 Accepted</code>) indicates that the request is queued for invocation. </p>",
+      "refs": {
+      }
+    },
+    "KMSAccessDeniedException": {
+      "base": "<p>Lambda was unable to decrypt the environment variables because KMS access was denied. Check the Lambda function's KMS permissions.</p>",
+      "refs": {
+      }
+    },
+    "KMSDisabledException": {
+      "base": "<p>Lambda was unable to decrypt the environment variables because the KMS key used is disabled. Check the Lambda function's KMS key settings.</p>",
+      "refs": {
+      }
+    },
+    "KMSInvalidStateException": {
+      "base": "<p>Lambda was unable to decrypt the environment variables because the KMS key used is in an invalid state for Decrypt. Check the function's KMS key settings.</p>",
+      "refs": {
+      }
+    },
+    "KMSKeyArn": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$KMSKeyArn": "<p>The ARN of the AWS Key Management Service (AWS KMS) key that's used to encrypt your function's environment variables. If it's not provided, AWS Lambda uses a default service key.</p>",
+        "FunctionConfiguration$KMSKeyArn": "<p>The KMS key that's used to encrypt the function's environment variables. This key is only returned if you've configured a customer managed CMK.</p>",
+        "UpdateFunctionConfigurationRequest$KMSKeyArn": "<p>The ARN of the AWS Key Management Service (AWS KMS) key that's used to encrypt your function's environment variables. If it's not provided, AWS Lambda uses a default service key.</p>"
+      }
+    },
+    "KMSNotFoundException": {
+      "base": "<p>Lambda was unable to decrypt the environment variables because the KMS key was not found. Check the function's KMS key settings. </p>",
+      "refs": {
+      }
+    },
+    "LastUpdateStatus": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$LastUpdateStatus": "<p>The status of the last update that was performed on the function. This is first set to <code>Successful</code> after function creation completes.</p>"
+      }
+    },
+    "LastUpdateStatusReason": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$LastUpdateStatusReason": "<p>The reason for the last update that was performed on the function.</p>"
+      }
+    },
+    "LastUpdateStatusReasonCode": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$LastUpdateStatusReasonCode": "<p>The reason code for the last update that was performed on the function.</p>"
+      }
+    },
+    "Layer": {
+      "base": "<p>An <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>.</p>",
+      "refs": {
+        "LayersReferenceList$member": null
+      }
+    },
+    "LayerArn": {
+      "base": null,
+      "refs": {
+        "GetLayerVersionResponse$LayerArn": "<p>The ARN of the layer.</p>",
+        "LayersListItem$LayerArn": "<p>The Amazon Resource Name (ARN) of the function layer.</p>",
+        "PublishLayerVersionResponse$LayerArn": "<p>The ARN of the layer.</p>"
+      }
+    },
+    "LayerList": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Layers": "<p>A list of <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">function layers</a> to add to the function's execution environment. Specify each layer by its ARN, including the version.</p>",
+        "UpdateFunctionConfigurationRequest$Layers": "<p>A list of <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">function layers</a> to add to the function's execution environment. Specify each layer by its ARN, including the version.</p>"
+      }
+    },
+    "LayerName": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "DeleteLayerVersionRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "GetLayerVersionPolicyRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "GetLayerVersionRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "LayersListItem$LayerName": "<p>The name of the layer.</p>",
+        "ListLayerVersionsRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "PublishLayerVersionRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>",
+        "RemoveLayerVersionPermissionRequest$LayerName": "<p>The name or Amazon Resource Name (ARN) of the layer.</p>"
+      }
+    },
+    "LayerPermissionAllowedAction": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$Action": "<p>The API action that grants access to the layer. For example, <code>lambda:GetLayerVersion</code>.</p>"
+      }
+    },
+    "LayerPermissionAllowedPrincipal": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$Principal": "<p>An account ID, or <code>*</code> to grant permission to all AWS accounts.</p>"
+      }
+    },
+    "LayerVersionArn": {
+      "base": null,
+      "refs": {
+        "GetLayerVersionByArnRequest$Arn": "<p>The ARN of the layer version.</p>",
+        "GetLayerVersionResponse$LayerVersionArn": "<p>The ARN of the layer version.</p>",
+        "Layer$Arn": "<p>The Amazon Resource Name (ARN) of the function layer.</p>",
+        "LayerList$member": null,
+        "LayerVersionsListItem$LayerVersionArn": "<p>The ARN of the layer version.</p>",
+        "PublishLayerVersionResponse$LayerVersionArn": "<p>The ARN of the layer version.</p>"
+      }
+    },
+    "LayerVersionContentInput": {
+      "base": "<p>A ZIP archive that contains the contents of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>. You can specify either an Amazon S3 location, or upload a layer archive directly.</p>",
+      "refs": {
+        "PublishLayerVersionRequest$Content": "<p>The function layer archive.</p>"
+      }
+    },
+    "LayerVersionContentOutput": {
+      "base": "<p>Details about a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>.</p>",
+      "refs": {
+        "GetLayerVersionResponse$Content": "<p>Details about the layer version.</p>",
+        "PublishLayerVersionResponse$Content": "<p>Details about the layer version.</p>"
+      }
+    },
+    "LayerVersionNumber": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$VersionNumber": "<p>The version number.</p>",
+        "DeleteLayerVersionRequest$VersionNumber": "<p>The version number.</p>",
+        "GetLayerVersionPolicyRequest$VersionNumber": "<p>The version number.</p>",
+        "GetLayerVersionRequest$VersionNumber": "<p>The version number.</p>",
+        "GetLayerVersionResponse$Version": "<p>The version number.</p>",
+        "LayerVersionsListItem$Version": "<p>The version number.</p>",
+        "PublishLayerVersionResponse$Version": "<p>The version number.</p>",
+        "RemoveLayerVersionPermissionRequest$VersionNumber": "<p>The version number.</p>"
+      }
+    },
+    "LayerVersionsList": {
+      "base": null,
+      "refs": {
+        "ListLayerVersionsResponse$LayerVersions": "<p>A list of versions.</p>"
+      }
+    },
+    "LayerVersionsListItem": {
+      "base": "<p>Details about a version of an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>.</p>",
+      "refs": {
+        "LayerVersionsList$member": null,
+        "LayersListItem$LatestMatchingVersion": "<p>The newest version of the layer.</p>"
+      }
+    },
+    "LayersList": {
+      "base": null,
+      "refs": {
+        "ListLayersResponse$Layers": "<p>A list of function layers.</p>"
+      }
+    },
+    "LayersListItem": {
+      "base": "<p>Details about an <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\">AWS Lambda layer</a>.</p>",
+      "refs": {
+        "LayersList$member": null
+      }
+    },
+    "LayersReferenceList": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$Layers": "<p>The function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html\"> layers</a>.</p>"
+      }
+    },
+    "LicenseInfo": {
+      "base": null,
+      "refs": {
+        "GetLayerVersionResponse$LicenseInfo": "<p>The layer's software license.</p>",
+        "LayerVersionsListItem$LicenseInfo": "<p>The layer's open-source license.</p>",
+        "PublishLayerVersionRequest$LicenseInfo": "<p>The layer's software license. It can be any of the following:</p> <ul> <li> <p>An <a href=\"https://spdx.org/licenses/\">SPDX license identifier</a>. For example, <code>MIT</code>.</p> </li> <li> <p>The URL of a license hosted on the internet. For example, <code>https://opensource.org/licenses/MIT</code>.</p> </li> <li> <p>The full text of the license.</p> </li> </ul>",
+        "PublishLayerVersionResponse$LicenseInfo": "<p>The layer's software license.</p>"
+      }
+    },
+    "ListAliasesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAliasesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEventSourceMappingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEventSourceMappingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFunctionEventInvokeConfigsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFunctionEventInvokeConfigsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFunctionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFunctionsResponse": {
+      "base": "<p>A list of Lambda functions.</p>",
+      "refs": {
+      }
+    },
+    "ListLayerVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLayerVersionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLayersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLayersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProvisionedConcurrencyConfigsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProvisionedConcurrencyConfigsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVersionsByFunctionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListVersionsByFunctionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LocalMountPath": {
+      "base": null,
+      "refs": {
+        "FileSystemConfig$LocalMountPath": "<p>The path where the function can access the file system, starting with <code>/mnt/</code>.</p>"
+      }
+    },
+    "LogType": {
+      "base": null,
+      "refs": {
+        "InvocationRequest$LogType": "<p>Set to <code>Tail</code> to include the execution log in the response.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "AccountLimit$TotalCodeSize": "<p>The amount of storage space that you can use for all deployment packages and layer archives.</p>",
+        "AccountLimit$CodeSizeUnzipped": "<p>The maximum size of a function's deployment package and layers when they're extracted.</p>",
+        "AccountLimit$CodeSizeZipped": "<p>The maximum size of a deployment package when it's uploaded directly to AWS Lambda. Use Amazon S3 for larger files.</p>",
+        "AccountUsage$TotalCodeSize": "<p>The amount of storage space, in bytes, that's being used by deployment packages and layer archives.</p>",
+        "AccountUsage$FunctionCount": "<p>The number of Lambda functions.</p>",
+        "FunctionConfiguration$CodeSize": "<p>The size of the function's deployment package, in bytes.</p>",
+        "Layer$CodeSize": "<p>The size of the layer archive in bytes.</p>",
+        "LayerVersionContentOutput$CodeSize": "<p>The size of the layer archive in bytes.</p>"
+      }
+    },
+    "MasterRegion": {
+      "base": null,
+      "refs": {
+        "ListFunctionsRequest$MasterRegion": "<p>For Lambda@Edge functions, the AWS Region of the master function. For example, <code>us-east-1</code> filters the list of functions to only include Lambda@Edge functions replicated from a master function in US East (N. Virginia). If specified, you must set <code>FunctionVersion</code> to <code>ALL</code>.</p>"
+      }
+    },
+    "MaxFunctionEventInvokeConfigListItems": {
+      "base": null,
+      "refs": {
+        "ListFunctionEventInvokeConfigsRequest$MaxItems": "<p>The maximum number of configurations to return.</p>"
+      }
+    },
+    "MaxLayerListItems": {
+      "base": null,
+      "refs": {
+        "ListLayerVersionsRequest$MaxItems": "<p>The maximum number of versions to return.</p>",
+        "ListLayersRequest$MaxItems": "<p>The maximum number of layers to return.</p>"
+      }
+    },
+    "MaxListItems": {
+      "base": null,
+      "refs": {
+        "ListAliasesRequest$MaxItems": "<p>Limit the number of aliases returned.</p>",
+        "ListEventSourceMappingsRequest$MaxItems": "<p>The maximum number of event source mappings to return.</p>",
+        "ListFunctionsRequest$MaxItems": "<p>The maximum number of functions to return.</p>",
+        "ListVersionsByFunctionRequest$MaxItems": "<p>The maximum number of versions to return.</p>"
+      }
+    },
+    "MaxProvisionedConcurrencyConfigListItems": {
+      "base": null,
+      "refs": {
+        "ListProvisionedConcurrencyConfigsRequest$MaxItems": "<p>Specify a number to limit the number of configurations returned.</p>"
+      }
+    },
+    "MaximumBatchingWindowInSeconds": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$MaximumBatchingWindowInSeconds": "<p>(Streams) The maximum amount of time to gather records before invoking the function, in seconds.</p>",
+        "EventSourceMappingConfiguration$MaximumBatchingWindowInSeconds": "<p>(Streams) The maximum amount of time to gather records before invoking the function, in seconds. The default value is zero.</p>",
+        "UpdateEventSourceMappingRequest$MaximumBatchingWindowInSeconds": "<p>(Streams) The maximum amount of time to gather records before invoking the function, in seconds.</p>"
+      }
+    },
+    "MaximumEventAgeInSeconds": {
+      "base": null,
+      "refs": {
+        "FunctionEventInvokeConfig$MaximumEventAgeInSeconds": "<p>The maximum age of a request that Lambda sends to a function for processing.</p>",
+        "PutFunctionEventInvokeConfigRequest$MaximumEventAgeInSeconds": "<p>The maximum age of a request that Lambda sends to a function for processing.</p>",
+        "UpdateFunctionEventInvokeConfigRequest$MaximumEventAgeInSeconds": "<p>The maximum age of a request that Lambda sends to a function for processing.</p>"
+      }
+    },
+    "MaximumRecordAgeInSeconds": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$MaximumRecordAgeInSeconds": "<p>(Streams) Discard records older than the specified age. The default value is infinite (-1).</p>",
+        "EventSourceMappingConfiguration$MaximumRecordAgeInSeconds": "<p>(Streams) Discard records older than the specified age. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires.</p>",
+        "UpdateEventSourceMappingRequest$MaximumRecordAgeInSeconds": "<p>(Streams) Discard records older than the specified age. The default value is infinite (-1).</p>"
+      }
+    },
+    "MaximumRetryAttempts": {
+      "base": null,
+      "refs": {
+        "FunctionEventInvokeConfig$MaximumRetryAttempts": "<p>The maximum number of times to retry when the function returns an error.</p>",
+        "PutFunctionEventInvokeConfigRequest$MaximumRetryAttempts": "<p>The maximum number of times to retry when the function returns an error.</p>",
+        "UpdateFunctionEventInvokeConfigRequest$MaximumRetryAttempts": "<p>The maximum number of times to retry when the function returns an error.</p>"
+      }
+    },
+    "MaximumRetryAttemptsEventSourceMapping": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$MaximumRetryAttempts": "<p>(Streams) Discard records after the specified number of retries. The default value is infinite (-1). When set to infinite (-1), failed records will be retried until the record expires.</p>",
+        "EventSourceMappingConfiguration$MaximumRetryAttempts": "<p>(Streams) Discard records after the specified number of retries. The default value is infinite (-1). When set to infinite (-1), failed records are retried until the record expires.</p>",
+        "UpdateEventSourceMappingRequest$MaximumRetryAttempts": "<p>(Streams) Discard records after the specified number of retries. The default value is infinite (-1). When set to infinite (-1), failed records will be retried until the record expires.</p>"
+      }
+    },
+    "MemorySize": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$MemorySize": "<p>The amount of memory that your function has access to. Increasing the function's memory also increases its CPU allocation. The default value is 128 MB. The value must be a multiple of 64 MB.</p>",
+        "FunctionConfiguration$MemorySize": "<p>The memory that's allocated to the function.</p>",
+        "UpdateFunctionConfigurationRequest$MemorySize": "<p>The amount of memory that your function has access to. Increasing the function's memory also increases its CPU allocation. The default value is 128 MB. The value must be a multiple of 64 MB.</p>"
+      }
+    },
+    "NameSpacedFunctionArn": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$FunctionArn": "<p>The function's Amazon Resource Name (ARN).</p>"
+      }
+    },
+    "NamespacedFunctionName": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$FunctionName": "<p>The name of the function.</p>",
+        "GetFunctionConfigurationRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetFunctionRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "GetPolicyRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "InvocationRequest$FunctionName": "<p>The name of the Lambda function, version, or alias.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code> (name-only), <code>my-function:v1</code> (with alias).</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>You can append a version number or alias to any of the formats. The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "InvokeAsyncRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>my-function</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:my-function</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:my-function</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>",
+        "ListVersionsByFunctionRequest$FunctionName": "<p>The name of the Lambda function.</p> <p class=\"title\"> <b>Name formats</b> </p> <ul> <li> <p> <b>Function name</b> - <code>MyFunction</code>.</p> </li> <li> <p> <b>Function ARN</b> - <code>arn:aws:lambda:us-west-2:123456789012:function:MyFunction</code>.</p> </li> <li> <p> <b>Partial ARN</b> - <code>123456789012:function:MyFunction</code>.</p> </li> </ul> <p>The length constraint applies only to the full ARN. If you specify only the function name, it is limited to 64 characters in length.</p>"
+      }
+    },
+    "NamespacedStatementId": {
+      "base": null,
+      "refs": {
+        "RemovePermissionRequest$StatementId": "<p>Statement ID of the permission to remove.</p>"
+      }
+    },
+    "NonNegativeInteger": {
+      "base": null,
+      "refs": {
+        "GetProvisionedConcurrencyConfigResponse$AvailableProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency available.</p>",
+        "GetProvisionedConcurrencyConfigResponse$AllocatedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency allocated.</p>",
+        "ProvisionedConcurrencyConfigListItem$AvailableProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency available.</p>",
+        "ProvisionedConcurrencyConfigListItem$AllocatedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency allocated.</p>",
+        "PutProvisionedConcurrencyConfigResponse$AvailableProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency available.</p>",
+        "PutProvisionedConcurrencyConfigResponse$AllocatedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency allocated.</p>"
+      }
+    },
+    "OnFailure": {
+      "base": "<p>A destination for events that failed processing.</p>",
+      "refs": {
+        "DestinationConfig$OnFailure": "<p>The destination configuration for failed invocations.</p>"
+      }
+    },
+    "OnSuccess": {
+      "base": "<p>A destination for events that were processed successfully.</p>",
+      "refs": {
+        "DestinationConfig$OnSuccess": "<p>The destination configuration for successful invocations.</p>"
+      }
+    },
+    "OrganizationId": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$OrganizationId": "<p>With the principal set to <code>*</code>, grant permission to all accounts in the specified organization.</p>"
+      }
+    },
+    "ParallelizationFactor": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$ParallelizationFactor": "<p>(Streams) The number of batches to process from each shard concurrently.</p>",
+        "EventSourceMappingConfiguration$ParallelizationFactor": "<p>(Streams) The number of batches to process from each shard concurrently. The default value is 1.</p>",
+        "UpdateEventSourceMappingRequest$ParallelizationFactor": "<p>(Streams) The number of batches to process from each shard concurrently.</p>"
+      }
+    },
+    "PolicyLengthExceededException": {
+      "base": "<p>The permissions policy for the resource is too large. <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/limits.html\">Learn more</a> </p>",
+      "refs": {
+      }
+    },
+    "PositiveInteger": {
+      "base": null,
+      "refs": {
+        "GetProvisionedConcurrencyConfigResponse$RequestedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency requested.</p>",
+        "ProvisionedConcurrencyConfigListItem$RequestedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency requested.</p>",
+        "PutProvisionedConcurrencyConfigRequest$ProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency to allocate for the version or alias.</p>",
+        "PutProvisionedConcurrencyConfigResponse$RequestedProvisionedConcurrentExecutions": "<p>The amount of provisioned concurrency requested.</p>"
+      }
+    },
+    "PreconditionFailedException": {
+      "base": "<p>The RevisionId provided does not match the latest RevisionId for the Lambda function or alias. Call the <code>GetFunction</code> or the <code>GetAlias</code> API to retrieve the latest RevisionId for your resource.</p>",
+      "refs": {
+      }
+    },
+    "Principal": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$Principal": "<p>The AWS service or account that invokes the function. If you specify a service, use <code>SourceArn</code> or <code>SourceAccount</code> to limit who can invoke the function through that service.</p>"
+      }
+    },
+    "ProvisionedConcurrencyConfigList": {
+      "base": null,
+      "refs": {
+        "ListProvisionedConcurrencyConfigsResponse$ProvisionedConcurrencyConfigs": "<p>A list of provisioned concurrency configurations.</p>"
+      }
+    },
+    "ProvisionedConcurrencyConfigListItem": {
+      "base": "<p>Details about the provisioned concurrency configuration for a function alias or version.</p>",
+      "refs": {
+        "ProvisionedConcurrencyConfigList$member": null
+      }
+    },
+    "ProvisionedConcurrencyConfigNotFoundException": {
+      "base": "<p>The specified configuration does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ProvisionedConcurrencyStatusEnum": {
+      "base": null,
+      "refs": {
+        "GetProvisionedConcurrencyConfigResponse$Status": "<p>The status of the allocation process.</p>",
+        "ProvisionedConcurrencyConfigListItem$Status": "<p>The status of the allocation process.</p>",
+        "PutProvisionedConcurrencyConfigResponse$Status": "<p>The status of the allocation process.</p>"
+      }
+    },
+    "PublishLayerVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PublishLayerVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PublishVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutFunctionConcurrencyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutFunctionEventInvokeConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutProvisionedConcurrencyConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutProvisionedConcurrencyConfigResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Qualifier": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$Qualifier": "<p>Specify a version or alias to add permissions to a published version of the function.</p>",
+        "DeleteFunctionEventInvokeConfigRequest$Qualifier": "<p>A version number or alias name.</p>",
+        "DeleteFunctionRequest$Qualifier": "<p>Specify a version to delete. You can't delete a version that's referenced by an alias.</p>",
+        "DeleteProvisionedConcurrencyConfigRequest$Qualifier": "<p>The version number or alias name.</p>",
+        "GetFunctionConfigurationRequest$Qualifier": "<p>Specify a version or alias to get details about a published version of the function.</p>",
+        "GetFunctionEventInvokeConfigRequest$Qualifier": "<p>A version number or alias name.</p>",
+        "GetFunctionRequest$Qualifier": "<p>Specify a version or alias to get details about a published version of the function.</p>",
+        "GetPolicyRequest$Qualifier": "<p>Specify a version or alias to get the policy for that resource.</p>",
+        "GetProvisionedConcurrencyConfigRequest$Qualifier": "<p>The version number or alias name.</p>",
+        "InvocationRequest$Qualifier": "<p>Specify a version or alias to invoke a published version of the function.</p>",
+        "PutFunctionEventInvokeConfigRequest$Qualifier": "<p>A version number or alias name.</p>",
+        "PutProvisionedConcurrencyConfigRequest$Qualifier": "<p>The version number or alias name.</p>",
+        "RemovePermissionRequest$Qualifier": "<p>Specify a version or alias to remove permissions from a published version of the function.</p>",
+        "UpdateFunctionEventInvokeConfigRequest$Qualifier": "<p>A version number or alias name.</p>"
+      }
+    },
+    "Queue": {
+      "base": null,
+      "refs": {
+        "Queues$member": null
+      }
+    },
+    "Queues": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$Queues": "<p> (MQ) The name of the Amazon MQ broker destination queue to consume. </p>",
+        "EventSourceMappingConfiguration$Queues": "<p> (MQ) The name of the Amazon MQ broker destination queue to consume. </p>"
+      }
+    },
+    "RemoveLayerVersionPermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemovePermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestTooLargeException": {
+      "base": "<p>The request payload exceeded the <code>Invoke</code> request body JSON input limit. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/limits.html\">Limits</a>. </p>",
+      "refs": {
+      }
+    },
+    "ReservedConcurrentExecutions": {
+      "base": null,
+      "refs": {
+        "Concurrency$ReservedConcurrentExecutions": "<p>The number of concurrent executions that are reserved for this function. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html\">Managing Concurrency</a>.</p>",
+        "GetFunctionConcurrencyResponse$ReservedConcurrentExecutions": "<p>The number of simultaneous executions that are reserved for the function.</p>",
+        "PutFunctionConcurrencyRequest$ReservedConcurrentExecutions": "<p>The number of simultaneous executions to reserve for the function.</p>"
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "DeadLetterConfig$TargetArn": "<p>The Amazon Resource Name (ARN) of an Amazon SQS queue or Amazon SNS topic.</p>"
+      }
+    },
+    "ResourceConflictException": {
+      "base": "<p>The resource already exists, or another operation is in progress.</p>",
+      "refs": {
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The operation conflicts with the resource's availability. For example, you attempted to update an EventSource Mapping in CREATING, or tried to delete a EventSource mapping currently in the UPDATING state.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource specified in the request does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotReadyException": {
+      "base": "<p>The function is inactive and its VPC connection is no longer available. Wait for the VPC connection to reestablish and try again.</p>",
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Role": "<p>The Amazon Resource Name (ARN) of the function's execution role.</p>",
+        "FunctionConfiguration$Role": "<p>The function's execution role.</p>",
+        "UpdateFunctionConfigurationRequest$Role": "<p>The Amazon Resource Name (ARN) of the function's execution role.</p>"
+      }
+    },
+    "Runtime": {
+      "base": null,
+      "refs": {
+        "CompatibleRuntimes$member": null,
+        "CreateFunctionRequest$Runtime": "<p>The identifier of the function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html\">runtime</a>.</p>",
+        "FunctionConfiguration$Runtime": "<p>The runtime environment for the Lambda function.</p>",
+        "ListLayerVersionsRequest$CompatibleRuntime": "<p>A runtime identifier. For example, <code>go1.x</code>.</p>",
+        "ListLayersRequest$CompatibleRuntime": "<p>A runtime identifier. For example, <code>go1.x</code>.</p>",
+        "UpdateFunctionConfigurationRequest$Runtime": "<p>The identifier of the function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html\">runtime</a>.</p>"
+      }
+    },
+    "S3Bucket": {
+      "base": null,
+      "refs": {
+        "FunctionCode$S3Bucket": "<p>An Amazon S3 bucket in the same AWS Region as your function. The bucket can be in a different AWS account.</p>",
+        "LayerVersionContentInput$S3Bucket": "<p>The Amazon S3 bucket of the layer archive.</p>",
+        "UpdateFunctionCodeRequest$S3Bucket": "<p>An Amazon S3 bucket in the same AWS Region as your function. The bucket can be in a different AWS account.</p>"
+      }
+    },
+    "S3Key": {
+      "base": null,
+      "refs": {
+        "FunctionCode$S3Key": "<p>The Amazon S3 key of the deployment package.</p>",
+        "LayerVersionContentInput$S3Key": "<p>The Amazon S3 key of the layer archive.</p>",
+        "UpdateFunctionCodeRequest$S3Key": "<p>The Amazon S3 key of the deployment package.</p>"
+      }
+    },
+    "S3ObjectVersion": {
+      "base": null,
+      "refs": {
+        "FunctionCode$S3ObjectVersion": "<p>For versioned objects, the version of the deployment package object to use.</p>",
+        "LayerVersionContentInput$S3ObjectVersion": "<p>For versioned objects, the version of the layer archive object to use.</p>",
+        "UpdateFunctionCodeRequest$S3ObjectVersion": "<p>For versioned objects, the version of the deployment package object to use.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "SecurityGroupIds$member": null
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "VpcConfig$SecurityGroupIds": "<p>A list of VPC security groups IDs.</p>",
+        "VpcConfigResponse$SecurityGroupIds": "<p>A list of VPC security groups IDs.</p>"
+      }
+    },
+    "SensitiveString": {
+      "base": null,
+      "refs": {
+        "EnvironmentError$Message": "<p>The error message.</p>"
+      }
+    },
+    "ServiceException": {
+      "base": "<p>The AWS Lambda service encountered an internal error.</p>",
+      "refs": {
+      }
+    },
+    "SourceAccessConfiguration": {
+      "base": "<p> (MQ) The Secrets Manager secret that stores your broker credentials. To store your secret, use the following format: <code> { \"username\": \"your username\", \"password\": \"your password\" }</code> </p>",
+      "refs": {
+        "SourceAccessConfigurations$member": null
+      }
+    },
+    "SourceAccessConfigurations": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$SourceAccessConfigurations": "<p> (MQ) The Secrets Manager secret that stores your broker credentials. To store your secret, use the following format: <code> { \"username\": \"your username\", \"password\": \"your password\" }</code> </p> <p>To reference the secret, use the following format: <code>[ { \"Type\": \"BASIC_AUTH\", \"URI\": \"secretARN\" } ]</code> </p> <p>The value of <code>Type</code> is always <code>BASIC_AUTH</code>. To encrypt the secret, you can use customer or service managed keys. When using a customer managed KMS key, the Lambda execution role requires <code>kms:Decrypt</code> permissions.</p>",
+        "EventSourceMappingConfiguration$SourceAccessConfigurations": "<p> (MQ) The Secrets Manager secret that stores your broker credentials. To store your secret, use the following format: <code> { \"username\": \"your username\", \"password\": \"your password\" }</code> </p> <p>To reference the secret, use the following format: <code>[ { \"Type\": \"BASIC_AUTH\", \"URI\": \"secretARN\" } ]</code> </p> <p>The value of <code>Type</code> is always <code>BASIC_AUTH</code>. To encrypt the secret, you can use customer or service managed keys. When using a customer managed KMS key, the Lambda execution role requires <code>kms:Decrypt</code> permissions.</p>",
+        "UpdateEventSourceMappingRequest$SourceAccessConfigurations": "<p> (MQ) The Secrets Manager secret that stores your broker credentials. To store your secret, use the following format: <code> { \"username\": \"your username\", \"password\": \"your password\" }</code> </p> <p>To reference the secret, use the following format: <code>[ { \"Type\": \"BASIC_AUTH\", \"URI\": \"secretARN\" } ]</code> </p> <p>The value of <code>Type</code> is always <code>BASIC_AUTH</code>. To encrypt the secret, you can use customer or service managed keys. When using a customer managed KMS key, the Lambda execution role requires <code>kms:Decrypt</code> permissions.</p>"
+      }
+    },
+    "SourceAccessType": {
+      "base": null,
+      "refs": {
+        "SourceAccessConfiguration$Type": "<p>To reference the secret, use the following format: <code>[ { \"Type\": \"BASIC_AUTH\", \"URI\": \"secretARN\" } ]</code> </p> <p>The value of <code>Type</code> is always <code>BASIC_AUTH</code>. To encrypt the secret, you can use customer or service managed keys. When using a customer managed KMS key, the Lambda execution role requires <code>kms:Decrypt</code> permissions.</p>"
+      }
+    },
+    "SourceOwner": {
+      "base": null,
+      "refs": {
+        "AddPermissionRequest$SourceAccount": "<p>For Amazon S3, the ID of the account that owns the resource. Use this together with <code>SourceArn</code> to ensure that the resource is owned by the specified account. It is possible for an Amazon S3 bucket to be deleted by its owner and recreated by another account.</p>"
+      }
+    },
+    "State": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$State": "<p>The current state of the function. When the state is <code>Inactive</code>, you can reactivate the function by invoking it.</p>"
+      }
+    },
+    "StateReason": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$StateReason": "<p>The reason for the function's current state.</p>"
+      }
+    },
+    "StateReasonCode": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$StateReasonCode": "<p>The reason code for the function's current state. When the code is <code>Creating</code>, you can't invoke or modify the function.</p>"
+      }
+    },
+    "StatementId": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$StatementId": "<p>An identifier that distinguishes the policy from others on the same layer version.</p>",
+        "AddPermissionRequest$StatementId": "<p>A statement identifier that differentiates the statement from others in the same policy.</p>",
+        "RemoveLayerVersionPermissionRequest$StatementId": "<p>The identifier that was specified when the statement was added.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AddLayerVersionPermissionRequest$RevisionId": "<p>Only update the policy if the revision ID matches the ID specified. Use this option to avoid modifying a policy that has changed since you last read it.</p>",
+        "AddLayerVersionPermissionResponse$Statement": "<p>The permission statement.</p>",
+        "AddLayerVersionPermissionResponse$RevisionId": "<p>A unique identifier for the current revision of the policy.</p>",
+        "AddPermissionRequest$RevisionId": "<p>Only update the policy if the revision ID matches the ID that's specified. Use this option to avoid modifying a policy that has changed since you last read it.</p>",
+        "AddPermissionResponse$Statement": "<p>The permission statement that's added to the function policy.</p>",
+        "AliasConfiguration$RevisionId": "<p>A unique identifier that changes when you update the alias.</p>",
+        "CodeStorageExceededException$Type": "<p>The exception type.</p>",
+        "CodeStorageExceededException$message": null,
+        "DeleteEventSourceMappingRequest$UUID": "<p>The identifier of the event source mapping.</p>",
+        "EC2AccessDeniedException$Type": null,
+        "EC2AccessDeniedException$Message": null,
+        "EC2ThrottledException$Type": null,
+        "EC2ThrottledException$Message": null,
+        "EC2UnexpectedException$Type": null,
+        "EC2UnexpectedException$Message": null,
+        "EC2UnexpectedException$EC2ErrorCode": null,
+        "EFSIOException$Type": null,
+        "EFSIOException$Message": null,
+        "EFSMountConnectivityException$Type": null,
+        "EFSMountConnectivityException$Message": null,
+        "EFSMountFailureException$Type": null,
+        "EFSMountFailureException$Message": null,
+        "EFSMountTimeoutException$Type": null,
+        "EFSMountTimeoutException$Message": null,
+        "ENILimitReachedException$Type": null,
+        "ENILimitReachedException$Message": null,
+        "EnvironmentError$ErrorCode": "<p>The error code.</p>",
+        "EventSourceMappingConfiguration$UUID": "<p>The identifier of the event source mapping.</p>",
+        "EventSourceMappingConfiguration$LastProcessingResult": "<p>The result of the last AWS Lambda invocation of your Lambda function.</p>",
+        "EventSourceMappingConfiguration$State": "<p>The state of the event source mapping. It can be one of the following: <code>Creating</code>, <code>Enabling</code>, <code>Enabled</code>, <code>Disabling</code>, <code>Disabled</code>, <code>Updating</code>, or <code>Deleting</code>.</p>",
+        "EventSourceMappingConfiguration$StateTransitionReason": "<p>Indicates whether the last change to the event source mapping was made by a user, or by the Lambda service.</p>",
+        "FunctionCodeLocation$RepositoryType": "<p>The service that's hosting the file.</p>",
+        "FunctionCodeLocation$Location": "<p>A presigned URL that you can use to download the deployment package.</p>",
+        "FunctionConfiguration$CodeSha256": "<p>The SHA256 hash of the function's deployment package.</p>",
+        "FunctionConfiguration$RevisionId": "<p>The latest updated revision of the function or alias.</p>",
+        "GetEventSourceMappingRequest$UUID": "<p>The identifier of the event source mapping.</p>",
+        "GetLayerVersionPolicyResponse$Policy": "<p>The policy document.</p>",
+        "GetLayerVersionPolicyResponse$RevisionId": "<p>A unique identifier for the current revision of the policy.</p>",
+        "GetPolicyResponse$Policy": "<p>The resource-based policy.</p>",
+        "GetPolicyResponse$RevisionId": "<p>A unique identifier for the current revision of the policy.</p>",
+        "GetProvisionedConcurrencyConfigResponse$StatusReason": "<p>For failed allocations, the reason that provisioned concurrency could not be allocated.</p>",
+        "InvalidParameterValueException$Type": "<p>The exception type.</p>",
+        "InvalidParameterValueException$message": "<p>The exception message.</p>",
+        "InvalidRequestContentException$Type": "<p>The exception type.</p>",
+        "InvalidRequestContentException$message": "<p>The exception message.</p>",
+        "InvalidRuntimeException$Type": null,
+        "InvalidRuntimeException$Message": null,
+        "InvalidSecurityGroupIDException$Type": null,
+        "InvalidSecurityGroupIDException$Message": null,
+        "InvalidSubnetIDException$Type": null,
+        "InvalidSubnetIDException$Message": null,
+        "InvalidZipFileException$Type": null,
+        "InvalidZipFileException$Message": null,
+        "InvocationRequest$ClientContext": "<p>Up to 3583 bytes of base64-encoded data about the invoking client to pass to the function in the context object.</p>",
+        "InvocationResponse$FunctionError": "<p>If present, indicates that an error occurred during function execution. Details about the error are included in the response payload.</p>",
+        "InvocationResponse$LogResult": "<p>The last 4 KB of the execution log, which is base64 encoded.</p>",
+        "KMSAccessDeniedException$Type": null,
+        "KMSAccessDeniedException$Message": null,
+        "KMSDisabledException$Type": null,
+        "KMSDisabledException$Message": null,
+        "KMSInvalidStateException$Type": null,
+        "KMSInvalidStateException$Message": null,
+        "KMSNotFoundException$Type": null,
+        "KMSNotFoundException$Message": null,
+        "LayerVersionContentOutput$Location": "<p>A link to the layer archive in Amazon S3 that is valid for 10 minutes.</p>",
+        "LayerVersionContentOutput$CodeSha256": "<p>The SHA-256 hash of the layer archive.</p>",
+        "ListAliasesRequest$Marker": "<p>Specify the pagination token that's returned by a previous request to retrieve the next page of results.</p>",
+        "ListAliasesResponse$NextMarker": "<p>The pagination token that's included if more results are available.</p>",
+        "ListEventSourceMappingsRequest$Marker": "<p>A pagination token returned by a previous call.</p>",
+        "ListEventSourceMappingsResponse$NextMarker": "<p>A pagination token that's returned when the response doesn't contain all event source mappings.</p>",
+        "ListFunctionEventInvokeConfigsRequest$Marker": "<p>Specify the pagination token that's returned by a previous request to retrieve the next page of results.</p>",
+        "ListFunctionEventInvokeConfigsResponse$NextMarker": "<p>The pagination token that's included if more results are available.</p>",
+        "ListFunctionsRequest$Marker": "<p>Specify the pagination token that's returned by a previous request to retrieve the next page of results.</p>",
+        "ListFunctionsResponse$NextMarker": "<p>The pagination token that's included if more results are available.</p>",
+        "ListLayerVersionsRequest$Marker": "<p>A pagination token returned by a previous call.</p>",
+        "ListLayerVersionsResponse$NextMarker": "<p>A pagination token returned when the response doesn't contain all versions.</p>",
+        "ListLayersRequest$Marker": "<p>A pagination token returned by a previous call.</p>",
+        "ListLayersResponse$NextMarker": "<p>A pagination token returned when the response doesn't contain all layers.</p>",
+        "ListProvisionedConcurrencyConfigsRequest$Marker": "<p>Specify the pagination token that's returned by a previous request to retrieve the next page of results.</p>",
+        "ListProvisionedConcurrencyConfigsResponse$NextMarker": "<p>The pagination token that's included if more results are available.</p>",
+        "ListVersionsByFunctionRequest$Marker": "<p>Specify the pagination token that's returned by a previous request to retrieve the next page of results.</p>",
+        "ListVersionsByFunctionResponse$NextMarker": "<p>The pagination token that's included if more results are available.</p>",
+        "PolicyLengthExceededException$Type": null,
+        "PolicyLengthExceededException$message": null,
+        "PreconditionFailedException$Type": "<p>The exception type.</p>",
+        "PreconditionFailedException$message": "<p>The exception message.</p>",
+        "ProvisionedConcurrencyConfigListItem$StatusReason": "<p>For failed allocations, the reason that provisioned concurrency could not be allocated.</p>",
+        "ProvisionedConcurrencyConfigNotFoundException$Type": null,
+        "ProvisionedConcurrencyConfigNotFoundException$message": null,
+        "PublishVersionRequest$CodeSha256": "<p>Only publish a version if the hash value matches the value that's specified. Use this option to avoid publishing a version if the function code has changed since you last updated it. You can get the hash for the version that you uploaded from the output of <a>UpdateFunctionCode</a>.</p>",
+        "PublishVersionRequest$RevisionId": "<p>Only update the function if the revision ID matches the ID that's specified. Use this option to avoid publishing a version if the function configuration has changed since you last updated it.</p>",
+        "PutProvisionedConcurrencyConfigResponse$StatusReason": "<p>For failed allocations, the reason that provisioned concurrency could not be allocated.</p>",
+        "RemoveLayerVersionPermissionRequest$RevisionId": "<p>Only update the policy if the revision ID matches the ID specified. Use this option to avoid modifying a policy that has changed since you last read it.</p>",
+        "RemovePermissionRequest$RevisionId": "<p>Only update the policy if the revision ID matches the ID that's specified. Use this option to avoid modifying a policy that has changed since you last read it.</p>",
+        "RequestTooLargeException$Type": null,
+        "RequestTooLargeException$message": null,
+        "ResourceConflictException$Type": "<p>The exception type.</p>",
+        "ResourceConflictException$message": "<p>The exception message.</p>",
+        "ResourceInUseException$Type": null,
+        "ResourceInUseException$Message": null,
+        "ResourceNotFoundException$Type": null,
+        "ResourceNotFoundException$Message": null,
+        "ResourceNotReadyException$Type": "<p>The exception type.</p>",
+        "ResourceNotReadyException$message": "<p>The exception message.</p>",
+        "ServiceException$Type": null,
+        "ServiceException$Message": null,
+        "SubnetIPAddressLimitReachedException$Type": null,
+        "SubnetIPAddressLimitReachedException$Message": null,
+        "TooManyRequestsException$retryAfterSeconds": "<p>The number of seconds the caller should wait before retrying.</p>",
+        "TooManyRequestsException$Type": null,
+        "TooManyRequestsException$message": null,
+        "UnsupportedMediaTypeException$Type": null,
+        "UnsupportedMediaTypeException$message": null,
+        "UpdateAliasRequest$RevisionId": "<p>Only update the alias if the revision ID matches the ID that's specified. Use this option to avoid modifying an alias that has changed since you last read it.</p>",
+        "UpdateEventSourceMappingRequest$UUID": "<p>The identifier of the event source mapping.</p>",
+        "UpdateFunctionCodeRequest$RevisionId": "<p>Only update the function if the revision ID matches the ID that's specified. Use this option to avoid modifying a function that has changed since you last read it.</p>",
+        "UpdateFunctionConfigurationRequest$RevisionId": "<p>Only update the function if the revision ID matches the ID that's specified. Use this option to avoid modifying a function that has changed since you last read it.</p>"
+      }
+    },
+    "SubnetIPAddressLimitReachedException": {
+      "base": "<p>AWS Lambda was not able to set up VPC access for the Lambda function because one or more configured subnets has no available IP addresses.</p>",
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "VpcConfig$SubnetIds": "<p>A list of VPC subnet IDs.</p>",
+        "VpcConfigResponse$SubnetIds": "<p>A list of VPC subnet IDs.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "Tags$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>A list of tag keys to remove from the function.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tags$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Tags": "<p>A list of <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/tagging.html\">tags</a> to apply to the function.</p>",
+        "GetFunctionResponse$Tags": "<p>The function's <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/tagging.html\">tags</a>.</p>",
+        "ListTagsResponse$Tags": "<p>The function's tags.</p>",
+        "TagResourceRequest$Tags": "<p>A list of tags to apply to the function.</p>"
+      }
+    },
+    "ThrottleReason": {
+      "base": null,
+      "refs": {
+        "TooManyRequestsException$Reason": null
+      }
+    },
+    "Timeout": {
+      "base": null,
+      "refs": {
+        "CreateFunctionRequest$Timeout": "<p>The amount of time that Lambda allows a function to run before stopping it. The default is 3 seconds. The maximum allowed value is 900 seconds.</p>",
+        "FunctionConfiguration$Timeout": "<p>The amount of time in seconds that Lambda allows a function to run before stopping it.</p>",
+        "UpdateFunctionConfigurationRequest$Timeout": "<p>The amount of time that Lambda allows a function to run before stopping it. The default is 3 seconds. The maximum allowed value is 900 seconds.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "FunctionConfiguration$LastModified": "<p>The date and time that the function was last updated, in <a href=\"https://www.w3.org/TR/NOTE-datetime\">ISO-8601 format</a> (YYYY-MM-DDThh:mm:ss.sTZD).</p>",
+        "GetLayerVersionResponse$CreatedDate": "<p>The date that the layer version was created, in <a href=\"https://www.w3.org/TR/NOTE-datetime\">ISO-8601 format</a> (YYYY-MM-DDThh:mm:ss.sTZD).</p>",
+        "GetProvisionedConcurrencyConfigResponse$LastModified": "<p>The date and time that a user last updated the configuration, in <a href=\"https://www.iso.org/iso-8601-date-and-time-format.html\">ISO 8601 format</a>.</p>",
+        "LayerVersionsListItem$CreatedDate": "<p>The date that the version was created, in ISO 8601 format. For example, <code>2018-11-27T15:10:45.123+0000</code>.</p>",
+        "ProvisionedConcurrencyConfigListItem$LastModified": "<p>The date and time that a user last updated the configuration, in <a href=\"https://www.iso.org/iso-8601-date-and-time-format.html\">ISO 8601 format</a>.</p>",
+        "PublishLayerVersionResponse$CreatedDate": "<p>The date that the layer version was created, in <a href=\"https://www.w3.org/TR/NOTE-datetime\">ISO-8601 format</a> (YYYY-MM-DDThh:mm:ss.sTZD).</p>",
+        "PutProvisionedConcurrencyConfigResponse$LastModified": "<p>The date and time that a user last updated the configuration, in <a href=\"https://www.iso.org/iso-8601-date-and-time-format.html\">ISO 8601 format</a>.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p>The request throughput limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "Topic": {
+      "base": null,
+      "refs": {
+        "Topics$member": null
+      }
+    },
+    "Topics": {
+      "base": null,
+      "refs": {
+        "CreateEventSourceMappingRequest$Topics": "<p> (MSK) The name of the Kafka topic. </p>",
+        "EventSourceMappingConfiguration$Topics": "<p> (MSK) The name of the Kafka topic to consume. </p>"
+      }
+    },
+    "TracingConfig": {
+      "base": "<p>The function's AWS X-Ray tracing configuration. To sample and record incoming requests, set <code>Mode</code> to <code>Active</code>.</p>",
+      "refs": {
+        "CreateFunctionRequest$TracingConfig": "<p>Set <code>Mode</code> to <code>Active</code> to sample and trace a subset of incoming requests with AWS X-Ray.</p>",
+        "UpdateFunctionConfigurationRequest$TracingConfig": "<p>Set <code>Mode</code> to <code>Active</code> to sample and trace a subset of incoming requests with AWS X-Ray.</p>"
+      }
+    },
+    "TracingConfigResponse": {
+      "base": "<p>The function's AWS X-Ray tracing configuration.</p>",
+      "refs": {
+        "FunctionConfiguration$TracingConfig": "<p>The function's AWS X-Ray tracing configuration.</p>"
+      }
+    },
+    "TracingMode": {
+      "base": null,
+      "refs": {
+        "TracingConfig$Mode": "<p>The tracing mode.</p>",
+        "TracingConfigResponse$Mode": "<p>The tracing mode.</p>"
+      }
+    },
+    "UnreservedConcurrentExecutions": {
+      "base": null,
+      "refs": {
+        "AccountLimit$UnreservedConcurrentExecutions": "<p>The maximum number of simultaneous function executions, minus the capacity that's reserved for individual functions with <a>PutFunctionConcurrency</a>.</p>"
+      }
+    },
+    "UnsupportedMediaTypeException": {
+      "base": "<p>The content type of the <code>Invoke</code> request body is not JSON.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEventSourceMappingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFunctionCodeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFunctionConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFunctionEventInvokeConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "AliasConfiguration$FunctionVersion": "<p>The function version that the alias invokes.</p>",
+        "CreateAliasRequest$FunctionVersion": "<p>The function version that the alias invokes.</p>",
+        "FunctionConfiguration$Version": "<p>The version of the Lambda function.</p>",
+        "InvocationResponse$ExecutedVersion": "<p>The version of the function that executed. When you invoke a function with an alias, this indicates which version the alias resolved to.</p>",
+        "ListAliasesRequest$FunctionVersion": "<p>Specify a function version to only list aliases that invoke that version.</p>",
+        "UpdateAliasRequest$FunctionVersion": "<p>The function version that the alias invokes.</p>"
+      }
+    },
+    "VpcConfig": {
+      "base": "<p>The VPC security groups and subnets that are attached to a Lambda function. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html\">VPC Settings</a>.</p>",
+      "refs": {
+        "CreateFunctionRequest$VpcConfig": "<p>For network connectivity to AWS resources in a VPC, specify a list of security groups and subnets in the VPC. When you connect a function to a VPC, it can only access resources and the internet through that VPC. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html\">VPC Settings</a>.</p>",
+        "UpdateFunctionConfigurationRequest$VpcConfig": "<p>For network connectivity to AWS resources in a VPC, specify a list of security groups and subnets in the VPC. When you connect a function to a VPC, it can only access resources and the internet through that VPC. For more information, see <a href=\"https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html\">VPC Settings</a>.</p>"
+      }
+    },
+    "VpcConfigResponse": {
+      "base": "<p>The VPC security groups and subnets that are attached to a Lambda function.</p>",
+      "refs": {
+        "FunctionConfiguration$VpcConfig": "<p>The function's networking configuration.</p>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "VpcConfigResponse$VpcId": "<p>The ID of the VPC.</p>"
+      }
+    },
+    "Weight": {
+      "base": null,
+      "refs": {
+        "AdditionalVersionWeights$value": null
+      }
+    }
+  }
+}

@@ -1,0 +1,1702 @@
+{
+  "version": "2.0",
+  "service": "<fullname>Amazon WorkSpaces Service</fullname> <p>Amazon WorkSpaces enables you to provision virtual, cloud-based Microsoft Windows and Amazon Linux desktops for your users.</p>",
+  "operations": {
+    "AssociateConnectionAlias": "<p>Associates the specified connection alias with the specified directory to enable cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p> <note> <p>Before performing this operation, call <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeConnectionAliases.html\"> DescribeConnectionAliases</a> to make sure that the current state of the connection alias is <code>CREATED</code>.</p> </note>",
+    "AssociateIpGroups": "<p>Associates the specified IP access control group with the specified directory.</p>",
+    "AuthorizeIpRules": "<p>Adds one or more rules to the specified IP access control group.</p> <p>This action gives users permission to access their WorkSpaces from the CIDR address ranges specified in the rules.</p>",
+    "CopyWorkspaceImage": "<p>Copies the specified image from the specified Region to the current Region. For more information about copying images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/copy-custom-image.html\"> Copy a Custom WorkSpaces Image</a>.</p> <important> <p>Before copying a shared image, be sure to verify that it has been shared from the correct AWS account. To determine if an image has been shared and to see the AWS account ID that owns an image, use the <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeWorkspaceImages.html\">DescribeWorkSpaceImages</a> and <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeWorkspaceImagePermissions.html\">DescribeWorkspaceImagePermissions</a> API operations. </p> </important>",
+    "CreateConnectionAlias": "<p>Creates the specified connection alias for use with cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+    "CreateIpGroup": "<p>Creates an IP access control group.</p> <p>An IP access control group provides you with the ability to control the IP addresses from which users are allowed to access their WorkSpaces. To specify the CIDR address ranges, add rules to your IP access control group and then associate the group with your directory. You can add rules when you create the group or at any time using <a>AuthorizeIpRules</a>.</p> <p>There is a default IP access control group associated with your directory. If you don't associate an IP access control group with your directory, the default group is used. The default group includes a default rule that allows users to access their WorkSpaces from anywhere. You cannot modify the default IP access control group for your directory.</p>",
+    "CreateTags": "<p>Creates the specified tags for the specified WorkSpaces resource.</p>",
+    "CreateWorkspaces": "<p>Creates one or more WorkSpaces.</p> <p>This operation is asynchronous and returns before the WorkSpaces are created.</p>",
+    "DeleteConnectionAlias": "<p>Deletes the specified connection alias. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p> <important> <p> <b>If you will no longer be using a fully qualified domain name (FQDN) as the registration code for your WorkSpaces users, you must take certain precautions to prevent potential security issues.</b> For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html#cross-region-redirection-security-considerations\"> Security Considerations if You Stop Using Cross-Region Redirection</a>.</p> </important> <note> <p>To delete a connection alias that has been shared, the shared account must first disassociate the connection alias from any directories it has been associated with. Then you must unshare the connection alias from the account it has been shared with. You can delete a connection alias only after it is no longer shared with any accounts or associated with any directories.</p> </note>",
+    "DeleteIpGroup": "<p>Deletes the specified IP access control group.</p> <p>You cannot delete an IP access control group that is associated with a directory.</p>",
+    "DeleteTags": "<p>Deletes the specified tags from the specified WorkSpaces resource.</p>",
+    "DeleteWorkspaceImage": "<p>Deletes the specified image from your account. To delete an image, you must first delete any bundles that are associated with the image and unshare the image if it is shared with other accounts. </p>",
+    "DeregisterWorkspaceDirectory": "<p>Deregisters the specified directory. This operation is asynchronous and returns before the WorkSpace directory is deregistered. If any WorkSpaces are registered to this directory, you must remove them before you can deregister the directory.</p>",
+    "DescribeAccount": "<p>Retrieves a list that describes the configuration of Bring Your Own License (BYOL) for the specified account.</p>",
+    "DescribeAccountModifications": "<p>Retrieves a list that describes modifications to the configuration of Bring Your Own License (BYOL) for the specified account.</p>",
+    "DescribeClientProperties": "<p>Retrieves a list that describes one or more specified Amazon WorkSpaces clients.</p>",
+    "DescribeConnectionAliasPermissions": "<p>Describes the permissions that the owner of a connection alias has granted to another AWS account for the specified connection alias. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+    "DescribeConnectionAliases": "<p>Retrieves a list that describes the connection aliases used for cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+    "DescribeIpGroups": "<p>Describes one or more of your IP access control groups.</p>",
+    "DescribeTags": "<p>Describes the specified tags for the specified WorkSpaces resource.</p>",
+    "DescribeWorkspaceBundles": "<p>Retrieves a list that describes the available WorkSpace bundles.</p> <p>You can filter the results using either bundle ID or owner, but not both.</p>",
+    "DescribeWorkspaceDirectories": "<p>Describes the available directories that are registered with Amazon WorkSpaces.</p>",
+    "DescribeWorkspaceImagePermissions": "<p>Describes the permissions that the owner of an image has granted to other AWS accounts for an image.</p>",
+    "DescribeWorkspaceImages": "<p>Retrieves a list that describes one or more specified images, if the image identifiers are provided. Otherwise, all images in the account are described. </p>",
+    "DescribeWorkspaceSnapshots": "<p>Describes the snapshots for the specified WorkSpace.</p>",
+    "DescribeWorkspaces": "<p>Describes the specified WorkSpaces.</p> <p>You can filter the results by using the bundle identifier, directory identifier, or owner, but you can specify only one filter at a time.</p>",
+    "DescribeWorkspacesConnectionStatus": "<p>Describes the connection status of the specified WorkSpaces.</p>",
+    "DisassociateConnectionAlias": "<p>Disassociates a connection alias from a directory. Disassociating a connection alias disables cross-Region redirection between two directories in different AWS Regions. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p> <note> <p>Before performing this operation, call <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeConnectionAliases.html\"> DescribeConnectionAliases</a> to make sure that the current state of the connection alias is <code>CREATED</code>.</p> </note>",
+    "DisassociateIpGroups": "<p>Disassociates the specified IP access control group from the specified directory.</p>",
+    "ImportWorkspaceImage": "<p>Imports the specified Windows 10 Bring Your Own License (BYOL) image into Amazon WorkSpaces. The image must be an already licensed Amazon EC2 image that is in your AWS account, and you must own the image. For more information about creating BYOL images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/byol-windows-images.html\"> Bring Your Own Windows Desktop Licenses</a>.</p>",
+    "ListAvailableManagementCidrRanges": "<p>Retrieves a list of IP address ranges, specified as IPv4 CIDR blocks, that you can use for the network management interface when you enable Bring Your Own License (BYOL). </p> <p>This operation can be run only by AWS accounts that are enabled for BYOL. If your account isn't enabled for BYOL, you'll receive an <code>AccessDeniedException</code> error.</p> <p>The management network interface is connected to a secure Amazon WorkSpaces management network. It is used for interactive streaming of the WorkSpace desktop to Amazon WorkSpaces clients, and to allow Amazon WorkSpaces to manage the WorkSpace.</p>",
+    "MigrateWorkspace": "<p>Migrates a WorkSpace from one operating system or bundle type to another, while retaining the data on the user volume.</p> <p>The migration process recreates the WorkSpace by using a new root volume from the target bundle image and the user volume from the last available snapshot of the original WorkSpace. During migration, the original <code>D:\\Users\\%USERNAME%</code> user profile folder is renamed to <code>D:\\Users\\%USERNAME%MMddyyTHHmmss%.NotMigrated</code>. A new <code>D:\\Users\\%USERNAME%\\</code> folder is generated by the new OS. Certain files in the old user profile are moved to the new user profile.</p> <p>For available migration scenarios, details about what happens during migration, and best practices, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/migrate-workspaces.html\">Migrate a WorkSpace</a>.</p>",
+    "ModifyAccount": "<p>Modifies the configuration of Bring Your Own License (BYOL) for the specified account.</p>",
+    "ModifyClientProperties": "<p>Modifies the properties of the specified Amazon WorkSpaces clients.</p>",
+    "ModifySelfservicePermissions": "<p>Modifies the self-service WorkSpace management capabilities for your users. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/enable-user-self-service-workspace-management.html\">Enable Self-Service WorkSpace Management Capabilities for Your Users</a>.</p>",
+    "ModifyWorkspaceAccessProperties": "<p>Specifies which devices and operating systems users can use to access their WorkSpaces. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/update-directory-details.html#control-device-access\"> Control Device Access</a>.</p>",
+    "ModifyWorkspaceCreationProperties": "<p>Modify the default properties used to create WorkSpaces.</p>",
+    "ModifyWorkspaceProperties": "<p>Modifies the specified WorkSpace properties. For important information about how to modify the size of the root and user volumes, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/modify-workspaces.html\"> Modify a WorkSpace</a>. </p>",
+    "ModifyWorkspaceState": "<p>Sets the state of the specified WorkSpace.</p> <p>To maintain a WorkSpace without being interrupted, set the WorkSpace state to <code>ADMIN_MAINTENANCE</code>. WorkSpaces in this state do not respond to requests to reboot, stop, start, rebuild, or restore. An AutoStop WorkSpace in this state is not stopped. Users cannot log into a WorkSpace in the <code>ADMIN_MAINTENANCE</code> state.</p>",
+    "RebootWorkspaces": "<p>Reboots the specified WorkSpaces.</p> <p>You cannot reboot a WorkSpace unless its state is <code>AVAILABLE</code> or <code>UNHEALTHY</code>.</p> <p>This operation is asynchronous and returns before the WorkSpaces have rebooted.</p>",
+    "RebuildWorkspaces": "<p>Rebuilds the specified WorkSpace.</p> <p>You cannot rebuild a WorkSpace unless its state is <code>AVAILABLE</code>, <code>ERROR</code>, <code>UNHEALTHY</code>, <code>STOPPED</code>, or <code>REBOOTING</code>.</p> <p>Rebuilding a WorkSpace is a potentially destructive action that can result in the loss of data. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/reset-workspace.html\">Rebuild a WorkSpace</a>.</p> <p>This operation is asynchronous and returns before the WorkSpaces have been completely rebuilt.</p>",
+    "RegisterWorkspaceDirectory": "<p>Registers the specified directory. This operation is asynchronous and returns before the WorkSpace directory is registered. If this is the first time you are registering a directory, you will need to create the workspaces_DefaultRole role before you can register a directory. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/workspaces-access-control.html#create-default-role\"> Creating the workspaces_DefaultRole Role</a>.</p>",
+    "RestoreWorkspace": "<p>Restores the specified WorkSpace to its last known healthy state.</p> <p>You cannot restore a WorkSpace unless its state is <code> AVAILABLE</code>, <code>ERROR</code>, <code>UNHEALTHY</code>, or <code>STOPPED</code>.</p> <p>Restoring a WorkSpace is a potentially destructive action that can result in the loss of data. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/restore-workspace.html\">Restore a WorkSpace</a>.</p> <p>This operation is asynchronous and returns before the WorkSpace is completely restored.</p>",
+    "RevokeIpRules": "<p>Removes one or more rules from the specified IP access control group.</p>",
+    "StartWorkspaces": "<p>Starts the specified WorkSpaces.</p> <p>You cannot start a WorkSpace unless it has a running mode of <code>AutoStop</code> and a state of <code>STOPPED</code>.</p>",
+    "StopWorkspaces": "<p> Stops the specified WorkSpaces.</p> <p>You cannot stop a WorkSpace unless it has a running mode of <code>AutoStop</code> and a state of <code>AVAILABLE</code>, <code>IMPAIRED</code>, <code>UNHEALTHY</code>, or <code>ERROR</code>.</p>",
+    "TerminateWorkspaces": "<p>Terminates the specified WorkSpaces.</p> <important> <p>Terminating a WorkSpace is a permanent action and cannot be undone. The user's data is destroyed. If you need to archive any user data, contact AWS Support before terminating the WorkSpace.</p> </important> <p>You can terminate a WorkSpace that is in any state except <code>SUSPENDED</code>.</p> <p>This operation is asynchronous and returns before the WorkSpaces have been completely terminated. After a WorkSpace is terminated, the <code>TERMINATED</code> state is returned only briefly before the WorkSpace directory metadata is cleaned up, so this state is rarely returned. To confirm that a WorkSpace is terminated, check for the WorkSpace ID by using <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeWorkspaces.html\"> DescribeWorkSpaces</a>. If the WorkSpace ID isn't returned, then the WorkSpace has been successfully terminated.</p>",
+    "UpdateConnectionAliasPermission": "<p>Shares or unshares a connection alias with one account by specifying whether that account has permission to associate the connection alias with a directory. If the association permission is granted, the connection alias is shared with that account. If the association permission is revoked, the connection alias is unshared with the account. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p> <note> <ul> <li> <p>Before performing this operation, call <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeConnectionAliases.html\"> DescribeConnectionAliases</a> to make sure that the current state of the connection alias is <code>CREATED</code>.</p> </li> <li> <p>To delete a connection alias that has been shared, the shared account must first disassociate the connection alias from any directories it has been associated with. Then you must unshare the connection alias from the account it has been shared with. You can delete a connection alias only after it is no longer shared with any accounts or associated with any directories.</p> </li> </ul> </note>",
+    "UpdateRulesOfIpGroup": "<p>Replaces the current rules of the specified IP access control group with the specified rules.</p>",
+    "UpdateWorkspaceImagePermission": "<p>Shares or unshares an image with one account by specifying whether that account has permission to copy the image. If the copy image permission is granted, the image is shared with that account. If the copy image permission is revoked, the image is unshared with the account. For more information about sharing images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/share-custom-image.html\"> Share or Unshare a Custom WorkSpaces Image</a>.</p> <note> <ul> <li> <p>To delete an image that has been shared, you must unshare the image before you delete it.</p> </li> <li> <p>Sharing Bring Your Own License (BYOL) images across AWS accounts isn't supported at this time in the AWS GovCloud (US-West) Region. To share BYOL images across accounts in the AWS GovCloud (US-West) Region, contact AWS Support.</p> </li> </ul> </note>"
+  },
+  "shapes": {
+    "ARN": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$IamRoleId": "<p>The identifier of the IAM role. This is the role that allows Amazon WorkSpaces to make calls to other services, such as Amazon EC2, on your behalf.</p>"
+      }
+    },
+    "AccessDeniedException": {
+      "base": "<p>The user is not authorized to access a resource.</p>",
+      "refs": {
+      }
+    },
+    "AccessPropertyValue": {
+      "base": null,
+      "refs": {
+        "WorkspaceAccessProperties$DeviceTypeWindows": "<p>Indicates whether users can use Windows clients to access their WorkSpaces. To restrict WorkSpaces access to trusted devices (also known as managed devices) with valid certificates, specify a value of <code>TRUST</code>. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/trusted-devices.html\">Restrict WorkSpaces Access to Trusted Devices</a>. </p>",
+        "WorkspaceAccessProperties$DeviceTypeOsx": "<p>Indicates whether users can use macOS clients to access their WorkSpaces. To restrict WorkSpaces access to trusted devices (also known as managed devices) with valid certificates, specify a value of <code>TRUST</code>. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/trusted-devices.html\">Restrict WorkSpaces Access to Trusted Devices</a>. </p>",
+        "WorkspaceAccessProperties$DeviceTypeWeb": "<p>Indicates whether users can access their WorkSpaces through a web browser.</p>",
+        "WorkspaceAccessProperties$DeviceTypeIos": "<p>Indicates whether users can use iOS devices to access their WorkSpaces.</p>",
+        "WorkspaceAccessProperties$DeviceTypeAndroid": "<p>Indicates whether users can use Android devices to access their WorkSpaces.</p>",
+        "WorkspaceAccessProperties$DeviceTypeChromeOs": "<p>Indicates whether users can use Chromebooks to access their WorkSpaces.</p>",
+        "WorkspaceAccessProperties$DeviceTypeZeroClient": "<p>Indicates whether users can use zero client devices to access their WorkSpaces.</p>"
+      }
+    },
+    "AccountModification": {
+      "base": "<p>Describes a modification to the configuration of Bring Your Own License (BYOL) for the specified account. </p>",
+      "refs": {
+        "AccountModificationList$member": null
+      }
+    },
+    "AccountModificationList": {
+      "base": null,
+      "refs": {
+        "DescribeAccountModificationsResult$AccountModifications": "<p>The list of modifications to the configuration of BYOL.</p>"
+      }
+    },
+    "Alias": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$Alias": "<p>The directory alias.</p>"
+      }
+    },
+    "Application": {
+      "base": null,
+      "refs": {
+        "ApplicationList$member": null
+      }
+    },
+    "ApplicationList": {
+      "base": null,
+      "refs": {
+        "ImportWorkspaceImageRequest$Applications": "<p>If specified, the version of Microsoft Office to subscribe to. Valid only for Windows 10 BYOL images. For more information about subscribing to Office for BYOL images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/byol-windows-images.html\"> Bring Your Own Windows Desktop Licenses</a>.</p> <note> <p>Although this parameter is an array, only one item is allowed at this time.</p> </note>"
+      }
+    },
+    "AssociateConnectionAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateConnectionAliasResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateIpGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateIpGroupsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociationStatus": {
+      "base": null,
+      "refs": {
+        "ConnectionAliasAssociation$AssociationStatus": "<p>The association status of the connection alias.</p>"
+      }
+    },
+    "AuthorizeIpRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AuthorizeIpRulesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AwsAccount": {
+      "base": null,
+      "refs": {
+        "ConnectionAlias$OwnerAccountId": "<p>The identifier of the AWS account that owns the connection alias.</p>",
+        "ConnectionAliasAssociation$AssociatedAccountId": "<p>The identifier of the AWS account that associated the connection alias with a directory.</p>",
+        "ConnectionAliasPermission$SharedAccountId": "<p>The identifier of the AWS account that the connection alias is shared with.</p>",
+        "ImagePermission$SharedAccountId": "<p>The identifier of the AWS account that an image has been shared with.</p>",
+        "UpdateWorkspaceImagePermissionRequest$SharedAccountId": "<p>The identifier of the AWS account to share or unshare the image with.</p> <important> <p>Before sharing the image, confirm that you are sharing to the correct AWS account ID.</p> </important>",
+        "WorkspaceImage$OwnerAccountId": "<p>The identifier of the AWS account that owns the image.</p>"
+      }
+    },
+    "BooleanObject": {
+      "base": null,
+      "refs": {
+        "ConnectionAliasPermission$AllowAssociation": "<p>Indicates whether the specified AWS account is allowed to associate the connection alias with a directory.</p>",
+        "DefaultWorkspaceCreationProperties$EnableWorkDocs": "<p>Specifies whether the directory is enabled for Amazon WorkDocs.</p>",
+        "DefaultWorkspaceCreationProperties$EnableInternetAccess": "<p>Specifies whether to automatically assign an Elastic public IP address to WorkSpaces in this directory by default. If enabled, the Elastic public IP address allows outbound internet access from your WorkSpaces when you’re using an internet gateway in the Amazon VPC in which your WorkSpaces are located. If you're using a Network Address Translation (NAT) gateway for outbound internet access from your VPC, or if your WorkSpaces are in public subnets and you manually assign them Elastic IP addresses, you should disable this setting. This setting applies to new WorkSpaces that you launch or to existing WorkSpaces that you rebuild. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/amazon-workspaces-vpc.html\"> Configure a VPC for Amazon WorkSpaces</a>.</p>",
+        "DefaultWorkspaceCreationProperties$UserEnabledAsLocalAdministrator": "<p>Specifies whether WorkSpace users are local administrators on their WorkSpaces.</p>",
+        "DefaultWorkspaceCreationProperties$EnableMaintenanceMode": "<p>Specifies whether maintenance mode is enabled for WorkSpaces. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/workspace-maintenance.html\">WorkSpace Maintenance</a>.</p>",
+        "RegisterWorkspaceDirectoryRequest$EnableWorkDocs": "<p>Indicates whether Amazon WorkDocs is enabled or disabled. If you have enabled this parameter and WorkDocs is not available in the Region, you will receive an OperationNotSupportedException error. Set <code>EnableWorkDocs</code> to disabled, and try again.</p>",
+        "RegisterWorkspaceDirectoryRequest$EnableSelfService": "<p>Indicates whether self-service capabilities are enabled or disabled.</p>",
+        "UpdateWorkspaceImagePermissionRequest$AllowCopyImage": "<p>The permission to copy the image. This permission can be revoked only after an image has been shared.</p>",
+        "Workspace$UserVolumeEncryptionEnabled": "<p>Indicates whether the data stored on the user volume is encrypted.</p>",
+        "Workspace$RootVolumeEncryptionEnabled": "<p>Indicates whether the data stored on the root volume is encrypted.</p>",
+        "WorkspaceCreationProperties$EnableWorkDocs": "<p>Indicates whether Amazon WorkDocs is enabled for your WorkSpaces.</p> <note> <p>If WorkDocs is already enabled for a WorkSpaces directory and you disable it, new WorkSpaces launched in the directory will not have WorkDocs enabled. However, WorkDocs remains enabled for any existing WorkSpaces, unless you either disable users' access to WorkDocs or you delete the WorkDocs site. To disable users' access to WorkDocs, see <a href=\"https://docs.aws.amazon.com/workdocs/latest/adminguide/inactive-user.html\">Disabling Users</a> in the <i>Amazon WorkDocs Administration Guide</i>. To delete a WorkDocs site, see <a href=\"https://docs.aws.amazon.com/workdocs/latest/adminguide/manage-sites.html\">Deleting a Site</a> in the <i>Amazon WorkDocs Administration Guide</i>.</p> <p>If you enable WorkDocs on a directory that already has existing WorkSpaces, the existing WorkSpaces and any new WorkSpaces that are launched in the directory will have WorkDocs enabled.</p> </note>",
+        "WorkspaceCreationProperties$EnableInternetAccess": "<p>Indicates whether internet access is enabled for your WorkSpaces.</p>",
+        "WorkspaceCreationProperties$UserEnabledAsLocalAdministrator": "<p>Indicates whether users are local administrators of their WorkSpaces.</p>",
+        "WorkspaceCreationProperties$EnableMaintenanceMode": "<p>Indicates whether maintenance mode is enabled for your WorkSpaces. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/workspace-maintenance.html\">WorkSpace Maintenance</a>. </p>",
+        "WorkspaceRequest$UserVolumeEncryptionEnabled": "<p>Indicates whether the data stored on the user volume is encrypted.</p>",
+        "WorkspaceRequest$RootVolumeEncryptionEnabled": "<p>Indicates whether the data stored on the root volume is encrypted.</p>"
+      }
+    },
+    "BundleId": {
+      "base": null,
+      "refs": {
+        "BundleIdList$member": null,
+        "DescribeWorkspacesRequest$BundleId": "<p>The identifier of the bundle. All WorkSpaces that are created from this bundle are retrieved. You cannot combine this parameter with any other filter.</p>",
+        "MigrateWorkspaceRequest$BundleId": "<p>The identifier of the target bundle type to migrate the WorkSpace to.</p>",
+        "Workspace$BundleId": "<p>The identifier of the bundle used to create the WorkSpace.</p>",
+        "WorkspaceBundle$BundleId": "<p>The bundle identifier.</p>",
+        "WorkspaceRequest$BundleId": "<p>The identifier of the bundle for the WorkSpace. You can use <a>DescribeWorkspaceBundles</a> to list the available bundles.</p>"
+      }
+    },
+    "BundleIdList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceBundlesRequest$BundleIds": "<p>The identifiers of the bundles. You cannot combine this parameter with any other filter.</p>"
+      }
+    },
+    "BundleList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceBundlesResult$Bundles": "<p>Information about the bundles.</p>"
+      }
+    },
+    "BundleOwner": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceBundlesRequest$Owner": "<p>The owner of the bundles. You cannot combine this parameter with any other filter.</p> <p>Specify <code>AMAZON</code> to describe the bundles provided by AWS or null to describe the bundles that belong to your account.</p>",
+        "WorkspaceBundle$Owner": "<p>The owner of the bundle. This is the account identifier of the owner, or <code>AMAZON</code> if the bundle is provided by AWS.</p>"
+      }
+    },
+    "ClientProperties": {
+      "base": "<p>Describes an Amazon WorkSpaces client.</p>",
+      "refs": {
+        "ClientPropertiesResult$ClientProperties": "<p>Information about the Amazon WorkSpaces client.</p>",
+        "ModifyClientPropertiesRequest$ClientProperties": "<p>Information about the Amazon WorkSpaces client.</p>"
+      }
+    },
+    "ClientPropertiesList": {
+      "base": null,
+      "refs": {
+        "DescribeClientPropertiesResult$ClientPropertiesList": "<p>Information about the specified Amazon WorkSpaces clients.</p>"
+      }
+    },
+    "ClientPropertiesResult": {
+      "base": "<p>Information about the Amazon WorkSpaces client.</p>",
+      "refs": {
+        "ClientPropertiesList$member": null
+      }
+    },
+    "Compute": {
+      "base": null,
+      "refs": {
+        "ComputeType$Name": "<p>The compute type.</p>",
+        "WorkspaceProperties$ComputeTypeName": "<p>The compute type. For more information, see <a href=\"http://aws.amazon.com/workspaces/details/#Amazon_WorkSpaces_Bundles\">Amazon WorkSpaces Bundles</a>.</p>"
+      }
+    },
+    "ComputeType": {
+      "base": "<p>Describes the compute type.</p>",
+      "refs": {
+        "WorkspaceBundle$ComputeType": "<p>The compute type. For more information, see <a href=\"http://aws.amazon.com/workspaces/details/#Amazon_WorkSpaces_Bundles\">Amazon WorkSpaces Bundles</a>.</p>"
+      }
+    },
+    "ComputerName": {
+      "base": null,
+      "refs": {
+        "Workspace$ComputerName": "<p>The name of the WorkSpace, as seen by the operating system. The format of this name varies. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/launch-workspaces-tutorials.html\"> Launch a WorkSpace</a>. </p>"
+      }
+    },
+    "ConnectionAlias": {
+      "base": "<p>Describes a connection alias. Connection aliases are used for cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+      "refs": {
+        "ConnectionAliasList$member": null
+      }
+    },
+    "ConnectionAliasAssociation": {
+      "base": "<p>Describes a connection alias association that is used for cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+      "refs": {
+        "ConnectionAliasAssociationList$member": null
+      }
+    },
+    "ConnectionAliasAssociationList": {
+      "base": null,
+      "refs": {
+        "ConnectionAlias$Associations": "<p>The association status of the connection alias.</p>"
+      }
+    },
+    "ConnectionAliasId": {
+      "base": null,
+      "refs": {
+        "AssociateConnectionAliasRequest$AliasId": "<p>The identifier of the connection alias.</p>",
+        "ConnectionAlias$AliasId": "<p>The identifier of the connection alias.</p>",
+        "ConnectionAliasIdList$member": null,
+        "CreateConnectionAliasResult$AliasId": "<p>The identifier of the connection alias.</p>",
+        "DeleteConnectionAliasRequest$AliasId": "<p>The identifier of the connection alias to delete.</p>",
+        "DescribeConnectionAliasPermissionsRequest$AliasId": "<p>The identifier of the connection alias.</p>",
+        "DescribeConnectionAliasPermissionsResult$AliasId": "<p>The identifier of the connection alias.</p>",
+        "DisassociateConnectionAliasRequest$AliasId": "<p>The identifier of the connection alias to disassociate.</p>",
+        "UpdateConnectionAliasPermissionRequest$AliasId": "<p>The identifier of the connection alias that you want to update permissions for.</p>"
+      }
+    },
+    "ConnectionAliasIdList": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionAliasesRequest$AliasIds": "<p>The identifiers of the connection aliases to describe.</p>"
+      }
+    },
+    "ConnectionAliasList": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionAliasesResult$ConnectionAliases": "<p>Information about the specified connection aliases.</p>"
+      }
+    },
+    "ConnectionAliasPermission": {
+      "base": "<p>Describes the permissions for a connection alias. Connection aliases are used for cross-Region redirection. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/cross-region-redirection.html\"> Cross-Region Redirection for Amazon WorkSpaces</a>.</p>",
+      "refs": {
+        "ConnectionAliasPermissions$member": null,
+        "UpdateConnectionAliasPermissionRequest$ConnectionAliasPermission": "<p>Indicates whether to share or unshare the connection alias with the specified AWS account.</p>"
+      }
+    },
+    "ConnectionAliasPermissions": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionAliasPermissionsResult$ConnectionAliasPermissions": "<p>The permissions associated with a connection alias.</p>"
+      }
+    },
+    "ConnectionAliasState": {
+      "base": null,
+      "refs": {
+        "ConnectionAlias$State": "<p>The current state of the connection alias.</p>"
+      }
+    },
+    "ConnectionIdentifier": {
+      "base": null,
+      "refs": {
+        "AssociateConnectionAliasResult$ConnectionIdentifier": "<p>The identifier of the connection alias association. You use the connection identifier in the DNS TXT record when you're configuring your DNS routing policies. </p>",
+        "ConnectionAliasAssociation$ConnectionIdentifier": "<p>The identifier of the connection alias association. You use the connection identifier in the DNS TXT record when you're configuring your DNS routing policies.</p>"
+      }
+    },
+    "ConnectionState": {
+      "base": null,
+      "refs": {
+        "WorkspaceConnectionStatus$ConnectionState": "<p>The connection state of the WorkSpace. The connection state is unknown if the WorkSpace is stopped.</p>"
+      }
+    },
+    "ConnectionString": {
+      "base": null,
+      "refs": {
+        "ConnectionAlias$ConnectionString": "<p>The connection string specified for the connection alias. The connection string must be in the form of a fully qualified domain name (FQDN), such as <code>www.example.com</code>.</p>",
+        "CreateConnectionAliasRequest$ConnectionString": "<p>A connection string in the form of a fully qualified domain name (FQDN), such as <code>www.example.com</code>.</p> <important> <p>After you create a connection string, it is always associated to your AWS account. You cannot recreate the same connection string with a different account, even if you delete all instances of it from the original account. The connection string is globally reserved for your account.</p> </important>"
+      }
+    },
+    "CopyWorkspaceImageRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyWorkspaceImageResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateConnectionAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateConnectionAliasResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIpGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIpGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTagsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DedicatedTenancyCidrRangeList": {
+      "base": null,
+      "refs": {
+        "ListAvailableManagementCidrRangesResult$ManagementCidrRanges": "<p>The list of available IP address ranges, specified as IPv4 CIDR blocks.</p>"
+      }
+    },
+    "DedicatedTenancyManagementCidrRange": {
+      "base": null,
+      "refs": {
+        "AccountModification$DedicatedTenancyManagementCidrRange": "<p>The IP address range, specified as an IPv4 CIDR block, for the management network interface used for the account.</p>",
+        "DedicatedTenancyCidrRangeList$member": null,
+        "DescribeAccountResult$DedicatedTenancyManagementCidrRange": "<p>The IP address range, specified as an IPv4 CIDR block, used for the management network interface.</p> <p>The management network interface is connected to a secure Amazon WorkSpaces management network. It is used for interactive streaming of the WorkSpace desktop to Amazon WorkSpaces clients, and to allow Amazon WorkSpaces to manage the WorkSpace.</p>",
+        "ModifyAccountRequest$DedicatedTenancyManagementCidrRange": "<p>The IP address range, specified as an IPv4 CIDR block, for the management network interface. Specify an IP address range that is compatible with your network and in CIDR notation (that is, specify the range as an IPv4 CIDR block). The CIDR block size must be /16 (for example, 203.0.113.25/16). It must also be specified as available by the <code>ListAvailableManagementCidrRanges</code> operation.</p>"
+      }
+    },
+    "DedicatedTenancyModificationStateEnum": {
+      "base": null,
+      "refs": {
+        "AccountModification$ModificationState": "<p>The state of the modification to the configuration of BYOL.</p>"
+      }
+    },
+    "DedicatedTenancySupportEnum": {
+      "base": null,
+      "refs": {
+        "ModifyAccountRequest$DedicatedTenancySupport": "<p>The status of BYOL.</p>"
+      }
+    },
+    "DedicatedTenancySupportResultEnum": {
+      "base": null,
+      "refs": {
+        "AccountModification$DedicatedTenancySupport": "<p>The status of BYOL (whether BYOL is being enabled or disabled).</p>",
+        "DescribeAccountResult$DedicatedTenancySupport": "<p>The status of BYOL (whether BYOL is enabled or disabled).</p>"
+      }
+    },
+    "DefaultOu": {
+      "base": null,
+      "refs": {
+        "DefaultWorkspaceCreationProperties$DefaultOu": "<p>The organizational unit (OU) in the directory for the WorkSpace machine accounts.</p>",
+        "WorkspaceCreationProperties$DefaultOu": "<p>The default organizational unit (OU) for your WorkSpaces directories. This string must be the full Lightweight Directory Access Protocol (LDAP) distinguished name for the target domain and OU. It must be in the form <code>\"OU=<i>value</i>,DC=<i>value</i>,DC=<i>value</i>\"</code>, where <i>value</i> is any string of characters, and the number of domain components (DCs) is two or more. For example, <code>OU=WorkSpaces_machines,DC=machines,DC=example,DC=com</code>. </p> <important> <ul> <li> <p>To avoid errors, certain characters in the distinguished name must be escaped. For more information, see <a href=\"https://docs.microsoft.com/previous-versions/windows/desktop/ldap/distinguished-names\"> Distinguished Names</a> in the Microsoft documentation.</p> </li> <li> <p>The API doesn't validate whether the OU exists.</p> </li> </ul> </important>"
+      }
+    },
+    "DefaultWorkspaceCreationProperties": {
+      "base": "<p>Describes the default values that are used to create WorkSpaces. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/update-directory-details.html\">Update Directory Details for Your WorkSpaces</a>.</p>",
+      "refs": {
+        "WorkspaceDirectory$WorkspaceCreationProperties": "<p>The default creation properties for all WorkSpaces in the directory.</p>"
+      }
+    },
+    "DeleteConnectionAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteConnectionAliasResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteIpGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteIpGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTagsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWorkspaceImageRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWorkspaceImageResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterWorkspaceDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterWorkspaceDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountModificationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountModificationsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAccountResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClientPropertiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClientPropertiesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionAliasPermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionAliasPermissionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionAliasesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionAliasesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIpGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIpGroupsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTagsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceBundlesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceBundlesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceDirectoriesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceDirectoriesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceImagePermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceImagePermissionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceImagesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceImagesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceSnapshotsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspaceSnapshotsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspacesConnectionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspacesConnectionStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "AccountModification$ErrorMessage": "<p>The text of the error message that is returned if the configuration of BYOL cannot be modified.</p>",
+        "FailedCreateWorkspaceRequest$ErrorMessage": "<p>The text of the error message that is returned if the WorkSpace cannot be created.</p>",
+        "FailedWorkspaceChangeRequest$ErrorMessage": "<p>The text of the error message that is returned if the WorkSpace cannot be rebooted.</p>",
+        "Workspace$ErrorMessage": "<p>The text of the error message that is returned if the WorkSpace cannot be created.</p>",
+        "WorkspaceBundle$Description": "<p>A description.</p>",
+        "WorkspaceImage$ErrorMessage": "<p>The text of the error message that is returned for the image.</p>"
+      }
+    },
+    "DirectoryId": {
+      "base": null,
+      "refs": {
+        "AssociateIpGroupsRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "DeregisterWorkspaceDirectoryRequest$DirectoryId": "<p>The identifier of the directory. If any WorkSpaces are registered to this directory, you must remove them before you deregister the directory, or you will receive an OperationNotSupportedException error.</p>",
+        "DescribeWorkspacesRequest$DirectoryId": "<p>The identifier of the directory. In addition, you can optionally specify a specific directory user (see <code>UserName</code>). You cannot combine this parameter with any other filter.</p>",
+        "DirectoryIdList$member": null,
+        "DisassociateIpGroupsRequest$DirectoryId": "<p>The identifier of the directory.</p>",
+        "ModifySelfservicePermissionsRequest$ResourceId": "<p>The identifier of the directory.</p>",
+        "ModifyWorkspaceAccessPropertiesRequest$ResourceId": "<p>The identifier of the directory.</p>",
+        "ModifyWorkspaceCreationPropertiesRequest$ResourceId": "<p>The identifier of the directory.</p>",
+        "RegisterWorkspaceDirectoryRequest$DirectoryId": "<p>The identifier of the directory. You cannot register a directory if it does not have a status of Active. If the directory does not have a status of Active, you will receive an InvalidResourceStateException error. If you have already registered the maximum number of directories that you can register with Amazon WorkSpaces, you will receive a ResourceLimitExceededException error. Deregister directories that you are not using for WorkSpaces, and try again.</p>",
+        "Workspace$DirectoryId": "<p>The identifier of the AWS Directory Service directory for the WorkSpace.</p>",
+        "WorkspaceDirectory$DirectoryId": "<p>The directory identifier.</p>",
+        "WorkspaceRequest$DirectoryId": "<p>The identifier of the AWS Directory Service directory for the WorkSpace. You can use <a>DescribeWorkspaceDirectories</a> to list the available directories.</p>"
+      }
+    },
+    "DirectoryIdList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceDirectoriesRequest$DirectoryIds": "<p>The identifiers of the directories. If the value is null, all directories are retrieved.</p>"
+      }
+    },
+    "DirectoryList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceDirectoriesResult$Directories": "<p>Information about the directories.</p>"
+      }
+    },
+    "DirectoryName": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$DirectoryName": "<p>The name of the directory.</p>"
+      }
+    },
+    "DisassociateConnectionAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateConnectionAliasResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateIpGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateIpGroupsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DnsIpAddresses": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$DnsIpAddresses": "<p>The IP addresses of the DNS servers for the directory.</p>"
+      }
+    },
+    "Ec2ImageId": {
+      "base": null,
+      "refs": {
+        "ImportWorkspaceImageRequest$Ec2ImageId": "<p>The identifier of the EC2 image.</p>"
+      }
+    },
+    "ErrorType": {
+      "base": null,
+      "refs": {
+        "FailedCreateWorkspaceRequest$ErrorCode": "<p>The error code that is returned if the WorkSpace cannot be created.</p>",
+        "FailedWorkspaceChangeRequest$ErrorCode": "<p>The error code that is returned if the WorkSpace cannot be rebooted.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "InvalidParameterValuesException$message": "<p>The exception error message.</p>",
+        "InvalidResourceStateException$message": null,
+        "OperationInProgressException$message": null,
+        "OperationNotSupportedException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceAssociatedException$message": null,
+        "ResourceCreationFailedException$message": null,
+        "ResourceLimitExceededException$message": "<p>The exception error message.</p>",
+        "ResourceNotFoundException$message": "<p>The resource could not be found.</p>",
+        "ResourceUnavailableException$message": "<p>The exception error message.</p>",
+        "UnsupportedNetworkConfigurationException$message": null,
+        "UnsupportedWorkspaceConfigurationException$message": null,
+        "WorkspacesDefaultRoleNotFoundException$message": null
+      }
+    },
+    "FailedCreateWorkspaceRequest": {
+      "base": "<p>Describes a WorkSpace that cannot be created.</p>",
+      "refs": {
+        "FailedCreateWorkspaceRequests$member": null
+      }
+    },
+    "FailedCreateWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "CreateWorkspacesResult$FailedRequests": "<p>Information about the WorkSpaces that could not be created.</p>"
+      }
+    },
+    "FailedRebootWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "RebootWorkspacesResult$FailedRequests": "<p>Information about the WorkSpaces that could not be rebooted.</p>"
+      }
+    },
+    "FailedRebuildWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "RebuildWorkspacesResult$FailedRequests": "<p>Information about the WorkSpace that could not be rebuilt.</p>"
+      }
+    },
+    "FailedStartWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "StartWorkspacesResult$FailedRequests": "<p>Information about the WorkSpaces that could not be started.</p>"
+      }
+    },
+    "FailedStopWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "StopWorkspacesResult$FailedRequests": "<p>Information about the WorkSpaces that could not be stopped.</p>"
+      }
+    },
+    "FailedTerminateWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "TerminateWorkspacesResult$FailedRequests": "<p>Information about the WorkSpaces that could not be terminated.</p>"
+      }
+    },
+    "FailedWorkspaceChangeRequest": {
+      "base": "<p>Describes a WorkSpace that could not be rebooted. (<a>RebootWorkspaces</a>), rebuilt (<a>RebuildWorkspaces</a>), restored (<a>RestoreWorkspace</a>), terminated (<a>TerminateWorkspaces</a>), started (<a>StartWorkspaces</a>), or stopped (<a>StopWorkspaces</a>).</p>",
+      "refs": {
+        "FailedRebootWorkspaceRequests$member": null,
+        "FailedRebuildWorkspaceRequests$member": null,
+        "FailedStartWorkspaceRequests$member": null,
+        "FailedStopWorkspaceRequests$member": null,
+        "FailedTerminateWorkspaceRequests$member": null
+      }
+    },
+    "ImagePermission": {
+      "base": "<p>Describes the AWS accounts that have been granted permission to use a shared image. For more information about sharing images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/share-custom-image.html\"> Share or Unshare a Custom WorkSpaces Image</a>.</p>",
+      "refs": {
+        "ImagePermissions$member": null
+      }
+    },
+    "ImagePermissions": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceImagePermissionsResult$ImagePermissions": "<p>The identifiers of the AWS accounts that the image has been shared with.</p>"
+      }
+    },
+    "ImageType": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceImagesRequest$ImageType": "<p>The type (owned or shared) of the image.</p>"
+      }
+    },
+    "ImportWorkspaceImageRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportWorkspaceImageResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvalidParameterValuesException": {
+      "base": "<p>One or more parameter values are not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidResourceStateException": {
+      "base": "<p>The state of the resource is not valid for this operation.</p>",
+      "refs": {
+      }
+    },
+    "IpAddress": {
+      "base": null,
+      "refs": {
+        "DnsIpAddresses$member": null,
+        "Workspace$IpAddress": "<p>The IP address of the WorkSpace.</p>"
+      }
+    },
+    "IpGroupDesc": {
+      "base": null,
+      "refs": {
+        "CreateIpGroupRequest$GroupDesc": "<p>The description of the group.</p>",
+        "WorkspacesIpGroup$groupDesc": "<p>The description of the group.</p>"
+      }
+    },
+    "IpGroupId": {
+      "base": null,
+      "refs": {
+        "AuthorizeIpRulesRequest$GroupId": "<p>The identifier of the group.</p>",
+        "CreateIpGroupResult$GroupId": "<p>The identifier of the group.</p>",
+        "DeleteIpGroupRequest$GroupId": "<p>The identifier of the IP access control group.</p>",
+        "IpGroupIdList$member": null,
+        "RevokeIpRulesRequest$GroupId": "<p>The identifier of the group.</p>",
+        "UpdateRulesOfIpGroupRequest$GroupId": "<p>The identifier of the group.</p>",
+        "WorkspacesIpGroup$groupId": "<p>The identifier of the group.</p>"
+      }
+    },
+    "IpGroupIdList": {
+      "base": null,
+      "refs": {
+        "AssociateIpGroupsRequest$GroupIds": "<p>The identifiers of one or more IP access control groups.</p>",
+        "DescribeIpGroupsRequest$GroupIds": "<p>The identifiers of one or more IP access control groups.</p>",
+        "DisassociateIpGroupsRequest$GroupIds": "<p>The identifiers of one or more IP access control groups.</p>",
+        "WorkspaceDirectory$ipGroupIds": "<p>The identifiers of the IP access control groups associated with the directory.</p>"
+      }
+    },
+    "IpGroupName": {
+      "base": null,
+      "refs": {
+        "CreateIpGroupRequest$GroupName": "<p>The name of the group.</p>",
+        "WorkspacesIpGroup$groupName": "<p>The name of the group.</p>"
+      }
+    },
+    "IpRevokedRuleList": {
+      "base": null,
+      "refs": {
+        "RevokeIpRulesRequest$UserRules": "<p>The rules to remove from the group.</p>"
+      }
+    },
+    "IpRule": {
+      "base": null,
+      "refs": {
+        "IpRevokedRuleList$member": null,
+        "IpRuleItem$ipRule": "<p>The IP address range, in CIDR notation.</p>"
+      }
+    },
+    "IpRuleDesc": {
+      "base": null,
+      "refs": {
+        "IpRuleItem$ruleDesc": "<p>The description.</p>"
+      }
+    },
+    "IpRuleItem": {
+      "base": "<p>Describes a rule for an IP access control group.</p>",
+      "refs": {
+        "IpRuleList$member": null
+      }
+    },
+    "IpRuleList": {
+      "base": null,
+      "refs": {
+        "AuthorizeIpRulesRequest$UserRules": "<p>The rules to add to the group.</p>",
+        "CreateIpGroupRequest$UserRules": "<p>The rules to add to the group.</p>",
+        "UpdateRulesOfIpGroupRequest$UserRules": "<p>One or more rules.</p>",
+        "WorkspacesIpGroup$userRules": "<p>The rules.</p>"
+      }
+    },
+    "Limit": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionAliasPermissionsRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "DescribeConnectionAliasesRequest$Limit": "<p>The maximum number of connection aliases to return.</p>",
+        "DescribeIpGroupsRequest$MaxResults": "<p>The maximum number of items to return.</p>",
+        "DescribeWorkspaceDirectoriesRequest$Limit": "<p>The maximum number of directories to return.</p>",
+        "DescribeWorkspaceImagePermissionsRequest$MaxResults": "<p>The maximum number of items to return.</p>",
+        "DescribeWorkspaceImagesRequest$MaxResults": "<p>The maximum number of items to return.</p>",
+        "DescribeWorkspacesRequest$Limit": "<p>The maximum number of items to return.</p>"
+      }
+    },
+    "ListAvailableManagementCidrRangesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAvailableManagementCidrRangesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ManagementCidrRangeConstraint": {
+      "base": null,
+      "refs": {
+        "ListAvailableManagementCidrRangesRequest$ManagementCidrRangeConstraint": "<p>The IP address range to search. Specify an IP address range that is compatible with your network and in CIDR notation (that is, specify the range as an IPv4 CIDR block).</p>"
+      }
+    },
+    "ManagementCidrRangeMaxResults": {
+      "base": null,
+      "refs": {
+        "ListAvailableManagementCidrRangesRequest$MaxResults": "<p>The maximum number of items to return.</p>"
+      }
+    },
+    "MigrateWorkspaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MigrateWorkspaceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModificationResourceEnum": {
+      "base": null,
+      "refs": {
+        "ModificationState$Resource": "<p>The resource.</p>"
+      }
+    },
+    "ModificationState": {
+      "base": "<p>Describes a WorkSpace modification.</p>",
+      "refs": {
+        "ModificationStateList$member": null
+      }
+    },
+    "ModificationStateEnum": {
+      "base": null,
+      "refs": {
+        "ModificationState$State": "<p>The modification state.</p>"
+      }
+    },
+    "ModificationStateList": {
+      "base": null,
+      "refs": {
+        "Workspace$ModificationStates": "<p>The modification states of the WorkSpace.</p>"
+      }
+    },
+    "ModifyAccountRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyAccountResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyClientPropertiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyClientPropertiesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifySelfservicePermissionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifySelfservicePermissionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceAccessPropertiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceAccessPropertiesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceCreationPropertiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceCreationPropertiesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspacePropertiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspacePropertiesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceStateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyWorkspaceStateResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "NonEmptyString": {
+      "base": null,
+      "refs": {
+        "AssociateConnectionAliasRequest$ResourceId": "<p>The identifier of the directory to associate the connection alias with.</p>",
+        "ClientPropertiesResult$ResourceId": "<p>The resource identifier, in the form of a directory ID.</p>",
+        "ConnectionAliasAssociation$ResourceId": "<p>The identifier of the directory associated with a connection alias.</p>",
+        "CreateTagsRequest$ResourceId": "<p>The identifier of the WorkSpaces resource. The supported resource types are WorkSpaces, registered directories, images, custom bundles, IP access control groups, and connection aliases.</p>",
+        "DeleteTagsRequest$ResourceId": "<p>The identifier of the WorkSpaces resource. The supported resource types are WorkSpaces, registered directories, images, custom bundles, IP access control groups, and connection aliases.</p>",
+        "DescribeConnectionAliasesRequest$ResourceId": "<p>The identifier of the directory associated with the connection alias.</p>",
+        "DescribeTagsRequest$ResourceId": "<p>The identifier of the WorkSpaces resource. The supported resource types are WorkSpaces, registered directories, images, custom bundles, IP access control groups, and connection aliases.</p>",
+        "ModifyClientPropertiesRequest$ResourceId": "<p>The resource identifiers, in the form of directory IDs.</p>",
+        "ResourceIdList$member": null,
+        "ResourceNotFoundException$ResourceId": "<p>The ID of the resource that could not be found.</p>",
+        "ResourceUnavailableException$ResourceId": "<p>The identifier of the resource that is not available.</p>",
+        "RootStorage$Capacity": "<p>The size of the root volume.</p>",
+        "TagKeyList$member": null,
+        "UserStorage$Capacity": "<p>The size of the user storage.</p>",
+        "WorkspaceBundle$Name": "<p>The name of the bundle.</p>"
+      }
+    },
+    "OperatingSystem": {
+      "base": "<p>The operating system that the image is running.</p>",
+      "refs": {
+        "WorkspaceImage$OperatingSystem": "<p>The operating system that the image is running. </p>"
+      }
+    },
+    "OperatingSystemType": {
+      "base": null,
+      "refs": {
+        "OperatingSystem$Type": "<p>The operating system.</p>"
+      }
+    },
+    "OperationInProgressException": {
+      "base": "<p>The properties of this WorkSpace are currently being modified. Try again in a moment.</p>",
+      "refs": {
+      }
+    },
+    "OperationNotSupportedException": {
+      "base": "<p>This operation is not supported.</p>",
+      "refs": {
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "DescribeAccountModificationsRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeAccountModificationsResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeConnectionAliasPermissionsRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results. </p>",
+        "DescribeConnectionAliasPermissionsResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeConnectionAliasesRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results. </p>",
+        "DescribeConnectionAliasesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeIpGroupsRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeIpGroupsResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeWorkspaceBundlesRequest$NextToken": "<p>The token for the next set of results. (You received this token from a previous call.)</p>",
+        "DescribeWorkspaceBundlesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if there are no more results available. This token is valid for one day and must be used within that time frame.</p>",
+        "DescribeWorkspaceDirectoriesRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeWorkspaceDirectoriesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeWorkspaceImagePermissionsRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeWorkspaceImagePermissionsResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeWorkspaceImagesRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeWorkspaceImagesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeWorkspacesConnectionStatusRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeWorkspacesConnectionStatusResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "DescribeWorkspacesRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "DescribeWorkspacesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>",
+        "ListAvailableManagementCidrRangesRequest$NextToken": "<p>If you received a <code>NextToken</code> from a previous call that was paginated, provide this token to receive the next set of results.</p>",
+        "ListAvailableManagementCidrRangesResult$NextToken": "<p>The token to use to retrieve the next set of results, or null if no more results are available.</p>"
+      }
+    },
+    "RebootRequest": {
+      "base": "<p>Describes the information used to reboot a WorkSpace.</p>",
+      "refs": {
+        "RebootWorkspaceRequests$member": null
+      }
+    },
+    "RebootWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "RebootWorkspacesRequest$RebootWorkspaceRequests": "<p>The WorkSpaces to reboot. You can specify up to 25 WorkSpaces.</p>"
+      }
+    },
+    "RebootWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RebootWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RebuildRequest": {
+      "base": "<p>Describes the information used to rebuild a WorkSpace.</p>",
+      "refs": {
+        "RebuildWorkspaceRequests$member": null
+      }
+    },
+    "RebuildWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "RebuildWorkspacesRequest$RebuildWorkspaceRequests": "<p>The WorkSpace to rebuild. You can specify a single WorkSpace.</p>"
+      }
+    },
+    "RebuildWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RebuildWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReconnectEnum": {
+      "base": null,
+      "refs": {
+        "ClientProperties$ReconnectEnabled": "<p>Specifies whether users can cache their credentials on the Amazon WorkSpaces client. When enabled, users can choose to reconnect to their WorkSpaces without re-entering their credentials. </p>",
+        "SelfservicePermissions$RestartWorkspace": "<p>Specifies whether users can restart their WorkSpace.</p>",
+        "SelfservicePermissions$IncreaseVolumeSize": "<p>Specifies whether users can increase the volume size of the drives on their WorkSpace.</p>",
+        "SelfservicePermissions$ChangeComputeType": "<p>Specifies whether users can change the compute type (bundle) for their WorkSpace.</p>",
+        "SelfservicePermissions$SwitchRunningMode": "<p>Specifies whether users can switch the running mode of their WorkSpace.</p>",
+        "SelfservicePermissions$RebuildWorkspace": "<p>Specifies whether users can rebuild the operating system of a WorkSpace to its original state.</p>"
+      }
+    },
+    "Region": {
+      "base": null,
+      "refs": {
+        "CopyWorkspaceImageRequest$SourceRegion": "<p>The identifier of the source Region.</p>"
+      }
+    },
+    "RegisterWorkspaceDirectoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterWorkspaceDirectoryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegistrationCode": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$RegistrationCode": "<p>The registration code for the directory. This is the code that users enter in their Amazon WorkSpaces client application to connect to the directory.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceAssociatedException": {
+      "base": "<p>The resource is associated with a directory.</p>",
+      "refs": {
+      }
+    },
+    "ResourceCreationFailedException": {
+      "base": "<p>The resource could not be created.</p>",
+      "refs": {
+      }
+    },
+    "ResourceIdList": {
+      "base": null,
+      "refs": {
+        "DescribeClientPropertiesRequest$ResourceIds": "<p>The resource identifier, in the form of directory IDs.</p>"
+      }
+    },
+    "ResourceLimitExceededException": {
+      "base": "<p>Your resource limits have been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource could not be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceUnavailableException": {
+      "base": "<p>The specified resource is not available.</p>",
+      "refs": {
+      }
+    },
+    "RestoreWorkspaceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreWorkspaceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeIpRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeIpRulesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RootStorage": {
+      "base": "<p>Describes the root volume for a WorkSpace bundle.</p>",
+      "refs": {
+        "WorkspaceBundle$RootStorage": "<p>The size of the root volume.</p>"
+      }
+    },
+    "RootVolumeSizeGib": {
+      "base": null,
+      "refs": {
+        "WorkspaceProperties$RootVolumeSizeGib": "<p>The size of the root volume. For important information about how to modify the size of the root and user volumes, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/modify-workspaces.html\">Modify a WorkSpace</a>.</p>"
+      }
+    },
+    "RunningMode": {
+      "base": null,
+      "refs": {
+        "WorkspaceProperties$RunningMode": "<p>The running mode. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/running-mode.html\">Manage the WorkSpace Running Mode</a>.</p>"
+      }
+    },
+    "RunningModeAutoStopTimeoutInMinutes": {
+      "base": null,
+      "refs": {
+        "WorkspaceProperties$RunningModeAutoStopTimeoutInMinutes": "<p>The time after a user logs off when WorkSpaces are automatically stopped. Configured in 60-minute intervals.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "DefaultWorkspaceCreationProperties$CustomSecurityGroupId": "<p>The identifier of the default security group to apply to WorkSpaces when they are created. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/amazon-workspaces-security-groups.html\"> Security Groups for Your WorkSpaces</a>.</p>",
+        "WorkspaceCreationProperties$CustomSecurityGroupId": "<p>The identifier of your custom security group.</p>",
+        "WorkspaceDirectory$WorkspaceSecurityGroupId": "<p>The identifier of the security group that is assigned to new WorkSpaces.</p>"
+      }
+    },
+    "SelfservicePermissions": {
+      "base": "<p>Describes the self-service permissions for a directory. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/enable-user-self-service-workspace-management.html\">Enable Self-Service WorkSpace Management Capabilities for Your Users</a>.</p>",
+      "refs": {
+        "ModifySelfservicePermissionsRequest$SelfservicePermissions": "<p>The permissions to enable or disable self-service capabilities.</p>",
+        "WorkspaceDirectory$SelfservicePermissions": "<p>The default self-service permissions for WorkSpaces in the directory.</p>"
+      }
+    },
+    "Snapshot": {
+      "base": "<p>Describes a snapshot.</p>",
+      "refs": {
+        "SnapshotList$member": null
+      }
+    },
+    "SnapshotList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceSnapshotsResult$RebuildSnapshots": "<p>Information about the snapshots that can be used to rebuild a WorkSpace. These snapshots include the user volume.</p>",
+        "DescribeWorkspaceSnapshotsResult$RestoreSnapshots": "<p>Information about the snapshots that can be used to restore a WorkSpace. These snapshots include both the root volume and the user volume.</p>"
+      }
+    },
+    "StartRequest": {
+      "base": "<p>Information used to start a WorkSpace.</p>",
+      "refs": {
+        "StartWorkspaceRequests$member": null
+      }
+    },
+    "StartWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "StartWorkspacesRequest$StartWorkspaceRequests": "<p>The WorkSpaces to start. You can specify up to 25 WorkSpaces.</p>"
+      }
+    },
+    "StartWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopRequest": {
+      "base": "<p>Describes the information used to stop a WorkSpace.</p>",
+      "refs": {
+        "StopWorkspaceRequests$member": null
+      }
+    },
+    "StopWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "StopWorkspacesRequest$StopWorkspaceRequests": "<p>The WorkSpaces to stop. You can specify up to 25 WorkSpaces.</p>"
+      }
+    },
+    "StopWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIds$member": null,
+        "Workspace$SubnetId": "<p>The identifier of the subnet for the WorkSpace.</p>"
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "RegisterWorkspaceDirectoryRequest$SubnetIds": "<p>The identifiers of the subnets for your virtual private cloud (VPC). Make sure that the subnets are in supported Availability Zones. The subnets must also be in separate Availability Zones. If these conditions are not met, you will receive an OperationNotSupportedException error.</p>",
+        "WorkspaceDirectory$SubnetIds": "<p>The identifiers of the subnets used with the directory.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Describes a tag.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the tag.</p>"
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "DeleteTagsRequest$TagKeys": "<p>The tag keys.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CopyWorkspaceImageRequest$Tags": "<p>The tags for the image.</p>",
+        "CreateConnectionAliasRequest$Tags": "<p>The tags to associate with the connection alias.</p>",
+        "CreateIpGroupRequest$Tags": "<p>The tags. Each WorkSpaces resource can have a maximum of 50 tags.</p>",
+        "CreateTagsRequest$Tags": "<p>The tags. Each WorkSpaces resource can have a maximum of 50 tags.</p>",
+        "DescribeTagsResult$TagList": "<p>The tags.</p>",
+        "ImportWorkspaceImageRequest$Tags": "<p>The tags. Each WorkSpaces resource can have a maximum of 50 tags.</p>",
+        "RegisterWorkspaceDirectoryRequest$Tags": "<p>The tags associated with the directory.</p>",
+        "WorkspaceRequest$Tags": "<p>The tags for the WorkSpace.</p>"
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "TargetWorkspaceState": {
+      "base": null,
+      "refs": {
+        "ModifyWorkspaceStateRequest$WorkspaceState": "<p>The WorkSpace state.</p>"
+      }
+    },
+    "Tenancy": {
+      "base": null,
+      "refs": {
+        "RegisterWorkspaceDirectoryRequest$Tenancy": "<p>Indicates whether your WorkSpace directory is dedicated or shared. To use Bring Your Own License (BYOL) images, this value must be set to <code>DEDICATED</code> and your AWS account must be enabled for BYOL. If your account has not been enabled for BYOL, you will receive an InvalidParameterValuesException error. For more information about BYOL images, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/byol-windows-images.html\">Bring Your Own Windows Desktop Images</a>.</p>",
+        "WorkspaceDirectory$Tenancy": "<p>Specifies whether the directory is dedicated or shared. To use Bring Your Own License (BYOL), this value must be set to <code>DEDICATED</code>. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/byol-windows-images.html\">Bring Your Own Windows Desktop Images</a>.</p>"
+      }
+    },
+    "TerminateRequest": {
+      "base": "<p>Describes the information used to terminate a WorkSpace.</p>",
+      "refs": {
+        "TerminateWorkspaceRequests$member": null
+      }
+    },
+    "TerminateWorkspaceRequests": {
+      "base": null,
+      "refs": {
+        "TerminateWorkspacesRequest$TerminateWorkspaceRequests": "<p>The WorkSpaces to terminate. You can specify up to 25 WorkSpaces.</p>"
+      }
+    },
+    "TerminateWorkspacesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TerminateWorkspacesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "AccountModification$StartTime": "<p>The timestamp when the modification of the BYOL configuration was started.</p>",
+        "Snapshot$SnapshotTime": "<p>The time when the snapshot was created.</p>",
+        "WorkspaceBundle$LastUpdatedTime": "<p>The last time that the bundle was updated.</p>",
+        "WorkspaceConnectionStatus$ConnectionStateCheckTimestamp": "<p>The timestamp of the connection status check.</p>",
+        "WorkspaceConnectionStatus$LastKnownUserConnectionTimestamp": "<p>The timestamp of the last known user connection.</p>",
+        "WorkspaceImage$Created": "<p>The date when the image was created. If the image has been shared, the AWS account that the image has been shared with sees the original creation date of the image.</p>"
+      }
+    },
+    "UnsupportedNetworkConfigurationException": {
+      "base": "<p>The configuration of this network is not supported for this operation, or your network configuration conflicts with the Amazon WorkSpaces management network IP range. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/amazon-workspaces-vpc.html\"> Configure a VPC for Amazon WorkSpaces</a>.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedWorkspaceConfigurationException": {
+      "base": "<p>The configuration of this WorkSpace is not supported for this operation. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/required-service-components.html\">Required Configuration and Service Components for WorkSpaces </a>.</p>",
+      "refs": {
+      }
+    },
+    "UpdateConnectionAliasPermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateConnectionAliasPermissionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRulesOfIpGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRulesOfIpGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWorkspaceImagePermissionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWorkspaceImagePermissionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UserName": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspacesRequest$UserName": "<p>The name of the directory user. You must specify this parameter with <code>DirectoryId</code>.</p>",
+        "Workspace$UserName": "<p>The user for the WorkSpace.</p>",
+        "WorkspaceDirectory$CustomerUserName": "<p>The user name for the service account.</p>",
+        "WorkspaceRequest$UserName": "<p>The user name of the user for the WorkSpace. This user name must exist in the AWS Directory Service directory for the WorkSpace.</p>"
+      }
+    },
+    "UserStorage": {
+      "base": "<p>Describes the user storage for a WorkSpace bundle.</p>",
+      "refs": {
+        "WorkspaceBundle$UserStorage": "<p>The size of the user storage.</p>"
+      }
+    },
+    "UserVolumeSizeGib": {
+      "base": null,
+      "refs": {
+        "WorkspaceProperties$UserVolumeSizeGib": "<p>The size of the user storage. For important information about how to modify the size of the root and user volumes, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/modify-workspaces.html\">Modify a WorkSpace</a>.</p>"
+      }
+    },
+    "VolumeEncryptionKey": {
+      "base": null,
+      "refs": {
+        "Workspace$VolumeEncryptionKey": "<p>The symmetric AWS KMS customer master key (CMK) used to encrypt data stored on your WorkSpace. Amazon WorkSpaces does not support asymmetric CMKs.</p>",
+        "WorkspaceRequest$VolumeEncryptionKey": "<p>The symmetric AWS KMS customer master key (CMK) used to encrypt data stored on your WorkSpace. Amazon WorkSpaces does not support asymmetric CMKs.</p>"
+      }
+    },
+    "Workspace": {
+      "base": "<p>Describes a WorkSpace.</p>",
+      "refs": {
+        "WorkspaceList$member": null
+      }
+    },
+    "WorkspaceAccessProperties": {
+      "base": "<p>The device types and operating systems that can be used to access a WorkSpace. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/workspaces-network-requirements.html\">Amazon WorkSpaces Client Network Requirements</a>.</p>",
+      "refs": {
+        "ModifyWorkspaceAccessPropertiesRequest$WorkspaceAccessProperties": "<p>The device types and operating systems to enable or disable for access.</p>",
+        "WorkspaceDirectory$WorkspaceAccessProperties": "<p>The devices and operating systems that users can use to access WorkSpaces.</p>"
+      }
+    },
+    "WorkspaceBundle": {
+      "base": "<p>Describes a WorkSpace bundle.</p>",
+      "refs": {
+        "BundleList$member": null
+      }
+    },
+    "WorkspaceConnectionStatus": {
+      "base": "<p>Describes the connection status of a WorkSpace.</p>",
+      "refs": {
+        "WorkspaceConnectionStatusList$member": null
+      }
+    },
+    "WorkspaceConnectionStatusList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspacesConnectionStatusResult$WorkspacesConnectionStatus": "<p>Information about the connection status of the WorkSpace.</p>"
+      }
+    },
+    "WorkspaceCreationProperties": {
+      "base": "<p>Describes the default properties that are used for creating WorkSpaces. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/update-directory-details.html\">Update Directory Details for Your WorkSpaces</a>. </p>",
+      "refs": {
+        "ModifyWorkspaceCreationPropertiesRequest$WorkspaceCreationProperties": "<p>The default properties for creating WorkSpaces.</p>"
+      }
+    },
+    "WorkspaceDirectory": {
+      "base": "<p>Describes a directory that is used with Amazon WorkSpaces.</p>",
+      "refs": {
+        "DirectoryList$member": null
+      }
+    },
+    "WorkspaceDirectoryState": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$State": "<p>The state of the directory's registration with Amazon WorkSpaces. After a directory is deregistered, the <code>DEREGISTERED</code> state is returned very briefly before the directory metadata is cleaned up, so this state is rarely returned. To confirm that a directory is deregistered, check for the directory ID by using <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeWorkspaceDirectories.html\"> DescribeWorkspaceDirectories</a>. If the directory ID isn't returned, then the directory has been successfully deregistered.</p>"
+      }
+    },
+    "WorkspaceDirectoryType": {
+      "base": null,
+      "refs": {
+        "WorkspaceDirectory$DirectoryType": "<p>The directory type.</p>"
+      }
+    },
+    "WorkspaceErrorCode": {
+      "base": null,
+      "refs": {
+        "AccountModification$ErrorCode": "<p>The error code that is returned if the configuration of BYOL cannot be modified.</p>",
+        "Workspace$ErrorCode": "<p>The error code that is returned if the WorkSpace cannot be created.</p>"
+      }
+    },
+    "WorkspaceId": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceSnapshotsRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "FailedWorkspaceChangeRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "MigrateWorkspaceRequest$SourceWorkspaceId": "<p>The identifier of the WorkSpace to migrate from.</p>",
+        "MigrateWorkspaceResult$SourceWorkspaceId": "<p>The original identifier of the WorkSpace that is being migrated.</p>",
+        "MigrateWorkspaceResult$TargetWorkspaceId": "<p>The new identifier of the WorkSpace that is being migrated. If the migration does not succeed, the target WorkSpace ID will not be used, and the WorkSpace will still have the original WorkSpace ID.</p>",
+        "ModifyWorkspacePropertiesRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "ModifyWorkspaceStateRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "RebootRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "RebuildRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "RestoreWorkspaceRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "StartRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "StopRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "TerminateRequest$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "Workspace$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "WorkspaceConnectionStatus$WorkspaceId": "<p>The identifier of the WorkSpace.</p>",
+        "WorkspaceIdList$member": null
+      }
+    },
+    "WorkspaceIdList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspacesConnectionStatusRequest$WorkspaceIds": "<p>The identifiers of the WorkSpaces. You can specify up to 25 WorkSpaces.</p>",
+        "DescribeWorkspacesRequest$WorkspaceIds": "<p>The identifiers of the WorkSpaces. You cannot combine this parameter with any other filter.</p> <p>Because the <a>CreateWorkspaces</a> operation is asynchronous, the identifier it returns is not immediately available. If you immediately call <a>DescribeWorkspaces</a> with this identifier, no information is returned.</p>"
+      }
+    },
+    "WorkspaceImage": {
+      "base": "<p>Describes a WorkSpace image.</p>",
+      "refs": {
+        "WorkspaceImageList$member": null
+      }
+    },
+    "WorkspaceImageDescription": {
+      "base": null,
+      "refs": {
+        "CopyWorkspaceImageRequest$Description": "<p>A description of the image.</p>",
+        "ImportWorkspaceImageRequest$ImageDescription": "<p>The description of the WorkSpace image.</p>",
+        "WorkspaceImage$Description": "<p>The description of the image.</p>"
+      }
+    },
+    "WorkspaceImageErrorCode": {
+      "base": null,
+      "refs": {
+        "WorkspaceImage$ErrorCode": "<p>The error code that is returned for the image.</p>"
+      }
+    },
+    "WorkspaceImageId": {
+      "base": null,
+      "refs": {
+        "CopyWorkspaceImageRequest$SourceImageId": "<p>The identifier of the source image.</p>",
+        "CopyWorkspaceImageResult$ImageId": "<p>The identifier of the image.</p>",
+        "DeleteWorkspaceImageRequest$ImageId": "<p>The identifier of the image.</p>",
+        "DescribeWorkspaceImagePermissionsRequest$ImageId": "<p>The identifier of the image.</p>",
+        "DescribeWorkspaceImagePermissionsResult$ImageId": "<p>The identifier of the image.</p>",
+        "ImportWorkspaceImageResult$ImageId": "<p>The identifier of the WorkSpace image.</p>",
+        "UpdateWorkspaceImagePermissionRequest$ImageId": "<p>The identifier of the image.</p>",
+        "WorkspaceBundle$ImageId": "<p>The image identifier of the bundle.</p>",
+        "WorkspaceImage$ImageId": "<p>The identifier of the image.</p>",
+        "WorkspaceImageIdList$member": null
+      }
+    },
+    "WorkspaceImageIdList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceImagesRequest$ImageIds": "<p>The identifier of the image.</p>"
+      }
+    },
+    "WorkspaceImageIngestionProcess": {
+      "base": null,
+      "refs": {
+        "ImportWorkspaceImageRequest$IngestionProcess": "<p>The ingestion process to be used when importing the image. For non-GPU-enabled bundles (bundles other than Graphics or GraphicsPro), specify <code>BYOL_REGULAR</code>.</p>"
+      }
+    },
+    "WorkspaceImageList": {
+      "base": null,
+      "refs": {
+        "DescribeWorkspaceImagesResult$Images": "<p>Information about the images.</p>"
+      }
+    },
+    "WorkspaceImageName": {
+      "base": null,
+      "refs": {
+        "CopyWorkspaceImageRequest$Name": "<p>The name of the image.</p>",
+        "ImportWorkspaceImageRequest$ImageName": "<p>The name of the WorkSpace image.</p>",
+        "WorkspaceImage$Name": "<p>The name of the image.</p>"
+      }
+    },
+    "WorkspaceImageRequiredTenancy": {
+      "base": null,
+      "refs": {
+        "WorkspaceImage$RequiredTenancy": "<p>Specifies whether the image is running on dedicated hardware. When Bring Your Own License (BYOL) is enabled, this value is set to <code>DEDICATED</code>. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/byol-windows-images.html\">Bring Your Own Windows Desktop Images</a>.</p>"
+      }
+    },
+    "WorkspaceImageState": {
+      "base": null,
+      "refs": {
+        "WorkspaceImage$State": "<p>The status of the image.</p>"
+      }
+    },
+    "WorkspaceList": {
+      "base": null,
+      "refs": {
+        "CreateWorkspacesResult$PendingRequests": "<p>Information about the WorkSpaces that were created.</p> <p>Because this operation is asynchronous, the identifier returned is not immediately available for use with other operations. For example, if you call <a>DescribeWorkspaces</a> before the WorkSpace is created, the information returned can be incomplete.</p>",
+        "DescribeWorkspacesResult$Workspaces": "<p>Information about the WorkSpaces.</p> <p>Because <a>CreateWorkspaces</a> is an asynchronous operation, some of the returned information could be incomplete.</p>"
+      }
+    },
+    "WorkspaceProperties": {
+      "base": "<p>Describes a WorkSpace.</p>",
+      "refs": {
+        "ModifyWorkspacePropertiesRequest$WorkspaceProperties": "<p>The properties of the WorkSpace.</p>",
+        "Workspace$WorkspaceProperties": "<p>The properties of the WorkSpace.</p>",
+        "WorkspaceRequest$WorkspaceProperties": "<p>The WorkSpace properties.</p>"
+      }
+    },
+    "WorkspaceRequest": {
+      "base": "<p>Describes the information used to create a WorkSpace.</p>",
+      "refs": {
+        "FailedCreateWorkspaceRequest$WorkspaceRequest": "<p>Information about the WorkSpace.</p>",
+        "WorkspaceRequestList$member": null
+      }
+    },
+    "WorkspaceRequestList": {
+      "base": null,
+      "refs": {
+        "CreateWorkspacesRequest$Workspaces": "<p>The WorkSpaces to create. You can specify up to 25 WorkSpaces.</p>"
+      }
+    },
+    "WorkspaceState": {
+      "base": null,
+      "refs": {
+        "Workspace$State": "<p>The operational state of the WorkSpace.</p> <note> <p>After a WorkSpace is terminated, the <code>TERMINATED</code> state is returned only briefly before the WorkSpace directory metadata is cleaned up, so this state is rarely returned. To confirm that a WorkSpace is terminated, check for the WorkSpace ID by using <a href=\"https://docs.aws.amazon.com/workspaces/latest/api/API_DescribeWorkspaces.html\"> DescribeWorkSpaces</a>. If the WorkSpace ID isn't returned, then the WorkSpace has been successfully terminated.</p> </note>"
+      }
+    },
+    "WorkspacesDefaultRoleNotFoundException": {
+      "base": "<p>The workspaces_DefaultRole role could not be found. If this is the first time you are registering a directory, you will need to create the workspaces_DefaultRole role before you can register a directory. For more information, see <a href=\"https://docs.aws.amazon.com/workspaces/latest/adminguide/workspaces-access-control.html#create-default-role\">Creating the workspaces_DefaultRole Role</a>.</p>",
+      "refs": {
+      }
+    },
+    "WorkspacesIpGroup": {
+      "base": "<p>Describes an IP access control group.</p>",
+      "refs": {
+        "WorkspacesIpGroupsList$member": null
+      }
+    },
+    "WorkspacesIpGroupsList": {
+      "base": null,
+      "refs": {
+        "DescribeIpGroupsResult$Result": "<p>Information about the IP access control groups.</p>"
+      }
+    }
+  }
+}

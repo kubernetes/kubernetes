@@ -1,0 +1,89 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "getwithoutbody:v1",
+ "name": "getwithoutbody",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates a GET with a request.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+  "ListMetricRequest": {
+   "id": "ListMetricRequest",
+   "type": "object",
+   "description": "The request of getwithoutbody.metricDescriptors.list.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"getwithoutbody#listMetricRequest\".",
+     "default": "getwithoutbody#listMetricRequest"
+    }
+   }
+  },
+  "ListMetricResponse": {
+   "id": "ListMetricResponse",
+   "type": "object",
+   "description": "The response of getwithoutbody.metricDescriptors.list.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"getwithoutbody#listMetricResponse\".",
+     "default": "getwithoutbody#listMetricResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Pagination token. If present, indicates that additional results are available for retrieval. To access the results past the pagination limit, set this value to the pageToken query parameter."
+    }
+   }
+  }
+ },
+ "resources": {
+  "metricDescriptors": {
+   "methods": {
+    "list": {
+     "id": "getwithoutbody.metricDescriptors.list",
+     "path": "{project}/metricDescriptors",
+     "httpMethod": "GET",
+     "description": "List all of the available metric descriptors. Large number of metric descriptors will be paginated, use the nextPageToken returned in the response to request subsequent pages of results by setting the pageToken query parameter to the value of the nextPageToken.",
+     "parameters": {
+      "count": {
+       "type": "integer",
+       "description": "Maximum number of metric descriptors per page. Used for pagination. If not specified, count = 100.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The pagination token, which is used to page through large result sets. Set this value to the value of the nextPageToken to retrieve the next page of results.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project id. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "ListMetricRequest"
+     },
+     "response": {
+      "$ref": "ListMetricResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/getwithoutbody.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

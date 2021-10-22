@@ -1,0 +1,57 @@
+{
+  "version" : "2.0",
+  "service" : "<p>The Amazon API Gateway Management API allows you to directly manage runtime aspects of your deployed APIs. To use it, you must explicitly set the SDK's endpoint to point to the endpoint of your deployed API. The endpoint will be of the form https://{api-id}.execute-api.{region}.amazonaws.com/{stage}, or will be the endpoint corresponding to your API's custom domain and base path, if applicable.</p>",
+  "operations" : {
+    "DeleteConnection" : "<p>Delete the connection with the provided id.</p>",
+    "GetConnection" : "<p>Get information about the connection with the provided id.</p>",
+    "PostToConnection" : "<p>Sends the provided data to the specified connection.</p>"
+  },
+  "shapes" : {
+    "Connection" : {
+      "base" : "<p>The information about the connection</p>",
+      "refs" : { }
+    },
+    "Data" : {
+      "base" : "<p>The data to be sent to the client specified by its connection id.</p>",
+      "refs" : { }
+    },
+    "ForbiddenException" : {
+      "base" : "<p>The caller is not authorized to invoke this operation.</p>",
+      "refs" : { }
+    },
+    "GoneException" : {
+      "base" : "<p>The connection with the provided id no longer exists.</p>",
+      "refs" : { }
+    },
+    "Identity" : {
+      "base" : null,
+      "refs" : {
+        "Connection$Identity" : null
+      }
+    },
+    "LimitExceededException" : {
+      "base" : "<p>The client is sending more than the allowed number of requests per unit of time or the WebSocket client side buffer is full.</p>",
+      "refs" : { }
+    },
+    "PayloadTooLargeException" : {
+      "base" : "<p>The data has exceeded the maximum size allowed.</p>",
+      "refs" : { }
+    },
+    "__string" : {
+      "base" : null,
+      "refs" : {
+        "Data$Message" : null,
+        "Identity$SourceIp" : "<p>The source IP address of the TCP connection making the request to API Gateway.</p>",
+        "Identity$UserAgent" : "<p>The User Agent of the API caller.</p>",
+        "PayloadTooLargeException$Message" : null
+      }
+    },
+    "__timestampIso8601" : {
+      "base" : null,
+      "refs" : {
+        "Connection$ConnectedAt" : "<p>The time in ISO 8601 format for when the connection was established.</p>",
+        "Connection$LastActiveAt" : "<p>The time in ISO 8601 format for when the connection was last active.</p>"
+      }
+    }
+  }
+}

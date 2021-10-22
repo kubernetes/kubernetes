@@ -1,0 +1,773 @@
+{
+  "version": "2.0",
+  "service": "<p>Transit Gateway Network Manager (Network Manager) enables you to create a global network, in which you can monitor your AWS and on-premises networks that are built around transit gateways.</p>",
+  "operations": {
+    "AssociateCustomerGateway": "<p>Associates a customer gateway with a device and optionally, with a link. If you specify a link, it must be associated with the specified device. </p> <p>You can only associate customer gateways that are connected to a VPN attachment on a transit gateway. The transit gateway must be registered in your global network. When you register a transit gateway, customer gateways that are connected to the transit gateway are automatically included in the global network. To list customer gateways that are connected to a transit gateway, use the <a href=\"https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpnConnections.html\">DescribeVpnConnections</a> EC2 API and filter by <code>transit-gateway-id</code>.</p> <p>You cannot associate a customer gateway with more than one device and link. </p>",
+    "AssociateLink": "<p>Associates a link to a device. A device can be associated to multiple links and a link can be associated to multiple devices. The device and link must be in the same global network and the same site.</p>",
+    "CreateDevice": "<p>Creates a new device in a global network. If you specify both a site ID and a location, the location of the site is used for visualization in the Network Manager console.</p>",
+    "CreateGlobalNetwork": "<p>Creates a new, empty global network.</p>",
+    "CreateLink": "<p>Creates a new link for a specified site.</p>",
+    "CreateSite": "<p>Creates a new site in a global network.</p>",
+    "DeleteDevice": "<p>Deletes an existing device. You must first disassociate the device from any links and customer gateways.</p>",
+    "DeleteGlobalNetwork": "<p>Deletes an existing global network. You must first delete all global network objects (devices, links, and sites) and deregister all transit gateways.</p>",
+    "DeleteLink": "<p>Deletes an existing link. You must first disassociate the link from any devices and customer gateways.</p>",
+    "DeleteSite": "<p>Deletes an existing site. The site cannot be associated with any device or link.</p>",
+    "DeregisterTransitGateway": "<p>Deregisters a transit gateway from your global network. This action does not delete your transit gateway, or modify any of its attachments. This action removes any customer gateway associations.</p>",
+    "DescribeGlobalNetworks": "<p>Describes one or more global networks. By default, all global networks are described. To describe the objects in your global network, you must use the appropriate <code>Get*</code> action. For example, to list the transit gateways in your global network, use <a>GetTransitGatewayRegistrations</a>.</p>",
+    "DisassociateCustomerGateway": "<p>Disassociates a customer gateway from a device and a link.</p>",
+    "DisassociateLink": "<p>Disassociates an existing device from a link. You must first disassociate any customer gateways that are associated with the link.</p>",
+    "GetCustomerGatewayAssociations": "<p>Gets the association information for customer gateways that are associated with devices and links in your global network.</p>",
+    "GetDevices": "<p>Gets information about one or more of your devices in a global network.</p>",
+    "GetLinkAssociations": "<p>Gets the link associations for a device or a link. Either the device ID or the link ID must be specified.</p>",
+    "GetLinks": "<p>Gets information about one or more links in a specified global network.</p> <p>If you specify the site ID, you cannot specify the type or provider in the same request. You can specify the type and provider in the same request.</p>",
+    "GetSites": "<p>Gets information about one or more of your sites in a global network.</p>",
+    "GetTransitGatewayRegistrations": "<p>Gets information about the transit gateway registrations in a specified global network.</p>",
+    "ListTagsForResource": "<p>Lists the tags for a specified resource.</p>",
+    "RegisterTransitGateway": "<p>Registers a transit gateway in your global network. The transit gateway can be in any AWS Region, but it must be owned by the same AWS account that owns the global network. You cannot register a transit gateway in more than one global network.</p>",
+    "TagResource": "<p>Tags a specified resource.</p>",
+    "UntagResource": "<p>Removes tags from a specified resource.</p>",
+    "UpdateDevice": "<p>Updates the details for an existing device. To remove information for any of the parameters, specify an empty string.</p>",
+    "UpdateGlobalNetwork": "<p>Updates an existing global network. To remove information for any of the parameters, specify an empty string.</p>",
+    "UpdateLink": "<p>Updates the details for an existing link. To remove information for any of the parameters, specify an empty string.</p>",
+    "UpdateSite": "<p>Updates the information for an existing site. To remove information for any of the parameters, specify an empty string.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AssociateCustomerGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateCustomerGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateLinkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateLinkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Bandwidth": {
+      "base": "<p>Describes bandwidth information.</p>",
+      "refs": {
+        "CreateLinkRequest$Bandwidth": "<p> The upload speed and download speed in Mbps. </p>",
+        "Link$Bandwidth": "<p>The bandwidth for the link.</p>",
+        "UpdateLinkRequest$Bandwidth": "<p>The upload and download speed in Mbps. </p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>There was a conflict processing the request. Updating or deleting the resource can cause an inconsistent state.</p>",
+      "refs": {
+      }
+    },
+    "CreateDeviceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDeviceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGlobalNetworkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGlobalNetworkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLinkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLinkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSiteRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSiteResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CustomerGatewayAssociation": {
+      "base": "<p>Describes the association between a customer gateway, a device, and a link.</p>",
+      "refs": {
+        "AssociateCustomerGatewayResponse$CustomerGatewayAssociation": "<p>The customer gateway association.</p>",
+        "CustomerGatewayAssociationList$member": null,
+        "DisassociateCustomerGatewayResponse$CustomerGatewayAssociation": "<p>Information about the customer gateway association.</p>"
+      }
+    },
+    "CustomerGatewayAssociationList": {
+      "base": null,
+      "refs": {
+        "GetCustomerGatewayAssociationsResponse$CustomerGatewayAssociations": "<p>The customer gateway associations.</p>"
+      }
+    },
+    "CustomerGatewayAssociationState": {
+      "base": null,
+      "refs": {
+        "CustomerGatewayAssociation$State": "<p>The association state.</p>"
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "Device$CreatedAt": "<p>The date and time that the site was created.</p>",
+        "GlobalNetwork$CreatedAt": "<p>The date and time that the global network was created.</p>",
+        "Link$CreatedAt": "<p>The date and time that the link was created.</p>",
+        "Site$CreatedAt": "<p>The date and time that the site was created.</p>"
+      }
+    },
+    "DeleteDeviceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDeviceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGlobalNetworkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteGlobalNetworkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLinkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLinkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSiteRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSiteResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterTransitGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterTransitGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGlobalNetworksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGlobalNetworksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Device": {
+      "base": "<p>Describes a device.</p>",
+      "refs": {
+        "CreateDeviceResponse$Device": "<p>Information about the device.</p>",
+        "DeleteDeviceResponse$Device": "<p>Information about the device.</p>",
+        "DeviceList$member": null,
+        "UpdateDeviceResponse$Device": "<p>Information about the device.</p>"
+      }
+    },
+    "DeviceList": {
+      "base": null,
+      "refs": {
+        "GetDevicesResponse$Devices": "<p>The devices.</p>"
+      }
+    },
+    "DeviceState": {
+      "base": null,
+      "refs": {
+        "Device$State": "<p>The device state.</p>"
+      }
+    },
+    "DisassociateCustomerGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateCustomerGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateLinkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateLinkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetCustomerGatewayAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetCustomerGatewayAssociationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLinkAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLinkAssociationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLinksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLinksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSitesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSitesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTransitGatewayRegistrationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetTransitGatewayRegistrationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GlobalNetwork": {
+      "base": "<p>Describes a global network.</p>",
+      "refs": {
+        "CreateGlobalNetworkResponse$GlobalNetwork": "<p>Information about the global network object.</p>",
+        "DeleteGlobalNetworkResponse$GlobalNetwork": "<p>Information about the global network.</p>",
+        "GlobalNetworkList$member": null,
+        "UpdateGlobalNetworkResponse$GlobalNetwork": "<p>Information about the global network object.</p>"
+      }
+    },
+    "GlobalNetworkList": {
+      "base": null,
+      "refs": {
+        "DescribeGlobalNetworksResponse$GlobalNetworks": "<p>Information about the global networks.</p>"
+      }
+    },
+    "GlobalNetworkState": {
+      "base": null,
+      "refs": {
+        "GlobalNetwork$State": "<p>The state of the global network.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Bandwidth$UploadSpeed": "<p>Upload speed in Mbps.</p>",
+        "Bandwidth$DownloadSpeed": "<p>Download speed in Mbps.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>The request has failed due to an internal error.</p>",
+      "refs": {
+      }
+    },
+    "Link": {
+      "base": "<p>Describes a link.</p>",
+      "refs": {
+        "CreateLinkResponse$Link": "<p>Information about the link.</p>",
+        "DeleteLinkResponse$Link": "<p>Information about the link.</p>",
+        "LinkList$member": null,
+        "UpdateLinkResponse$Link": "<p>Information about the link.</p>"
+      }
+    },
+    "LinkAssociation": {
+      "base": "<p>Describes the association between a device and a link.</p>",
+      "refs": {
+        "AssociateLinkResponse$LinkAssociation": "<p>The link association.</p>",
+        "DisassociateLinkResponse$LinkAssociation": "<p>Information about the link association.</p>",
+        "LinkAssociationList$member": null
+      }
+    },
+    "LinkAssociationList": {
+      "base": null,
+      "refs": {
+        "GetLinkAssociationsResponse$LinkAssociations": "<p>The link associations.</p>"
+      }
+    },
+    "LinkAssociationState": {
+      "base": null,
+      "refs": {
+        "LinkAssociation$LinkAssociationState": "<p>The state of the association.</p>"
+      }
+    },
+    "LinkList": {
+      "base": null,
+      "refs": {
+        "GetLinksResponse$Links": "<p>The links.</p>"
+      }
+    },
+    "LinkState": {
+      "base": null,
+      "refs": {
+        "Link$State": "<p>The state of the link.</p>"
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Location": {
+      "base": "<p>Describes a location.</p>",
+      "refs": {
+        "CreateDeviceRequest$Location": "<p>The location of the device.</p>",
+        "CreateSiteRequest$Location": "<p>The site location. This information is used for visualization in the Network Manager console. If you specify the address, the latitude and longitude are automatically calculated.</p> <ul> <li> <p> <code>Address</code>: The physical address of the site.</p> </li> <li> <p> <code>Latitude</code>: The latitude of the site. </p> </li> <li> <p> <code>Longitude</code>: The longitude of the site.</p> </li> </ul>",
+        "Device$Location": "<p>The site location.</p>",
+        "Site$Location": "<p>The location of the site.</p>",
+        "UpdateDeviceRequest$Location": null,
+        "UpdateSiteRequest$Location": "<p>The site location:</p> <ul> <li> <p> <code>Address</code>: The physical address of the site.</p> </li> <li> <p> <code>Latitude</code>: The latitude of the site. </p> </li> <li> <p> <code>Longitude</code>: The longitude of the site.</p> </li> </ul>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "DescribeGlobalNetworksRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetCustomerGatewayAssociationsRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetDevicesRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetLinkAssociationsRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetLinksRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetSitesRequest$MaxResults": "<p>The maximum number of results to return.</p>",
+        "GetTransitGatewayRegistrationsRequest$MaxResults": "<p>The maximum number of results to return.</p>"
+      }
+    },
+    "RegisterTransitGatewayRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterTransitGatewayResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceARN": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "TagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "UntagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource could not be found.</p>",
+      "refs": {
+      }
+    },
+    "RetryAfterSeconds": {
+      "base": null,
+      "refs": {
+        "InternalServerException$RetryAfterSeconds": "<p>Indicates when to retry the request.</p>",
+        "ThrottlingException$RetryAfterSeconds": "<p>Indicates when to retry the request.</p>"
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>A service limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "Site": {
+      "base": "<p>Describes a site.</p>",
+      "refs": {
+        "CreateSiteResponse$Site": "<p>Information about the site.</p>",
+        "DeleteSiteResponse$Site": "<p>Information about the site.</p>",
+        "SiteList$member": null,
+        "UpdateSiteResponse$Site": "<p>Information about the site.</p>"
+      }
+    },
+    "SiteList": {
+      "base": null,
+      "refs": {
+        "GetSitesResponse$Sites": "<p>The sites.</p>"
+      }
+    },
+    "SiteState": {
+      "base": null,
+      "refs": {
+        "Site$State": "<p>The state of the site.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "AssociateCustomerGatewayRequest$CustomerGatewayArn": "<p>The Amazon Resource Name (ARN) of the customer gateway. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazonec2.html#amazonec2-resources-for-iam-policies\">Resources Defined by Amazon EC2</a>.</p>",
+        "AssociateCustomerGatewayRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "AssociateCustomerGatewayRequest$DeviceId": "<p>The ID of the device.</p>",
+        "AssociateCustomerGatewayRequest$LinkId": "<p>The ID of the link.</p>",
+        "AssociateLinkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "AssociateLinkRequest$DeviceId": "<p>The ID of the device.</p>",
+        "AssociateLinkRequest$LinkId": "<p>The ID of the link.</p>",
+        "ConflictException$Message": null,
+        "ConflictException$ResourceId": "<p>The ID of the resource.</p>",
+        "ConflictException$ResourceType": "<p>The resource type.</p>",
+        "CreateDeviceRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "CreateDeviceRequest$Description": "<p>A description of the device.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "CreateDeviceRequest$Type": "<p>The type of the device.</p>",
+        "CreateDeviceRequest$Vendor": "<p>The vendor of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "CreateDeviceRequest$Model": "<p>The model of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "CreateDeviceRequest$SerialNumber": "<p>The serial number of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "CreateDeviceRequest$SiteId": "<p>The ID of the site.</p>",
+        "CreateGlobalNetworkRequest$Description": "<p>A description of the global network.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "CreateLinkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "CreateLinkRequest$Description": "<p>A description of the link.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "CreateLinkRequest$Type": "<p>The type of the link.</p> <p>Constraints: Cannot include the following characters: | \\ ^</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "CreateLinkRequest$Provider": "<p>The provider of the link.</p> <p>Constraints: Cannot include the following characters: | \\ ^</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "CreateLinkRequest$SiteId": "<p>The ID of the site.</p>",
+        "CreateSiteRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "CreateSiteRequest$Description": "<p>A description of your site.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "CustomerGatewayAssociation$CustomerGatewayArn": "<p>The Amazon Resource Name (ARN) of the customer gateway.</p>",
+        "CustomerGatewayAssociation$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "CustomerGatewayAssociation$DeviceId": "<p>The ID of the device.</p>",
+        "CustomerGatewayAssociation$LinkId": "<p>The ID of the link.</p>",
+        "DeleteDeviceRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DeleteDeviceRequest$DeviceId": "<p>The ID of the device.</p>",
+        "DeleteGlobalNetworkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DeleteLinkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DeleteLinkRequest$LinkId": "<p>The ID of the link.</p>",
+        "DeleteSiteRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DeleteSiteRequest$SiteId": "<p>The ID of the site.</p>",
+        "DeregisterTransitGatewayRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DeregisterTransitGatewayRequest$TransitGatewayArn": "<p>The Amazon Resource Name (ARN) of the transit gateway.</p>",
+        "DescribeGlobalNetworksRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "DescribeGlobalNetworksResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "Device$DeviceId": "<p>The ID of the device.</p>",
+        "Device$DeviceArn": "<p>The Amazon Resource Name (ARN) of the device.</p>",
+        "Device$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "Device$Description": "<p>The description of the device.</p>",
+        "Device$Type": "<p>The device type.</p>",
+        "Device$Vendor": "<p>The device vendor.</p>",
+        "Device$Model": "<p>The device model.</p>",
+        "Device$SerialNumber": "<p>The device serial number.</p>",
+        "Device$SiteId": "<p>The site ID.</p>",
+        "DisassociateCustomerGatewayRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DisassociateCustomerGatewayRequest$CustomerGatewayArn": "<p>The Amazon Resource Name (ARN) of the customer gateway. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazonec2.html#amazonec2-resources-for-iam-policies\">Resources Defined by Amazon EC2</a>.</p>",
+        "DisassociateLinkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "DisassociateLinkRequest$DeviceId": "<p>The ID of the device.</p>",
+        "DisassociateLinkRequest$LinkId": "<p>The ID of the link.</p>",
+        "GetCustomerGatewayAssociationsRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetCustomerGatewayAssociationsRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetCustomerGatewayAssociationsResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GetDevicesRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetDevicesRequest$SiteId": "<p>The ID of the site.</p>",
+        "GetDevicesRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetDevicesResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GetLinkAssociationsRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetLinkAssociationsRequest$DeviceId": "<p>The ID of the device.</p>",
+        "GetLinkAssociationsRequest$LinkId": "<p>The ID of the link.</p>",
+        "GetLinkAssociationsRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetLinkAssociationsResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GetLinksRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetLinksRequest$SiteId": "<p>The ID of the site.</p>",
+        "GetLinksRequest$Type": "<p>The link type.</p>",
+        "GetLinksRequest$Provider": "<p>The link provider.</p>",
+        "GetLinksRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetLinksResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GetSitesRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetSitesRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetSitesResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GetTransitGatewayRegistrationsRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GetTransitGatewayRegistrationsRequest$NextToken": "<p>The token for the next page of results.</p>",
+        "GetTransitGatewayRegistrationsResponse$NextToken": "<p>The token for the next page of results.</p>",
+        "GlobalNetwork$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "GlobalNetwork$GlobalNetworkArn": "<p>The Amazon Resource Name (ARN) of the global network.</p>",
+        "GlobalNetwork$Description": "<p>The description of the global network.</p>",
+        "InternalServerException$Message": null,
+        "Link$LinkId": "<p>The ID of the link.</p>",
+        "Link$LinkArn": "<p>The Amazon Resource Name (ARN) of the link.</p>",
+        "Link$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "Link$SiteId": "<p>The ID of the site.</p>",
+        "Link$Description": "<p>The description of the link.</p>",
+        "Link$Type": "<p>The type of the link.</p>",
+        "Link$Provider": "<p>The provider of the link.</p>",
+        "LinkAssociation$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "LinkAssociation$DeviceId": "<p>The device ID for the link association.</p>",
+        "LinkAssociation$LinkId": "<p>The ID of the link.</p>",
+        "Location$Address": "<p>The physical address.</p>",
+        "Location$Latitude": "<p>The latitude.</p>",
+        "Location$Longitude": "<p>The longitude.</p>",
+        "RegisterTransitGatewayRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "RegisterTransitGatewayRequest$TransitGatewayArn": "<p>The Amazon Resource Name (ARN) of the transit gateway. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazonec2.html#amazonec2-resources-for-iam-policies\">Resources Defined by Amazon EC2</a>.</p>",
+        "ResourceNotFoundException$Message": null,
+        "ResourceNotFoundException$ResourceId": "<p>The ID of the resource.</p>",
+        "ResourceNotFoundException$ResourceType": "<p>The resource type.</p>",
+        "ServiceQuotaExceededException$Message": "<p>The error message.</p>",
+        "ServiceQuotaExceededException$ResourceId": "<p>The ID of the resource.</p>",
+        "ServiceQuotaExceededException$ResourceType": "<p>The resource type.</p>",
+        "ServiceQuotaExceededException$LimitCode": "<p>The limit code.</p>",
+        "ServiceQuotaExceededException$ServiceCode": "<p>The service code.</p>",
+        "Site$SiteId": "<p>The ID of the site.</p>",
+        "Site$SiteArn": "<p>The Amazon Resource Name (ARN) of the site.</p>",
+        "Site$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "Site$Description": "<p>The description of the site.</p>",
+        "StringList$member": null,
+        "ThrottlingException$Message": null,
+        "TransitGatewayRegistration$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "TransitGatewayRegistration$TransitGatewayArn": "<p>The Amazon Resource Name (ARN) of the transit gateway.</p>",
+        "TransitGatewayRegistrationStateReason$Message": "<p>The message for the state reason.</p>",
+        "UpdateDeviceRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "UpdateDeviceRequest$DeviceId": "<p>The ID of the device.</p>",
+        "UpdateDeviceRequest$Description": "<p>A description of the device.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "UpdateDeviceRequest$Type": "<p>The type of the device.</p>",
+        "UpdateDeviceRequest$Vendor": "<p>The vendor of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "UpdateDeviceRequest$Model": "<p>The model of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "UpdateDeviceRequest$SerialNumber": "<p>The serial number of the device.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "UpdateDeviceRequest$SiteId": "<p>The ID of the site.</p>",
+        "UpdateGlobalNetworkRequest$GlobalNetworkId": "<p>The ID of your global network.</p>",
+        "UpdateGlobalNetworkRequest$Description": "<p>A description of the global network.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "UpdateLinkRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "UpdateLinkRequest$LinkId": "<p>The ID of the link.</p>",
+        "UpdateLinkRequest$Description": "<p>A description of the link.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "UpdateLinkRequest$Type": "<p>The type of the link.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "UpdateLinkRequest$Provider": "<p>The provider of the link.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "UpdateSiteRequest$GlobalNetworkId": "<p>The ID of the global network.</p>",
+        "UpdateSiteRequest$SiteId": "<p>The ID of your site.</p>",
+        "UpdateSiteRequest$Description": "<p>A description of your site.</p> <p>Length Constraints: Maximum length of 256 characters.</p>",
+        "ValidationException$Message": null,
+        "ValidationExceptionField$Name": "<p>The name of the field.</p>",
+        "ValidationExceptionField$Message": "<p>The message for the field.</p>"
+      }
+    },
+    "StringList": {
+      "base": null,
+      "refs": {
+        "DescribeGlobalNetworksRequest$GlobalNetworkIds": "<p>The IDs of one or more global networks. The maximum is 10.</p>",
+        "GetCustomerGatewayAssociationsRequest$CustomerGatewayArns": "<p>One or more customer gateway Amazon Resource Names (ARNs). For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazonec2.html#amazonec2-resources-for-iam-policies\">Resources Defined by Amazon EC2</a>. The maximum is 10.</p>",
+        "GetDevicesRequest$DeviceIds": "<p>One or more device IDs. The maximum is 10.</p>",
+        "GetLinksRequest$LinkIds": "<p>One or more link IDs. The maximum is 10.</p>",
+        "GetSitesRequest$SiteIds": "<p>One or more site IDs. The maximum is 10.</p>",
+        "GetTransitGatewayRegistrationsRequest$TransitGatewayArns": "<p>The Amazon Resource Names (ARNs) of one or more transit gateways. The maximum is 10.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Describes a tag.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The tag key.</p> <p>Length Constraints: Maximum length of 128 characters.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tag keys to remove from the specified resource.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateDeviceRequest$Tags": "<p>The tags to apply to the resource during creation.</p>",
+        "CreateGlobalNetworkRequest$Tags": "<p>The tags to apply to the resource during creation.</p>",
+        "CreateLinkRequest$Tags": "<p>The tags to apply to the resource during creation.</p>",
+        "CreateSiteRequest$Tags": "<p>The tags to apply to the resource during creation.</p>",
+        "Device$Tags": "<p>The tags for the device.</p>",
+        "GlobalNetwork$Tags": "<p>The tags for the global network.</p>",
+        "Link$Tags": "<p>The tags for the link.</p>",
+        "ListTagsForResourceResponse$TagList": "<p>The list of tags.</p>",
+        "Site$Tags": "<p>The tags for the site.</p>",
+        "TagResourceRequest$Tags": "<p>The tags to apply to the specified resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The tag value.</p> <p>Length Constraints: Maximum length of 256 characters.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The request was denied due to request throttling.</p>",
+      "refs": {
+      }
+    },
+    "TransitGatewayRegistration": {
+      "base": "<p>Describes the registration of a transit gateway to a global network.</p>",
+      "refs": {
+        "DeregisterTransitGatewayResponse$TransitGatewayRegistration": "<p>The transit gateway registration information.</p>",
+        "RegisterTransitGatewayResponse$TransitGatewayRegistration": "<p>Information about the transit gateway registration.</p>",
+        "TransitGatewayRegistrationList$member": null
+      }
+    },
+    "TransitGatewayRegistrationList": {
+      "base": null,
+      "refs": {
+        "GetTransitGatewayRegistrationsResponse$TransitGatewayRegistrations": "<p>The transit gateway registrations.</p>"
+      }
+    },
+    "TransitGatewayRegistrationState": {
+      "base": null,
+      "refs": {
+        "TransitGatewayRegistrationStateReason$Code": "<p>The code for the state reason.</p>"
+      }
+    },
+    "TransitGatewayRegistrationStateReason": {
+      "base": "<p>Describes the status of a transit gateway registration.</p>",
+      "refs": {
+        "TransitGatewayRegistration$State": "<p>The state of the transit gateway registration.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeviceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeviceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGlobalNetworkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateGlobalNetworkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateLinkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateLinkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSiteRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSiteResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The input fails to satisfy the constraints.</p>",
+      "refs": {
+      }
+    },
+    "ValidationExceptionField": {
+      "base": "<p>Describes a validation exception for a field.</p>",
+      "refs": {
+        "ValidationExceptionFieldList$member": null
+      }
+    },
+    "ValidationExceptionFieldList": {
+      "base": null,
+      "refs": {
+        "ValidationException$Fields": "<p>The fields that caused the error, if applicable.</p>"
+      }
+    },
+    "ValidationExceptionReason": {
+      "base": null,
+      "refs": {
+        "ValidationException$Reason": "<p>The reason for the error.</p>"
+      }
+    }
+  }
+}

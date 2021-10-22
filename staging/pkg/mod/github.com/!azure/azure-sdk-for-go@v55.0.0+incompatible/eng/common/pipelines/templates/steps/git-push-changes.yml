@@ -1,0 +1,54 @@
+parameters:
+  BaseRepoBranch: not-specified
+  BaseRepoOwner: azure-sdk
+  CommitMsg: not-specified
+  TargetRepoOwner: Azure
+  TargetRepoName: $(Build.Repository.Name)
+  PushArgs:
+  WorkingDirectory: $(System.DefaultWorkingDirectory)'
+  ScriptDirectory: eng/common/scripts
+  SkipCheckingForChanges: false
+
+steps:
+- pwsh: |
+    echo "git add -A"
+    git add -A
+
+    echo "git diff --name-status --cached --exit-code"
+    git diff --name-status --cached --exit-code
+
+    if ($LastExitCode -ne 0) {
+      echo "##vso[task.setvariable variable=HasChanges]$true"
+      echo "Changes detected so setting HasChanges=true"
+    }
+    else {
+      echo "##vso[task.setvariable variable=HasChanges]$false"
+      echo "No changes so skipping code push"
+    }
+  displayName: Check for changes
+  condition: and(succeeded(), eq(${{ parameters.SkipCheckingForChanges }}, false))
+  workingDirectory: ${{ parameters.WorkingDirectory }}
+  ignoreLASTEXITCODE: true
+
+- pwsh: |
+    # Remove the repo owner from the front of the repo name if it exists there
+    $repoName = "${{ parameters.TargetRepoName }}" -replace "^${{ parameters.TargetRepoOwner }}/", ""
+    echo "##vso[task.setvariable variable=RepoNameWithoutOwner]$repoName"
+    echo "RepoName = $repoName"
+  displayName: Remove Repo Owner from Repo Name
+  condition: succeeded()
+  workingDirectory: ${{ parameters.WorkingDirectory }}
+
+- task: PowerShell@2
+  displayName: Push changes
+  condition: and(succeeded(), eq(variables['HasChanges'], 'true'))
+  inputs:
+    pwsh: true
+    workingDirectory: ${{ parameters.WorkingDirectory }}
+    filePath: ${{ parameters.ScriptDirectory }}/git-branch-push.ps1
+    arguments: >
+      -PRBranchName "${{ parameters.BaseRepoBranch }}"
+      -CommitMsg "${{ parameters.CommitMsg }}"
+      -GitUrl "https://$(azuresdk-github-pat)@github.com/${{ parameters.BaseRepoOwner }}/$(RepoNameWithoutOwner).git"
+      -PushArgs "${{ parameters.PushArgs }}"
+      -SkipCommit $${{ parameters.SkipCheckingForChanges }}

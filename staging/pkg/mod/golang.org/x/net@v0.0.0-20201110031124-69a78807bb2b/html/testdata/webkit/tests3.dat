@@ -1,0 +1,305 @@
+#data
+<head></head><style></style>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,20): unexpected-start-tag-out-of-my-head
+#document
+| <html>
+|   <head>
+|     <style>
+|   <body>
+
+#data
+<head></head><script></script>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,21): unexpected-start-tag-out-of-my-head
+#document
+| <html>
+|   <head>
+|     <script>
+|   <body>
+
+#data
+<head></head><!-- --><style></style><!-- --><script></script>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,28): unexpected-start-tag-out-of-my-head
+(1,52): unexpected-start-tag-out-of-my-head
+#document
+| <html>
+|   <head>
+|     <style>
+|     <script>
+|   <!--   -->
+|   <!--   -->
+|   <body>
+
+#data
+<head></head><!-- -->x<style></style><!-- --><script></script>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <!--   -->
+|   <body>
+|     "x"
+|     <style>
+|     <!--   -->
+|     <script>
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>
+</pre></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>
+foo</pre></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "foo"
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>
+
+foo</pre></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+foo"
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>
+foo
+</pre></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "foo
+"
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>x</pre><span>
+</span></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "x"
+|     <span>
+|       "
+"
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>x
+y</pre></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "x
+y"
+
+#data
+<!DOCTYPE html><html><head></head><body><pre>x<div>
+y</pre></body></html>
+#errors
+(2,7): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "x"
+|       <div>
+|         "
+y"
+
+#data
+<!DOCTYPE html><pre>&#x0a;&#x0a;A</pre>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+A"
+
+#data
+<!DOCTYPE html><HTML><META><HEAD></HEAD></HTML>
+#errors
+(1,33): two-heads-are-not-better-than-one
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <meta>
+|   <body>
+
+#data
+<!DOCTYPE html><HTML><HEAD><head></HEAD></HTML>
+#errors
+(1,33): two-heads-are-not-better-than-one
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<textarea>foo<span>bar</span><i>baz
+#errors
+(1,10): expected-doctype-but-got-start-tag
+(1,35): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "foo<span>bar</span><i>baz"
+
+#data
+<title>foo<span>bar</em><i>baz
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,30): expected-named-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|     <title>
+|       "foo<span>bar</em><i>baz"
+|   <body>
+
+#data
+<!DOCTYPE html><textarea>
+</textarea>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+
+#data
+<!DOCTYPE html><textarea>
+foo</textarea>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "foo"
+
+#data
+<!DOCTYPE html><textarea>
+
+foo</textarea>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "
+foo"
+
+#data
+<!DOCTYPE html><html><head></head><body><ul><li><div><p><li></ul></body></html>
+#errors
+(1,60): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ul>
+|       <li>
+|         <div>
+|           <p>
+|       <li>
+
+#data
+<!doctype html><nobr><nobr><nobr>
+#errors
+(1,27): unexpected-start-tag-implies-end-tag
+(1,33): unexpected-start-tag-implies-end-tag
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <nobr>
+|     <nobr>
+|     <nobr>
+
+#data
+<!doctype html><nobr><nobr></nobr><nobr>
+#errors
+(1,27): unexpected-start-tag-implies-end-tag
+(1,40): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <nobr>
+|     <nobr>
+|     <nobr>
+
+#data
+<!doctype html><html><body><p><table></table></body></html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <table>
+
+#data
+<p><table></table>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <table>

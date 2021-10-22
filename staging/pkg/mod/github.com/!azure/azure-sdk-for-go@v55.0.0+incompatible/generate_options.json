@@ -1,0 +1,12 @@
+{
+  "autorestArguments": [
+    "--use=@microsoft.azure/autorest.go@2.1.183",
+    "--go",
+    "--verbose",
+    "--go-sdk-folder=.",
+    "--multiapi",
+    "--use-onever",
+    "--version=V2",
+    "--go.license-header=MICROSOFT_MIT_NO_VERSION"
+  ]
+}

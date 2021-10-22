@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeComputeEnvironments",
+            "input": {},
+            "errorExpectedFromService": false
+        }
+    ]
+}

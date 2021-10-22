@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "GetConnectors": {
+      "input_token": "nextToken",
+      "limit_key": "maxResults",
+      "output_token": "nextToken",
+      "result_key": "connectorList"
+    },
+    "GetReplicationJobs": {
+      "input_token": "nextToken",
+      "limit_key": "maxResults",
+      "output_token": "nextToken",
+      "result_key": "replicationJobList"
+    },
+    "GetReplicationRuns": {
+      "input_token": "nextToken",
+      "limit_key": "maxResults",
+      "output_token": "nextToken",
+      "result_key": "replicationRunList"
+    },
+    "GetServers": {
+      "input_token": "nextToken",
+      "limit_key": "maxResults",
+      "output_token": "nextToken",
+      "result_key": "serverList"
+    }
+  }
+}

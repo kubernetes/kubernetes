@@ -1,0 +1,789 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon WorkLink is a cloud-based service that provides secure access to internal websites and web apps from iOS and Android phones. In a single step, your users, such as employees, can access internal websites as efficiently as they access any other public website. They enter a URL in their web browser, or choose a link to an internal website in an email. Amazon WorkLink authenticates the user's access and securely renders authorized internal web content in a secure rendering service in the AWS cloud. Amazon WorkLink doesn't download or store any internal web content on mobile devices.</p>",
+  "operations": {
+    "AssociateDomain": "<p>Specifies a domain to be associated to Amazon WorkLink.</p>",
+    "AssociateWebsiteAuthorizationProvider": "<p>Associates a website authorization provider with a specified fleet. This is used to authorize users against associated websites in the company network.</p>",
+    "AssociateWebsiteCertificateAuthority": "<p>Imports the root certificate of a certificate authority (CA) used to obtain TLS certificates used by associated websites within the company network.</p>",
+    "CreateFleet": "<p>Creates a fleet. A fleet consists of resources and the configuration that delivers associated websites to authorized users who download and set up the Amazon WorkLink app.</p>",
+    "DeleteFleet": "<p>Deletes a fleet. Prevents users from accessing previously associated websites. </p>",
+    "DescribeAuditStreamConfiguration": "<p>Describes the configuration for delivering audit streams to the customer account.</p>",
+    "DescribeCompanyNetworkConfiguration": "<p>Describes the networking configuration to access the internal websites associated with the specified fleet.</p>",
+    "DescribeDevice": "<p>Provides information about a user's device.</p>",
+    "DescribeDevicePolicyConfiguration": "<p>Describes the device policy configuration for the specified fleet.</p>",
+    "DescribeDomain": "<p>Provides information about the domain.</p>",
+    "DescribeFleetMetadata": "<p>Provides basic information for the specified fleet, excluding identity provider, networking, and device configuration details.</p>",
+    "DescribeIdentityProviderConfiguration": "<p>Describes the identity provider configuration of the specified fleet.</p>",
+    "DescribeWebsiteCertificateAuthority": "<p>Provides information about the certificate authority.</p>",
+    "DisassociateDomain": "<p>Disassociates a domain from Amazon WorkLink. End users lose the ability to access the domain with Amazon WorkLink. </p>",
+    "DisassociateWebsiteAuthorizationProvider": "<p>Disassociates a website authorization provider from a specified fleet. After the disassociation, users can't load any associated websites that require this authorization provider.</p>",
+    "DisassociateWebsiteCertificateAuthority": "<p>Removes a certificate authority (CA).</p>",
+    "ListDevices": "<p>Retrieves a list of devices registered with the specified fleet.</p>",
+    "ListDomains": "<p>Retrieves a list of domains associated to a specified fleet.</p>",
+    "ListFleets": "<p>Retrieves a list of fleets for the current account and Region.</p>",
+    "ListTagsForResource": "<p>Retrieves a list of tags for the specified resource.</p>",
+    "ListWebsiteAuthorizationProviders": "<p>Retrieves a list of website authorization providers associated with a specified fleet.</p>",
+    "ListWebsiteCertificateAuthorities": "<p>Retrieves a list of certificate authorities added for the current account and Region.</p>",
+    "RestoreDomainAccess": "<p>Moves a domain to ACTIVE status if it was in the INACTIVE status.</p>",
+    "RevokeDomainAccess": "<p>Moves a domain to INACTIVE status if it was in the ACTIVE status.</p>",
+    "SignOutUser": "<p>Signs the user out from all of their devices. The user can sign in again if they have valid credentials.</p>",
+    "TagResource": "<p>Adds or overwrites one or more tags for the specified resource, such as a fleet. Each tag consists of a key and an optional value. If a resource already has a tag with the same key, this operation updates its value.</p>",
+    "UntagResource": "<p>Removes one or more tags from the specified resource.</p>",
+    "UpdateAuditStreamConfiguration": "<p>Updates the audit stream configuration for the fleet.</p>",
+    "UpdateCompanyNetworkConfiguration": "<p>Updates the company network configuration for the fleet.</p>",
+    "UpdateDevicePolicyConfiguration": "<p>Updates the device policy configuration for the fleet.</p>",
+    "UpdateDomainMetadata": "<p>Updates domain metadata, such as DisplayName.</p>",
+    "UpdateFleetMetadata": "<p>Updates fleet metadata, such as DisplayName.</p>",
+    "UpdateIdentityProviderConfiguration": "<p>Updates the identity provider configuration for the fleet.</p>"
+  },
+  "shapes": {
+    "AcmCertificateArn": {
+      "base": null,
+      "refs": {
+        "AssociateDomainRequest$AcmCertificateArn": "<p>The ARN of an issued ACM certificate that is valid for the domain being associated.</p>",
+        "DescribeDomainResponse$AcmCertificateArn": "<p>The ARN of an issued ACM certificate that is valid for the domain being associated.</p>"
+      }
+    },
+    "AssociateDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDomainResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateWebsiteAuthorizationProviderRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateWebsiteAuthorizationProviderResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateWebsiteCertificateAuthorityRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateWebsiteCertificateAuthorityResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AuditStreamArn": {
+      "base": null,
+      "refs": {
+        "DescribeAuditStreamConfigurationResponse$AuditStreamArn": "<p>The ARN of the Amazon Kinesis data stream that will receive the audit events.</p>",
+        "UpdateAuditStreamConfigurationRequest$AuditStreamArn": "<p>The ARN of the Amazon Kinesis data stream that receives the audit events.</p>"
+      }
+    },
+    "AuthorizationProviderType": {
+      "base": null,
+      "refs": {
+        "AssociateWebsiteAuthorizationProviderRequest$AuthorizationProviderType": "<p>The authorization provider type.</p>",
+        "WebsiteAuthorizationProviderSummary$AuthorizationProviderType": "<p>The authorization provider type.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CreateFleetRequest$OptimizeForEndUserLocation": "<p>The option to optimize for better performance by routing traffic through the closest AWS Region to users, which may be outside of your home Region.</p>",
+        "DescribeFleetMetadataResponse$OptimizeForEndUserLocation": "<p>The option to optimize for better performance by routing traffic through the closest AWS Region to users, which may be outside of your home Region.</p>",
+        "UpdateFleetMetadataRequest$OptimizeForEndUserLocation": "<p>The option to optimize for better performance by routing traffic through the closest AWS Region to users, which may be outside of your home Region.</p>"
+      }
+    },
+    "Certificate": {
+      "base": null,
+      "refs": {
+        "AssociateWebsiteCertificateAuthorityRequest$Certificate": "<p>The root certificate of the CA.</p>",
+        "DescribeDevicePolicyConfigurationResponse$DeviceCaCertificate": "<p>The certificate chain, including intermediate certificates and the root certificate authority certificate used to issue device certificates.</p>",
+        "DescribeWebsiteCertificateAuthorityResponse$Certificate": "<p>The root certificate of the certificate authority.</p>"
+      }
+    },
+    "CertificateChain": {
+      "base": null,
+      "refs": {
+        "UpdateDevicePolicyConfigurationRequest$DeviceCaCertificate": "<p>The certificate chain, including intermediate certificates and the root certificate authority certificate used to issue device certificates.</p>"
+      }
+    },
+    "CompanyCode": {
+      "base": null,
+      "refs": {
+        "DescribeFleetMetadataResponse$CompanyCode": "<p>The identifier used by users to sign in to the Amazon WorkLink app.</p>",
+        "FleetSummary$CompanyCode": "<p>The identifier used by users to sign into the Amazon WorkLink app.</p>"
+      }
+    },
+    "CreateFleetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFleetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$FirstAccessedTime": "<p>The date that the device first signed in to Amazon WorkLink.</p>",
+        "DescribeDeviceResponse$LastAccessedTime": "<p>The date that the device last accessed Amazon WorkLink.</p>",
+        "DescribeDomainResponse$CreatedTime": "<p>The time that the domain was added.</p>",
+        "DescribeFleetMetadataResponse$CreatedTime": "<p>The time that the fleet was created.</p>",
+        "DescribeFleetMetadataResponse$LastUpdatedTime": "<p>The time that the fleet was last updated.</p>",
+        "DescribeWebsiteCertificateAuthorityResponse$CreatedTime": "<p>The time that the certificate authority was added.</p>",
+        "DomainSummary$CreatedTime": "<p>The time that the domain was created.</p>",
+        "FleetSummary$CreatedTime": "<p>The time when the fleet was created.</p>",
+        "FleetSummary$LastUpdatedTime": "<p>The time when the fleet was last updated.</p>",
+        "WebsiteAuthorizationProviderSummary$CreatedTime": "<p>The time of creation.</p>",
+        "WebsiteCaSummary$CreatedTime": "<p>The time when the CA was added.</p>"
+      }
+    },
+    "DeleteFleetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFleetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAuditStreamConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAuditStreamConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCompanyNetworkConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCompanyNetworkConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDevicePolicyConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDevicePolicyConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDeviceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDeviceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDomainResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFleetMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFleetMetadataResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIdentityProviderConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIdentityProviderConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWebsiteCertificateAuthorityRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeWebsiteCertificateAuthorityResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeviceManufacturer": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$Manufacturer": "<p>The manufacturer of the device.</p>"
+      }
+    },
+    "DeviceModel": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$Model": "<p>The model of the device.</p>"
+      }
+    },
+    "DeviceOperatingSystemName": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$OperatingSystem": "<p>The operating system of the device.</p>"
+      }
+    },
+    "DeviceOperatingSystemVersion": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$OperatingSystemVersion": "<p>The operating system version of the device.</p>"
+      }
+    },
+    "DevicePatchLevel": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$PatchLevel": "<p>The operating system patch level of the device.</p>"
+      }
+    },
+    "DeviceStatus": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$Status": "<p>The current state of the device.</p>",
+        "DeviceSummary$DeviceStatus": "<p>The status of the device.</p>"
+      }
+    },
+    "DeviceSummary": {
+      "base": "<p>The summary of devices.</p>",
+      "refs": {
+        "DeviceSummaryList$member": null
+      }
+    },
+    "DeviceSummaryList": {
+      "base": null,
+      "refs": {
+        "ListDevicesResponse$Devices": "<p>Information about the devices.</p>"
+      }
+    },
+    "DisassociateDomainRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDomainResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateWebsiteAuthorizationProviderRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateWebsiteAuthorizationProviderResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateWebsiteCertificateAuthorityRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateWebsiteCertificateAuthorityResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisplayName": {
+      "base": null,
+      "refs": {
+        "AssociateDomainRequest$DisplayName": "<p>The name to display.</p>",
+        "AssociateWebsiteCertificateAuthorityRequest$DisplayName": "<p>The certificate name to display.</p>",
+        "CreateFleetRequest$DisplayName": "<p>The fleet name to display.</p>",
+        "DescribeDomainResponse$DisplayName": "<p>The name to display.</p>",
+        "DescribeFleetMetadataResponse$DisplayName": "<p>The name to display.</p>",
+        "DescribeWebsiteCertificateAuthorityResponse$DisplayName": "<p>The certificate name to display.</p>",
+        "DomainSummary$DisplayName": "<p>The name to display.</p>",
+        "FleetSummary$DisplayName": "<p>The name of the fleet to display.</p>",
+        "UpdateDomainMetadataRequest$DisplayName": "<p>The name to display.</p>",
+        "UpdateFleetMetadataRequest$DisplayName": "<p>The fleet name to display. The existing DisplayName is unset if null is passed.</p>",
+        "WebsiteCaSummary$DisplayName": "<p>The name to display.</p>"
+      }
+    },
+    "DomainName": {
+      "base": null,
+      "refs": {
+        "AssociateDomainRequest$DomainName": "<p>The fully qualified domain name (FQDN).</p>",
+        "AssociateWebsiteAuthorizationProviderRequest$DomainName": "<p>The domain name of the authorization provider. This applies only to SAML-based authorization providers.</p>",
+        "DescribeDomainRequest$DomainName": "<p>The name of the domain.</p>",
+        "DescribeDomainResponse$DomainName": "<p>The name of the domain.</p>",
+        "DisassociateDomainRequest$DomainName": "<p>The name of the domain.</p>",
+        "DomainSummary$DomainName": "<p>The name of the domain.</p>",
+        "RestoreDomainAccessRequest$DomainName": "<p>The name of the domain.</p>",
+        "RevokeDomainAccessRequest$DomainName": "<p>The name of the domain.</p>",
+        "UpdateDomainMetadataRequest$DomainName": "<p>The name of the domain.</p>",
+        "WebsiteAuthorizationProviderSummary$DomainName": "<p>The domain name of the authorization provider. This applies only to SAML-based authorization providers.</p>"
+      }
+    },
+    "DomainStatus": {
+      "base": null,
+      "refs": {
+        "DescribeDomainResponse$DomainStatus": "<p>The current state for the domain.</p>",
+        "DomainSummary$DomainStatus": "<p>The status of the domain.</p>"
+      }
+    },
+    "DomainSummary": {
+      "base": "<p>The summary of the domain.</p>",
+      "refs": {
+        "DomainSummaryList$member": null
+      }
+    },
+    "DomainSummaryList": {
+      "base": null,
+      "refs": {
+        "ListDomainsResponse$Domains": "<p>Information about the domains.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "InternalServerErrorException$Message": null,
+        "InvalidRequestException$Message": null,
+        "ResourceAlreadyExistsException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "TooManyRequestsException$Message": null,
+        "UnauthorizedException$Message": null
+      }
+    },
+    "FleetArn": {
+      "base": null,
+      "refs": {
+        "AssociateDomainRequest$FleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "AssociateWebsiteAuthorizationProviderRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "AssociateWebsiteCertificateAuthorityRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "CreateFleetResponse$FleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DeleteFleetRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeAuditStreamConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeCompanyNetworkConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeDevicePolicyConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeDeviceRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeDomainRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeFleetMetadataRequest$FleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "DescribeIdentityProviderConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DescribeWebsiteCertificateAuthorityRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DisassociateDomainRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DisassociateWebsiteAuthorizationProviderRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "DisassociateWebsiteCertificateAuthorityRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "FleetSummary$FleetArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "ListDevicesRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "ListDomainsRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "ListTagsForResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "ListWebsiteAuthorizationProvidersRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "ListWebsiteCertificateAuthoritiesRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "RestoreDomainAccessRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "RevokeDomainAccessRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "SignOutUserRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "TagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "UntagResourceRequest$ResourceArn": "<p>The Amazon Resource Name (ARN) of the fleet.</p>",
+        "UpdateAuditStreamConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "UpdateCompanyNetworkConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "UpdateDevicePolicyConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "UpdateDomainMetadataRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "UpdateFleetMetadataRequest$FleetArn": "<p>The ARN of the fleet.</p>",
+        "UpdateIdentityProviderConfigurationRequest$FleetArn": "<p>The ARN of the fleet.</p>"
+      }
+    },
+    "FleetName": {
+      "base": null,
+      "refs": {
+        "CreateFleetRequest$FleetName": "<p>A unique name for the fleet.</p>",
+        "DescribeFleetMetadataResponse$FleetName": "<p>The name of the fleet.</p>",
+        "FleetSummary$FleetName": "<p>The name of the fleet.</p>"
+      }
+    },
+    "FleetStatus": {
+      "base": null,
+      "refs": {
+        "DescribeFleetMetadataResponse$FleetStatus": "<p>The current state of the fleet.</p>",
+        "FleetSummary$FleetStatus": "<p>The status of the fleet.</p>"
+      }
+    },
+    "FleetSummary": {
+      "base": "<p>The summary of the fleet.</p>",
+      "refs": {
+        "FleetSummaryList$member": null
+      }
+    },
+    "FleetSummaryList": {
+      "base": null,
+      "refs": {
+        "ListFleetsResponse$FleetSummaryList": "<p>The summary list of the fleets.</p>"
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "AssociateWebsiteAuthorizationProviderResponse$AuthorizationProviderId": "<p>A unique identifier for the authorization provider.</p>",
+        "AssociateWebsiteCertificateAuthorityResponse$WebsiteCaId": "<p>A unique identifier for the CA.</p>",
+        "DescribeDeviceRequest$DeviceId": "<p>A unique identifier for a registered user's device.</p>",
+        "DescribeWebsiteCertificateAuthorityRequest$WebsiteCaId": "<p>A unique identifier for the certificate authority.</p>",
+        "DeviceSummary$DeviceId": "<p>The ID of the device.</p>",
+        "DisassociateWebsiteAuthorizationProviderRequest$AuthorizationProviderId": "<p>A unique identifier for the authorization provider.</p>",
+        "DisassociateWebsiteCertificateAuthorityRequest$WebsiteCaId": "<p>A unique identifier for the CA.</p>",
+        "WebsiteAuthorizationProviderSummary$AuthorizationProviderId": "<p>A unique identifier for the authorization provider.</p>",
+        "WebsiteCaSummary$WebsiteCaId": "<p>A unique identifier for the CA.</p>"
+      }
+    },
+    "IdentityProviderType": {
+      "base": null,
+      "refs": {
+        "DescribeIdentityProviderConfigurationResponse$IdentityProviderType": "<p>The type of identity provider.</p>",
+        "UpdateIdentityProviderConfigurationRequest$IdentityProviderType": "<p>The type of identity provider.</p>"
+      }
+    },
+    "InternalServerErrorException": {
+      "base": "<p>The service is temporarily unavailable.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request is not valid.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDevicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDomainsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDomainsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFleetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFleetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWebsiteAuthorizationProvidersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWebsiteAuthorizationProvidersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWebsiteCertificateAuthoritiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListWebsiteCertificateAuthoritiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListDevicesRequest$MaxResults": "<p>The maximum number of results to be included in the next page.</p>",
+        "ListDomainsRequest$MaxResults": "<p>The maximum number of results to be included in the next page.</p>",
+        "ListFleetsRequest$MaxResults": "<p>The maximum number of results to be included in the next page.</p>",
+        "ListWebsiteAuthorizationProvidersRequest$MaxResults": "<p>The maximum number of results to be included in the next page.</p>",
+        "ListWebsiteCertificateAuthoritiesRequest$MaxResults": "<p>The maximum number of results to be included in the next page.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListDevicesRequest$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListDevicesResponse$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If there are no more pages, this value is null.</p>",
+        "ListDomainsRequest$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListDomainsResponse$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If there are no more pages, this value is null.</p>",
+        "ListFleetsRequest$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListFleetsResponse$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If there are no more pages, this value is null.</p>",
+        "ListWebsiteAuthorizationProvidersRequest$NextToken": "<p>The pagination token to use to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListWebsiteAuthorizationProvidersResponse$NextToken": "<p>The pagination token to use to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListWebsiteCertificateAuthoritiesRequest$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If this value is null, it retrieves the first page.</p>",
+        "ListWebsiteCertificateAuthoritiesResponse$NextToken": "<p>The pagination token used to retrieve the next page of results for this operation. If there are no more pages, this value is null.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The requested resource was not found.</p>",
+      "refs": {
+      }
+    },
+    "RestoreDomainAccessRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreDomainAccessResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeDomainAccessRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeDomainAccessResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SamlMetadata": {
+      "base": null,
+      "refs": {
+        "DescribeIdentityProviderConfigurationResponse$ServiceProviderSamlMetadata": "<p>The SAML metadata document uploaded to the user’s identity provider.</p>",
+        "DescribeIdentityProviderConfigurationResponse$IdentityProviderSamlMetadata": "<p>The SAML metadata document provided by the user’s identity provider.</p>",
+        "UpdateIdentityProviderConfigurationRequest$IdentityProviderSamlMetadata": "<p>The SAML metadata document provided by the customer’s identity provider. The existing IdentityProviderSamlMetadata is unset if null is passed.</p>"
+      }
+    },
+    "SecurityGroupId": {
+      "base": null,
+      "refs": {
+        "SecurityGroupIds$member": null
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "DescribeCompanyNetworkConfigurationResponse$SecurityGroupIds": "<p>The security groups associated with access to the provided subnets.</p>",
+        "UpdateCompanyNetworkConfigurationRequest$SecurityGroupIds": "<p>The security groups associated with access to the provided subnets.</p>"
+      }
+    },
+    "SignOutUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SignOutUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "DescribeCompanyNetworkConfigurationResponse$SubnetIds": "<p>The subnets used for X-ENI connections from Amazon WorkLink rendering containers.</p>",
+        "UpdateCompanyNetworkConfigurationRequest$SubnetIds": "<p>The subnets used for X-ENI connections from Amazon WorkLink rendering containers.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The list of tag keys to remove from the resource.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateFleetRequest$Tags": "<p> The tags to add to the resource. A tag is a key-value pair.</p>",
+        "DescribeFleetMetadataResponse$Tags": "<p>The tags attached to the resource. A tag is a key-value pair.</p>",
+        "FleetSummary$Tags": "<p>The tags attached to the resource. A tag is a key-value pair.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>The tags attached to the resource. A tag is a key-value pair.</p>",
+        "TagResourceRequest$Tags": "<p>The tags to add to the resource. A tag is a key-value pair.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p>The number of requests exceeds the limit.</p>",
+      "refs": {
+      }
+    },
+    "UnauthorizedException": {
+      "base": "<p>You are not authorized to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAuditStreamConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAuditStreamConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateCompanyNetworkConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateCompanyNetworkConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDevicePolicyConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDevicePolicyConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDomainMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDomainMetadataResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFleetMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateFleetMetadataResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateIdentityProviderConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateIdentityProviderConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Username": {
+      "base": null,
+      "refs": {
+        "DescribeDeviceResponse$Username": "<p>The user name associated with the device.</p>",
+        "SignOutUserRequest$Username": "<p>The name of the user.</p>"
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "DescribeCompanyNetworkConfigurationResponse$VpcId": "<p>The VPC with connectivity to associated websites.</p>",
+        "UpdateCompanyNetworkConfigurationRequest$VpcId": "<p>The VPC with connectivity to associated websites.</p>"
+      }
+    },
+    "WebsiteAuthorizationProviderSummary": {
+      "base": "<p>The summary of the website authorization provider.</p>",
+      "refs": {
+        "WebsiteAuthorizationProvidersSummaryList$member": null
+      }
+    },
+    "WebsiteAuthorizationProvidersSummaryList": {
+      "base": null,
+      "refs": {
+        "ListWebsiteAuthorizationProvidersResponse$WebsiteAuthorizationProviders": "<p>The website authorization providers.</p>"
+      }
+    },
+    "WebsiteCaSummary": {
+      "base": "<p>The summary of the certificate authority (CA).</p>",
+      "refs": {
+        "WebsiteCaSummaryList$member": null
+      }
+    },
+    "WebsiteCaSummaryList": {
+      "base": null,
+      "refs": {
+        "ListWebsiteCertificateAuthoritiesResponse$WebsiteCertificateAuthorities": "<p>Information about the certificates.</p>"
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+[
+    {
+        "given": {"foo": [{"✓": "✓"}, {"✓": "✗"}]},
+        "cases": [
+            {
+                "expression": "foo[].\"✓\"",
+                "result": ["✓", "✗"]
+            }
+        ]
+    },
+    {
+        "given": {"☯": true},
+        "cases": [
+            {
+                "expression": "\"☯\"",
+                "result": true
+            }
+        ]
+    },
+    {
+        "given": {"♪♫•*¨*•.¸¸❤¸¸.•*¨*•♫♪": true},
+        "cases": [
+            {
+                "expression": "\"♪♫•*¨*•.¸¸❤¸¸.•*¨*•♫♪\"",
+                "result": true
+            }
+        ]
+    },
+    {
+        "given": {"☃": true},
+        "cases": [
+            {
+                "expression": "\"☃\"",
+                "result": true
+            }
+        ]
+    }
+]

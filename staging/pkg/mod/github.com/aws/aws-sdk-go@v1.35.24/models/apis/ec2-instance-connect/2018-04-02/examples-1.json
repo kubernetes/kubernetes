@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "examples": {
+    "SendSSHPublicKey": [
+      {
+        "input": {
+          "AvailabilityZone": "us-west-2a",
+          "InstanceId": "i-abcd1234",
+          "InstanceOSUser": "ec2-user",
+          "SSHPublicKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3FlHqj2eqCdrGHuA6dRjfZXQ4HX5lXEIRHaNbxEwE5Te7xNF7StwhrDtiV7IdT5fDqbRyGw/szPj3xGkNTVoElCZ2dDFb2qYZ1WLIpZwj/UhO9l2mgfjR56UojjQut5Jvn2KZ1OcyrNO0J83kCaJCV7JoVbXY79FBMUccYNY45zmv9+1FMCfY6i2jdIhwR6+yLk8oubL8lIPyq7X+6b9S0yKCkB7Peml1DvghlybpAIUrC9vofHt6XP4V1i0bImw1IlljQS+DUmULRFSccATDscCX9ajnj7Crhm0HAZC0tBPXpFdHkPwL3yzYo546SCS9LKEwz62ymxxbL9k7h09t"
+        },
+        "output": {
+          "RequestId": "abcd1234-abcd-1234-abcd-1234abcd1234",
+          "Success": true
+        },
+        "comments": {
+          "input": {
+            "AvailabilityZone": "The zone where the instance was launched",
+            "InstanceId": "The instance ID to publish the key to.",
+            "InstanceOSUser": "This should be the user you wish to be when ssh-ing to the instance (eg, ec2-user@[instance IP])",
+            "SSHPublicKey": "This should be in standard OpenSSH format (ssh-rsa [key body])"
+          },
+          "output": {
+            "RequestId": "This request ID should be provided when contacting AWS Support.",
+            "Success": "Should be true if the service does not return an error response."
+          }
+        },
+        "description": "The following example pushes a sample SSH public key to the EC2 instance i-abcd1234 in AZ us-west-2b for use by the instance OS user ec2-user.",
+        "id": "send-ssh-key-to-an-ec2-instance-1518124883100",
+        "title": "To push an SSH key to an EC2 instance"
+      }
+    ]
+  }
+}

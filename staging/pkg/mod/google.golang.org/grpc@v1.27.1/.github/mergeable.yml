@@ -1,0 +1,36 @@
+version: 2
+mergeable:
+  - when: pull_request.*
+    validate:
+      - do: label
+        must_include:
+          regex: '^Type:'
+    fail:
+      - do: checks
+        status: 'failure'
+        payload:
+          title: 'Need an appropriate "Type:" label'
+          summary: 'Need an appropriate "Type:" label'
+  - when: pull_request.*
+    # This validator requires either the "no release notes" label OR a "Release" milestone
+    # to be considered successful.  However, validators "pass" in mergeable only if all
+    # checks pass.  So it is implemented in reverse.
+    # I.e.: !(!no_relnotes && !release_milestone) ==> no_relnotes || release_milestone
+    # If both validators pass, then it is considered a failure, and if either fails, it is
+    # considered a success.
+    validate:
+      - do: label
+        must_exclude:
+          regex: '^no release notes$'
+      - do: milestone
+        must_exclude:
+          regex: 'Release$'
+    pass:
+      - do: checks
+        status: 'failure'  # fail on pass
+        payload:
+          title: 'Need Release milestone or "no release notes" label'
+          summary: 'Need Release milestone or "no release notes" label'
+    fail:
+      - do: checks
+        status: 'success' # pass on fail

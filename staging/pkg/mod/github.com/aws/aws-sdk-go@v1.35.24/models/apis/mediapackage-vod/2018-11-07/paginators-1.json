@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListAssets": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Assets"
+    },
+    "ListPackagingConfigurations": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PackagingConfigurations"
+    },
+    "ListPackagingGroups": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "PackagingGroups"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "DescribeBackups": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Backups"
+    },
+    "DescribeEvents": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ServerEvents"
+    },
+    "DescribeServers": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Servers"
+    },
+    "ListTagsForResource": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Tags"
+    }
+  }
+}

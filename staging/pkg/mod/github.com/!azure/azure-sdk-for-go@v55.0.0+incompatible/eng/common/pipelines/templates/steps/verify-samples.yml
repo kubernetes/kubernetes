@@ -1,0 +1,15 @@
+parameters:
+  - name: ServiceDirectory
+    type: string
+    default: not-specified
+  - name: ScriptDirectory
+    type: string
+    default: eng/common/scripts
+
+steps:
+  - pwsh: |
+      # If the last path segment is an absolute path it will be used entirely.
+      $root = [System.IO.Path]::Combine('$(Build.SourcesDirectory)', 'sdk', '${{ parameters.ServiceDirectory }}')
+      Get-ChildItem $root -Filter *.md -Recurse | ${{ parameters.ScriptDirectory }}/Test-SampleMetadata.ps1 -AllowParentProducts
+    displayName: Verify sample metadata
+    workingDirectory: $(Build.SourcesDirectory)

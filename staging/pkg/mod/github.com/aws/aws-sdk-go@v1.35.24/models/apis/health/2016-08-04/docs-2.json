@@ -1,0 +1,714 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Health</fullname> <p>The AWS Health API provides programmatic access to the AWS Health information that appears in the <a href=\"https://phd.aws.amazon.com/phd/home#/\">AWS Personal Health Dashboard</a>. You can use the API operations to get information about AWS Health events that affect your AWS services and resources.</p> <note> <p>You must have a Business or Enterprise support plan from <a href=\"http://aws.amazon.com/premiumsupport/\">AWS Support</a> to use the AWS Health API. If you call the AWS Health API from an AWS account that doesn't have a Business or Enterprise support plan, you receive a <code>SubscriptionRequiredException</code> error.</p> </note> <p>AWS Health has a single endpoint: health.us-east-1.amazonaws.com (HTTPS). Use this endpoint to call the AWS Health API operations.</p> <p>For authentication of requests, AWS Health uses the <a href=\"https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html\">Signature Version 4 Signing Process</a>.</p> <p>If your AWS account is part of AWS Organizations, you can use the AWS Health organizational view feature. This feature provides a centralized view of AWS Health events across all accounts in your organization. You can aggregate AWS Health events in real time to identify accounts in your organization that are affected by an operational event or get notified of security vulnerabilities. Use the organizational view API operations to enable this feature and return event information. For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/ug/aggregate-events.html\">Aggregating AWS Health events</a> in the <i>AWS Health User Guide</i>.</p> <note> <p>When you use the AWS Health API operations to return AWS Health events, see the following recommendations:</p> <ul> <li> <p>Use the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html#AWSHealth-Type-Event-eventScopeCode\">eventScopeCode</a> parameter to specify whether to return AWS Health events that are public or account-specific.</p> </li> <li> <p>Use pagination to view all events from the response. For example, if you call the <code>DescribeEventsForOrganization</code> operation to get all events in your organization, you might receive several page results. Specify the <code>nextToken</code> in the next request to return more results.</p> </li> </ul> </note>",
+  "operations": {
+    "DescribeAffectedAccountsForOrganization": "<p>Returns a list of accounts in the organization from AWS Organizations that are affected by the provided event. For more information about the different types of AWS Health events, see <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a>. </p> <p>Before you can call this operation, you must first enable AWS Health to work with AWS Organizations. To do this, call the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EnableHealthServiceAccessForOrganization.html\">EnableHealthServiceAccessForOrganization</a> operation from your organization's master account.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeAffectedEntities": "<p>Returns a list of entities that have been affected by the specified events, based on the specified filter criteria. Entities can refer to individual customer resources, groups of customer resources, or any other construct, depending on the AWS service. Events that have impact beyond that of the affected entities, or where the extent of impact is unknown, include at least one entity indicating this.</p> <p>At least one event ARN is required. Results are sorted by the <code>lastUpdatedTime</code> of the entity, starting with the most recent.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeAffectedEntitiesForOrganization": "<p>Returns a list of entities that have been affected by one or more events for one or more accounts in your organization in AWS Organizations, based on the filter criteria. Entities can refer to individual customer resources, groups of customer resources, or any other construct, depending on the AWS service.</p> <p>At least one event Amazon Resource Name (ARN) and account ID are required. Results are sorted by the <code>lastUpdatedTime</code> of the entity, starting with the most recent.</p> <p>Before you can call this operation, you must first enable AWS Health to work with AWS Organizations. To do this, call the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EnableHealthServiceAccessForOrganization.html\">EnableHealthServiceAccessForOrganization</a> operation from your organization's master account. </p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeEntityAggregates": "<p>Returns the number of entities that are affected by each of the specified events. If no events are specified, the counts of all affected entities are returned.</p>",
+    "DescribeEventAggregates": "<p>Returns the number of events of each event type (issue, scheduled change, and account notification). If no filter is specified, the counts of all events in each category are returned.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeEventDetails": "<p>Returns detailed information about one or more specified events. Information includes standard event data (Region, service, and so on, as returned by <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEvents.html\">DescribeEvents</a>), a detailed event description, and possible additional metadata that depends upon the nature of the event. Affected entities are not included. To retrieve those, use the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntities.html\">DescribeAffectedEntities</a> operation.</p> <p>If a specified event cannot be retrieved, an error message is returned for that event.</p>",
+    "DescribeEventDetailsForOrganization": "<p>Returns detailed information about one or more specified events for one or more accounts in your organization. Information includes standard event data (Region, service, and so on, as returned by <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventsForOrganization.html\">DescribeEventsForOrganization</a>), a detailed event description, and possible additional metadata that depends upon the nature of the event. Affected entities are not included; to retrieve those, use the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntitiesForOrganization.html\">DescribeAffectedEntitiesForOrganization</a> operation.</p> <p>Before you can call this operation, you must first enable AWS Health to work with AWS Organizations. To do this, call the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EnableHealthServiceAccessForOrganization.html\">EnableHealthServiceAccessForOrganization</a> operation from your organization's master account.</p> <p>When you call the <code>DescribeEventDetailsForOrganization</code> operation, you specify the <code>organizationEventDetailFilters</code> object in the request. Depending on the AWS Health event type, note the following differences:</p> <ul> <li> <p>If the event is public, the <code>awsAccountId</code> parameter must be empty. If you specify an account ID for a public event, then an error message is returned. That's because the event might apply to all AWS accounts and isn't specific to an account in your organization.</p> </li> <li> <p>If the event is specific to an account, then you must specify the <code>awsAccountId</code> parameter in the request. If you don't specify an account ID, an error message returns because the event is specific to an AWS account in your organization. </p> </li> </ul> <p>For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a>.</p>",
+    "DescribeEventTypes": "<p>Returns the event types that meet the specified filter criteria. If no filter criteria are specified, all event types are returned, in no particular order.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeEvents": "<p> Returns information about events that meet the specified filter criteria. Events are returned in a summary form and do not include the detailed description, any additional metadata that depends on the event type, or any affected resources. To retrieve that information, use the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetails.html\">DescribeEventDetails</a> and <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntities.html\">DescribeAffectedEntities</a> operations.</p> <p>If no filter criteria are specified, all events are returned. Results are sorted by <code>lastModifiedTime</code>, starting with the most recent event.</p> <note> <ul> <li> <p>When you call the <code>DescribeEvents</code> operation and specify an entity for the <code>entityValues</code> parameter, AWS Health might return public events that aren't specific to that resource. For example, if you call <code>DescribeEvents</code> and specify an ID for an Amazon Elastic Compute Cloud (Amazon EC2) instance, AWS Health might return events that aren't specific to that resource or service. To get events that are specific to a service, use the <code>services</code> parameter in the <code>filter</code> object. For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a>.</p> </li> <li> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </li> </ul> </note>",
+    "DescribeEventsForOrganization": "<p>Returns information about events across your organization in AWS Organizations. You can use the<code>filters</code> parameter to specify the events that you want to return. Events are returned in a summary form and don't include the affected accounts, detailed description, any additional metadata that depends on the event type, or any affected resources. To retrieve that information, use the following operations:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedAccountsForOrganization.html\">DescribeAffectedAccountsForOrganization</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetailsForOrganization.html\">DescribeEventDetailsForOrganization</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntitiesForOrganization.html\">DescribeAffectedEntitiesForOrganization</a> </p> </li> </ul> <p>If you don't specify a <code>filter</code>, the <code>DescribeEventsForOrganizations</code> returns all events across your organization. Results are sorted by <code>lastModifiedTime</code>, starting with the most recent event. </p> <p>For more information about the different types of AWS Health events, see <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a>.</p> <p>Before you can call this operation, you must first enable AWS Health to work with AWS Organizations. To do this, call the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EnableHealthServiceAccessForOrganization.html\">EnableHealthServiceAccessForOrganization</a> operation from your organization's master AWS account.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the next request to return more results.</p> </note>",
+    "DescribeHealthServiceStatusForOrganization": "<p>This operation provides status information on enabling or disabling AWS Health to work with your organization. To call this operation, you must sign in as an IAM user, assume an IAM role, or sign in as the root user (not recommended) in the organization's master account.</p>",
+    "DisableHealthServiceAccessForOrganization": "<p>Disables AWS Health from working with AWS Organizations. To call this operation, you must sign in as an AWS Identity and Access Management (IAM) user, assume an IAM role, or sign in as the root user (not recommended) in the organization's master AWS account. For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/ug/aggregate-events.html\">Aggregating AWS Health events</a> in the <i>AWS Health User Guide</i>.</p> <p>This operation doesn't remove the service-linked role (SLR) from the AWS master account in your organization. You must use the IAM console, API, or AWS Command Line Interface (AWS CLI) to remove the SLR. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/using-service-linked-roles.html#delete-service-linked-role\">Deleting a Service-Linked Role</a> in the <i>IAM User Guide</i>.</p> <note> <p>You can also disable the organizational feature by using the Organizations <a href=\"https://docs.aws.amazon.com/organizations/latest/APIReference/API_DisableAWSServiceAccess.html\">DisableAWSServiceAccess</a> API operation. After you call this operation, AWS Health stops aggregating events for all other AWS accounts in your organization. If you call the AWS Health API operations for organizational view, AWS Health returns an error. AWS Health continues to aggregate health events for your AWS account.</p> </note>",
+    "EnableHealthServiceAccessForOrganization": "<p>Calling this operation enables AWS Health to work with AWS Organizations. This applies a service-linked role (SLR) to the master account in the organization. To call this operation, you must sign in as an IAM user, assume an IAM role, or sign in as the root user (not recommended) in the organization's master account.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/ug/aggregate-events.html\">Aggregating AWS Health events</a> in the <i>AWS Health User Guide</i>.</p>"
+  },
+  "shapes": {
+    "AffectedEntity": {
+      "base": "<p>Information about an entity that is affected by a Health event.</p>",
+      "refs": {
+        "EntityList$member": null
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p> <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EnableHealthServiceAccessForOrganization.html\">EnableHealthServiceAccessForOrganization</a> is already in progress. Wait for the action to complete before trying again. To get the current status, use the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeHealthServiceStatusForOrganization.html\">DescribeHealthServiceStatusForOrganization</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DateTimeRange": {
+      "base": "<p>A range of dates and times that is used by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EventFilter.html\">EventFilter</a> and <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EntityFilter.html\">EntityFilter</a> objects. If <code>from</code> is set and <code>to</code> is set: match items where the timestamp (<code>startTime</code>, <code>endTime</code>, or <code>lastUpdatedTime</code>) is between <code>from</code> and <code>to</code> inclusive. If <code>from</code> is set and <code>to</code> is not set: match items where the timestamp value is equal to or after <code>from</code>. If <code>from</code> is not set and <code>to</code> is set: match items where the timestamp value is equal to or before <code>to</code>.</p>",
+      "refs": {
+        "OrganizationEventFilter$startTime": null,
+        "OrganizationEventFilter$endTime": null,
+        "OrganizationEventFilter$lastUpdatedTime": null,
+        "dateTimeRangeList$member": null
+      }
+    },
+    "DescribeAffectedAccountsForOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAffectedAccountsForOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAffectedEntitiesForOrganizationFailedSet": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedEntitiesForOrganizationResponse$failedSet": "<p>A JSON set of elements of the failed response, including the <code>awsAccountId</code>, <code>errorMessage</code>, <code>errorName</code>, and <code>eventArn</code>.</p>"
+      }
+    },
+    "DescribeAffectedEntitiesForOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAffectedEntitiesForOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAffectedEntitiesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAffectedEntitiesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEntityAggregatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEntityAggregatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventAggregatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventAggregatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventDetailsFailedSet": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsResponse$failedSet": "<p>Error messages for any events that could not be retrieved.</p>"
+      }
+    },
+    "DescribeEventDetailsForOrganizationFailedSet": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsForOrganizationResponse$failedSet": "<p>Error messages for any events that could not be retrieved.</p>"
+      }
+    },
+    "DescribeEventDetailsForOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventDetailsForOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventDetailsForOrganizationSuccessfulSet": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsForOrganizationResponse$successfulSet": "<p>Information about the events that could be retrieved.</p>"
+      }
+    },
+    "DescribeEventDetailsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventDetailsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventDetailsSuccessfulSet": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsResponse$successfulSet": "<p>Information about the events that could be retrieved.</p>"
+      }
+    },
+    "DescribeEventTypesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventTypesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventsForOrganizationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventsForOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeHealthServiceStatusForOrganizationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EntityAggregate": {
+      "base": "<p>The number of entities that are affected by one or more events. Returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEntityAggregates.html\">DescribeEntityAggregates</a> operation.</p>",
+      "refs": {
+        "EntityAggregateList$member": null
+      }
+    },
+    "EntityAggregateList": {
+      "base": null,
+      "refs": {
+        "DescribeEntityAggregatesResponse$entityAggregates": "<p>The number of entities that are affected by each of the specified events.</p>"
+      }
+    },
+    "EntityFilter": {
+      "base": "<p>The values to use to filter results from the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EntityFilter.html\">EntityFilter</a> operation.</p>",
+      "refs": {
+        "DescribeAffectedEntitiesRequest$filter": "<p>Values to narrow the results returned. At least one event ARN is required.</p>"
+      }
+    },
+    "EntityList": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedEntitiesForOrganizationResponse$entities": "<p>A JSON set of elements including the <code>awsAccountId</code> and its <code>entityArn</code>, <code>entityValue</code> and its <code>entityArn</code>, <code>lastUpdatedTime</code>, and <code>statusCode</code>.</p>",
+        "DescribeAffectedEntitiesResponse$entities": "<p>The entities that match the filter criteria.</p>"
+      }
+    },
+    "Event": {
+      "base": "<p>Summary information about an AWS Health event.</p> <p>AWS Health events can be public or account-specific:</p> <ul> <li> <p> <i>Public events</i> might be service events that are not specific to an AWS account. For example, if there is an issue with an AWS Region, AWS Health provides information about the event, even if you don't use services or resources in that Region.</p> </li> <li> <p> <i>Account-specific</i> events are specific to either your AWS account or an account in your organization. For example, if there's an issue with Amazon Elastic Compute Cloud in a Region that you use, AWS Health provides information about the event and the affected resources in the account.</p> </li> </ul> <p>You can determine if an event is public or account-specific by using the <code>eventScopeCode</code> parameter. For more information, see <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html#AWSHealth-Type-Event-eventScopeCode\">eventScopeCode</a>.</p>",
+      "refs": {
+        "EventDetails$event": "<p>Summary information about the event.</p>",
+        "EventList$member": null,
+        "OrganizationEventDetails$event": null
+      }
+    },
+    "EventAccountFilter": {
+      "base": "<p>The values used to filter results from the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetailsForOrganization.html\">DescribeEventDetailsForOrganization</a> and <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntitiesForOrganization.html\">DescribeAffectedEntitiesForOrganization</a> operations.</p>",
+      "refs": {
+        "OrganizationEntityFiltersList$member": null,
+        "OrganizationEventDetailFiltersList$member": null
+      }
+    },
+    "EventAggregate": {
+      "base": "<p>The number of events of each issue type. Returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventAggregates.html\">DescribeEventAggregates</a> operation.</p>",
+      "refs": {
+        "EventAggregateList$member": null
+      }
+    },
+    "EventAggregateList": {
+      "base": null,
+      "refs": {
+        "DescribeEventAggregatesResponse$eventAggregates": "<p>The number of events in each category that meet the optional filter criteria.</p>"
+      }
+    },
+    "EventArnsList": {
+      "base": null,
+      "refs": {
+        "DescribeEntityAggregatesRequest$eventArns": "<p>A list of event ARNs (unique identifiers). For example: <code>\"arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-CDE456\", \"arn:aws:health:us-west-1::event/EBS/AWS_EBS_LOST_VOLUME/AWS_EBS_LOST_VOLUME_CHI789_JKL101\"</code> </p>"
+      }
+    },
+    "EventDescription": {
+      "base": "<p>The detailed description of the event. Included in the information returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetails.html\">DescribeEventDetails</a> operation.</p>",
+      "refs": {
+        "EventDetails$eventDescription": "<p>The most recent description of the event.</p>",
+        "OrganizationEventDetails$eventDescription": null
+      }
+    },
+    "EventDetails": {
+      "base": "<p>Detailed information about an event. A combination of an <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a> object, an <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EventDescription.html\">EventDescription</a> object, and additional metadata about the event. Returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetails.html\">DescribeEventDetails</a> operation.</p>",
+      "refs": {
+        "DescribeEventDetailsSuccessfulSet$member": null
+      }
+    },
+    "EventDetailsErrorItem": {
+      "base": "<p>Error information returned when a <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetails.html\">DescribeEventDetails</a> operation cannot find a specified event.</p>",
+      "refs": {
+        "DescribeEventDetailsFailedSet$member": null
+      }
+    },
+    "EventFilter": {
+      "base": "<p>The values to use to filter results from the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEvents.html\">DescribeEvents</a> and <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventAggregates.html\">DescribeEventAggregates</a> operations.</p>",
+      "refs": {
+        "DescribeEventAggregatesRequest$filter": "<p>Values to narrow the results returned.</p>",
+        "DescribeEventsRequest$filter": "<p>Values to narrow the results returned.</p>"
+      }
+    },
+    "EventList": {
+      "base": null,
+      "refs": {
+        "DescribeEventsResponse$events": "<p>The events that match the specified filter criteria.</p>"
+      }
+    },
+    "EventType": {
+      "base": "<p>Metadata about a type of event that is reported by AWS Health. Data consists of the category (for example, <code>issue</code>), the service (for example, <code>EC2</code>), and the event type code (for example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>).</p>",
+      "refs": {
+        "EventTypeList$member": null
+      }
+    },
+    "EventTypeCategoryList": {
+      "base": null,
+      "refs": {
+        "EventTypeFilter$eventTypeCategories": "<p>A list of event type category codes (<code>issue</code>, <code>scheduledChange</code>, or <code>accountNotification</code>).</p>"
+      }
+    },
+    "EventTypeCodeList": {
+      "base": null,
+      "refs": {
+        "EventTypeFilter$eventTypeCodes": "<p>A list of event type codes.</p>"
+      }
+    },
+    "EventTypeFilter": {
+      "base": "<p>The values to use to filter results from the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventTypes.html\">DescribeEventTypes</a> operation.</p>",
+      "refs": {
+        "DescribeEventTypesRequest$filter": "<p>Values to narrow the results returned.</p>"
+      }
+    },
+    "EventTypeList": {
+      "base": null,
+      "refs": {
+        "DescribeEventTypesResponse$eventTypes": "<p>A list of event types that match the filter criteria. Event types have a category (<code>issue</code>, <code>accountNotification</code>, or <code>scheduledChange</code>), a service (for example, <code>EC2</code>, <code>RDS</code>, <code>DATAPIPELINE</code>, <code>BILLING</code>), and a code (in the format <code>AWS_<i>SERVICE</i>_<i>DESCRIPTION</i> </code>; for example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>).</p>"
+      }
+    },
+    "InvalidPaginationToken": {
+      "base": "<p>The specified pagination token (<code>nextToken</code>) is not valid.</p>",
+      "refs": {
+      }
+    },
+    "OrganizationAffectedEntitiesErrorItem": {
+      "base": "<p>Error information returned when a <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeAffectedEntitiesForOrganization.html\">DescribeAffectedEntitiesForOrganization</a> operation cannot find or process a specific entity.</p>",
+      "refs": {
+        "DescribeAffectedEntitiesForOrganizationFailedSet$member": null
+      }
+    },
+    "OrganizationEntityFiltersList": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedEntitiesForOrganizationRequest$organizationEntityFilters": "<p>A JSON set of elements including the <code>awsAccountId</code> and the <code>eventArn</code>.</p>"
+      }
+    },
+    "OrganizationEvent": {
+      "base": "<p>Summary information about an event, returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventsForOrganization.html\">DescribeEventsForOrganization</a> operation.</p>",
+      "refs": {
+        "OrganizationEventList$member": null
+      }
+    },
+    "OrganizationEventDetailFiltersList": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsForOrganizationRequest$organizationEventDetailFilters": "<p>A set of JSON elements that includes the <code>awsAccountId</code> and the <code>eventArn</code>.</p>"
+      }
+    },
+    "OrganizationEventDetails": {
+      "base": "<p>Detailed information about an event. A combination of an <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_Event.html\">Event</a> object, an <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_EventDescription.html\">EventDescription</a> object, and additional metadata about the event. Returned by the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetailsForOrganization.html\">DescribeEventDetailsForOrganization</a> operation.</p>",
+      "refs": {
+        "DescribeEventDetailsForOrganizationSuccessfulSet$member": null
+      }
+    },
+    "OrganizationEventDetailsErrorItem": {
+      "base": "<p>Error information returned when a <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetailsForOrganization.html\">DescribeEventDetailsForOrganization</a> operation cannot find a specified event.</p>",
+      "refs": {
+        "DescribeEventDetailsForOrganizationFailedSet$member": null
+      }
+    },
+    "OrganizationEventFilter": {
+      "base": "<p>The values to filter results from the <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventsForOrganization.html\">DescribeEventsForOrganization</a> operation.</p>",
+      "refs": {
+        "DescribeEventsForOrganizationRequest$filter": "<p>Values to narrow the results returned.</p>"
+      }
+    },
+    "OrganizationEventList": {
+      "base": null,
+      "refs": {
+        "DescribeEventsForOrganizationResponse$events": "<p>The events that match the specified filter criteria.</p>"
+      }
+    },
+    "UnsupportedLocale": {
+      "base": "<p>The specified locale is not supported.</p>",
+      "refs": {
+      }
+    },
+    "accountId": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$awsAccountId": "<p>The 12-digit AWS account number that contains the affected entity.</p>",
+        "EventAccountFilter$awsAccountId": "<p>The 12-digit AWS account numbers that contains the affected entities.</p>",
+        "OrganizationAffectedEntitiesErrorItem$awsAccountId": "<p>The 12-digit AWS account numbers that contains the affected entities.</p>",
+        "OrganizationEventDetails$awsAccountId": "<p>The 12-digit AWS account numbers that contains the affected entities.</p>",
+        "OrganizationEventDetailsErrorItem$awsAccountId": "<p>Error information returned when a <a href=\"https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEventDetailsForOrganization.html\">DescribeEventDetailsForOrganization</a> operation cannot find a specified event.</p>",
+        "affectedAccountsList$member": null,
+        "awsAccountIdsList$member": null
+      }
+    },
+    "affectedAccountsList": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedAccountsForOrganizationResponse$affectedAccounts": "<p>A JSON set of elements of the affected accounts.</p>"
+      }
+    },
+    "aggregateValue": {
+      "base": null,
+      "refs": {
+        "EventAggregate$aggregateValue": "<p>The issue type for the associated count.</p>"
+      }
+    },
+    "availabilityZone": {
+      "base": null,
+      "refs": {
+        "Event$availabilityZone": "<p>The AWS Availability Zone of the event. For example, us-east-1a.</p>",
+        "availabilityZones$member": null
+      }
+    },
+    "availabilityZones": {
+      "base": null,
+      "refs": {
+        "EventFilter$availabilityZones": "<p>A list of AWS availability zones.</p>"
+      }
+    },
+    "awsAccountIdsList": {
+      "base": null,
+      "refs": {
+        "OrganizationEventFilter$awsAccountIds": "<p>A list of 12-digit AWS account numbers that contains the affected entities.</p>"
+      }
+    },
+    "count": {
+      "base": null,
+      "refs": {
+        "EntityAggregate$count": "<p>The number of entities that match the criteria for the specified events.</p>",
+        "EventAggregate$count": "<p>The number of events of the associated issue type.</p>"
+      }
+    },
+    "dateTimeRangeList": {
+      "base": null,
+      "refs": {
+        "EntityFilter$lastUpdatedTimes": "<p>A list of the most recent dates and times that the entity was updated.</p>",
+        "EventFilter$startTimes": "<p>A list of dates and times that the event began.</p>",
+        "EventFilter$endTimes": "<p>A list of dates and times that the event ended.</p>",
+        "EventFilter$lastUpdatedTimes": "<p>A list of dates and times that the event was last updated.</p>"
+      }
+    },
+    "entityArn": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$entityArn": "<p>The unique identifier for the entity. Format: <code>arn:aws:health:<i>entity-region</i>:<i>aws-account</i>:entity/<i>entity-id</i> </code>. Example: <code>arn:aws:health:us-east-1:111222333444:entity/AVh5GGT7ul1arKr1sE1K</code> </p>",
+        "entityArnList$member": null
+      }
+    },
+    "entityArnList": {
+      "base": null,
+      "refs": {
+        "EntityFilter$entityArns": "<p>A list of entity ARNs (unique identifiers).</p>",
+        "EventFilter$entityArns": "<p>A list of entity ARNs (unique identifiers).</p>",
+        "OrganizationEventFilter$entityArns": "<p>A list of entity ARNs (unique identifiers).</p>"
+      }
+    },
+    "entityStatusCode": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$statusCode": "<p>The most recent status of the entity affected by the event. The possible values are <code>IMPAIRED</code>, <code>UNIMPAIRED</code>, and <code>UNKNOWN</code>.</p>",
+        "entityStatusCodeList$member": null
+      }
+    },
+    "entityStatusCodeList": {
+      "base": null,
+      "refs": {
+        "EntityFilter$statusCodes": "<p>A list of entity status codes (<code>IMPAIRED</code>, <code>UNIMPAIRED</code>, or <code>UNKNOWN</code>).</p>"
+      }
+    },
+    "entityUrl": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$entityUrl": "<p>The URL of the affected entity.</p>"
+      }
+    },
+    "entityValue": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$entityValue": "<p>The ID of the affected entity.</p>",
+        "entityValueList$member": null
+      }
+    },
+    "entityValueList": {
+      "base": null,
+      "refs": {
+        "EntityFilter$entityValues": "<p>A list of IDs for affected entities.</p>",
+        "EventFilter$entityValues": "<p>A list of entity identifiers, such as EC2 instance IDs (<code>i-34ab692e</code>) or EBS volumes (<code>vol-426ab23e</code>).</p>",
+        "OrganizationEventFilter$entityValues": "<p>A list of entity identifiers, such as EC2 instance IDs (i-34ab692e) or EBS volumes (vol-426ab23e).</p>"
+      }
+    },
+    "eventAggregateField": {
+      "base": null,
+      "refs": {
+        "DescribeEventAggregatesRequest$aggregateField": "<p>The only currently supported value is <code>eventTypeCategory</code>.</p>"
+      }
+    },
+    "eventArn": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "DescribeAffectedAccountsForOrganizationRequest$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "EntityAggregate$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "Event$arn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "EventAccountFilter$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "EventArnsList$member": null,
+        "EventDetailsErrorItem$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "OrganizationAffectedEntitiesErrorItem$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "OrganizationEvent$arn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "OrganizationEventDetailsErrorItem$eventArn": "<p>The unique identifier for the event. Format: <code>arn:aws:health:<i>event-region</i>::event/<i>SERVICE</i>/<i>EVENT_TYPE_CODE</i>/<i>EVENT_TYPE_PLUS_ID</i> </code>. Example: <code>Example: arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-DEF456</code> </p>",
+        "eventArnList$member": null
+      }
+    },
+    "eventArnList": {
+      "base": null,
+      "refs": {
+        "DescribeEventDetailsRequest$eventArns": "<p>A list of event ARNs (unique identifiers). For example: <code>\"arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-CDE456\", \"arn:aws:health:us-west-1::event/EBS/AWS_EBS_LOST_VOLUME/AWS_EBS_LOST_VOLUME_CHI789_JKL101\"</code> </p>",
+        "EntityFilter$eventArns": "<p>A list of event ARNs (unique identifiers). For example: <code>\"arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-CDE456\", \"arn:aws:health:us-west-1::event/EBS/AWS_EBS_LOST_VOLUME/AWS_EBS_LOST_VOLUME_CHI789_JKL101\"</code> </p>",
+        "EventFilter$eventArns": "<p>A list of event ARNs (unique identifiers). For example: <code>\"arn:aws:health:us-east-1::event/EC2/EC2_INSTANCE_RETIREMENT_SCHEDULED/EC2_INSTANCE_RETIREMENT_SCHEDULED_ABC123-CDE456\", \"arn:aws:health:us-west-1::event/EBS/AWS_EBS_LOST_VOLUME/AWS_EBS_LOST_VOLUME_CHI789_JKL101\"</code> </p>"
+      }
+    },
+    "eventDescription": {
+      "base": null,
+      "refs": {
+        "EventDescription$latestDescription": "<p>The most recent description of the event.</p>"
+      }
+    },
+    "eventMetadata": {
+      "base": null,
+      "refs": {
+        "EventDetails$eventMetadata": "<p>Additional metadata about the event.</p>",
+        "OrganizationEventDetails$eventMetadata": "<p>Additional metadata about the event.</p>"
+      }
+    },
+    "eventScopeCode": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedAccountsForOrganizationResponse$eventScopeCode": "<p>This parameter specifies if the AWS Health event is a public AWS service event or an account-specific event.</p> <ul> <li> <p>If the <code>eventScopeCode</code> value is <code>PUBLIC</code>, then the <code>affectedAccounts</code> value is always empty.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>ACCOUNT_SPECIFIC</code>, then the <code>affectedAccounts</code> value lists the affected AWS accounts in your organization. For example, if an event affects a service such as Amazon Elastic Compute Cloud and you have AWS accounts that use that service, those account IDs appear in the response.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>NONE</code>, then the <code>eventArn</code> that you specified in the request is invalid or doesn't exist.</p> </li> </ul>",
+        "Event$eventScopeCode": "<p>This parameter specifies if the AWS Health event is a public AWS service event or an account-specific event.</p> <ul> <li> <p>If the <code>eventScopeCode</code> value is <code>PUBLIC</code>, then the <code>affectedAccounts</code> value is always empty.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>ACCOUNT_SPECIFIC</code>, then the <code>affectedAccounts</code> value lists the affected AWS accounts in your organization. For example, if an event affects a service such as Amazon Elastic Compute Cloud and you have AWS accounts that use that service, those account IDs appear in the response.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>NONE</code>, then the <code>eventArn</code> that you specified in the request is invalid or doesn't exist.</p> </li> </ul>",
+        "OrganizationEvent$eventScopeCode": "<p>This parameter specifies if the AWS Health event is a public AWS service event or an account-specific event.</p> <ul> <li> <p>If the <code>eventScopeCode</code> value is <code>PUBLIC</code>, then the <code>affectedAccounts</code> value is always empty.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>ACCOUNT_SPECIFIC</code>, then the <code>affectedAccounts</code> value lists the affected AWS accounts in your organization. For example, if an event affects a service such as Amazon Elastic Compute Cloud and you have AWS accounts that use that service, those account IDs appear in the response.</p> </li> <li> <p>If the <code>eventScopeCode</code> value is <code>NONE</code>, then the <code>eventArn</code> that you specified in the request is invalid or doesn't exist.</p> </li> </ul>"
+      }
+    },
+    "eventStatusCode": {
+      "base": null,
+      "refs": {
+        "Event$statusCode": "<p>The most recent status of the event. Possible values are <code>open</code>, <code>closed</code>, and <code>upcoming</code>.</p>",
+        "OrganizationEvent$statusCode": "<p>The most recent status of the event. Possible values are <code>open</code>, <code>closed</code>, and <code>upcoming</code>.</p>",
+        "eventStatusCodeList$member": null
+      }
+    },
+    "eventStatusCodeList": {
+      "base": null,
+      "refs": {
+        "EventFilter$eventStatusCodes": "<p>A list of event status codes.</p>",
+        "OrganizationEventFilter$eventStatusCodes": "<p>A list of event status codes.</p>"
+      }
+    },
+    "eventType": {
+      "base": null,
+      "refs": {
+        "eventTypeList$member": null
+      }
+    },
+    "eventTypeCategory": {
+      "base": null,
+      "refs": {
+        "Event$eventTypeCategory": "<p>The category of the event. Possible values are <code>issue</code>, <code>scheduledChange</code>, and <code>accountNotification</code>.</p>",
+        "EventType$category": "<p>A list of event type category codes (<code>issue</code>, <code>scheduledChange</code>, or <code>accountNotification</code>).</p>",
+        "EventTypeCategoryList$member": null,
+        "OrganizationEvent$eventTypeCategory": "<p>The category of the event type.</p>",
+        "eventTypeCategoryList$member": null
+      }
+    },
+    "eventTypeCategoryList": {
+      "base": null,
+      "refs": {
+        "EventFilter$eventTypeCategories": "<p>A list of event type category codes (<code>issue</code>, <code>scheduledChange</code>, or <code>accountNotification</code>).</p>",
+        "OrganizationEventFilter$eventTypeCategories": "<p>A list of event type category codes (issue, scheduledChange, or accountNotification).</p>"
+      }
+    },
+    "eventTypeCode": {
+      "base": null,
+      "refs": {
+        "Event$eventTypeCode": "<p>The unique identifier for the event type. The format is <code>AWS_<i>SERVICE</i>_<i>DESCRIPTION</i> </code>; for example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>.</p>",
+        "EventType$code": "<p>The unique identifier for the event type. The format is <code>AWS_<i>SERVICE</i>_<i>DESCRIPTION</i> </code>; for example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>.</p>",
+        "EventTypeCodeList$member": null,
+        "OrganizationEvent$eventTypeCode": "<p>The unique identifier for the event type. The format is <code>AWS_SERVICE_DESCRIPTION</code>. For example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>.</p>"
+      }
+    },
+    "eventTypeList": {
+      "base": null,
+      "refs": {
+        "EventFilter$eventTypeCodes": "<p>A list of unique identifiers for event types. For example, <code>\"AWS_EC2_SYSTEM_MAINTENANCE_EVENT\",\"AWS_RDS_MAINTENANCE_SCHEDULED\".</code> </p>",
+        "OrganizationEventFilter$eventTypeCodes": "<p>A list of unique identifiers for event types. For example, <code>\"AWS_EC2_SYSTEM_MAINTENANCE_EVENT\",\"AWS_RDS_MAINTENANCE_SCHEDULED\".</code> </p>"
+      }
+    },
+    "healthServiceAccessStatusForOrganization": {
+      "base": null,
+      "refs": {
+        "DescribeHealthServiceStatusForOrganizationResponse$healthServiceAccessStatusForOrganization": "<p>Information about the status of enabling or disabling AWS Health Organizational View in your organization.</p> <p>Valid values are <code>ENABLED | DISABLED | PENDING</code>. </p>"
+      }
+    },
+    "locale": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedEntitiesForOrganizationRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeAffectedEntitiesRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeEventDetailsForOrganizationRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeEventDetailsRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeEventTypesRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeEventsForOrganizationRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>",
+        "DescribeEventsRequest$locale": "<p>The locale (language) to return information in. English (en) is the default and the only supported value at this time.</p>"
+      }
+    },
+    "maxResults": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedAccountsForOrganizationRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeAffectedEntitiesForOrganizationRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeAffectedEntitiesRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeEventAggregatesRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeEventTypesRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeEventsForOrganizationRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>",
+        "DescribeEventsRequest$maxResults": "<p>The maximum number of items to return in one batch, between 10 and 100, inclusive.</p>"
+      }
+    },
+    "metadataKey": {
+      "base": null,
+      "refs": {
+        "eventMetadata$key": null
+      }
+    },
+    "metadataValue": {
+      "base": null,
+      "refs": {
+        "eventMetadata$value": null
+      }
+    },
+    "nextToken": {
+      "base": null,
+      "refs": {
+        "DescribeAffectedAccountsForOrganizationRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeAffectedAccountsForOrganizationResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeAffectedEntitiesForOrganizationRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeAffectedEntitiesForOrganizationResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeAffectedEntitiesRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeAffectedEntitiesResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventAggregatesRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventAggregatesResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventTypesRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventTypesResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventsForOrganizationRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventsForOrganizationResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventsRequest$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>",
+        "DescribeEventsResponse$nextToken": "<p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next batch of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value.</p>"
+      }
+    },
+    "region": {
+      "base": null,
+      "refs": {
+        "Event$region": "<p>The AWS region name of the event.</p>",
+        "OrganizationEvent$region": "<p>The AWS Region name of the event.</p>",
+        "regionList$member": null
+      }
+    },
+    "regionList": {
+      "base": null,
+      "refs": {
+        "EventFilter$regions": "<p>A list of AWS regions.</p>",
+        "OrganizationEventFilter$regions": "<p>A list of AWS Regions.</p>"
+      }
+    },
+    "service": {
+      "base": null,
+      "refs": {
+        "Event$service": "<p>The AWS service that is affected by the event. For example, <code>EC2</code>, <code>RDS</code>.</p>",
+        "EventType$service": "<p>The AWS service that is affected by the event. For example, <code>EC2</code>, <code>RDS</code>.</p>",
+        "OrganizationEvent$service": "<p>The AWS service that is affected by the event. For example, EC2, RDS.</p>",
+        "serviceList$member": null
+      }
+    },
+    "serviceList": {
+      "base": null,
+      "refs": {
+        "EventFilter$services": "<p>The AWS services associated with the event. For example, <code>EC2</code>, <code>RDS</code>.</p>",
+        "EventTypeFilter$services": "<p>The AWS services associated with the event. For example, <code>EC2</code>, <code>RDS</code>.</p>",
+        "OrganizationEventFilter$services": "<p>The AWS services associated with the event. For example, <code>EC2</code>, <code>RDS</code>.</p>"
+      }
+    },
+    "string": {
+      "base": null,
+      "refs": {
+        "ConcurrentModificationException$message": null,
+        "EventDetailsErrorItem$errorName": "<p>The name of the error.</p>",
+        "EventDetailsErrorItem$errorMessage": "<p>A message that describes the error.</p>",
+        "InvalidPaginationToken$message": null,
+        "OrganizationAffectedEntitiesErrorItem$errorName": "<p>The name of the error.</p>",
+        "OrganizationAffectedEntitiesErrorItem$errorMessage": "<p>The unique identifier for the event type. The format is <code>AWS_SERVICE_DESCRIPTION</code>. For example, <code>AWS_EC2_SYSTEM_MAINTENANCE_EVENT</code>.</p>",
+        "OrganizationEventDetailsErrorItem$errorName": "<p>The name of the error.</p>",
+        "OrganizationEventDetailsErrorItem$errorMessage": "<p>A message that describes the error.</p>",
+        "UnsupportedLocale$message": null
+      }
+    },
+    "tagFilter": {
+      "base": null,
+      "refs": {
+        "EntityFilter$tags": "<p>A map of entity tags attached to the affected entity.</p> <note> <p>Currently, the <code>tags</code> property isn't supported.</p> </note>",
+        "EventFilter$tags": "<p>A map of entity tags attached to the affected entity.</p> <note> <p>Currently, the <code>tags</code> property isn't supported.</p> </note>"
+      }
+    },
+    "tagKey": {
+      "base": null,
+      "refs": {
+        "tagSet$key": null
+      }
+    },
+    "tagSet": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$tags": "<p>A map of entity tags attached to the affected entity.</p> <note> <p>Currently, the <code>tags</code> property isn't supported.</p> </note>",
+        "tagFilter$member": null
+      }
+    },
+    "tagValue": {
+      "base": null,
+      "refs": {
+        "tagSet$value": null
+      }
+    },
+    "timestamp": {
+      "base": null,
+      "refs": {
+        "AffectedEntity$lastUpdatedTime": "<p>The most recent time that the entity was updated.</p>",
+        "DateTimeRange$from": "<p>The starting date and time of a time range.</p>",
+        "DateTimeRange$to": "<p>The ending date and time of a time range.</p>",
+        "Event$startTime": "<p>The date and time that the event began.</p>",
+        "Event$endTime": "<p>The date and time that the event ended.</p>",
+        "Event$lastUpdatedTime": "<p>The most recent date and time that the event was updated.</p>",
+        "OrganizationEvent$startTime": "<p>The date and time that the event began.</p>",
+        "OrganizationEvent$endTime": "<p>The date and time that the event ended.</p>",
+        "OrganizationEvent$lastUpdatedTime": "<p>The most recent date and time that the event was updated.</p>"
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+# This step is designed to work against linux only
+parameters:
+  ServiceDirectory: ''
+  GoWorkspace: ''
+  LintVersion: ''
+  Scope: 'sdk/...'
+
+steps:
+          
+  - template: /eng/common/pipelines/templates/steps/verify-links.yml
+    parameters:
+      Directory: sdk/${{ parameters.ServiceDirectory }}
+      CheckLinkGuidance: $true
+
+  - script: |
+      curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{parameters.LintVersion}}
+      golangci-lint --version
+    displayName: 'Install GoLintCLI and dependencies.'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - pwsh: |
+      $modDirs = (./eng/scripts/get_module_dirs.ps1 -serviceDir $(SCOPE))
+      foreach ($md in $modDirs) {
+        pushd $md
+        Write-Host "##[command]Executing golangci-lint run -c ${{parameters.GoWorkspace}}eng/.golangci.yml in $md"
+        golangci-lint run -c ${{parameters.GoWorkspace}}eng/.golangci.yml
+      }
+      exit 0
+    displayName: 'Lint'
+    failOnStderr: false
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - script: |
+      echo scanning copyright headers in $(pwd)
+      grep -L -r --include \*.go -P "Copyright (\d{4}|\(c\)) Microsoft" . | tee >&2
+    displayName: 'Copyright Header Check'
+    condition: succeededOrFailed()
+    failOnStderr: true
+    workingDirectory: 'sdk/${{parameters.ServiceDirectory}}'
+
+  - script: |
+      echo check source file formatting in $(pwd)
+      gofmt -s -l -d $(find . -name '*.go' -print) >&2
+    displayName: 'Format Check'
+    condition: succeededOrFailed()
+    failOnStderr: true
+    workingDirectory: 'sdk/${{parameters.ServiceDirectory}}'
+
+  - template: /eng/common/pipelines/templates/steps/eng-common-workflow-enforcer.yml

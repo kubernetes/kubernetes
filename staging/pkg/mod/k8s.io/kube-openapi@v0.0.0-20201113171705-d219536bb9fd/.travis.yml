@@ -1,0 +1,14 @@
+dist: xenial
+language: go
+go:
+- "1.12"
+
+env:
+- GO111MODULE=on
+
+go_import_path: k8s.io/kube-openapi
+
+script:
+- go mod tidy && git diff --exit-code
+- go build ./cmd/... ./pkg/...
+- go test ./cmd/... ./pkg/... ./test/...

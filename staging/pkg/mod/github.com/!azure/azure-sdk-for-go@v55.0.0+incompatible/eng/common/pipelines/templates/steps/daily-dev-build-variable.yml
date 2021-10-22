@@ -1,0 +1,24 @@
+# This script fragment is used across our repos to set a variable "SetDevVersion" which
+# is used when this pipeline is going to be generating and publishing daily dev builds.
+parameters:
+  ServiceDirectory: ''
+steps:
+- ${{if ne(parameters.ServiceDirectory, '')}}:
+  - task: Powershell@2
+    inputs:
+      filePath: $(Build.SourcesDirectory)/eng/common/scripts/Save-Package-Properties.ps1
+      arguments: >
+        -ServiceDirectory ${{parameters.ServiceDirectory}}
+        -OutDirectory $(Build.ArtifactStagingDirectory)/PackageInfo
+      pwsh: true
+      workingDirectory: $(Pipeline.Workspace)
+    displayName: Dump Package properties
+    condition: succeeded()
+- pwsh: |
+    $setDailyDevBuild = "false"
+    if (('$(Build.Reason)' -eq 'Schedule') -and ('$(System.TeamProject)' -eq 'internal')) {
+      $setDailyDevBuild = "true"
+    }
+    echo "##vso[task.setvariable variable=SetDevVersion]$setDailyDevBuild"
+  displayName: "Setup Versioning Properties"
+  condition: eq(variables['SetDevVersion'], '')

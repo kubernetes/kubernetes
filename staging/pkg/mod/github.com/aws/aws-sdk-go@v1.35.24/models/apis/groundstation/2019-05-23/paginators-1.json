@@ -1,0 +1,40 @@
+{
+  "pagination": {
+    "ListConfigs": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "configList"
+    },
+    "ListContacts": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "contactList"
+    },
+    "ListDataflowEndpointGroups": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "dataflowEndpointGroupList"
+    },
+    "ListGroundStations": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "groundStationList"
+    },
+    "ListMissionProfiles": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "missionProfileList"
+    },
+    "ListSatellites": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "satellites"
+    }
+  }
+}

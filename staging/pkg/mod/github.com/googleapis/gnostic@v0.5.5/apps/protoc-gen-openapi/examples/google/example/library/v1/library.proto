@@ -1,0 +1,357 @@
+// Copyright 2019 Google LLC.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+package google.example.library.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "google.golang.org/genproto/googleapis/example/library/v1;library";
+option java_multiple_files = true;
+option java_outer_classname = "LibraryProto";
+option java_package = "com.google.example.library.v1";
+
+// This API represents a simple digital library.  It lets you manage Shelf
+// resources and Book resources in the library. It defines the following
+// resource model:
+//
+// - The API has a collection of [Shelf][google.example.library.v1.Shelf]
+//   resources, named `shelves/*`
+//
+// - Each Shelf has a collection of [Book][google.example.library.v1.Book]
+//   resources, named `shelves/*/books/*`
+service LibraryService {
+  option (google.api.default_host) = "library-example.googleapis.com";
+
+  // Creates a shelf, and returns the new Shelf.
+  rpc CreateShelf(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/v1/shelves"
+      body: "shelf"
+    };
+    option (google.api.method_signature) = "shelf";
+  }
+
+  // Gets a shelf. Returns NOT_FOUND if the shelf does not exist.
+  rpc GetShelf(GetShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      get: "/v1/{name=shelves/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists shelves. The order is unspecified but deterministic. Newly created
+  // shelves will not necessarily be added to the end of this list.
+  rpc ListShelves(ListShelvesRequest) returns (ListShelvesResponse) {
+    option (google.api.http) = {
+      get: "/v1/shelves"
+    };
+  }
+
+  // Deletes a shelf. Returns NOT_FOUND if the shelf does not exist.
+  rpc DeleteShelf(DeleteShelfRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=shelves/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Merges two shelves by adding all books from the shelf named
+  // `other_shelf_name` to shelf `name`, and deletes
+  // `other_shelf_name`. Returns the updated shelf.
+  // The book ids of the moved books may not be the same as the original books.
+  //
+  // Returns NOT_FOUND if either shelf does not exist.
+  // This call is a no-op if the specified shelves are the same.
+  rpc MergeShelves(MergeShelvesRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/v1/{name=shelves/*}:merge"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name,other_shelf_name";
+  }
+
+  // Creates a book, and returns the new Book.
+  rpc CreateBook(CreateBookRequest) returns (Book) {
+    option (google.api.http) = {
+      post: "/v1/{name=shelves/*}/books"
+      body: "book"
+    };
+    option (google.api.method_signature) = "name,book";
+  }
+
+  // Gets a book. Returns NOT_FOUND if the book does not exist.
+  rpc GetBook(GetBookRequest) returns (Book) {
+    option (google.api.http) = {
+      get: "/v1/{name=shelves/*/books/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists books in a shelf. The order is unspecified but deterministic. Newly
+  // created books will not necessarily be added to the end of this list.
+  // Returns NOT_FOUND if the shelf does not exist.
+  rpc ListBooks(ListBooksRequest) returns (ListBooksResponse) {
+    option (google.api.http) = {
+      get: "/v1/{name=shelves/*}/books"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Deletes a book. Returns NOT_FOUND if the book does not exist.
+  rpc DeleteBook(DeleteBookRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=shelves/*/books/*}"
+    };
+  }
+
+  // Updates a book. Returns INVALID_ARGUMENT if the name of the book
+  // is non-empty and does not equal the existing name.
+  rpc UpdateBook(UpdateBookRequest) returns (Book) {
+    option (google.api.http) = {
+      put: "/v1/{book.name=shelves/*/books/*}"
+      body: "book"
+    };
+    option (google.api.method_signature) = "book";
+  }
+
+  // Moves a book to another shelf, and returns the new book. The book
+  // id of the new book may not be the same as the original book.
+  rpc MoveBook(MoveBookRequest) returns (Book) {
+    option (google.api.http) = {
+      post: "/v1/{name=shelves/*/books/*}:move"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name,other_shelf_name";
+  }
+}
+
+// A single book in the library.
+message Book {
+  option (google.api.resource) = {
+    type: "library-example.googleapis.com/Book",
+    pattern: "shelves/{shelf_id}/books/{book_id}"
+  };
+  // The resource name of the book.
+  // Book names have the form `shelves/{shelf_id}/books/{book_id}`.
+  // The name is ignored when creating a book.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "library-example.googleapis.com/Book"
+  ];
+
+  // The name of the book author.
+  string author = 2;
+
+  // The title of the book.
+  string title = 3;
+
+  // Value indicating whether the book has been read.
+  bool read = 4;
+
+  // Creation timestamp.
+  google.protobuf.Timestamp create_time = 5
+   [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Last update timestamp.
+  google.protobuf.Timestamp update_time = 6
+   [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// A Shelf contains a collection of books with a theme.
+message Shelf {
+  option (google.api.resource) = {
+    type: "library-example.googleapis.com/Shelf",
+    pattern: "shelves/{shelf_id}"
+  };
+  // The resource name of the shelf.
+  // Shelf names have the form `shelves/{shelf_id}`.
+  // The name is ignored when creating a shelf.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "library-example.googleapis.com/Shelf"
+  ];
+
+  // The theme of the shelf
+  string theme = 2;
+
+  // Creation timestamp.
+  google.protobuf.Timestamp create_time = 3
+    [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Last update timestamp.
+  google.protobuf.Timestamp update_time = 4
+    [(google.api.field_behavior) = OUTPUT_ONLY];
+
+}
+
+// Request message for LibraryService.CreateShelf.
+message CreateShelfRequest {
+  // The shelf to create.
+  Shelf shelf = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for LibraryService.GetShelf.
+message GetShelfRequest {
+  // The name of the shelf to retrieve.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+}
+
+// Request message for LibraryService.ListShelves.
+message ListShelvesRequest {
+  // Requested page size. Server may return fewer shelves than requested.
+  // If unspecified, server will pick an appropriate default.
+  int32 page_size = 1;
+
+  // A token identifying a page of results the server should return.
+  // Typically, this is the value of
+  // [ListShelvesResponse.next_page_token][google.example.library.v1.ListShelvesResponse.next_page_token]
+  // returned from the previous call to `ListShelves` method.
+  string page_token = 2;
+}
+
+// Response message for LibraryService.ListShelves.
+message ListShelvesResponse {
+  // The list of shelves.
+  repeated Shelf shelves = 1;
+
+  // A token to retrieve next page of results.
+  // Pass this value in the
+  // [ListShelvesRequest.page_token][google.example.library.v1.ListShelvesRequest.page_token]
+  // field in the subsequent call to `ListShelves` method to retrieve the next
+  // page of results.
+  string next_page_token = 2;
+}
+
+// Request message for LibraryService.DeleteShelf.
+message DeleteShelfRequest {
+  // The name of the shelf to delete.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+}
+
+// Describes the shelf being removed (other_shelf_name) and updated
+// (name) in this merge.
+message MergeShelvesRequest {
+  // The name of the shelf we're adding books to.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+
+  // The name of the shelf we're removing books from and deleting.
+  string other_shelf_name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+}
+
+// Request message for LibraryService.CreateBook.
+message CreateBookRequest {
+  // The name of the shelf in which the book is created.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+
+  // The book to create.
+  Book book = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for LibraryService.GetBook.
+message GetBookRequest {
+  // The name of the book to retrieve.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Book"
+  ];
+}
+
+// Request message for LibraryService.ListBooks.
+message ListBooksRequest {
+  // The name of the shelf whose books we'd like to list.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+
+  // Requested page size. Server may return fewer books than requested.
+  // If unspecified, server will pick an appropriate default.
+  int32 page_size = 2;
+
+  // A token identifying a page of results the server should return.
+  // Typically, this is the value of
+  // [ListBooksResponse.next_page_token][google.example.library.v1.ListBooksResponse.next_page_token].
+  // returned from the previous call to `ListBooks` method.
+  string page_token = 3;
+}
+
+// Response message for LibraryService.ListBooks.
+message ListBooksResponse {
+  // The list of books.
+  repeated Book books = 1;
+
+  // A token to retrieve next page of results.
+  // Pass this value in the
+  // [ListBooksRequest.page_token][google.example.library.v1.ListBooksRequest.page_token]
+  // field in the subsequent call to `ListBooks` method to retrieve the next
+  // page of results.
+  string next_page_token = 2;
+}
+
+// Request message for LibraryService.UpdateBook.
+message UpdateBookRequest {
+  // The name of the book to update.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The book to update with. The name must match or be empty.
+  Book book = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for LibraryService.DeleteBook.
+message DeleteBookRequest {
+  // The name of the book to delete.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Book"
+  ];
+}
+
+// Describes what book to move (name) and what shelf we're moving it
+// to (other_shelf_name).
+message MoveBookRequest {
+  // The name of the book to move.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Book"
+  ];
+
+  // The name of the destination shelf.
+  string other_shelf_name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "Shelf"
+  ];
+}

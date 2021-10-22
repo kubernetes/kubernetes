@@ -1,0 +1,75 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  build:
+    strategy:
+      matrix:
+        go-versions: [1.13.x]
+        platform: [windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          go build ./...
+      - name: Run Windows Unit Tests
+        run: |
+          $env:GH_ACTION="TRUE"
+          go test -v -race ./mount/...
+  test:
+    strategy:
+      matrix:
+        go-versions: [1.12.x, 1.13.x, 1.14.x]
+        platform: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Test
+      run: |
+        make test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Lint
+        run: |
+          docker run --rm -v `pwd`:/go/src/k8s.io/klog -w /go/src/k8s.io/klog \
+            golangci/golangci-lint:v1.23.8 golangci-lint run --disable-all -v \
+            -E govet -E misspell -E gofmt -E ineffassign -E golint
+  apidiff:
+    runs-on: ubuntu-latest
+    if: github.base_ref
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.13.x
+      - name: Add GOBIN to PATH
+        run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: Install dependencies
+        run: go get golang.org/x/exp/cmd/apidiff
+      - name: Checkout old code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.base_ref }}
+          path: "old"
+      - name: Checkout new code
+        uses: actions/checkout@v2
+        with:
+          path: "new"
+      - name: APIDiff
+        run: ./hack/verify-apidiff.sh -d ../old
+        working-directory: "new"

@@ -1,0 +1,301 @@
+#data
+<html><ruby>a<rb>b<rb></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|       <rb>
+
+#data
+<html><ruby>a<rb>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rb>b<rtc></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|       <rtc>
+
+#data
+<html><ruby>a<rb>b<rp></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|       <rp>
+
+#data
+<html><ruby>a<rb>b<span></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,31): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|         <span>
+
+#data
+<html><ruby>a<rt>b<rb></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|       <rb>
+
+#data
+<html><ruby>a<rt>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rt>b<rtc></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|       <rtc>
+
+#data
+<html><ruby>a<rt>b<rp></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|       <rp>
+
+#data
+<html><ruby>a<rt>b<span></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,31): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|         <span>
+
+#data
+<html><ruby>a<rtc>b<rb></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|       <rb>
+
+#data
+<html><ruby>a<rtc>b<rt>c<rt>d</ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|         <rt>
+|           "c"
+|         <rt>
+|           "d"
+
+#data
+<html><ruby>a<rtc>b<rtc></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|       <rtc>
+
+#data
+<html><ruby>a<rtc>b<rp></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|         <rp>
+
+#data
+<html><ruby>a<rtc>b<span></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|         <span>
+
+#data
+<html><ruby>a<rp>b<rb></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|       <rb>
+
+#data
+<html><ruby>a<rp>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rp>b<rtc></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|       <rtc>
+
+#data
+<html><ruby>a<rp>b<rp></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|       <rp>
+
+#data
+<html><ruby>a<rp>b<span></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,31): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|         <span>
+
+#data
+<html><ruby><rtc><ruby>a<rb>b<rt></ruby></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <rtc>
+|         <ruby>
+|           "a"
+|           <rb>
+|             "b"
+|           <rt>

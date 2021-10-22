@@ -1,0 +1,98 @@
+// Copyright 2019 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package grpc.go.profiling.v1alpha;
+
+// This package defines the proto messages and RPC services exposed by gRPC for
+// profiling management. A reference client implementation to interact with
+// this service is provided as a command-line application. This service can be
+// used to toggle profiling on and off and retrieve stats from a gRPC
+// application.
+option go_package = "google.golang.org/grpc/profiling/proto";
+
+// EnableRequest defines the fields in a /Profiling/Enable method request to
+// toggle profiling on and off within a gRPC program.
+message EnableRequest {
+  // Setting this to true will enable profiling. Setting this to false will
+  // disable profiling.
+  bool enabled = 1;
+}
+
+// EnableResponse defines the fields in a /Profiling/Enable method response.
+message EnableResponse {
+}
+
+// GetStreamStatsRequest defines the fields in a /Profiling/GetStreamStats
+// method request to retrieve stream-level stats in a gRPC client/server.
+message GetStreamStatsRequest {
+}
+
+// GetStreamStatsResponse defines the fields in a /Profiling/GetStreamStats
+// method response.
+message GetStreamStatsResponse {
+	repeated Stat stream_stats = 1;
+}
+
+// A Timer measures the start and end of execution of a component within
+// gRPC that's being profiled. It includes a tag and some additional metadata
+// to identify itself.
+message Timer {
+	// tags is a comma-separated list of strings used to tag a timer.
+  string tags = 1;
+
+  // begin_sec and begin_nsec are the start epoch second and nanosecond,
+  // respectively, of the component profiled by this timer in UTC. begin_nsec
+  // must be a non-negative integer.
+  int64 begin_sec = 2;
+  int32 begin_nsec = 3;
+
+  // end_sec and end_nsec are the end epoch second and nanosecond,
+  // respectively, of the component profiled by this timer in UTC. end_nsec
+  // must be a non-negative integer.
+  int64 end_sec = 4;
+  int32 end_nsec = 5;
+
+  // go_id is the goroutine ID of the component being profiled.
+  int64 go_id = 6;
+}
+
+// A Stat is a collection of Timers along with some additional
+// metadata to tag and identify itself.
+message Stat {
+  // tags is a comma-separated list of strings used to categorize a stat.
+  string tags = 1;
+
+  // timers is an array of Timers, each representing a different
+  // (but possibly overlapping) component within this stat.
+  repeated Timer timers = 2;
+
+	// metadata is an array of bytes used to uniquely identify a stat with an
+	// undefined encoding format. For example, the Stats returned by the
+	// /Profiling/GetStreamStats service use the metadata field to encode the
+	// connection ID and the stream ID of each query.
+  bytes metadata = 3;
+}
+
+// The Profiling service exposes functions to remotely manage the gRPC
+// profiling behaviour in a program.
+service Profiling {
+  // Enable allows users to toggle profiling on and off remotely.
+  rpc Enable (EnableRequest) returns (EnableResponse);
+
+  // GetStreamStats is used to retrieve an array of stream-level stats from a
+  // gRPC client/server.
+  rpc GetStreamStats (GetStreamStatsRequest) returns (GetStreamStatsResponse);
+}

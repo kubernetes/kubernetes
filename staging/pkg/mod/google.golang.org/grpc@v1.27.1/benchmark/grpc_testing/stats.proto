@@ -1,0 +1,55 @@
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package grpc.testing;
+
+message ServerStats {
+  // wall clock time change in seconds since last reset
+  double time_elapsed = 1;
+
+  // change in user time (in seconds) used by the server since last reset
+  double time_user = 2;
+
+  // change in server time (in seconds) used by the server process and all
+  // threads since last reset
+  double time_system = 3;
+}
+
+// Histogram params based on grpc/support/histogram.c
+message HistogramParams {
+  double resolution = 1;    // first bucket is [0, 1 + resolution)
+  double max_possible = 2;  // use enough buckets to allow this value
+}
+
+// Histogram data based on grpc/support/histogram.c
+message HistogramData {
+  repeated uint32 bucket = 1;
+  double min_seen = 2;
+  double max_seen = 3;
+  double sum = 4;
+  double sum_of_squares = 5;
+  double count = 6;
+}
+
+message ClientStats {
+  // Latency histogram. Data points are in nanoseconds.
+  HistogramData latencies = 1;
+
+  // See ServerStats for details.
+  double time_elapsed = 2;
+  double time_user = 3;
+  double time_system = 4;
+}

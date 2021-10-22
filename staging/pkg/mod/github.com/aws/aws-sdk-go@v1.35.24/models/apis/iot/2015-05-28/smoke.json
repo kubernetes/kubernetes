@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListPolicies",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeThing",
+            "input": {
+                "thingName": "fake-thing"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

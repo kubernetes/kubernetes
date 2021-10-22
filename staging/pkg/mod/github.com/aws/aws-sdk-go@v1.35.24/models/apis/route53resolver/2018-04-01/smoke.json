@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListResolverEndpoints",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "GetResolverRule",
+            "input": {
+                "ResolverRuleId": "fake-id"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

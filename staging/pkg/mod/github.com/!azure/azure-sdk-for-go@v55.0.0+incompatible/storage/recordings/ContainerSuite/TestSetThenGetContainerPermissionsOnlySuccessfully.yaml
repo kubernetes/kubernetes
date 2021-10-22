@@ -1,0 +1,145 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:9R8lT7v/DHQFciEWWLY+W9IPuU/8jxMNXyLFU5bsjyM=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/65containersuitetestsetthengetco?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Etag:
+      - '"0x8D9001BBC01F6B4"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - b696a4b3-e01e-005a-5904-32f90a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: <SignedIdentifiers></SignedIdentifiers>
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:OwtypuyunZyF6UYTwvqEX43iTq7YQ0NVJ6iqL4uHz/I=
+      Content-Length:
+      - "39"
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-blob-public-access:
+      - blob
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/65containersuitetestsetthengetco?comp=acl&restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Etag:
+      - '"0x8D9001BBC0F4457"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - b696a4c5-e01e-005a-6704-32f90a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:SYtG/6e+OGnErPGJvJM4nYZdKOMqgRUC5ZB72EER2vI=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/65containersuitetestsetthengetco?comp=acl&restype=container
+    method: GET
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x73\x20\x2F\x3E"
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Etag:
+      - '"0x8D9001BBC0F4457"'
+      Last-Modified:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Public-Access:
+      - blob
+      X-Ms-Request-Id:
+      - b696a503-e01e-005a-1b04-32f90a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:Vpxr/j74pTeaBH2FBPfrQFrmknkSh4kbQYo/YZclHdE=
+      User-Agent:
+      - Go/go1.15.1 (amd64-windows) azure-storage-go/v52.6.0 api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/65containersuitetestsetthengetco?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 15 Apr 2021 14:35:36 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - b696a516-e01e-005a-2b04-32f90a000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

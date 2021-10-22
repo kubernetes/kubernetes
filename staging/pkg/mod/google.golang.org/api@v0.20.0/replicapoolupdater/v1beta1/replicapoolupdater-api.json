@@ -1,0 +1,932 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/cloud-platform.read-only": {
+          "description": "View your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/replicapool": {
+          "description": "View and manage replica pools"
+        },
+        "https://www.googleapis.com/auth/replicapool.readonly": {
+          "description": "View replica pools"
+        }
+      }
+    }
+  },
+  "basePath": "/replicapoolupdater/v1beta1/projects/",
+  "baseUrl": "https://www.googleapis.com/replicapoolupdater/v1beta1/projects/",
+  "batchPath": "batch/replicapoolupdater/v1beta1",
+  "description": "[Deprecated. Please use compute.instanceGroupManagers.update method. replicapoolupdater API will be disabled after December 30th, 2016] Updates groups of Compute Engine instances.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/compute/docs/instance-groups/manager/#applying_rolling_updates_using_the_updater_service",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/Wtlg-4mzMjHnNfG0K_5p3rKq3yI\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "replicapoolupdater:v1beta1",
+  "kind": "discovery#restDescription",
+  "labels": [
+    "limited_availability"
+  ],
+  "name": "replicapoolupdater",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "rollingUpdates": {
+      "methods": {
+        "cancel": {
+          "description": "Cancels an update. The update must be PAUSED before it can be cancelled. This has no effect if the update is already CANCELLED.",
+          "httpMethod": "POST",
+          "id": "replicapoolupdater.rollingUpdates.cancel",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}/cancel",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "get": {
+          "description": "Returns information about an update.",
+          "httpMethod": "GET",
+          "id": "replicapoolupdater.rollingUpdates.get",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}",
+          "response": {
+            "$ref": "RollingUpdate"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "insert": {
+          "description": "Inserts and starts a new update.",
+          "httpMethod": "POST",
+          "id": "replicapoolupdater.rollingUpdates.insert",
+          "parameterOrder": [
+            "project",
+            "zone"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates",
+          "request": {
+            "$ref": "RollingUpdate"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "list": {
+          "description": "Lists recent updates for a given managed instance group, in reverse chronological order and paginated format.",
+          "httpMethod": "GET",
+          "id": "replicapoolupdater.rollingUpdates.list",
+          "parameterOrder": [
+            "project",
+            "zone"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "Optional. Filter expression for filtering listed resources.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+              "format": "uint32",
+              "location": "query",
+              "maximum": "500",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates",
+          "response": {
+            "$ref": "RollingUpdateList"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "listInstanceUpdates": {
+          "description": "Lists the current status for each instance within a given update.",
+          "httpMethod": "GET",
+          "id": "replicapoolupdater.rollingUpdates.listInstanceUpdates",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "Optional. Filter expression for filtering listed resources.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+              "format": "uint32",
+              "location": "query",
+              "maximum": "500",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}/instanceUpdates",
+          "response": {
+            "$ref": "InstanceUpdateList"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only",
+            "https://www.googleapis.com/auth/replicapool",
+            "https://www.googleapis.com/auth/replicapool.readonly"
+          ]
+        },
+        "pause": {
+          "description": "Pauses the update in state from ROLLING_FORWARD or ROLLING_BACK. Has no effect if invoked when the state of the update is PAUSED.",
+          "httpMethod": "POST",
+          "id": "replicapoolupdater.rollingUpdates.pause",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}/pause",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "resume": {
+          "description": "Continues an update in PAUSED state. Has no effect if invoked when the state of the update is ROLLED_OUT.",
+          "httpMethod": "POST",
+          "id": "replicapoolupdater.rollingUpdates.resume",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}/resume",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "rollback": {
+          "description": "Rolls back the update in state from ROLLING_FORWARD or PAUSED. Has no effect if invoked when the state of the update is ROLLED_BACK.",
+          "httpMethod": "POST",
+          "id": "replicapoolupdater.rollingUpdates.rollback",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "rollingUpdate"
+          ],
+          "parameters": {
+            "project": {
+              "description": "The Google Developers Console project name.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "rollingUpdate": {
+              "description": "The name of the update.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone in which the update's target resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/rollingUpdates/{rollingUpdate}/rollback",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        }
+      }
+    },
+    "zoneOperations": {
+      "methods": {
+        "get": {
+          "description": "Retrieves the specified zone-specific operation resource.",
+          "httpMethod": "GET",
+          "id": "replicapoolupdater.zoneOperations.get",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "operation"
+          ],
+          "parameters": {
+            "operation": {
+              "description": "Name of the operation resource to return.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Name of the project scoping this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "Name of the zone scoping this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/operations/{operation}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        },
+        "list": {
+          "description": "Retrieves the list of Operation resources contained within the specified zone.",
+          "httpMethod": "GET",
+          "id": "replicapoolupdater.zoneOperations.list",
+          "parameterOrder": [
+            "project",
+            "zone"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "Optional. Filter expression for filtering listed resources.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+              "format": "uint32",
+              "location": "query",
+              "maximum": "500",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "Name of the project scoping this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "zone": {
+              "description": "Name of the zone scoping this request.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/zones/{zone}/operations",
+          "response": {
+            "$ref": "OperationList"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/replicapool"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20161003",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "InstanceUpdate": {
+      "description": "Update of a single instance.",
+      "id": "InstanceUpdate",
+      "properties": {
+        "error": {
+          "description": "Errors that occurred during the instance update.",
+          "properties": {
+            "errors": {
+              "description": "[Output Only] The array of errors encountered while processing this operation.",
+              "items": {
+                "properties": {
+                  "code": {
+                    "description": "[Output Only] The error type identifier for this error.",
+                    "type": "string"
+                  },
+                  "location": {
+                    "description": "[Output Only] Indicates the field in the request that caused the error. This property is optional.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "[Output Only] An optional, human-readable error message.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "instance": {
+          "description": "Fully-qualified URL of the instance being updated.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the instance update. Possible values are:  \n- \"PENDING\": The instance update is pending execution. \n- \"ROLLING_FORWARD\": The instance update is going forward. \n- \"ROLLING_BACK\": The instance update is being rolled back. \n- \"PAUSED\": The instance update is temporarily paused (inactive). \n- \"ROLLED_OUT\": The instance update is finished, the instance is running the new template. \n- \"ROLLED_BACK\": The instance update is finished, the instance has been reverted to the previous template. \n- \"CANCELLED\": The instance update is paused and no longer can be resumed, undefined in which template the instance is running.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "InstanceUpdateList": {
+      "description": "Response returned by ListInstanceUpdates method.",
+      "id": "InstanceUpdateList",
+      "properties": {
+        "items": {
+          "description": "Collection of requested instance updates.",
+          "items": {
+            "$ref": "InstanceUpdate"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "replicapoolupdater#instanceUpdateList",
+          "description": "[Output Only] Type of the resource.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "A token used to continue a truncated list request.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] The fully qualified URL for the resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "An operation resource, used to manage asynchronous API requests.",
+      "id": "Operation",
+      "properties": {
+        "clientOperationId": {
+          "type": "string"
+        },
+        "creationTimestamp": {
+          "description": "[Output Only] Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "endTime": {
+          "type": "string"
+        },
+        "error": {
+          "description": "[Output Only] If errors occurred during processing of this operation, this field will be populated.",
+          "properties": {
+            "errors": {
+              "description": "[Output Only] The array of errors encountered while processing this operation.",
+              "items": {
+                "properties": {
+                  "code": {
+                    "description": "[Output Only] The error type identifier for this error.",
+                    "type": "string"
+                  },
+                  "location": {
+                    "description": "[Output Only] Indicates the field in the request that caused the error. This property is optional.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "[Output Only] An optional, human-readable error message.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "httpErrorMessage": {
+          "type": "string"
+        },
+        "httpErrorStatusCode": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "id": {
+          "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "insertTime": {
+          "description": "[Output Only] The time that this operation was requested. This is in RFC 3339 format.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "replicapoolupdater#operation",
+          "description": "[Output Only] Type of the resource. Always replicapoolupdater#operation for Operation resources.",
+          "type": "string"
+        },
+        "name": {
+          "description": "[Output Only] Name of the resource.",
+          "type": "string"
+        },
+        "operationType": {
+          "type": "string"
+        },
+        "progress": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "region": {
+          "description": "[Output Only] URL of the region where the operation resides.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] The fully qualified URL for the resource.",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "[Output Only] The time that this operation was started by the server. This is in RFC 3339 format.",
+          "type": "string"
+        },
+        "status": {
+          "description": "[Output Only] Status of the operation. Can be one of the following: \"PENDING\", \"RUNNING\", or \"DONE\".",
+          "type": "string"
+        },
+        "statusMessage": {
+          "description": "[Output Only] An optional textual description of the current status of the operation.",
+          "type": "string"
+        },
+        "targetId": {
+          "description": "[Output Only] Unique target id which identifies a particular incarnation of the target.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "targetLink": {
+          "description": "[Output Only] URL of the resource the operation is mutating.",
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "properties": {
+              "code": {
+                "description": "[Output only] The warning type identifier for this warning.",
+                "type": "string"
+              },
+              "data": {
+                "description": "[Output only] Metadata for this warning in key:value format.",
+                "items": {
+                  "properties": {
+                    "key": {
+                      "description": "[Output Only] Metadata key for this warning.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "[Output Only] Metadata value for this warning.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "message": {
+                "description": "[Output only] Optional human-readable details for this warning.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "zone": {
+          "description": "[Output Only] URL of the zone where the operation resides.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "OperationList": {
+      "description": "Contains a list of Operation resources.",
+      "id": "OperationList",
+      "properties": {
+        "id": {
+          "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+          "type": "string"
+        },
+        "items": {
+          "description": "[Output Only] The Operation resources.",
+          "items": {
+            "$ref": "Operation"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "replicapoolupdater#operationList",
+          "description": "[Output Only] Type of resource. Always replicapoolupdater#operationList for OperationList resources.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "[Output Only] A token used to continue a truncate.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] The fully qualified URL for the resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RollingUpdate": {
+      "description": "The following represents a resource describing a single update (rollout) of a group of instances to the given template.",
+      "id": "RollingUpdate",
+      "properties": {
+        "actionType": {
+          "description": "Specifies the action to take for each instance within the instance group. This can be RECREATE which will recreate each instance and is only available for managed instance groups. It can also be REBOOT which performs a soft reboot for each instance and is only available for regular (non-managed) instance groups.",
+          "type": "string"
+        },
+        "creationTimestamp": {
+          "description": "[Output Only] Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "description": {
+          "description": "An optional textual description of the resource; provided by the client when the resource is created.",
+          "type": "string"
+        },
+        "error": {
+          "description": "[Output Only] Errors that occurred during the rolling update.",
+          "properties": {
+            "errors": {
+              "description": "[Output Only] The array of errors encountered while processing this operation.",
+              "items": {
+                "properties": {
+                  "code": {
+                    "description": "[Output Only] The error type identifier for this error.",
+                    "type": "string"
+                  },
+                  "location": {
+                    "description": "[Output Only] Indicates the field in the request that caused the error. This property is optional.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "[Output Only] An optional, human-readable error message.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+          "type": "string"
+        },
+        "instanceGroup": {
+          "description": "Fully-qualified URL of an instance group being updated. Exactly one of instanceGroupManager and instanceGroup must be set.",
+          "type": "string"
+        },
+        "instanceGroupManager": {
+          "description": "Fully-qualified URL of an instance group manager being updated. Exactly one of instanceGroupManager and instanceGroup must be set.",
+          "type": "string"
+        },
+        "instanceTemplate": {
+          "description": "Fully-qualified URL of an instance template to apply.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "replicapoolupdater#rollingUpdate",
+          "description": "[Output Only] Type of the resource.",
+          "type": "string"
+        },
+        "oldInstanceTemplate": {
+          "description": "Fully-qualified URL of the instance template encountered while starting the update.",
+          "type": "string"
+        },
+        "policy": {
+          "description": "Parameters of the update process.",
+          "properties": {
+            "autoPauseAfterInstances": {
+              "description": "Number of instances to update before the updater pauses the rolling update.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "instanceStartupTimeoutSec": {
+              "description": "The maximum amount of time that the updater waits for a HEALTHY state after all of the update steps are complete. If the HEALTHY state is not received before the deadline, the instance update is considered a failure.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "maxNumConcurrentInstances": {
+              "description": "The maximum number of instances that can be updated simultaneously. An instance update is considered complete only after the instance is restarted and initialized.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "maxNumFailedInstances": {
+              "description": "The maximum number of instance updates that can fail before the group update is considered a failure. An instance update is considered failed if any of its update actions (e.g. Stop call on Instance resource in Rolling Reboot) failed with permanent failure, or if the instance is in an UNHEALTHY state after it finishes all of the update actions.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "minInstanceUpdateTimeSec": {
+              "description": "The minimum amount of time that the updater spends to update each instance. Update time is the time it takes to complete all update actions (e.g. Stop call on Instance resource in Rolling Reboot), reboot, and initialize. If the instance update finishes early, the updater pauses for the remainder of the time before it starts the next instance update.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "progress": {
+          "description": "[Output Only] An optional progress indicator that ranges from 0 to 100. There is no requirement that this be linear or support any granularity of operations. This should not be used to guess at when the update will be complete. This number should be monotonically increasing as the update progresses.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "selfLink": {
+          "description": "[Output Only] The fully qualified URL for the resource.",
+          "type": "string"
+        },
+        "status": {
+          "description": "[Output Only] Status of the update. Possible values are:  \n- \"ROLLING_FORWARD\": The update is going forward. \n- \"ROLLING_BACK\": The update is being rolled back. \n- \"PAUSED\": The update is temporarily paused (inactive). \n- \"ROLLED_OUT\": The update is finished, all instances have been updated successfully. \n- \"ROLLED_BACK\": The update is finished, all instances have been reverted to the previous template. \n- \"CANCELLED\": The update is paused and no longer can be resumed, undefined how many instances are running in which template.",
+          "type": "string"
+        },
+        "statusMessage": {
+          "description": "[Output Only] An optional textual description of the current status of the update.",
+          "type": "string"
+        },
+        "user": {
+          "description": "[Output Only] User who requested the update, for example: user@example.com.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RollingUpdateList": {
+      "description": "Response returned by List method.",
+      "id": "RollingUpdateList",
+      "properties": {
+        "items": {
+          "description": "Collection of requested updates.",
+          "items": {
+            "$ref": "RollingUpdate"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "replicapoolupdater#rollingUpdateList",
+          "description": "[Output Only] Type of the resource.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "A token used to continue a truncated list request.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] The fully qualified URL for the resource.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "replicapoolupdater/v1beta1/projects/",
+  "title": "Google Compute Engine Instance Group Updater API",
+  "version": "v1beta1"
+}

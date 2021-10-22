@@ -1,0 +1,22 @@
+parameters:
+  - name: DaysValid
+    default: 365
+    type: number
+
+steps:
+  - task: PowerShell@2
+    displayName: Retain pipeline run
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      pwsh: true
+      filePath: $(Build.SourcesDirectory)/eng/common/scripts/Add-RetentionLease.ps1
+      arguments: >
+        -Organization azure-sdk
+        -Project $(System.TeamProject)
+        -DefinitionId $(System.DefinitionId)
+        -RunId $(Build.BuildId)
+        -OwnerId Pipeline
+        -DaysValid ${{parameters.DaysValid}}
+        -AccessToken $env:SYSTEM_ACCESSTOKEN
+        -Debug

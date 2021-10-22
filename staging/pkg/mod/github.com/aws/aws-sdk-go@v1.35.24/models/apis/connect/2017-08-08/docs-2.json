@@ -1,0 +1,1567 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Connect is a cloud-based contact center solution that makes it easy to set up and manage a customer contact center and provide reliable customer engagement at any scale.</p> <p>Amazon Connect provides rich metrics and real-time reporting that allow you to optimize contact routing. You can also resolve customer issues more efficiently by putting customers in touch with the right agents.</p> <p>There are limits to the number of Amazon Connect resources that you can create and limits to the number of requests that you can make per second. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html\">Amazon Connect Service Quotas</a> in the <i>Amazon Connect Administrator Guide</i>.</p> <p>To connect programmatically to an AWS service, you use an endpoint. For a list of Amazon Connect endpoints, see <a href=\"https://docs.aws.amazon.com/general/latest/gr/connect_region.html\">Amazon Connect Endpoints</a>.</p> <note> <p>Working with contact flows? Check out the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p> </note>",
+  "operations": {
+    "AssociateRoutingProfileQueues": "<p>Associates a set of queues with a routing profile.</p>",
+    "CreateContactFlow": "<p>Creates a contact flow for the specified Amazon Connect instance.</p> <p>You can also create and update contact flows using the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p>",
+    "CreateRoutingProfile": "<p>Creates a new routing profile.</p>",
+    "CreateUser": "<p>Creates a user account for the specified Amazon Connect instance.</p> <p>For information about how to create user accounts using the Amazon Connect console, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/user-management.html\">Add Users</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "DeleteUser": "<p>Deletes a user account from the specified Amazon Connect instance.</p> <p>For information about what happens to a user's data when their account is deleted, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/delete-users.html\">Delete Users from Your Amazon Connect Instance</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "DescribeContactFlow": "<p>Describes the specified contact flow.</p> <p>You can also create and update contact flows using the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p>",
+    "DescribeRoutingProfile": "<p>Describes the specified routing profile.</p>",
+    "DescribeUser": "<p>Describes the specified user account. You can find the instance ID in the console (it’s the final part of the ARN). The console does not display the user IDs. Instead, list the users and note the IDs provided in the output.</p>",
+    "DescribeUserHierarchyGroup": "<p>Describes the specified hierarchy group.</p>",
+    "DescribeUserHierarchyStructure": "<p>Describes the hierarchy structure of the specified Amazon Connect instance.</p>",
+    "DisassociateRoutingProfileQueues": "<p>Disassociates a set of queues from a routing profile.</p>",
+    "GetContactAttributes": "<p>Retrieves the contact attributes for the specified contact.</p>",
+    "GetCurrentMetricData": "<p>Gets the real-time metric data from the specified Amazon Connect instance.</p> <p>For a description of each metric, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html\">Real-time Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "GetFederationToken": "<p>Retrieves a token for federation.</p>",
+    "GetMetricData": "<p>Gets historical metric data from the specified Amazon Connect instance.</p> <p>For a description of each historical metric, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/historical-metrics-definitions.html\">Historical Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListContactFlows": "<p>Provides information about the contact flows for the specified Amazon Connect instance.</p> <p>You can also create and update contact flows using the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p> <p>For more information about contact flows, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-contact-flows.html\">Contact Flows</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListHoursOfOperations": "<p>Provides information about the hours of operation for the specified Amazon Connect instance.</p> <p>For more information about hours of operation, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/set-hours-operation.html\">Set the Hours of Operation for a Queue</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListPhoneNumbers": "<p>Provides information about the phone numbers for the specified Amazon Connect instance. </p> <p>For more information about phone numbers, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/contact-center-phone-number.html\">Set Up Phone Numbers for Your Contact Center</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListPrompts": "<p>Provides information about the prompts for the specified Amazon Connect instance.</p>",
+    "ListQueues": "<p>Provides information about the queues for the specified Amazon Connect instance.</p> <p>For more information about queues, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-queues-standard-and-agent.html\">Queues: Standard and Agent</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListRoutingProfileQueues": "<p>List the queues associated with a routing profile.</p>",
+    "ListRoutingProfiles": "<p>Provides summary information about the routing profiles for the specified Amazon Connect instance.</p> <p>For more information about routing profiles, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-routing.html\">Routing Profiles</a> and <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/routing-profiles.html\">Create a Routing Profile</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListSecurityProfiles": "<p>Provides summary information about the security profiles for the specified Amazon Connect instance.</p> <p>For more information about security profiles, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/connect-security-profiles.html\">Security Profiles</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListTagsForResource": "<p>Lists the tags for the specified resource.</p> <p>For sample policies that use tags, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/security_iam_id-based-policy-examples.html\">Amazon Connect Identity-Based Policy Examples</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListUserHierarchyGroups": "<p>Provides summary information about the hierarchy groups for the specified Amazon Connect instance.</p> <p>For more information about agent hierarchies, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/agent-hierarchy.html\">Set Up Agent Hierarchies</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "ListUsers": "<p>Provides summary information about the users for the specified Amazon Connect instance.</p>",
+    "ResumeContactRecording": "<p>When a contact is being recorded, and the recording has been suspended using SuspendContactRecording, this API resumes recording the call.</p> <p>Only voice recordings are supported at this time.</p>",
+    "StartChatContact": "<p>Initiates a contact flow to start a new chat for the customer. Response of this API provides a token required to obtain credentials from the <a href=\"https://docs.aws.amazon.com/connect-participant/latest/APIReference/API_CreateParticipantConnection.html\">CreateParticipantConnection</a> API in the Amazon Connect Participant Service.</p> <p>When a new chat contact is successfully created, clients need to subscribe to the participant’s connection for the created chat within 5 minutes. This is achieved by invoking <a href=\"https://docs.aws.amazon.com/connect-participant/latest/APIReference/API_CreateParticipantConnection.html\">CreateParticipantConnection</a> with WEBSOCKET and CONNECTION_CREDENTIALS. </p> <p>A 429 error occurs in two situations:</p> <ul> <li> <p>API rate limit is exceeded. API TPS throttling returns a <code>TooManyRequests</code> exception from the API Gateway.</p> </li> <li> <p>The <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html\">quota for concurrent active chats</a> is exceeded. Active chat throttling returns a <code>LimitExceededException</code>.</p> </li> </ul> <p>For more information about how chat works, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/chat.html\">Chat</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "StartContactRecording": "<p>This API starts recording the contact when the agent joins the call. StartContactRecording is a one-time action. For example, if you use StopContactRecording to stop recording an ongoing call, you can't use StartContactRecording to restart it. For scenarios where the recording has started and you want to suspend and resume it, such as when collecting sensitive information (for example, a credit card number), use SuspendContactRecording and ResumeContactRecording.</p> <p>You can use this API to override the recording behavior configured in the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/set-recording-behavior.html\">Set recording behavior</a> block.</p> <p>Only voice recordings are supported at this time.</p>",
+    "StartOutboundVoiceContact": "<p>This API places an outbound call to a contact, and then initiates the contact flow. It performs the actions in the contact flow that's specified (in <code>ContactFlowId</code>).</p> <p>Agents are not involved in initiating the outbound API (that is, dialing the contact). If the contact flow places an outbound call to a contact, and then puts the contact in queue, that's when the call is routed to the agent, like any other inbound case.</p> <p>There is a 60 second dialing timeout for this operation. If the call is not connected after 60 seconds, it fails.</p> <note> <p>UK numbers with a 447 prefix are not allowed by default. Before you can dial these UK mobile numbers, you must submit a service quota increase request. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html\">Amazon Connect Service Quotas</a> in the <i>Amazon Connect Administrator Guide</i>. </p> </note>",
+    "StopContact": "<p>Ends the specified contact.</p>",
+    "StopContactRecording": "<p>When a contact is being recorded, this API stops recording the call. StopContactRecording is a one-time action. If you use StopContactRecording to stop recording an ongoing call, you can't use StartContactRecording to restart it. For scenarios where the recording has started and you want to suspend it for sensitive information (for example, to collect a credit card number), and then restart it, use SuspendContactRecording and ResumeContactRecording.</p> <p>Only voice recordings are supported at this time.</p>",
+    "SuspendContactRecording": "<p>When a contact is being recorded, this API suspends recording the call. For example, you might suspend the call recording while collecting sensitive information, such as a credit card number. Then use ResumeContactRecording to restart recording. </p> <p>The period of time that the recording is suspended is filled with silence in the final recording. </p> <p>Only voice recordings are supported at this time.</p>",
+    "TagResource": "<p>Adds the specified tags to the specified resource.</p> <p>The supported resource types are users, routing profiles, and contact flows.</p> <p>For sample policies that use tags, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/security_iam_id-based-policy-examples.html\">Amazon Connect Identity-Based Policy Examples</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+    "UntagResource": "<p>Removes the specified tags from the specified resource.</p>",
+    "UpdateContactAttributes": "<p>Creates or updates the contact attributes associated with the specified contact.</p> <p>You can add or update attributes for both ongoing and completed contacts. For example, you can update the customer's name or the reason the customer called while the call is active, or add notes about steps that the agent took during the call that are displayed to the next agent that takes the call. You can also update attributes for a contact using data from your CRM application and save the data with the contact in Amazon Connect. You could also flag calls for additional analysis, such as legal review or identifying abusive callers.</p> <p>Contact attributes are available in Amazon Connect for 24 months, and are then deleted.</p> <p>This operation is also available in the Amazon Connect Flow language. See <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/contact-actions-updatecontactattributes.html\">UpdateContactAttributes</a>.</p> <p> <b>Important:</b> You cannot use the operation to update attributes for contacts that occurred prior to the release of the API, September 12, 2018. You can update attributes only for contacts that started after the release of the API. If you attempt to update attributes for a contact that occurred prior to the release of the API, a 400 error is returned. This applies also to queued callbacks that were initiated prior to the release of the API but are still active in your instance.</p>",
+    "UpdateContactFlowContent": "<p>Updates the specified contact flow.</p> <p>You can also create and update contact flows using the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p>",
+    "UpdateContactFlowName": "<p>The name of the contact flow.</p>",
+    "UpdateRoutingProfileConcurrency": "<p>Updates the channels that agents can handle in the Contact Control Panel (CCP) for a routing profile.</p>",
+    "UpdateRoutingProfileDefaultOutboundQueue": "<p>Updates the default outbound queue of a routing profile.</p>",
+    "UpdateRoutingProfileName": "<p>Updates the name and description of a routing profile. The request accepts the following data in JSON format. At least <code>Name</code> or <code>Description</code> must be provided.</p>",
+    "UpdateRoutingProfileQueues": "<p>Updates the properties associated with a set of queues for a routing profile.</p>",
+    "UpdateUserHierarchy": "<p>Assigns the specified hierarchy group to the specified user.</p>",
+    "UpdateUserIdentityInfo": "<p>Updates the identity information for the specified user.</p> <important> <p>Someone with the ability to invoke <code>UpdateUserIndentityInfo</code> can change the login credentials of other users by changing their email address. This poses a security risk to your organization. They can change the email address of a user to the attacker's email address, and then reset the password through email. We strongly recommend limiting who has the ability to invoke <code>UpdateUserIndentityInfo</code>. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/security-profile-best-practices.html\">Best Practices for Security Profiles</a> in the <i>Amazon Connect Administrator Guide</i>.</p> </important>",
+    "UpdateUserPhoneConfig": "<p>Updates the phone configuration settings for the specified user.</p>",
+    "UpdateUserRoutingProfile": "<p>Assigns the specified routing profile to the specified user.</p>",
+    "UpdateUserSecurityProfiles": "<p>Assigns the specified security profiles to the specified user.</p>"
+  },
+  "shapes": {
+    "ARN": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Arn": "<p>The Amazon Resource Name (ARN) of the contact flow.</p>",
+        "ContactFlowSummary$Arn": "<p>The Amazon Resource Name (ARN) of the contact flow.</p>",
+        "CreateContactFlowResponse$ContactFlowArn": "<p>The Amazon Resource Name (ARN) of the contact flow.</p>",
+        "CreateRoutingProfileResponse$RoutingProfileArn": "<p>The Amazon Resource Name (ARN) of the routing profile.</p>",
+        "CreateUserResponse$UserArn": "<p>The Amazon Resource Name (ARN) of the user account.</p>",
+        "HierarchyGroup$Arn": "<p>The Amazon Resource Name (ARN) of the hierarchy group.</p>",
+        "HierarchyGroupSummary$Arn": "<p>The Amazon Resource Name (ARN) of the hierarchy group.</p>",
+        "HierarchyLevel$Arn": "<p>The Amazon Resource Name (ARN) of the hierarchy level.</p>",
+        "HoursOfOperationSummary$Arn": "<p>The Amazon Resource Name (ARN) of the hours of operation.</p>",
+        "ListTagsForResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "PhoneNumberSummary$Arn": "<p>The Amazon Resource Name (ARN) of the phone number.</p>",
+        "PromptSummary$Arn": "<p>The Amazon Resource Name (ARN) of the prompt.</p>",
+        "QueueReference$Arn": "<p>The Amazon Resource Name (ARN) of the queue.</p>",
+        "QueueSummary$Arn": "<p>The Amazon Resource Name (ARN) of the queue.</p>",
+        "RoutingProfile$RoutingProfileArn": "<p>The Amazon Resource Name (ARN) of the routing profile.</p>",
+        "RoutingProfileQueueConfigSummary$QueueArn": "<p>The Amazon Resource Name (ARN) of the queue.</p>",
+        "RoutingProfileSummary$Arn": "<p>The Amazon Resource Name (ARN) of the routing profile.</p>",
+        "SecurityProfileSummary$Arn": "<p>The Amazon Resource Name (ARN) of the security profile.</p>",
+        "TagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the resource.</p>",
+        "User$Arn": "<p>The Amazon Resource Name (ARN) of the user account.</p>",
+        "UserSummary$Arn": "<p>The Amazon Resource Name (ARN) of the user account.</p>"
+      }
+    },
+    "AfterContactWorkTimeLimit": {
+      "base": null,
+      "refs": {
+        "UserPhoneConfig$AfterContactWorkTimeLimit": "<p>The After Call Work (ACW) timeout setting, in seconds.</p>"
+      }
+    },
+    "AgentFirstName": {
+      "base": null,
+      "refs": {
+        "UserIdentityInfo$FirstName": "<p>The first name. This is required if you are using Amazon Connect or SAML for identity management.</p>"
+      }
+    },
+    "AgentLastName": {
+      "base": null,
+      "refs": {
+        "UserIdentityInfo$LastName": "<p>The last name. This is required if you are using Amazon Connect or SAML for identity management.</p>"
+      }
+    },
+    "AgentUsername": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$Username": "<p>The user name for the account. For instances not using SAML for identity management, the user name can include up to 20 characters. If you are using SAML for identity management, the user name can include up to 64 characters from [a-zA-Z0-9_-.\\@]+.</p>",
+        "User$Username": "<p>The user name assigned to the user account.</p>",
+        "UserSummary$Username": "<p>The Amazon Connect user name of the user account.</p>"
+      }
+    },
+    "AssociateRoutingProfileQueuesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "Attributes$key": null
+      }
+    },
+    "AttributeValue": {
+      "base": null,
+      "refs": {
+        "Attributes$value": null
+      }
+    },
+    "Attributes": {
+      "base": null,
+      "refs": {
+        "GetContactAttributesResponse$Attributes": "<p>Information about the attributes.</p>",
+        "StartChatContactRequest$Attributes": "<p>A custom key-value pair using an attribute map. The attributes are standard Amazon Connect attributes, and can be accessed in contact flows just like any other contact attributes. </p> <p>There can be up to 32,768 UTF-8 bytes across all key-value pairs per contact. Attribute keys can include only alphanumeric, dash, and underscore characters.</p>",
+        "StartOutboundVoiceContactRequest$Attributes": "<p>A custom key-value pair using an attribute map. The attributes are standard Amazon Connect attributes, and can be accessed in contact flows just like any other contact attributes.</p> <p>There can be up to 32,768 UTF-8 bytes across all key-value pairs per contact. Attribute keys can include only alphanumeric, dash, and underscore characters.</p>",
+        "UpdateContactAttributesRequest$Attributes": "<p>The Amazon Connect attributes. These attributes can be accessed in contact flows just like any other contact attributes.</p> <p>You can have up to 32,768 UTF-8 bytes across all attributes for a contact. Attribute keys can include only alphanumeric, dash, and underscore characters.</p>"
+      }
+    },
+    "AutoAccept": {
+      "base": null,
+      "refs": {
+        "UserPhoneConfig$AutoAccept": "<p>The Auto accept setting.</p>"
+      }
+    },
+    "Channel": {
+      "base": null,
+      "refs": {
+        "Channels$member": null,
+        "Dimensions$Channel": "<p>The channel used for grouping and filters.</p>",
+        "MediaConcurrency$Channel": "<p>The channels that agents can handle in the Contact Control Panel (CCP).</p>",
+        "RoutingProfileQueueConfigSummary$Channel": "<p>The channels this queue supports.</p>",
+        "RoutingProfileQueueReference$Channel": "<p>The channels agents can handle in the Contact Control Panel (CCP) for this routing profile.</p>"
+      }
+    },
+    "Channels": {
+      "base": null,
+      "refs": {
+        "Filters$Channels": "<p>The channel to use to filter the metrics.</p>"
+      }
+    },
+    "ChatContent": {
+      "base": null,
+      "refs": {
+        "ChatMessage$Content": "<p>The content of the chat message.</p>"
+      }
+    },
+    "ChatContentType": {
+      "base": null,
+      "refs": {
+        "ChatMessage$ContentType": "<p>The type of the content. Supported types are text/plain.</p>"
+      }
+    },
+    "ChatMessage": {
+      "base": "<p>A chat message.</p>",
+      "refs": {
+        "StartChatContactRequest$InitialMessage": "<p>The initial message to be sent to the newly created chat.</p>"
+      }
+    },
+    "ClientToken": {
+      "base": null,
+      "refs": {
+        "StartChatContactRequest$ClientToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+        "StartOutboundVoiceContactRequest$ClientToken": "<p>A unique, case-sensitive identifier that you provide to ensure the idempotency of the request. The token is valid for 7 days after creation. If a contact is already started, the contact ID is returned. If the contact is disconnected, a new contact is started.</p>"
+      }
+    },
+    "Comparison": {
+      "base": null,
+      "refs": {
+        "Threshold$Comparison": "<p>The type of comparison. Only \"less than\" (LT) comparisons are supported.</p>"
+      }
+    },
+    "Concurrency": {
+      "base": null,
+      "refs": {
+        "MediaConcurrency$Concurrency": "<p>The number of contacts an agent can have on a channel simultaneously.</p>"
+      }
+    },
+    "ContactFlow": {
+      "base": "<p>Contains information about a contact flow.</p>",
+      "refs": {
+        "DescribeContactFlowResponse$ContactFlow": "<p>Information about the contact flow.</p>"
+      }
+    },
+    "ContactFlowContent": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Content": "<p>The content of the contact flow.</p>",
+        "CreateContactFlowRequest$Content": "<p>The content of the contact flow. </p>",
+        "UpdateContactFlowContentRequest$Content": "<p>The JSON string that represents contact flow’s content. For an example, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language-example.html\">Example contact flow in Amazon Connect Flow language</a> in the <i>Amazon Connect Administrator Guide</i>. </p>"
+      }
+    },
+    "ContactFlowDescription": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Description": "<p>The description of the contact flow.</p>",
+        "CreateContactFlowRequest$Description": "<p>The description of the contact flow. </p>",
+        "UpdateContactFlowNameRequest$Description": "<p>The description of the contact flow.</p>"
+      }
+    },
+    "ContactFlowId": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Id": "<p>The identifier of the contact flow.</p>",
+        "ContactFlowSummary$Id": "<p>The identifier of the contact flow.</p>",
+        "CreateContactFlowResponse$ContactFlowId": "<p>The identifier of the contact flow.</p>",
+        "DescribeContactFlowRequest$ContactFlowId": "<p>The identifier of the contact flow.</p>",
+        "StartChatContactRequest$ContactFlowId": "<p>The identifier of the contact flow for initiating the chat. To see the ContactFlowId in the Amazon Connect console user interface, on the navigation menu go to <b>Routing</b>, <b>Contact Flows</b>. Choose the contact flow. On the contact flow page, under the name of the contact flow, choose <b>Show additional flow information</b>. The ContactFlowId is the last part of the ARN, shown here in bold: </p> <p>arn:aws:connect:us-west-2:xxxxxxxxxxxx:instance/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/contact-flow/<b>846ec553-a005-41c0-8341-xxxxxxxxxxxx</b> </p>",
+        "StartOutboundVoiceContactRequest$ContactFlowId": "<p>The identifier of the contact flow for the outbound call. To see the ContactFlowId in the Amazon Connect console user interface, on the navigation menu go to <b>Routing</b>, <b>Contact Flows</b>. Choose the contact flow. On the contact flow page, under the name of the contact flow, choose <b>Show additional flow information</b>. The ContactFlowId is the last part of the ARN, shown here in bold: </p> <p>arn:aws:connect:us-west-2:xxxxxxxxxxxx:instance/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/contact-flow/<b>846ec553-a005-41c0-8341-xxxxxxxxxxxx</b> </p>",
+        "UpdateContactFlowContentRequest$ContactFlowId": "<p>The identifier of the contact flow.</p>",
+        "UpdateContactFlowNameRequest$ContactFlowId": "<p>The identifier of the contact flow.</p>"
+      }
+    },
+    "ContactFlowName": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Name": "<p>The name of the contact flow.</p>",
+        "ContactFlowSummary$Name": "<p>The name of the contact flow.</p>",
+        "CreateContactFlowRequest$Name": "<p>The name of the contact flow.</p>",
+        "UpdateContactFlowNameRequest$Name": "<p>The name of the contact flow.</p>"
+      }
+    },
+    "ContactFlowNotPublishedException": {
+      "base": "<p>The contact flow has not been published.</p>",
+      "refs": {
+      }
+    },
+    "ContactFlowSummary": {
+      "base": "<p>Contains summary information about a contact flow.</p> <p>You can also create and update contact flows using the <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/flow-language.html\">Amazon Connect Flow language</a>.</p>",
+      "refs": {
+        "ContactFlowSummaryList$member": null
+      }
+    },
+    "ContactFlowSummaryList": {
+      "base": null,
+      "refs": {
+        "ListContactFlowsResponse$ContactFlowSummaryList": "<p>Information about the contact flows.</p>"
+      }
+    },
+    "ContactFlowType": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Type": "<p>The type of the contact flow. For descriptions of the available types, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/create-contact-flow.html#contact-flow-types\">Choose a Contact Flow Type</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+        "ContactFlowSummary$ContactFlowType": "<p>The type of contact flow.</p>",
+        "ContactFlowTypes$member": null,
+        "CreateContactFlowRequest$Type": "<p>The type of the contact flow. For descriptions of the available types, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/create-contact-flow.html#contact-flow-types\">Choose a Contact Flow Type</a> in the <i>Amazon Connect Administrator Guide</i>.</p>"
+      }
+    },
+    "ContactFlowTypes": {
+      "base": null,
+      "refs": {
+        "ListContactFlowsRequest$ContactFlowTypes": "<p>The type of contact flow.</p>"
+      }
+    },
+    "ContactId": {
+      "base": null,
+      "refs": {
+        "GetContactAttributesRequest$InitialContactId": "<p>The identifier of the initial contact.</p>",
+        "ResumeContactRecordingRequest$ContactId": "<p>The identifier of the contact.</p>",
+        "ResumeContactRecordingRequest$InitialContactId": "<p>The identifier of the contact. This is the identifier of the contact associated with the first interaction with the contact center.</p>",
+        "StartChatContactResponse$ContactId": "<p>The identifier of this contact within the Amazon Connect instance. </p>",
+        "StartContactRecordingRequest$ContactId": "<p>The identifier of the contact.</p>",
+        "StartContactRecordingRequest$InitialContactId": "<p>The identifier of the contact. This is the identifier of the contact associated with the first interaction with the contact center.</p>",
+        "StartOutboundVoiceContactResponse$ContactId": "<p>The identifier of this contact within the Amazon Connect instance.</p>",
+        "StopContactRecordingRequest$ContactId": "<p>The identifier of the contact.</p>",
+        "StopContactRecordingRequest$InitialContactId": "<p>The identifier of the contact. This is the identifier of the contact associated with the first interaction with the contact center.</p>",
+        "StopContactRequest$ContactId": "<p>The ID of the contact.</p>",
+        "SuspendContactRecordingRequest$ContactId": "<p>The identifier of the contact.</p>",
+        "SuspendContactRecordingRequest$InitialContactId": "<p>The identifier of the contact. This is the identifier of the contact associated with the first interaction with the contact center.</p>",
+        "UpdateContactAttributesRequest$InitialContactId": "<p>The identifier of the contact. This is the identifier of the contact associated with the first interaction with the contact center.</p>"
+      }
+    },
+    "ContactNotFoundException": {
+      "base": "<p>The contact with the specified ID is not active or does not exist.</p>",
+      "refs": {
+      }
+    },
+    "CreateContactFlowRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateContactFlowResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRoutingProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRoutingProfileResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Credentials": {
+      "base": "<p>Contains credentials to use for federation.</p>",
+      "refs": {
+        "GetFederationTokenResponse$Credentials": "<p>The credentials to use for federation.</p>"
+      }
+    },
+    "CurrentMetric": {
+      "base": "<p>Contains information about a real-time metric. For a description of each metric, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html\">Real-time Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+      "refs": {
+        "CurrentMetricData$Metric": "<p>Information about the metric.</p>",
+        "CurrentMetrics$member": null
+      }
+    },
+    "CurrentMetricData": {
+      "base": "<p>Contains the data for a real-time metric.</p>",
+      "refs": {
+        "CurrentMetricDataCollections$member": null
+      }
+    },
+    "CurrentMetricDataCollections": {
+      "base": null,
+      "refs": {
+        "CurrentMetricResult$Collections": "<p>The set of metrics.</p>"
+      }
+    },
+    "CurrentMetricName": {
+      "base": "<p>The current metric names.</p>",
+      "refs": {
+        "CurrentMetric$Name": "<p>The name of the metric.</p>"
+      }
+    },
+    "CurrentMetricResult": {
+      "base": "<p>Contains information about a set of real-time metrics.</p>",
+      "refs": {
+        "CurrentMetricResults$member": null
+      }
+    },
+    "CurrentMetricResults": {
+      "base": null,
+      "refs": {
+        "GetCurrentMetricDataResponse$MetricResults": "<p>Information about the real-time metrics.</p>"
+      }
+    },
+    "CurrentMetrics": {
+      "base": null,
+      "refs": {
+        "GetCurrentMetricDataRequest$CurrentMetrics": "<p>The metrics to retrieve. Specify the name and unit for each metric. The following metrics are available. For a description of all the metrics, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html\">Real-time Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p> <dl> <dt>AGENTS_AFTER_CONTACT_WORK</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#aftercallwork-real-time\">ACW</a> </p> </dd> <dt>AGENTS_AVAILABLE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#available-real-time\">Available</a> </p> </dd> <dt>AGENTS_ERROR</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#error-real-time\">Error</a> </p> </dd> <dt>AGENTS_NON_PRODUCTIVE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#non-productive-time-real-time\">NPT (Non-Productive Time)</a> </p> </dd> <dt>AGENTS_ON_CALL</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#on-call-real-time\">On contact</a> </p> </dd> <dt>AGENTS_ON_CONTACT</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#on-call-real-time\">On contact</a> </p> </dd> <dt>AGENTS_ONLINE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#online-real-time\">Online</a> </p> </dd> <dt>AGENTS_STAFFED</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#staffed-real-time\">Staffed</a> </p> </dd> <dt>CONTACTS_IN_QUEUE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#in-queue-real-time\">In queue</a> </p> </dd> <dt>CONTACTS_SCHEDULED</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#scheduled-real-time\">Scheduled</a> </p> </dd> <dt>OLDEST_CONTACT_AGE</dt> <dd> <p>Unit: SECONDS</p> <p>When you use groupings, Unit says SECONDS but the Value is returned in MILLISECONDS. For example, if you get a response like this:</p> <p> <code>{ \"Metric\": { \"Name\": \"OLDEST_CONTACT_AGE\", \"Unit\": \"SECONDS\" }, \"Value\": 24113.0 </code>}</p> <p>The actual OLDEST_CONTACT_AGE is 24 seconds.</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#oldest-real-time\">Oldest</a> </p> </dd> <dt>SLOTS_ACTIVE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#active-real-time\">Active</a> </p> </dd> <dt>SLOTS_AVAILABLE</dt> <dd> <p>Unit: COUNT</p> <p>Name in real-time metrics report: <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/real-time-metrics-definitions.html#availability-real-time\">Availability</a> </p> </dd> </dl>"
+      }
+    },
+    "Delay": {
+      "base": null,
+      "refs": {
+        "RoutingProfileQueueConfig$Delay": "<p>The delay, in seconds, a contact should be in the queue before they are routed to an available agent. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-routing-profiles-priority.html\">Queues: priority and delay</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+        "RoutingProfileQueueConfigSummary$Delay": "<p>The delay, in seconds, that a contact should be in the queue before they are routed to an available agent. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-routing-profiles-priority.html\">Queues: priority and delay</a> in the <i>Amazon Connect Administrator Guide</i>.</p>"
+      }
+    },
+    "DeleteUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeContactFlowRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeContactFlowResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRoutingProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRoutingProfileResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserHierarchyGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserHierarchyGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserHierarchyStructureRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserHierarchyStructureResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DestinationNotAllowedException": {
+      "base": "<p>Outbound calls to the destination number are not allowed.</p>",
+      "refs": {
+      }
+    },
+    "Dimensions": {
+      "base": "<p>Contains information about the dimensions for a set of metrics.</p>",
+      "refs": {
+        "CurrentMetricResult$Dimensions": "<p>The dimensions for the metrics.</p>",
+        "HistoricalMetricResult$Dimensions": "<p>The dimension for the metrics.</p>"
+      }
+    },
+    "DirectoryUserId": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$DirectoryUserId": "<p>The identifier of the user account in the directory used for identity management. If Amazon Connect cannot access the directory, you can specify this identifier to authenticate users. If you include the identifier, we assume that Amazon Connect cannot access the directory. Otherwise, the identity information is used to authenticate users from your directory.</p> <p>This parameter is required if you are using an existing directory for identity management in Amazon Connect when Amazon Connect cannot access your directory to authenticate users. If you are using SAML for identity management and include this parameter, an error is returned.</p>",
+        "User$DirectoryUserId": "<p>The identifier of the user account in the directory used for identity management.</p>"
+      }
+    },
+    "DisassociateRoutingProfileQueuesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisplayName": {
+      "base": null,
+      "refs": {
+        "ParticipantDetails$DisplayName": "<p>Display name of the participant.</p>"
+      }
+    },
+    "DuplicateResourceException": {
+      "base": "<p>A resource with the specified name already exists.</p>",
+      "refs": {
+      }
+    },
+    "Email": {
+      "base": null,
+      "refs": {
+        "UserIdentityInfo$Email": "<p>The email address. If you are using SAML for identity management and include this parameter, an error is returned.</p>"
+      }
+    },
+    "Filters": {
+      "base": "<p>Contains the filter to apply when retrieving metrics.</p>",
+      "refs": {
+        "GetCurrentMetricDataRequest$Filters": "<p>The queues, up to 100, or channels, to use to filter the metrics returned. Metric data is retrieved only for the resources associated with the queues or channels included in the filter. You can include both queue IDs and queue ARNs in the same request. Both <code>VOICE</code> and <code>CHAT</code> channels are supported.</p>",
+        "GetMetricDataRequest$Filters": "<p>The queues, up to 100, or channels, to use to filter the metrics returned. Metric data is retrieved only for the resources associated with the queues or channels included in the filter. You can include both queue IDs and queue ARNs in the same request. Both <code>VOICE</code> and <code>CHAT</code> channels are supported.</p>"
+      }
+    },
+    "GetContactAttributesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetContactAttributesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetCurrentMetricDataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetCurrentMetricDataResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFederationTokenRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetFederationTokenResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMetricDataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetMetricDataResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Grouping": {
+      "base": null,
+      "refs": {
+        "Groupings$member": null
+      }
+    },
+    "Groupings": {
+      "base": null,
+      "refs": {
+        "GetCurrentMetricDataRequest$Groupings": "<p>The grouping applied to the metrics returned. For example, when grouped by <code>QUEUE</code>, the metrics returned apply to each queue rather than aggregated for all queues. If you group by <code>CHANNEL</code>, you should include a Channels filter. Both <code>VOICE</code> and <code>CHAT</code> channels are supported.</p> <p>If no <code>Grouping</code> is included in the request, a summary of metrics is returned.</p>",
+        "GetMetricDataRequest$Groupings": "<p>The grouping applied to the metrics returned. For example, when results are grouped by queue, the metrics returned are grouped by queue. The values returned apply to the metrics for each queue rather than aggregated for all queues.</p> <p>The only supported grouping is <code>QUEUE</code>.</p> <p>If no grouping is specified, a summary of metrics for all queues is returned.</p>"
+      }
+    },
+    "HierarchyGroup": {
+      "base": "<p>Contains information about a hierarchy group.</p>",
+      "refs": {
+        "DescribeUserHierarchyGroupResponse$HierarchyGroup": "<p>Information about the hierarchy group.</p>"
+      }
+    },
+    "HierarchyGroupId": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$HierarchyGroupId": "<p>The identifier of the hierarchy group for the user.</p>",
+        "DescribeUserHierarchyGroupRequest$HierarchyGroupId": "<p>The identifier of the hierarchy group.</p>",
+        "HierarchyGroup$Id": "<p>The identifier of the hierarchy group.</p>",
+        "HierarchyGroupSummary$Id": "<p>The identifier of the hierarchy group.</p>",
+        "UpdateUserHierarchyRequest$HierarchyGroupId": "<p>The identifier of the hierarchy group.</p>",
+        "User$HierarchyGroupId": "<p>The identifier of the hierarchy group for the user.</p>"
+      }
+    },
+    "HierarchyGroupName": {
+      "base": null,
+      "refs": {
+        "HierarchyGroup$Name": "<p>The name of the hierarchy group.</p>",
+        "HierarchyGroupSummary$Name": "<p>The name of the hierarchy group.</p>"
+      }
+    },
+    "HierarchyGroupSummary": {
+      "base": "<p>Contains summary information about a hierarchy group.</p>",
+      "refs": {
+        "HierarchyGroupSummaryList$member": null,
+        "HierarchyPath$LevelOne": "<p>Information about level one.</p>",
+        "HierarchyPath$LevelTwo": "<p>Information about level two.</p>",
+        "HierarchyPath$LevelThree": "<p>Information about level three.</p>",
+        "HierarchyPath$LevelFour": "<p>Information about level four.</p>",
+        "HierarchyPath$LevelFive": "<p>Information about level five.</p>"
+      }
+    },
+    "HierarchyGroupSummaryList": {
+      "base": null,
+      "refs": {
+        "ListUserHierarchyGroupsResponse$UserHierarchyGroupSummaryList": "<p>Information about the hierarchy groups.</p>"
+      }
+    },
+    "HierarchyLevel": {
+      "base": "<p>Contains information about a hierarchy level.</p>",
+      "refs": {
+        "HierarchyStructure$LevelOne": "<p>Information about level one.</p>",
+        "HierarchyStructure$LevelTwo": "<p>Information about level two.</p>",
+        "HierarchyStructure$LevelThree": "<p>Information about level three.</p>",
+        "HierarchyStructure$LevelFour": "<p>Information about level four.</p>",
+        "HierarchyStructure$LevelFive": "<p>Information about level five.</p>"
+      }
+    },
+    "HierarchyLevelId": {
+      "base": null,
+      "refs": {
+        "HierarchyGroup$LevelId": "<p>The identifier of the level in the hierarchy group.</p>",
+        "HierarchyLevel$Id": "<p>The identifier of the hierarchy level.</p>"
+      }
+    },
+    "HierarchyLevelName": {
+      "base": null,
+      "refs": {
+        "HierarchyLevel$Name": "<p>The name of the hierarchy level.</p>"
+      }
+    },
+    "HierarchyPath": {
+      "base": "<p>Contains information about the levels of a hierarchy group.</p>",
+      "refs": {
+        "HierarchyGroup$HierarchyPath": "<p>Information about the levels in the hierarchy group.</p>"
+      }
+    },
+    "HierarchyStructure": {
+      "base": "<p>Contains information about a hierarchy structure.</p>",
+      "refs": {
+        "DescribeUserHierarchyStructureResponse$HierarchyStructure": "<p>Information about the hierarchy structure.</p>"
+      }
+    },
+    "HistoricalMetric": {
+      "base": "<p>Contains information about a historical metric. For a description of each metric, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/historical-metrics-definitions.html\">Historical Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p>",
+      "refs": {
+        "HistoricalMetricData$Metric": "<p>Information about the metric.</p>",
+        "HistoricalMetrics$member": null
+      }
+    },
+    "HistoricalMetricData": {
+      "base": "<p>Contains the data for a historical metric.</p>",
+      "refs": {
+        "HistoricalMetricDataCollections$member": null
+      }
+    },
+    "HistoricalMetricDataCollections": {
+      "base": null,
+      "refs": {
+        "HistoricalMetricResult$Collections": "<p>The set of metrics.</p>"
+      }
+    },
+    "HistoricalMetricName": {
+      "base": "<p>The historical metric names.</p>",
+      "refs": {
+        "HistoricalMetric$Name": "<p>The name of the metric.</p>"
+      }
+    },
+    "HistoricalMetricResult": {
+      "base": "<p>Contains information about the historical metrics retrieved.</p>",
+      "refs": {
+        "HistoricalMetricResults$member": null
+      }
+    },
+    "HistoricalMetricResults": {
+      "base": null,
+      "refs": {
+        "GetMetricDataResponse$MetricResults": "<p>Information about the historical metrics.</p> <p>If no grouping is specified, a summary of metric data is returned.</p>"
+      }
+    },
+    "HistoricalMetrics": {
+      "base": null,
+      "refs": {
+        "GetMetricDataRequest$HistoricalMetrics": "<p>The metrics to retrieve. Specify the name, unit, and statistic for each metric. The following historical metrics are available. For a description of each metric, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/historical-metrics-definitions.html\">Historical Metrics Definitions</a> in the <i>Amazon Connect Administrator Guide</i>.</p> <dl> <dt>ABANDON_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>AFTER_CONTACT_WORK_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>API_CONTACTS_HANDLED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CALLBACK_CONTACTS_HANDLED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_ABANDONED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_AGENT_HUNG_UP_FIRST</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_CONSULTED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_HANDLED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_HANDLED_INCOMING</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_HANDLED_OUTBOUND</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_HOLD_ABANDONS</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_MISSED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_QUEUED</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_TRANSFERRED_IN</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_TRANSFERRED_IN_FROM_QUEUE</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_TRANSFERRED_OUT</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>CONTACTS_TRANSFERRED_OUT_FROM_QUEUE</dt> <dd> <p>Unit: COUNT</p> <p>Statistic: SUM</p> </dd> <dt>HANDLE_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>HOLD_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>INTERACTION_AND_HOLD_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>INTERACTION_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>OCCUPANCY</dt> <dd> <p>Unit: PERCENT</p> <p>Statistic: AVG</p> </dd> <dt>QUEUE_ANSWER_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: AVG</p> </dd> <dt>QUEUED_TIME</dt> <dd> <p>Unit: SECONDS</p> <p>Statistic: MAX</p> </dd> <dt>SERVICE_LEVEL</dt> <dd> <p>Unit: PERCENT</p> <p>Statistic: AVG</p> <p>Threshold: Only \"Less than\" comparisons are supported, with the following service level thresholds: 15, 20, 25, 30, 45, 60, 90, 120, 180, 240, 300, 600</p> </dd> </dl>"
+      }
+    },
+    "HoursOfOperationId": {
+      "base": null,
+      "refs": {
+        "HoursOfOperationSummary$Id": "<p>The identifier of the hours of operation.</p>"
+      }
+    },
+    "HoursOfOperationName": {
+      "base": null,
+      "refs": {
+        "HoursOfOperationSummary$Name": "<p>The name of the hours of operation.</p>"
+      }
+    },
+    "HoursOfOperationSummary": {
+      "base": "<p>Contains summary information about hours of operation for a contact center.</p>",
+      "refs": {
+        "HoursOfOperationSummaryList$member": null
+      }
+    },
+    "HoursOfOperationSummaryList": {
+      "base": null,
+      "refs": {
+        "ListHoursOfOperationsResponse$HoursOfOperationSummaryList": "<p>Information about the hours of operation.</p>"
+      }
+    },
+    "InstanceId": {
+      "base": null,
+      "refs": {
+        "AssociateRoutingProfileQueuesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "CreateContactFlowRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "CreateRoutingProfileRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "CreateUserRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DeleteUserRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DescribeContactFlowRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DescribeRoutingProfileRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DescribeUserHierarchyGroupRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DescribeUserHierarchyStructureRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DescribeUserRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "DisassociateRoutingProfileQueuesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "GetContactAttributesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "GetCurrentMetricDataRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "GetFederationTokenRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "GetMetricDataRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListContactFlowsRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListHoursOfOperationsRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListPhoneNumbersRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListPromptsRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListQueuesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListRoutingProfileQueuesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListRoutingProfilesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListSecurityProfilesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListUserHierarchyGroupsRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ListUsersRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "ResumeContactRecordingRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "RoutingProfile$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "StartChatContactRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "StartContactRecordingRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "StartOutboundVoiceContactRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "StopContactRecordingRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "StopContactRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "SuspendContactRecordingRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateContactAttributesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateContactFlowContentRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateContactFlowNameRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateRoutingProfileConcurrencyRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateRoutingProfileDefaultOutboundQueueRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateRoutingProfileNameRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateRoutingProfileQueuesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateUserHierarchyRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateUserIdentityInfoRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateUserPhoneConfigRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateUserRoutingProfileRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>",
+        "UpdateUserSecurityProfilesRequest$InstanceId": "<p>The identifier of the Amazon Connect instance.</p>"
+      }
+    },
+    "InternalServiceException": {
+      "base": "<p>Request processing failed due to an error or failure with the service.</p>",
+      "refs": {
+      }
+    },
+    "InvalidContactFlowException": {
+      "base": "<p>The contact flow is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>One or more of the specified parameters are not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p>The request is not valid.</p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The allowed limit for the resource has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListContactFlowsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListContactFlowsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHoursOfOperationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListHoursOfOperationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPhoneNumbersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPhoneNumbersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPromptsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPromptsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListQueuesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListQueuesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRoutingProfileQueuesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRoutingProfileQueuesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRoutingProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRoutingProfilesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSecurityProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSecurityProfilesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUserHierarchyGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUserHierarchyGroupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResult100": {
+      "base": null,
+      "refs": {
+        "GetCurrentMetricDataRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "GetMetricDataRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListRoutingProfileQueuesRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>"
+      }
+    },
+    "MaxResult1000": {
+      "base": null,
+      "refs": {
+        "ListContactFlowsRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListHoursOfOperationsRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListPhoneNumbersRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListPromptsRequest$MaxResults": "<p>The maximum number of results to return per page.</p>",
+        "ListQueuesRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListRoutingProfilesRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListSecurityProfilesRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListUserHierarchyGroupsRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>",
+        "ListUsersRequest$MaxResults": "<p>The maximimum number of results to return per page.</p>"
+      }
+    },
+    "MediaConcurrencies": {
+      "base": null,
+      "refs": {
+        "CreateRoutingProfileRequest$MediaConcurrencies": "<p>The channels agents can handle in the Contact Control Panel (CCP) for this routing profile.</p>",
+        "RoutingProfile$MediaConcurrencies": "<p>The channels agents can handle in the Contact Control Panel (CCP) for this routing profile.</p>",
+        "UpdateRoutingProfileConcurrencyRequest$MediaConcurrencies": "<p>The channels agents can handle in the Contact Control Panel (CCP).</p>"
+      }
+    },
+    "MediaConcurrency": {
+      "base": "<p>Contains information about which channels are supported, and how many contacts an agent can have on a channel simultaneously.</p>",
+      "refs": {
+        "MediaConcurrencies$member": null
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "ContactFlowNotPublishedException$Message": null,
+        "ContactNotFoundException$Message": "<p>The message.</p>",
+        "DestinationNotAllowedException$Message": "<p>The message.</p>",
+        "DuplicateResourceException$Message": null,
+        "InternalServiceException$Message": "<p>The message.</p>",
+        "InvalidParameterException$Message": "<p>The message.</p>",
+        "InvalidRequestException$Message": "<p>The message.</p>",
+        "LimitExceededException$Message": "<p>The message.</p>",
+        "OutboundContactNotPermittedException$Message": "<p>The message.</p>",
+        "ResourceNotFoundException$Message": "<p>The message.</p>",
+        "ThrottlingException$Message": null,
+        "UserNotFoundException$Message": null
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "GetCurrentMetricDataRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p> <p>The token expires after 5 minutes from the time it is created. Subsequent requests that use the token must use the same request parameters as the request that generated the token.</p>",
+        "GetCurrentMetricDataResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p> <p>The token expires after 5 minutes from the time it is created. Subsequent requests that use the token must use the same request parameters as the request that generated the token.</p>",
+        "GetMetricDataRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "GetMetricDataResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p> <p>The token expires after 5 minutes from the time it is created. Subsequent requests that use the token must use the same request parameters as the request that generated the token.</p>",
+        "ListContactFlowsRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListContactFlowsResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListHoursOfOperationsRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListHoursOfOperationsResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListPhoneNumbersRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListPhoneNumbersResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListPromptsRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListPromptsResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListQueuesRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListQueuesResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListRoutingProfileQueuesRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListRoutingProfileQueuesResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListRoutingProfilesRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListRoutingProfilesResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListSecurityProfilesRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListSecurityProfilesResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListUserHierarchyGroupsRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListUserHierarchyGroupsResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>",
+        "ListUsersRequest$NextToken": "<p>The token for the next set of results. Use the value returned in the previous response in the next request to retrieve the next set of results.</p>",
+        "ListUsersResponse$NextToken": "<p>If there are additional results, this is the token for the next set of results.</p>"
+      }
+    },
+    "OutboundContactNotPermittedException": {
+      "base": "<p>The contact is not permitted.</p>",
+      "refs": {
+      }
+    },
+    "ParticipantDetails": {
+      "base": "<p>The customer's details.</p>",
+      "refs": {
+        "StartChatContactRequest$ParticipantDetails": "<p>Information identifying the participant.</p>"
+      }
+    },
+    "ParticipantId": {
+      "base": null,
+      "refs": {
+        "StartChatContactResponse$ParticipantId": "<p>The identifier for a chat participant. The participantId for a chat participant is the same throughout the chat lifecycle.</p>"
+      }
+    },
+    "ParticipantToken": {
+      "base": null,
+      "refs": {
+        "StartChatContactResponse$ParticipantToken": "<p>The token used by the chat participant to call <a href=\"https://docs.aws.amazon.com/connect-participant/latest/APIReference/API_CreateParticipantConnection.html\">CreateParticipantConnection</a>. The participant token is valid for the lifetime of a chat participant.</p>"
+      }
+    },
+    "Password": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$Password": "<p>The password for the user account. A password is required if you are using Amazon Connect for identity management. Otherwise, it is an error to include a password.</p>"
+      }
+    },
+    "PhoneNumber": {
+      "base": null,
+      "refs": {
+        "PhoneNumberSummary$PhoneNumber": "<p>The phone number.</p>",
+        "StartOutboundVoiceContactRequest$DestinationPhoneNumber": "<p>The phone number of the customer, in E.164 format.</p>",
+        "StartOutboundVoiceContactRequest$SourcePhoneNumber": "<p>The phone number associated with the Amazon Connect instance, in E.164 format. If you do not specify a source phone number, you must specify a queue.</p>",
+        "UserPhoneConfig$DeskPhoneNumber": "<p>The phone number for the user's desk phone.</p>"
+      }
+    },
+    "PhoneNumberCountryCode": {
+      "base": null,
+      "refs": {
+        "PhoneNumberCountryCodes$member": null,
+        "PhoneNumberSummary$PhoneNumberCountryCode": "<p>The ISO country code.</p>"
+      }
+    },
+    "PhoneNumberCountryCodes": {
+      "base": null,
+      "refs": {
+        "ListPhoneNumbersRequest$PhoneNumberCountryCodes": "<p>The ISO country code.</p>"
+      }
+    },
+    "PhoneNumberId": {
+      "base": null,
+      "refs": {
+        "PhoneNumberSummary$Id": "<p>The identifier of the phone number.</p>"
+      }
+    },
+    "PhoneNumberSummary": {
+      "base": "<p>Contains summary information about a phone number for a contact center.</p>",
+      "refs": {
+        "PhoneNumberSummaryList$member": null
+      }
+    },
+    "PhoneNumberSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPhoneNumbersResponse$PhoneNumberSummaryList": "<p>Information about the phone numbers.</p>"
+      }
+    },
+    "PhoneNumberType": {
+      "base": null,
+      "refs": {
+        "PhoneNumberSummary$PhoneNumberType": "<p>The type of phone number.</p>",
+        "PhoneNumberTypes$member": null
+      }
+    },
+    "PhoneNumberTypes": {
+      "base": null,
+      "refs": {
+        "ListPhoneNumbersRequest$PhoneNumberTypes": "<p>The type of phone number.</p>"
+      }
+    },
+    "PhoneType": {
+      "base": null,
+      "refs": {
+        "UserPhoneConfig$PhoneType": "<p>The phone type.</p>"
+      }
+    },
+    "Priority": {
+      "base": null,
+      "refs": {
+        "RoutingProfileQueueConfig$Priority": "<p>The order in which contacts are to be handled for the queue. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-routing-profiles-priority.html\">Queues: priority and delay</a>.</p>",
+        "RoutingProfileQueueConfigSummary$Priority": "<p>The order in which contacts are to be handled for the queue. For more information, see <a href=\"https://docs.aws.amazon.com/connect/latest/adminguide/concepts-routing-profiles-priority.html\">Queues: priority and delay</a>.</p>"
+      }
+    },
+    "ProblemDetail": {
+      "base": "<p>Information about a problem detail.</p>",
+      "refs": {
+        "Problems$member": null
+      }
+    },
+    "ProblemMessageString": {
+      "base": null,
+      "refs": {
+        "ProblemDetail$message": "<p>The problem detail's message.</p>"
+      }
+    },
+    "Problems": {
+      "base": null,
+      "refs": {
+        "InvalidContactFlowException$problems": "<p>The problems with the contact flow. Please fix before trying again.</p>"
+      }
+    },
+    "PromptId": {
+      "base": null,
+      "refs": {
+        "PromptSummary$Id": "<p>The identifier of the prompt.</p>"
+      }
+    },
+    "PromptName": {
+      "base": null,
+      "refs": {
+        "PromptSummary$Name": "<p>The name of the prompt.</p>"
+      }
+    },
+    "PromptSummary": {
+      "base": "<p>Contains information about the prompt.</p>",
+      "refs": {
+        "PromptSummaryList$member": null
+      }
+    },
+    "PromptSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPromptsResponse$PromptSummaryList": "<p>Information about the prompts.</p>"
+      }
+    },
+    "QueueId": {
+      "base": null,
+      "refs": {
+        "CreateRoutingProfileRequest$DefaultOutboundQueueId": "<p>The default outbound queue for the routing profile.</p>",
+        "QueueReference$Id": "<p>The identifier of the queue.</p>",
+        "QueueSummary$Id": "<p>The identifier of the queue.</p>",
+        "Queues$member": null,
+        "RoutingProfile$DefaultOutboundQueueId": "<p>The identifier of the default outbound queue for this routing profile.</p>",
+        "RoutingProfileQueueConfigSummary$QueueId": "<p>The identifier of the queue.</p>",
+        "RoutingProfileQueueReference$QueueId": "<p>The identifier of the queue.</p>",
+        "StartOutboundVoiceContactRequest$QueueId": "<p>The queue for the call. If you specify a queue, the phone displayed for caller ID is the phone number specified in the queue. If you do not specify a queue, the queue defined in the contact flow is used. If you do not specify a queue, you must specify a source phone number.</p>",
+        "UpdateRoutingProfileDefaultOutboundQueueRequest$DefaultOutboundQueueId": "<p>The identifier for the default outbound queue.</p>"
+      }
+    },
+    "QueueName": {
+      "base": null,
+      "refs": {
+        "QueueSummary$Name": "<p>The name of the queue.</p>",
+        "RoutingProfileQueueConfigSummary$QueueName": "<p>The name of the queue.</p>"
+      }
+    },
+    "QueueReference": {
+      "base": "<p>Contains information about a queue resource for which metrics are returned.</p>",
+      "refs": {
+        "Dimensions$Queue": "<p>Information about the queue for which metrics are returned.</p>"
+      }
+    },
+    "QueueSummary": {
+      "base": "<p>Contains summary information about a queue.</p>",
+      "refs": {
+        "QueueSummaryList$member": null
+      }
+    },
+    "QueueSummaryList": {
+      "base": null,
+      "refs": {
+        "ListQueuesResponse$QueueSummaryList": "<p>Information about the queues.</p>"
+      }
+    },
+    "QueueType": {
+      "base": null,
+      "refs": {
+        "QueueSummary$QueueType": "<p>The type of queue.</p>",
+        "QueueTypes$member": null
+      }
+    },
+    "QueueTypes": {
+      "base": null,
+      "refs": {
+        "ListQueuesRequest$QueueTypes": "<p>The type of queue.</p>"
+      }
+    },
+    "Queues": {
+      "base": null,
+      "refs": {
+        "Filters$Queues": "<p>The queues to use to filter the metrics. You can specify up to 100 queues per request.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource was not found.</p>",
+      "refs": {
+      }
+    },
+    "ResumeContactRecordingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResumeContactRecordingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RoutingProfile": {
+      "base": "<p>Contains information about a routing profile.</p>",
+      "refs": {
+        "DescribeRoutingProfileResponse$RoutingProfile": "<p>The routing profile.</p>"
+      }
+    },
+    "RoutingProfileDescription": {
+      "base": null,
+      "refs": {
+        "CreateRoutingProfileRequest$Description": "<p>Description of the routing profile. Must not be more than 250 characters.</p>",
+        "RoutingProfile$Description": "<p>The description of the routing profile.</p>",
+        "UpdateRoutingProfileNameRequest$Description": "<p>The description of the routing profile. Must not be more than 250 characters.</p>"
+      }
+    },
+    "RoutingProfileId": {
+      "base": null,
+      "refs": {
+        "AssociateRoutingProfileQueuesRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "CreateRoutingProfileResponse$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "CreateUserRequest$RoutingProfileId": "<p>The identifier of the routing profile for the user.</p>",
+        "DescribeRoutingProfileRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "DisassociateRoutingProfileQueuesRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "ListRoutingProfileQueuesRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "RoutingProfile$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "RoutingProfileSummary$Id": "<p>The identifier of the routing profile.</p>",
+        "UpdateRoutingProfileConcurrencyRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "UpdateRoutingProfileDefaultOutboundQueueRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "UpdateRoutingProfileNameRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "UpdateRoutingProfileQueuesRequest$RoutingProfileId": "<p>The identifier of the routing profile.</p>",
+        "UpdateUserRoutingProfileRequest$RoutingProfileId": "<p>The identifier of the routing profile for the user.</p>",
+        "User$RoutingProfileId": "<p>The identifier of the routing profile for the user.</p>"
+      }
+    },
+    "RoutingProfileName": {
+      "base": null,
+      "refs": {
+        "CreateRoutingProfileRequest$Name": "<p>The name of the routing profile. Must not be more than 127 characters.</p>",
+        "RoutingProfile$Name": "<p>The name of the routing profile.</p>",
+        "RoutingProfileSummary$Name": "<p>The name of the routing profile.</p>",
+        "UpdateRoutingProfileNameRequest$Name": "<p>The name of the routing profile. Must not be more than 127 characters.</p>"
+      }
+    },
+    "RoutingProfileQueueConfig": {
+      "base": "<p>Contains information about the queue and channel for which priority and delay can be set.</p>",
+      "refs": {
+        "RoutingProfileQueueConfigList$member": null
+      }
+    },
+    "RoutingProfileQueueConfigList": {
+      "base": null,
+      "refs": {
+        "AssociateRoutingProfileQueuesRequest$QueueConfigs": "<p>The queues to associate with this routing profile.</p>",
+        "CreateRoutingProfileRequest$QueueConfigs": "<p>The inbound queues associated with the routing profile. If no queue is added, the agent can only make outbound calls.</p>",
+        "UpdateRoutingProfileQueuesRequest$QueueConfigs": "<p>The queues to be updated for this routing profile.</p>"
+      }
+    },
+    "RoutingProfileQueueConfigSummary": {
+      "base": "<p>Contains summary information about a routing profile queue.</p>",
+      "refs": {
+        "RoutingProfileQueueConfigSummaryList$member": null
+      }
+    },
+    "RoutingProfileQueueConfigSummaryList": {
+      "base": null,
+      "refs": {
+        "ListRoutingProfileQueuesResponse$RoutingProfileQueueConfigSummaryList": "<p>Information about the routing profiles.</p>"
+      }
+    },
+    "RoutingProfileQueueReference": {
+      "base": "<p>Contains the channel and queue identifier for a routing profile.</p>",
+      "refs": {
+        "RoutingProfileQueueConfig$QueueReference": "<p>Contains information about a queue resource.</p>",
+        "RoutingProfileQueueReferenceList$member": null
+      }
+    },
+    "RoutingProfileQueueReferenceList": {
+      "base": null,
+      "refs": {
+        "DisassociateRoutingProfileQueuesRequest$QueueReferences": "<p>The queues to disassociate from this routing profile.</p>"
+      }
+    },
+    "RoutingProfileSummary": {
+      "base": "<p>Contains summary information about a routing profile.</p>",
+      "refs": {
+        "RoutingProfileSummaryList$member": null
+      }
+    },
+    "RoutingProfileSummaryList": {
+      "base": null,
+      "refs": {
+        "ListRoutingProfilesResponse$RoutingProfileSummaryList": "<p>Information about the routing profiles.</p>"
+      }
+    },
+    "SecurityProfileId": {
+      "base": null,
+      "refs": {
+        "SecurityProfileIds$member": null,
+        "SecurityProfileSummary$Id": "<p>The identifier of the security profile.</p>"
+      }
+    },
+    "SecurityProfileIds": {
+      "base": null,
+      "refs": {
+        "CreateUserRequest$SecurityProfileIds": "<p>The identifier of the security profile for the user.</p>",
+        "UpdateUserSecurityProfilesRequest$SecurityProfileIds": "<p>The identifiers of the security profiles for the user.</p>",
+        "User$SecurityProfileIds": "<p>The identifiers of the security profiles for the user.</p>"
+      }
+    },
+    "SecurityProfileName": {
+      "base": null,
+      "refs": {
+        "SecurityProfileSummary$Name": "<p>The name of the security profile.</p>"
+      }
+    },
+    "SecurityProfileSummary": {
+      "base": "<p>Contains information about a security profile.</p>",
+      "refs": {
+        "SecurityProfileSummaryList$member": null
+      }
+    },
+    "SecurityProfileSummaryList": {
+      "base": null,
+      "refs": {
+        "ListSecurityProfilesResponse$SecurityProfileSummaryList": "<p>Information about the security profiles.</p>"
+      }
+    },
+    "SecurityToken": {
+      "base": null,
+      "refs": {
+        "Credentials$AccessToken": "<p>An access token generated for a federated user to access Amazon Connect.</p>",
+        "Credentials$RefreshToken": "<p>Renews a token generated for a user to access the Amazon Connect instance.</p>"
+      }
+    },
+    "StartChatContactRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartChatContactResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartContactRecordingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartContactRecordingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartOutboundVoiceContactRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartOutboundVoiceContactResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Statistic": {
+      "base": null,
+      "refs": {
+        "HistoricalMetric$Statistic": "<p>The statistic for the metric.</p>"
+      }
+    },
+    "StopContactRecordingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopContactRecordingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopContactRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopContactResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SuspendContactRecordingRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SuspendContactRecordingResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The tag keys.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "ContactFlow$Tags": "<p>One or more tags.</p>",
+        "CreateContactFlowRequest$Tags": "<p>One or more tags.</p>",
+        "CreateRoutingProfileRequest$Tags": "<p>One or more tags.</p>",
+        "CreateUserRequest$Tags": "<p>One or more tags.</p>",
+        "ListTagsForResourceResponse$tags": "<p>Information about the tags.</p>",
+        "RoutingProfile$Tags": "<p>One or more tags.</p>",
+        "TagResourceRequest$tags": "<p>One or more tags. For example, { \"tags\": {\"key1\":\"value1\", \"key2\":\"value2\"} }.</p>",
+        "User$Tags": "<p>The tags.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "Threshold": {
+      "base": "<p>Contains information about the threshold for service level metrics.</p>",
+      "refs": {
+        "HistoricalMetric$Threshold": "<p>The threshold for the metric, used with service level metrics.</p>"
+      }
+    },
+    "ThresholdValue": {
+      "base": null,
+      "refs": {
+        "Threshold$ThresholdValue": "<p>The threshold value to compare.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The throttling limit has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "Unit": {
+      "base": null,
+      "refs": {
+        "CurrentMetric$Unit": "<p>The unit for the metric.</p>",
+        "HistoricalMetric$Unit": "<p>The unit for the metric.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateContactAttributesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateContactAttributesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateContactFlowContentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateContactFlowNameRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRoutingProfileConcurrencyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRoutingProfileDefaultOutboundQueueRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRoutingProfileNameRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRoutingProfileQueuesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserHierarchyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserIdentityInfoRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserPhoneConfigRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserRoutingProfileRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateUserSecurityProfilesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "User": {
+      "base": "<p>Contains information about a user account for a Amazon Connect instance.</p>",
+      "refs": {
+        "DescribeUserResponse$User": "<p>Information about the user account and configuration settings.</p>"
+      }
+    },
+    "UserId": {
+      "base": null,
+      "refs": {
+        "CreateUserResponse$UserId": "<p>The identifier of the user account.</p>",
+        "DeleteUserRequest$UserId": "<p>The identifier of the user.</p>",
+        "DescribeUserRequest$UserId": "<p>The identifier of the user account.</p>",
+        "UpdateUserHierarchyRequest$UserId": "<p>The identifier of the user account.</p>",
+        "UpdateUserIdentityInfoRequest$UserId": "<p>The identifier of the user account.</p>",
+        "UpdateUserPhoneConfigRequest$UserId": "<p>The identifier of the user account.</p>",
+        "UpdateUserRoutingProfileRequest$UserId": "<p>The identifier of the user account.</p>",
+        "UpdateUserSecurityProfilesRequest$UserId": "<p>The identifier of the user account.</p>",
+        "User$Id": "<p>The identifier of the user account.</p>",
+        "UserSummary$Id": "<p>The identifier of the user account.</p>"
+      }
+    },
+    "UserIdentityInfo": {
+      "base": "<p>Contains information about the identity of a user.</p>",
+      "refs": {
+        "CreateUserRequest$IdentityInfo": "<p>The information about the identity of the user.</p>",
+        "UpdateUserIdentityInfoRequest$IdentityInfo": "<p>The identity information for the user.</p>",
+        "User$IdentityInfo": "<p>Information about the user identity.</p>"
+      }
+    },
+    "UserNotFoundException": {
+      "base": "<p>No user with the specified credentials was found in the Amazon Connect instance.</p>",
+      "refs": {
+      }
+    },
+    "UserPhoneConfig": {
+      "base": "<p>Contains information about the phone configuration settings for a user.</p>",
+      "refs": {
+        "CreateUserRequest$PhoneConfig": "<p>The phone settings for the user.</p>",
+        "UpdateUserPhoneConfigRequest$PhoneConfig": "<p>Information about phone configuration settings for the user.</p>",
+        "User$PhoneConfig": "<p>Information about the phone configuration for the user.</p>"
+      }
+    },
+    "UserSummary": {
+      "base": "<p>Contains summary information about a user.</p>",
+      "refs": {
+        "UserSummaryList$member": null
+      }
+    },
+    "UserSummaryList": {
+      "base": null,
+      "refs": {
+        "ListUsersResponse$UserSummaryList": "<p>Information about the users.</p>"
+      }
+    },
+    "Value": {
+      "base": null,
+      "refs": {
+        "CurrentMetricData$Value": "<p>The value of the metric.</p>",
+        "HistoricalMetricData$Value": "<p>The value of the metric.</p>"
+      }
+    },
+    "VoiceRecordingConfiguration": {
+      "base": "<p>Contains information about the recording configuration settings.</p>",
+      "refs": {
+        "StartContactRecordingRequest$VoiceRecordingConfiguration": "<p>Who is being recorded.</p>"
+      }
+    },
+    "VoiceRecordingTrack": {
+      "base": null,
+      "refs": {
+        "VoiceRecordingConfiguration$VoiceRecordingTrack": "<p>Identifies which track is being recorded.</p>"
+      }
+    },
+    "timestamp": {
+      "base": null,
+      "refs": {
+        "Credentials$AccessTokenExpiration": "<p>A token generated with an expiration time for the session a user is logged in to Amazon Connect.</p>",
+        "Credentials$RefreshTokenExpiration": "<p>Renews the expiration timer for a generated token.</p>",
+        "GetCurrentMetricDataResponse$DataSnapshotTime": "<p>The time at which the metrics were retrieved and cached for pagination.</p>",
+        "GetMetricDataRequest$StartTime": "<p>The timestamp, in UNIX Epoch time format, at which to start the reporting interval for the retrieval of historical metrics data. The time must be specified using a multiple of 5 minutes, such as 10:05, 10:10, 10:15.</p> <p>The start time cannot be earlier than 24 hours before the time of the request. Historical metrics are available only for 24 hours.</p>",
+        "GetMetricDataRequest$EndTime": "<p>The timestamp, in UNIX Epoch time format, at which to end the reporting interval for the retrieval of historical metrics data. The time must be specified using an interval of 5 minutes, such as 11:00, 11:05, 11:10, and must be later than the start time timestamp.</p> <p>The time range between the start and end time must be less than 24 hours.</p>"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+[ default ]
+binary=0b1001
+octal=0o107
+ten=12
+hex=0xAFB1
+hex2=0xafb1

@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "ListAvailableSolutionStacks",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeEnvironmentResources",
+            "input": {
+                "EnvironmentId": "fake_environment"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

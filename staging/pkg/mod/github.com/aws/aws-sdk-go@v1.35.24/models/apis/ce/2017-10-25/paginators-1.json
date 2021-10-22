@@ -1,0 +1,19 @@
+{
+  "pagination": {
+    "GetSavingsPlansCoverage": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "GetSavingsPlansUtilizationDetails": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListCostCategoryDefinitions": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

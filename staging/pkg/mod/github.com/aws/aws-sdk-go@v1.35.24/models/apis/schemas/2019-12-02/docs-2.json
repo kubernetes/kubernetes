@@ -1,0 +1,451 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon EventBridge Schema Registry</p>",
+  "operations": {
+    "CreateDiscoverer": "<p>Creates a discoverer.</p>",
+    "CreateRegistry": "<p>Creates a registry.</p>",
+    "CreateSchema": "<p>Creates a schema definition.</p> <note><p>Inactive schemas will be deleted after two years.</p></note>",
+    "DeleteDiscoverer": "<p>Deletes a discoverer.</p>",
+    "DeleteRegistry": "<p>Deletes a Registry.</p>",
+    "DeleteResourcePolicy": "<p>Delete the resource-based policy attached to the specified registry.</p>",
+    "DeleteSchema": "<p>Delete a schema definition.</p>",
+    "DeleteSchemaVersion": "<p>Delete the schema version definition</p>",
+    "DescribeCodeBinding": "<p>Describe the code binding URI.</p>",
+    "DescribeDiscoverer": "<p>Describes the discoverer.</p>",
+    "DescribeRegistry": "<p>Describes the registry.</p>",
+    "DescribeSchema": "<p>Retrieve the schema definition.</p>",
+    "GetCodeBindingSource": "<p>Get the code binding source URI.</p>",
+    "GetDiscoveredSchema": "<p>Get the discovered schema that was generated based on sampled events.</p>",
+    "GetResourcePolicy": "<p>Retrieves the resource-based policy attached to a given registry.</p>",
+    "ListDiscoverers": "<p>List the discoverers.</p>",
+    "ListRegistries": "<p>List the registries.</p>",
+    "ListSchemaVersions": "<p>Provides a list of the schema versions and related information.</p>",
+    "ListSchemas": "<p>List the schemas.</p>",
+    "ListTagsForResource": "<p>Get tags for resource.</p>",
+    "PutCodeBinding": "<p>Put code binding URI</p>",
+    "PutResourcePolicy": "<p>The name of the policy.</p>",
+    "SearchSchemas": "<p>Search the schemas</p>",
+    "StartDiscoverer": "<p>Starts the discoverer</p>",
+    "StopDiscoverer": "<p>Stops the discoverer</p>",
+    "TagResource": "<p>Add tags to a resource.</p>",
+    "UntagResource": "<p>Removes tags from a resource.</p>",
+    "UpdateDiscoverer": "<p>Updates the discoverer</p>",
+    "UpdateRegistry": "<p>Updates a registry.</p>",
+    "UpdateSchema": "<p>Updates the schema definition</p> <note><p>Inactive schemas will be deleted after two years.</p></note>",
+    "ExportSchema": "<p>Exports a schema to a different specification.</p>"
+  },
+  "shapes": {
+    "BadRequestException": {
+      "base": null,
+      "refs": {}
+    },
+    "CodeBindingOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "CodeGenerationStatus": {
+      "base": null,
+      "refs": {
+        "CodeBindingOutput$Status": "<p>The current status of code binding generation.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": null,
+      "refs": {}
+    },
+    "CreateDiscovererInput": {
+      "base": null,
+      "refs": {}
+    },
+    "CreateRegistryInput": {
+      "base": null,
+      "refs": {}
+    },
+    "CreateSchemaInput": {
+      "base": null,
+      "refs": {}
+    },
+    "DescribeSchemaOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "DiscovererOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "DiscovererState": {
+      "base": null,
+      "refs": {
+        "DiscovererOutput$State": "<p>The state of the discoverer.</p>",
+        "DiscovererStateOutput$State": "<p>The state of the discoverer.</p>",
+        "DiscovererSummary$State": "<p>The state of the discoverer.</p>"
+      }
+    },
+    "DiscovererStateOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "DiscovererSummary": {
+      "base": null,
+      "refs": {
+        "__listOfDiscovererSummary$member": null
+      }
+    },
+    "ErrorOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ExportSchemaOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ForbiddenException": {
+      "base": null,
+      "refs": {}
+    },
+    "GetCodeBindingSourceOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "GetDiscoveredSchemaInput": {
+      "base": null,
+      "refs": {}
+    },
+    "GetDiscoveredSchemaOutput": {
+      "base": "<p></p>",
+      "refs": {}
+    },
+    "GetDiscoveredSchemaVersionItemInput": {
+      "base": null,
+      "refs": {
+        "__listOfGetDiscoveredSchemaVersionItemInput$member": null
+      }
+    },
+    "GetResourcePolicyOutput": {
+      "base": "<p>Information about the policy.</p>",
+      "refs": {}
+    },
+    "GoneException": {
+      "base": null,
+      "refs": {}
+    },
+    "InternalServerErrorException": {
+      "base": null,
+      "refs": {}
+    },
+    "ListDiscoverersOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ListRegistriesOutput": {
+      "base": "<p>List the registries.</p>",
+      "refs": {}
+    },
+    "ListSchemaVersionsOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ListSchemasOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ListTagsForResourceOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "LockServiceLinkedRoleInput": {
+      "base": null,
+      "refs": {}
+    },
+    "LockServiceLinkedRoleOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "NotFoundException": {
+      "base": null,
+      "refs": {}
+    },
+    "PreconditionFailedException": {
+      "base": null,
+      "refs": {}
+    },
+    "PutResourcePolicyInput": {
+      "base": "<p>Only update the policy if the revision ID matches the ID that's specified. Use this option to avoid modifying a policy that has changed since you last read it.</p>",
+      "refs": {}
+    },
+    "PutResourcePolicyOutput": {
+      "base": "<p>The resource-based policy.</p>",
+      "refs": {}
+    },
+    "RegistryOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "RegistrySummary": {
+      "base": null,
+      "refs": {
+        "__listOfRegistrySummary$member": null
+      }
+    },
+    "SchemaOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "SchemaSummary": {
+      "base": "<p>A summary of schema details.</p>",
+      "refs": {
+        "__listOfSchemaSummary$member": null
+      }
+    },
+    "SchemaVersionSummary": {
+      "base": null,
+      "refs": {
+        "__listOfSchemaVersionSummary$member": null
+      }
+    },
+    "SearchSchemaSummary": {
+      "base": null,
+      "refs": {
+        "__listOfSearchSchemaSummary$member": null
+      }
+    },
+    "SearchSchemaVersionSummary": {
+      "base": null,
+      "refs": {
+        "__listOfSearchSchemaVersionSummary$member": null
+      }
+    },
+    "SearchSchemasOutput": {
+      "base": null,
+      "refs": {}
+    },
+    "ServiceUnavailableException": {
+      "base": null,
+      "refs": {}
+    },
+    "TagResourceInput": {
+      "base": null,
+      "refs": {}
+    },
+    "Tags": {
+      "base": "<p>Key-value pairs associated with a resource.</p>",
+      "refs": {
+        "CreateDiscovererInput$Tags": "<p>Tags associated with the resource.</p>",
+        "CreateRegistryInput$Tags": "<p>Tags to associate with the registry.</p>",
+        "CreateSchemaInput$Tags": "<p>Tags associated with the schema.</p>",
+        "DescribeSchemaOutput$Tags": "<p>Tags associated with the resource.</p>",
+        "DiscovererOutput$Tags": "<p>Tags associated with the resource.</p>",
+        "DiscovererSummary$Tags": "<p>Tags associated with the resource.</p>",
+        "ListTagsForResourceOutput$Tags": null,
+        "RegistryOutput$Tags": "<p>Tags associated with the registry.</p>",
+        "RegistrySummary$Tags": "<p>Tags associated with the registry.</p>",
+        "SchemaOutput$Tags": null,
+        "SchemaSummary$Tags": "<p>Tags associated with the schema.</p>",
+        "TagResourceInput$Tags": "<p>Tags associated with the resource.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": null,
+      "refs": {}
+    },
+    "Type": {
+      "base": null,
+      "refs": {
+        "CreateSchemaInput$Type": "<p>The type of schema.</p>",
+        "GetDiscoveredSchemaInput$Type": "<p>The type of event.</p>",
+        "UpdateSchemaInput$Type": "<p>The schema type for the events schema.</p>"
+      }
+    },
+    "UnauthorizedException": {
+      "base": null,
+      "refs": {}
+    },
+    "UnlockServiceLinkedRoleInput": {
+      "base": null,
+      "refs": {}
+    },
+    "UpdateDiscovererInput": {
+      "base": null,
+      "refs": {}
+    },
+    "UpdateRegistryInput": {
+      "base": null,
+      "refs": {}
+    },
+    "UpdateSchemaInput": {
+      "base": null,
+      "refs": {}
+    },
+    "__boolean": {
+      "base": null,
+      "refs": {
+        "LockServiceLinkedRoleOutput$CanBeDeleted": null
+      }
+    },
+    "__integerMin1Max29000": {
+      "base": null,
+      "refs": {
+        "LockServiceLinkedRoleInput$Timeout": null
+      }
+    },
+    "__listOfDiscovererSummary": {
+      "base": null,
+      "refs": {
+        "ListDiscoverersOutput$Discoverers": "<p>An array of DiscovererSummary information.</p>",
+        "LockServiceLinkedRoleOutput$RelatedResources": null
+      }
+    },
+    "__listOfGetDiscoveredSchemaVersionItemInput": {
+      "base": null,
+      "refs": {
+        "GetDiscoveredSchemaInput$Events": "<p>An array of strings where each string is a JSON event. These are the events that were used to generate the schema. The array includes a single type of event and has a maximum size of 10 events.</p>"
+      }
+    },
+    "__listOfRegistrySummary": {
+      "base": null,
+      "refs": {
+        "ListRegistriesOutput$Registries": "<p>An array of registry summaries.</p>"
+      }
+    },
+    "__listOfSchemaSummary": {
+      "base": null,
+      "refs": {
+        "ListSchemasOutput$Schemas": "<p>An array of schema summaries.</p>"
+      }
+    },
+    "__listOfSchemaVersionSummary": {
+      "base": null,
+      "refs": {
+        "ListSchemaVersionsOutput$SchemaVersions": "<p>An array of schema version summaries.</p>"
+      }
+    },
+    "__listOfSearchSchemaSummary": {
+      "base": null,
+      "refs": {
+        "SearchSchemasOutput$Schemas": "<p>An array of SearchSchemaSummary information.</p>"
+      }
+    },
+    "__listOfSearchSchemaVersionSummary": {
+      "base": null,
+      "refs": {
+        "SearchSchemaSummary$SchemaVersions": "<p>An array of schema version summaries.</p>"
+      }
+    },
+    "__long": {
+      "base": null,
+      "refs": {
+        "SchemaSummary$VersionCount": "<p>The number of versions available for the schema.</p>"
+      }
+    },
+    "__string": {
+      "base": null,
+      "refs": {
+        "CodeBindingOutput$SchemaVersion": "<p>The version number of the schema.</p>",
+        "DescribeSchemaOutput$Content": "<p>The source of the schema definition.</p>",
+        "DescribeSchemaOutput$Description": "<p>The description of the schema.</p>",
+        "DescribeSchemaOutput$SchemaArn": "<p>The ARN of the schema.</p>",
+        "DescribeSchemaOutput$SchemaName": "<p>The name of the schema.</p>",
+        "DescribeSchemaOutput$SchemaVersion": "<p>The version number of the schema</p>",
+        "DescribeSchemaOutput$Type": "<p>The type of the schema.</p>",
+        "DiscovererOutput$Description": "<p>The description of the discoverer.</p>",
+        "DiscovererOutput$DiscovererArn": "<p>The ARN of the discoverer.</p>",
+        "DiscovererOutput$DiscovererId": "<p>The ID of the discoverer.</p>",
+        "DiscovererOutput$SourceArn": "<p>The ARN of the event bus.</p>",
+        "DiscovererStateOutput$DiscovererId": "<p>The ID of the discoverer.</p>",
+        "DiscovererSummary$DiscovererArn": "<p>The ARN of the discoverer.</p>",
+        "DiscovererSummary$DiscovererId": "<p>The ID of the discoverer.</p>",
+        "DiscovererSummary$SourceArn": "<p>The ARN of the event bus.</p>",
+        "ErrorOutput$Code": "<p>The error code.</p>",
+        "ErrorOutput$Message": "<p>The message string of the error output.</p>",
+        "ExportSchemaOutput$Content": "<p>The content of the schema.</p>",
+        "ExportSchemaOutput$SchemaArn": "<p>The ARN of the schema to export.</p>",
+        "ExportSchemaOutput$SchemaName": "<p>The name of the schema to export.</p>",
+        "ExportSchemaOutput$SchemaVersion": "<p>The version of the schema to export.</p>",
+        "ExportSchemaOutput$Type": "<p>The type of schema to export.</p>",
+        "GetDiscoveredSchemaOutput$Content": "<p>The source of the schema definition.</p>",
+        "GetResourcePolicyOutput$Policy": "<p>The resource-based policy.</p>",
+        "GetResourcePolicyOutput$RevisionId": "<p>The revision ID.</p>",
+        "ListDiscoverersOutput$NextToken": "<p>The token that specifies the next page of results to return. To request the first page, leave NextToken empty. The token will expire in 24 hours, and cannot be shared with other accounts.</p>",
+        "ListRegistriesOutput$NextToken": "<p>The token that specifies the next page of results to return. To request the first page, leave NextToken empty. The token will expire in 24 hours, and cannot be shared with other accounts.</p>",
+        "ListSchemaVersionsOutput$NextToken": "<p>The token that specifies the next page of results to return. To request the first page, leave NextToken empty. The token will expire in 24 hours, and cannot be shared with other accounts.</p>",
+        "ListSchemasOutput$NextToken": "<p>The token that specifies the next page of results to return. To request the first page, leave NextToken empty. The token will expire in 24 hours, and cannot be shared with other accounts.</p>",
+        "PutResourcePolicyInput$Policy": "<p>The resource-based policy.</p>",
+        "PutResourcePolicyInput$RevisionId": "<p>The revision ID of the policy.</p>",
+        "PutResourcePolicyOutput$Policy": "<p>The resource-based policy.</p>",
+        "PutResourcePolicyOutput$RevisionId": "<p>The revision ID of the policy.</p>",
+        "RegistryOutput$Description": "<p>The description of the registry.</p>",
+        "RegistryOutput$RegistryArn": "<p>The ARN of the registry.</p>",
+        "RegistryOutput$RegistryName": "<p>The name of the registry.</p>",
+        "RegistrySummary$RegistryArn": "<p>The ARN of the registry.</p>",
+        "RegistrySummary$RegistryName": "<p>The name of the registry.</p>",
+        "SchemaOutput$Description": "<p>The description of the schema.</p>",
+        "SchemaOutput$SchemaArn": "<p>The ARN of the schema.</p>",
+        "SchemaOutput$SchemaName": "<p>The name of the schema.</p>",
+        "SchemaOutput$SchemaVersion": "<p>The version number of the schema</p>",
+        "SchemaOutput$Type": "<p>The type of the schema.</p>",
+        "SchemaSummary$SchemaArn": "<p>The ARN of the schema.</p>",
+        "SchemaSummary$SchemaName": "<p>The name of the schema.</p>",
+        "SchemaVersionSummary$SchemaArn": "<p>The ARN of the schema version.</p>",
+        "SchemaVersionSummary$SchemaName": "<p>The name of the schema.</p>",
+        "SchemaVersionSummary$SchemaVersion": "<p>The version number of the schema.</p>",
+        "SearchSchemaSummary$RegistryName": "<p>The name of the registry.</p>",
+        "SearchSchemaSummary$SchemaArn": "<p>The ARN of the schema.</p>",
+        "SearchSchemaSummary$SchemaName": "<p>The name of the schema.</p>",
+        "SearchSchemaVersionSummary$SchemaVersion": "<p>The version number of the schema</p>",
+        "SearchSchemasOutput$NextToken": "<p>The token that specifies the next page of results to return. To request the first page, leave NextToken empty. The token will expire in 24 hours, and cannot be shared with other accounts.</p>",
+        "Tags$member": null
+      }
+    },
+    "__stringMin0Max256": {
+      "base": null,
+      "refs": {
+        "CreateDiscovererInput$Description": "<p>A description for the discoverer.</p>",
+        "CreateRegistryInput$Description": "<p>A description of the registry to be created.</p>",
+        "CreateSchemaInput$Description": "<p>A description of the schema.</p>",
+        "UpdateDiscovererInput$Description": "<p>The description of the discoverer to update.</p>",
+        "UpdateRegistryInput$Description": "<p>The description of the registry to update.</p>",
+        "UpdateSchemaInput$Description": "<p>The description of the schema.</p>"
+      }
+    },
+    "__stringMin0Max36": {
+      "base": null,
+      "refs": {
+        "UpdateSchemaInput$ClientTokenId": "<p>The ID of the client token.</p>"
+      }
+    },
+    "__stringMin1Max100000": {
+      "base": null,
+      "refs": {
+        "CreateSchemaInput$Content": "<p>The source of the schema definition.</p>",
+        "UpdateSchemaInput$Content": "<p>The source of the schema definition.</p>"
+      }
+    },
+    "__stringMin1Max1600": {
+      "base": null,
+      "refs": {
+        "LockServiceLinkedRoleInput$RoleArn": null,
+        "LockServiceLinkedRoleOutput$ReasonOfFailure": null,
+        "UnlockServiceLinkedRoleInput$RoleArn": null
+      }
+    },
+    "__stringMin20Max1600": {
+      "base": null,
+      "refs": {
+        "CreateDiscovererInput$SourceArn": "<p>The ARN of the event bus.</p>"
+      }
+    },
+    "__timestampIso8601": {
+      "base": null,
+      "refs": {
+        "CodeBindingOutput$CreationDate": "<p>The time and date that the code binding was created.</p>",
+        "CodeBindingOutput$LastModified": "<p>The date and time that code bindings were modified.</p>",
+        "DescribeSchemaOutput$LastModified": "<p>The date and time that schema was modified.</p>",
+        "DescribeSchemaOutput$VersionCreatedDate": "<p>The date the schema version was created.</p>",
+        "SchemaOutput$LastModified": "<p>The date and time that schema was modified.</p>",
+        "SchemaOutput$VersionCreatedDate": "<p>The date the schema version was created.</p>",
+        "SchemaSummary$LastModified": "<p>The date and time that schema was modified.</p>",
+        "SearchSchemaVersionSummary$CreatedDate": "<p>The date the schema version was created.</p>"
+      }
+    }
+  }
+}

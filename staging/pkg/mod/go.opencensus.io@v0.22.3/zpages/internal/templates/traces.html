@@ -1,0 +1,10 @@
+<p><b>Span Name: {{.Name}} </b></p>
+<p>{{.Num}} Requests</p>
+<pre>
+When                       Elapsed (sec)
+----------------------------------------
+{{range .Rows}}{{printf "%26s" (index .Fields 0)}} {{printf "%12s" (index .Fields 1)}} {{index .Fields 2}}{{.|traceid}}
+{{end}}</pre>
+<br>
+<p><b style="color:blue;">TraceId</b> means sampled request.
+    <b style="color:black;">TraceId</b> means not sampled request.</p>

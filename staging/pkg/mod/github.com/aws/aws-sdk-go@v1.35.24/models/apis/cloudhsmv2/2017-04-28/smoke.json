@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeClusters",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "ListTags",
+            "input": {
+                "ResourceId": "bogus-arn"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

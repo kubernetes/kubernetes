@@ -1,0 +1,228 @@
+{
+  "version": "2.0",
+  "service": "<p> Amazon Honeycode is a fully managed service that allows you to quickly build mobile and web apps for teams—without programming. Build Honeycode apps for managing almost anything, like projects, customers, operations, approvals, resources, and even your team. </p>",
+  "operations": {
+    "GetScreenData": "<p> The GetScreenData API allows retrieval of data from a screen in a Honeycode app. The API allows setting local variables in the screen to filter, sort or otherwise affect what will be displayed on the screen. </p>",
+    "InvokeScreenAutomation": "<p> The InvokeScreenAutomation API allows invoking an action defined in a screen in a Honeycode app. The API allows setting local variables, which can then be used in the automation being invoked. This allows automating the Honeycode app interactions to write, update or delete data in the workbook. </p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p> You do not have sufficient access to perform this action. Check that the workbook is owned by you and your IAM policy allows access to the screen/automation in the request. </p>",
+      "refs": {
+      }
+    },
+    "AutomationExecutionException": {
+      "base": "<p>The automation execution did not end successfully.</p>",
+      "refs": {
+      }
+    },
+    "AutomationExecutionTimeoutException": {
+      "base": "<p>The automation execution timed out.</p>",
+      "refs": {
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "InvokeScreenAutomationRequest$clientRequestToken": "<p> The request token for performing the automation action. Request tokens help to identify duplicate requests. If a call times out or fails due to a transient error like a failed network connection, you can retry the call with the same request token. The service ensures that if the first call using that request token is successfully performed, the second call will return the response of the previous call rather than performing the action again. </p> <p> Note that request tokens are valid only for a few minutes. You cannot use request tokens to dedupe requests spanning hours or days. </p>"
+      }
+    },
+    "ColumnMetadata": {
+      "base": "<p>Metadata for column in the table.</p>",
+      "refs": {
+        "ResultHeader$member": null
+      }
+    },
+    "DataItem": {
+      "base": "<p>The data in a particular data cell defined on the screen.</p>",
+      "refs": {
+        "DataItems$member": null
+      }
+    },
+    "DataItems": {
+      "base": null,
+      "refs": {
+        "ResultRow$dataItems": "<p>List of all the data cells in a row.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "AutomationExecutionException$message": null,
+        "AutomationExecutionTimeoutException$message": null,
+        "InternalServerException$message": null,
+        "RequestTimeoutException$message": null,
+        "ResourceNotFoundException$message": null,
+        "ServiceUnavailableException$message": null,
+        "ThrottlingException$message": null,
+        "ValidationException$message": null
+      }
+    },
+    "Format": {
+      "base": null,
+      "refs": {
+        "ColumnMetadata$format": "<p>The format of the column.</p>",
+        "DataItem$overrideFormat": "<p> The overrideFormat is optional and is specified only if a particular row of data has a different format for the data than the default format defined on the screen or the table. </p>"
+      }
+    },
+    "FormattedValue": {
+      "base": null,
+      "refs": {
+        "DataItem$formattedValue": "<p>The formatted value of the data. e.g. John Smith.</p>"
+      }
+    },
+    "GetScreenDataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetScreenDataResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>There were unexpected errors from the server.</p>",
+      "refs": {
+      }
+    },
+    "InvokeScreenAutomationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvokeScreenAutomationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "GetScreenDataRequest$maxResults": "<p> The number of results to be returned on a single page. Specify a number between 1 and 100. The maximum value is 100. </p> <p> This parameter is optional. If you don't specify this parameter, the default page size is 100. </p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "ColumnMetadata$name": "<p>The name of the column.</p>",
+        "ResultSetMap$key": null
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "GetScreenDataRequest$nextToken": "<p> This parameter is optional. If a nextToken is not specified, the API returns the first page of data. </p> <p> Pagination tokens expire after 1 hour. If you use a token that was returned more than an hour back, the API will throw ValidationException. </p>",
+        "GetScreenDataResult$nextToken": "<p> Provides the pagination token to load the next page if there are more results matching the request. If a pagination token is not present in the response, it means that all data matching the query has been loaded. </p>"
+      }
+    },
+    "RawValue": {
+      "base": null,
+      "refs": {
+        "DataItem$rawValue": "<p>The raw value of the data. e.g. jsmith@example.com</p>",
+        "VariableValue$rawValue": "<p>Raw value of the variable.</p>"
+      }
+    },
+    "RequestTimeoutException": {
+      "base": "<p>The request timed out.</p>",
+      "refs": {
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "GetScreenDataRequest$workbookId": "<p>The ID of the workbook that contains the screen.</p>",
+        "GetScreenDataRequest$appId": "<p>The ID of the app that contains the screem.</p>",
+        "GetScreenDataRequest$screenId": "<p>The ID of the screen.</p>",
+        "InvokeScreenAutomationRequest$workbookId": "<p>The ID of the workbook that contains the screen automation.</p>",
+        "InvokeScreenAutomationRequest$appId": "<p>The ID of the app that contains the screen automation.</p>",
+        "InvokeScreenAutomationRequest$screenId": "<p>The ID of the screen that contains the screen automation.</p>",
+        "InvokeScreenAutomationRequest$screenAutomationId": "<p>The ID of the automation action to be performed.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>A Workbook, App, Screen or Screen Automation was not found with the given ID.</p>",
+      "refs": {
+      }
+    },
+    "ResultHeader": {
+      "base": null,
+      "refs": {
+        "ResultSet$headers": "<p> List of headers for all the data cells in the block. The header identifies the name and default format of the data cell. Data cells appear in the same order in all rows as defined in the header. The names and formats are not repeated in the rows. If a particular row does not have a value for a data cell, a blank value is used. </p> <p> For example, a task list that displays the task name, due date and assigned person might have headers [ { \"name\": \"Task Name\"}, {\"name\": \"Due Date\", \"format\": \"DATE\"}, {\"name\": \"Assigned\", \"format\": \"CONTACT\"} ]. Every row in the result will have the task name as the first item, due date as the second item and assigned person as the third item. If a particular task does not have a due date, that row will still have a blank value in the second element and the assigned person will still be in the third element. </p>"
+      }
+    },
+    "ResultRow": {
+      "base": "<p>A single row in the ResultSet.</p>",
+      "refs": {
+        "ResultRows$member": null
+      }
+    },
+    "ResultRows": {
+      "base": null,
+      "refs": {
+        "ResultSet$rows": "<p> List of rows returned by the request. Each row has a row Id and a list of data cells in that row. The data cells will be present in the same order as they are defined in the header. </p>"
+      }
+    },
+    "ResultSet": {
+      "base": "<p> ResultSet contains the results of the request for a single block or list defined on the screen. </p>",
+      "refs": {
+        "ResultSetMap$value": null
+      }
+    },
+    "ResultSetMap": {
+      "base": null,
+      "refs": {
+        "GetScreenDataResult$results": "<p>A map of all the rows on the screen keyed by block name.</p>"
+      }
+    },
+    "RowId": {
+      "base": null,
+      "refs": {
+        "InvokeScreenAutomationRequest$rowId": "<p> The row ID for the automation if the automation is defined inside a block with source or list. </p>",
+        "ResultRow$rowId": "<p>The ID for a particular row.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>Remote service is unreachable.</p>",
+      "refs": {
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Tps(transactions per second) rate reached.</p>",
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p> Request is invalid. The message in the response contains details on why the request is invalid. </p>",
+      "refs": {
+      }
+    },
+    "VariableName": {
+      "base": null,
+      "refs": {
+        "VariableValueMap$key": null
+      }
+    },
+    "VariableValue": {
+      "base": "<p>The input variables to the app to be used by the InvokeScreenAutomation action request.</p>",
+      "refs": {
+        "VariableValueMap$value": null
+      }
+    },
+    "VariableValueMap": {
+      "base": null,
+      "refs": {
+        "GetScreenDataRequest$variables": "<p> Variables are optional and are needed only if the screen requires them to render correctly. Variables are specified as a map where the key is the name of the variable as defined on the screen. The value is an object which currently has only one property, rawValue, which holds the value of the variable to be passed to the screen. </p>",
+        "InvokeScreenAutomationRequest$variables": "<p> Variables are optional and are needed only if the screen requires them to render correctly. Variables are specified as a map where the key is the name of the variable as defined on the screen. The value is an object which currently has only one property, rawValue, which holds the value of the variable to be passed to the screen. </p>"
+      }
+    },
+    "WorkbookCursor": {
+      "base": null,
+      "refs": {
+        "GetScreenDataResult$workbookCursor": "<p> Indicates the cursor of the workbook at which the data returned by this workbook is read. Workbook cursor keeps increasing with every update and the increments are not sequential. </p>",
+        "InvokeScreenAutomationResult$workbookCursor": "<p>The updated workbook cursor after performing the automation action.</p>"
+      }
+    }
+  }
+}

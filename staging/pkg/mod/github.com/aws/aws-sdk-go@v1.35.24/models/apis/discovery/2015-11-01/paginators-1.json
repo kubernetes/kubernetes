@@ -1,0 +1,14 @@
+{
+  "pagination": {
+    "DescribeContinuousExports": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    },
+    "DescribeImportTasks": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults"
+    }
+  }
+}

@@ -1,0 +1,1851 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Kendra is a service for indexing large document sets.</p>",
+  "operations": {
+    "BatchDeleteDocument": "<p>Removes one or more documents from an index. The documents must have been added with the <a>BatchPutDocument</a> operation.</p> <p>The documents are deleted asynchronously. You can see the progress of the deletion by using AWS CloudWatch. Any error messages releated to the processing of the batch are sent to you CloudWatch log.</p>",
+    "BatchPutDocument": "<p>Adds one or more documents to an index.</p> <p>The <code>BatchPutDocument</code> operation enables you to ingest inline documents or a set of documents stored in an Amazon S3 bucket. Use this operation to ingest your text and unstructured text into an index, add custom attributes to the documents, and to attach an access control list to the documents added to the index.</p> <p>The documents are indexed asynchronously. You can see the progress of the batch using AWS CloudWatch. Any error messages related to processing the batch are sent to your AWS CloudWatch log.</p>",
+    "CreateDataSource": "<p>Creates a data source that you use to with an Amazon Kendra index. </p> <p>You specify a name, data source connector type and description for your data source. You also specify configuration information such as document metadata (author, source URI, and so on) and user context information.</p> <p> <code>CreateDataSource</code> is a synchronous operation. The operation returns 200 if the data source was successfully created. Otherwise, an exception is raised.</p>",
+    "CreateFaq": "<p>Creates an new set of frequently asked question (FAQ) questions and answers.</p>",
+    "CreateIndex": "<p>Creates a new Amazon Kendra index. Index creation is an asynchronous operation. To determine if index creation has completed, check the <code>Status</code> field returned from a call to . The <code>Status</code> field is set to <code>ACTIVE</code> when the index is ready to use.</p> <p>Once the index is active you can index your documents using the operation or using one of the supported data sources. </p>",
+    "DeleteDataSource": "<p>Deletes an Amazon Kendra data source. An exception is not thrown if the data source is already being deleted. While the data source is being deleted, the <code>Status</code> field returned by a call to the operation is set to <code>DELETING</code>. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/delete-data-source.html\">Deleting Data Sources</a>.</p>",
+    "DeleteFaq": "<p>Removes an FAQ from an index.</p>",
+    "DeleteIndex": "<p>Deletes an existing Amazon Kendra index. An exception is not thrown if the index is already being deleted. While the index is being deleted, the <code>Status</code> field returned by a call to the <a>DescribeIndex</a> operation is set to <code>DELETING</code>.</p>",
+    "DescribeDataSource": "<p>Gets information about a Amazon Kendra data source.</p>",
+    "DescribeFaq": "<p>Gets information about an FAQ list.</p>",
+    "DescribeIndex": "<p>Describes an existing Amazon Kendra index</p>",
+    "ListDataSourceSyncJobs": "<p>Gets statistics about synchronizing Amazon Kendra with a data source.</p>",
+    "ListDataSources": "<p>Lists the data sources that you have created.</p>",
+    "ListFaqs": "<p>Gets a list of FAQ lists associated with an index.</p>",
+    "ListIndices": "<p>Lists the Amazon Kendra indexes that you have created.</p>",
+    "ListTagsForResource": "<p>Gets a list of tags associated with a specified resource. Indexes, FAQs, and data sources can have tags associated with them.</p>",
+    "Query": "<p>Searches an active index. Use this API to search your documents using query. The <code>Query</code> operation enables to do faceted search and to filter results based on document attributes.</p> <p>It also enables you to provide user context that Amazon Kendra uses to enforce document access control in the search results. </p> <p>Amazon Kendra searches your index for text content and question and answer (FAQ) content. By default the response contains three types of results.</p> <ul> <li> <p>Relevant passages</p> </li> <li> <p>Matching FAQs</p> </li> <li> <p>Relevant documents</p> </li> </ul> <p>You can specify that the query return only one type of result using the <code>QueryResultTypeConfig</code> parameter.</p> <p>Each query returns the 100 most relevant results. </p>",
+    "StartDataSourceSyncJob": "<p>Starts a synchronization job for a data source. If a synchronization job is already in progress, Amazon Kendra returns a <code>ResourceInUseException</code> exception.</p>",
+    "StopDataSourceSyncJob": "<p>Stops a running synchronization job. You can't stop a scheduled synchronization job.</p>",
+    "SubmitFeedback": "<p>Enables you to provide feedback to Amazon Kendra to improve the performance of the service. </p>",
+    "TagResource": "<p>Adds the specified tag to the specified index, FAQ, or data source resource. If the tag already exists, the existing value is replaced with the new value.</p>",
+    "UntagResource": "<p>Removes a tag from an index, FAQ, or a data source.</p>",
+    "UpdateDataSource": "<p>Updates an existing Amazon Kendra data source.</p>",
+    "UpdateIndex": "<p>Updates an existing Amazon Kendra index.</p>"
+  },
+  "shapes": {
+    "AccessControlListConfiguration": {
+      "base": "<p>Access Control List files for the documents in a data source.</p>",
+      "refs": {
+        "S3DataSourceConfiguration$AccessControlListConfiguration": "<p>Provides the path to the S3 bucket that contains the user context filtering files for the data source.</p>"
+      }
+    },
+    "AccessDeniedException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "AclConfiguration": {
+      "base": "<p>Provides information about the column that should be used for filtering the query response by groups.</p>",
+      "refs": {
+        "DatabaseConfiguration$AclConfiguration": "<p>Information about the database column that provides information for user context filtering.</p>"
+      }
+    },
+    "AdditionalResultAttribute": {
+      "base": "<p>An attribute returned from an index query.</p>",
+      "refs": {
+        "AdditionalResultAttributeList$member": null
+      }
+    },
+    "AdditionalResultAttributeList": {
+      "base": null,
+      "refs": {
+        "QueryResultItem$AdditionalAttributes": "<p>One or more additional attributes associated with the query result.</p>"
+      }
+    },
+    "AdditionalResultAttributeValue": {
+      "base": "<p>An attribute returned with a document from a search.</p>",
+      "refs": {
+        "AdditionalResultAttribute$Value": "<p>An object that contains the attribute value.</p>"
+      }
+    },
+    "AdditionalResultAttributeValueType": {
+      "base": null,
+      "refs": {
+        "AdditionalResultAttribute$ValueType": "<p>The data type of the <code>Value</code> property.</p>"
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the index, FAQ, or data source to get a list of tags for.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the index, FAQ, or data source to tag.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the index, FAQ, or data source to remove the tag from.</p>"
+      }
+    },
+    "AttributeFilter": {
+      "base": "<p>Provides filtering the query results based on document attributes.</p> <p>When you use the <code>AndAllFilters</code> or <code>OrAllFilters</code>, filters you can use 2 layers under the first attribute filter. For example, you can use:</p> <p> <code>&lt;AndAllFilters&gt;</code> </p> <ol> <li> <p> <code> &lt;OrAllFilters&gt;</code> </p> </li> <li> <p> <code> &lt;EqualTo&gt;</code> </p> </li> </ol> <p>If you use more than 2 layers, you receive a <code>ValidationException</code> exception with the message \"<code>AttributeFilter</code> cannot have a depth of more than 2.\"</p>",
+      "refs": {
+        "AttributeFilter$NotFilter": "<p>Performs a logical <code>NOT</code> operation on all supplied filters.</p>",
+        "AttributeFilterList$member": null,
+        "QueryRequest$AttributeFilter": "<p>Enables filtered searches based on document attributes. You can only provide one attribute filter; however, the <code>AndAllFilters</code>, <code>NotFilter</code>, and <code>OrAllFilters</code> parameters contain a list of other filters.</p> <p>The <code>AttributeFilter</code> parameter enables you to create a set of filtering rules that a document must satisfy to be included in the query results.</p>"
+      }
+    },
+    "AttributeFilterList": {
+      "base": null,
+      "refs": {
+        "AttributeFilter$AndAllFilters": "<p>Performs a logical <code>AND</code> operation on all supplied filters.</p>",
+        "AttributeFilter$OrAllFilters": "<p>Performs a logical <code>OR</code> operation on all supplied filters.</p>"
+      }
+    },
+    "BatchDeleteDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDeleteDocumentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDeleteDocumentResponseFailedDocument": {
+      "base": "<p>Provides information about documents that could not be removed from an index by the <a>BatchDeleteDocument</a> operation.</p>",
+      "refs": {
+        "BatchDeleteDocumentResponseFailedDocuments$member": null
+      }
+    },
+    "BatchDeleteDocumentResponseFailedDocuments": {
+      "base": null,
+      "refs": {
+        "BatchDeleteDocumentResponse$FailedDocuments": "<p>A list of documents that could not be removed from the index. Each entry contains an error message that indicates why the document couldn't be removed from the index.</p>"
+      }
+    },
+    "BatchPutDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPutDocumentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchPutDocumentResponseFailedDocument": {
+      "base": "<p>Provides information about a document that could not be indexed.</p>",
+      "refs": {
+        "BatchPutDocumentResponseFailedDocuments$member": null
+      }
+    },
+    "BatchPutDocumentResponseFailedDocuments": {
+      "base": null,
+      "refs": {
+        "BatchPutDocumentResponse$FailedDocuments": "<p>A list of documents that were not added to the index because the document failed a validation check. Each document contains an error message that indicates why the document couldn't be added to the index.</p> <p>If there was an error adding a document to an index the error is reported in your AWS CloudWatch log. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/cloudwatch-logs.html\">Monitoring Amazon Kendra with Amazon CloudWatch Logs</a> </p>"
+      }
+    },
+    "Blob": {
+      "base": null,
+      "refs": {
+        "Document$Blob": "<p>The contents of the document. </p> <p>Documents passed to the <code>Blob</code> parameter must be base64 encoded. Your code might not need to encode the document file bytes if you're using an AWS SDK to call Amazon Kendra operations. If you are calling the Amazon Kendra endpoint directly using REST, you must base64 encode the contents before sending.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "ConfluenceAttachmentConfiguration$CrawlAttachments": "<p>Indicates whether Amazon Kendra indexes attachments to the pages and blogs in the Confluence data source. </p>",
+        "ConfluenceSpaceConfiguration$CrawlPersonalSpaces": "<p>Specifies whether Amazon Kendra should index personal spaces. Users can add restrictions to items in personal spaces. If personal spaces are indexed, queries without user context information may return restricted items from a personal space in their results. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/user-context-filter.html\">Filtering on user context</a>.</p>",
+        "ConfluenceSpaceConfiguration$CrawlArchivedSpaces": "<p>Specifies whether Amazon Kendra should index archived spaces.</p>",
+        "Highlight$TopAnswer": "<p>Indicates whether the response is the best response. True if this is the best response; otherwise, false.</p>",
+        "OneDriveConfiguration$DisableLocalGroups": "<p>A Boolean value that specifies whether local groups are disabled (<code>True</code>) or enabled (<code>False</code>). </p>",
+        "SalesforceConfiguration$CrawlAttachments": "<p>Indicates whether Amazon Kendra should index attachments to Salesforce objects.</p>",
+        "Search$Facetable": "<p>Indicates that the field can be used to create search facets, a count of results for each value in the field. The default is <code>false</code> .</p>",
+        "Search$Searchable": "<p>Determines whether the field is used in the search. If the <code>Searchable</code> field is <code>true</code>, you can use relevance tuning to manually tune how Amazon Kendra weights the field in the search. The default is <code>true</code> for string fields and <code>false</code> for number and date fields.</p>",
+        "Search$Displayable": "<p>Determines whether the field is returned in the query response. The default is <code>true</code>.</p>",
+        "Search$Sortable": "<p>Determines whether the field can be used to sort the results of a query. If you specify sorting on a field that does not have <code>Sortable</code> set to <code>true</code>, Amazon Kendra returns an exception. The default is <code>false</code>.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$CrawlAttachments": "<p>Indicates whether Amazon Kendra should index attachments to knowledge articles.</p>",
+        "ServiceNowServiceCatalogConfiguration$CrawlAttachments": "<p>Indicates whether Amazon Kendra should crawl attachments to the service catalog items. </p>",
+        "SharePointConfiguration$CrawlAttachments": "<p> <code>TRUE</code> to include attachments to documents stored in your Microsoft SharePoint site in the index; otherwise, <code>FALSE</code>.</p>",
+        "SharePointConfiguration$UseChangeLog": "<p>Set to <code>TRUE</code> to use the Microsoft SharePoint change log to determine the documents that need to be updated in the index. Depending on the size of the SharePoint change log, it may take longer for Amazon Kendra to use the change log than it takes it to determine the changed documents using the Amazon Kendra document crawler.</p>",
+        "SharePointConfiguration$DisableLocalGroups": "<p>A Boolean value that specifies whether local groups are disabled (<code>True</code>) or enabled (<code>False</code>). </p>"
+      }
+    },
+    "CapacityUnitsConfiguration": {
+      "base": "<p>Specifies capacity units configured for your index. You can add and remove capacity units to tune an index to your requirements.</p>",
+      "refs": {
+        "DescribeIndexResponse$CapacityUnits": "<p>For enterprise edtion indexes, you can choose to use additional capacity to meet the needs of your application. This contains the capacity units used for the index. A 0 for the query capacity or the storage capacity indicates that the index is using the default capacity for the index.</p>",
+        "UpdateIndexRequest$CapacityUnits": "<p>Sets the number of addtional storage and query capacity units that should be used by the index. You can change the capacity of the index up to 5 times per day.</p> <p>If you are using extra storage units, you can't reduce the storage capacity below that required to meet the storage needs for your index.</p>"
+      }
+    },
+    "ChangeDetectingColumns": {
+      "base": null,
+      "refs": {
+        "ColumnConfiguration$ChangeDetectingColumns": "<p>One to five columns that indicate when a document in the database has changed.</p>"
+      }
+    },
+    "ClaimRegex": {
+      "base": null,
+      "refs": {
+        "JwtTokenTypeConfiguration$ClaimRegex": "<p>The regular expression that identifies the claim.</p>"
+      }
+    },
+    "ClickFeedback": {
+      "base": "<p>Gathers information about when a particular result was clicked by a user. Your application uses the <a>SubmitFeedback</a> operation to provide click information.</p>",
+      "refs": {
+        "ClickFeedbackList$member": null
+      }
+    },
+    "ClickFeedbackList": {
+      "base": null,
+      "refs": {
+        "SubmitFeedbackRequest$ClickFeedbackItems": "<p>Tells Amazon Kendra that a particular search result link was chosen by the user. </p>"
+      }
+    },
+    "ClientTokenName": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$ClientToken": "<p>A token that you provide to identify the request to create a data source. Multiple calls to the <code>CreateDataSource</code> operation with the same client token will create only one data source.</p>",
+        "CreateFaqRequest$ClientToken": "<p>A token that you provide to identify the request to create a FAQ. Multiple calls to the <code>CreateFaqRequest</code> operation with the same client token will create only one FAQ. </p>",
+        "CreateIndexRequest$ClientToken": "<p>A token that you provide to identify the request to create an index. Multiple calls to the <code>CreateIndex</code> operation with the same client token will create only one index.</p>"
+      }
+    },
+    "ColumnConfiguration": {
+      "base": "<p>Provides information about how Amazon Kendra should use the columns of a database in an index.</p>",
+      "refs": {
+        "DatabaseConfiguration$ColumnConfiguration": "<p>Information about where the index should get the document information from the database.</p>"
+      }
+    },
+    "ColumnName": {
+      "base": null,
+      "refs": {
+        "AclConfiguration$AllowedGroupsColumnName": "<p>A list of groups, separated by semi-colons, that filters a query response based on user context. The document is only returned to users that are in one of the groups specified in the <code>UserContext</code> field of the <a>Query</a> operation.</p>",
+        "ChangeDetectingColumns$member": null,
+        "ColumnConfiguration$DocumentIdColumnName": "<p>The column that provides the document's unique identifier.</p>",
+        "ColumnConfiguration$DocumentDataColumnName": "<p>The column that contains the contents of the document.</p>",
+        "ColumnConfiguration$DocumentTitleColumnName": "<p>The column that contains the title of the document.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ConfluenceAttachmentConfiguration": {
+      "base": "<p>Specifies the attachment settings for the Confluence data source. Attachment settings are optional, if you don't specify settings attachments, Amazon Kendra won't index them.</p>",
+      "refs": {
+        "ConfluenceConfiguration$AttachmentConfiguration": "<p>Specifies configuration information for indexing attachments to Confluence blogs and pages.</p>"
+      }
+    },
+    "ConfluenceAttachmentFieldMappingsList": {
+      "base": null,
+      "refs": {
+        "ConfluenceAttachmentConfiguration$AttachmentFieldMappings": "<p>Defines how attachment metadata fields should be mapped to index fields. Before you can map a field, you must first create an index field with a matching type using the console or the <code>UpdateIndex</code> operation.</p> <p>If you specify the <code>AttachentFieldMappings</code> parameter, you must specify at least one field mapping.</p>"
+      }
+    },
+    "ConfluenceAttachmentFieldName": {
+      "base": null,
+      "refs": {
+        "ConfluenceAttachmentToIndexFieldMapping$DataSourceFieldName": "<p>The name of the field in the data source. </p> <p>You must first create the index field using the operation. </p>"
+      }
+    },
+    "ConfluenceAttachmentToIndexFieldMapping": {
+      "base": "<p>Defines the mapping between a field in the Confluence data source to a Amazon Kendra index field.</p> <p>You must first create the index field using the operation. </p>",
+      "refs": {
+        "ConfluenceAttachmentFieldMappingsList$member": null
+      }
+    },
+    "ConfluenceBlogConfiguration": {
+      "base": "<p>Specifies the blog settings for the Confluence data source. Blogs are always indexed unless filtered from the index by the <code>ExclusionPatterns</code> or <code>InclusionPatterns</code> fields in the data type.</p>",
+      "refs": {
+        "ConfluenceConfiguration$BlogConfiguration": "<p> Specifies configuration information for indexing Confluence blogs.</p>"
+      }
+    },
+    "ConfluenceBlogFieldMappingsList": {
+      "base": null,
+      "refs": {
+        "ConfluenceBlogConfiguration$BlogFieldMappings": "<p>Defines how blog metadata fields should be mapped to index fields. Before you can map a field, you must first create an index field with a matching type using the console or the <code>UpdateIndex</code> operation.</p> <p>If you specify the <code>BlogFieldMappings</code> parameter, you must specify at least one field mapping.</p>"
+      }
+    },
+    "ConfluenceBlogFieldName": {
+      "base": null,
+      "refs": {
+        "ConfluenceBlogToIndexFieldMapping$DataSourceFieldName": "<p>The name of the field in the data source. </p>"
+      }
+    },
+    "ConfluenceBlogToIndexFieldMapping": {
+      "base": "<p>Defines the mapping between a blog field in the Confluence data source to a Amazon Kendra index field.</p> <p>You must first create the index field using the operation. </p>",
+      "refs": {
+        "ConfluenceBlogFieldMappingsList$member": null
+      }
+    },
+    "ConfluenceConfiguration": {
+      "base": "<p>Provides configuration information for data sources that connect to Confluence.</p>",
+      "refs": {
+        "DataSourceConfiguration$ConfluenceConfiguration": "<p>Provides configuration information for connecting to a Confluence data source.</p>"
+      }
+    },
+    "ConfluencePageConfiguration": {
+      "base": "<p>Specifies the page settings for the Confluence data source.</p>",
+      "refs": {
+        "ConfluenceConfiguration$PageConfiguration": "<p>Specifies configuration information for indexing Confluence pages.</p>"
+      }
+    },
+    "ConfluencePageFieldMappingsList": {
+      "base": null,
+      "refs": {
+        "ConfluencePageConfiguration$PageFieldMappings": "<p>Defines how page metadata fields should be mapped to index fields. Before you can map a field, you must first create an index field with a matching type using the console or the <code>UpdateIndex</code> operation.</p> <p>If you specify the <code>PageFieldMappings</code> parameter, you must specify at least one field mapping.</p>"
+      }
+    },
+    "ConfluencePageFieldName": {
+      "base": null,
+      "refs": {
+        "ConfluencePageToIndexFieldMapping$DataSourceFieldName": "<p>The name of the field in the data source. </p>"
+      }
+    },
+    "ConfluencePageToIndexFieldMapping": {
+      "base": "<p>Defines the mapping between a field in the Confluence data source to a Amazon Kendra index field.</p> <p>You must first create the index field using the operation. </p>",
+      "refs": {
+        "ConfluencePageFieldMappingsList$member": null
+      }
+    },
+    "ConfluenceSpaceConfiguration": {
+      "base": "<p>Specifies the configuration for indexing Confluence spaces.</p>",
+      "refs": {
+        "ConfluenceConfiguration$SpaceConfiguration": "<p>Specifies configuration information for indexing Confluence spaces.</p>"
+      }
+    },
+    "ConfluenceSpaceFieldMappingsList": {
+      "base": null,
+      "refs": {
+        "ConfluenceSpaceConfiguration$SpaceFieldMappings": "<p>Defines how space metadata fields should be mapped to index fields. Before you can map a field, you must first create an index field with a matching type using the console or the <code>UpdateIndex</code> operation.</p> <p>If you specify the <code>SpaceFieldMappings</code> parameter, you must specify at least one field mapping.</p>"
+      }
+    },
+    "ConfluenceSpaceFieldName": {
+      "base": null,
+      "refs": {
+        "ConfluenceSpaceToIndexFieldMapping$DataSourceFieldName": "<p>The name of the field in the data source. </p>"
+      }
+    },
+    "ConfluenceSpaceIdentifier": {
+      "base": null,
+      "refs": {
+        "ConfluenceSpaceList$member": null
+      }
+    },
+    "ConfluenceSpaceList": {
+      "base": null,
+      "refs": {
+        "ConfluenceSpaceConfiguration$IncludeSpaces": "<p>A list of space keys for Confluence spaces. If you include a key, the blogs, documents, and attachments in the space are indexed. Spaces that aren't in the list aren't indexed. A space in the list must exist. Otherwise, Amazon Kendra logs an error when the data source is synchronized. If a space is in both the <code>IncludeSpaces</code> and the <code>ExcludeSpaces</code> list, the space is excluded.</p>",
+        "ConfluenceSpaceConfiguration$ExcludeSpaces": "<p>A list of space keys of Confluence spaces. If you include a key, the blogs, documents, and attachments in the space are not indexed. If a space is in both the <code>ExcludeSpaces</code> and the <code>IncludeSpaces</code> list, the space is excluded.</p>"
+      }
+    },
+    "ConfluenceSpaceToIndexFieldMapping": {
+      "base": "<p>Defines the mapping between a field in the Confluence data source to a Amazon Kendra index field.</p> <p>You must first create the index field using the operation. </p>",
+      "refs": {
+        "ConfluenceSpaceFieldMappingsList$member": null
+      }
+    },
+    "ConfluenceVersion": {
+      "base": null,
+      "refs": {
+        "ConfluenceConfiguration$Version": "<p>Specifies the version of the Confluence installation that you are connecting to.</p>"
+      }
+    },
+    "ConnectionConfiguration": {
+      "base": "<p>Provides the information necessary to connect to a database.</p>",
+      "refs": {
+        "DatabaseConfiguration$ConnectionConfiguration": "<p>The information necessary to connect to a database.</p>"
+      }
+    },
+    "ContentType": {
+      "base": null,
+      "refs": {
+        "Document$ContentType": "<p>The file type of the document in the <code>Blob</code> field.</p>"
+      }
+    },
+    "CreateDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDataSourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFaqRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFaqResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIndexRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateIndexResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DataSourceConfiguration": {
+      "base": "<p>Configuration information for a Amazon Kendra data source.</p>",
+      "refs": {
+        "CreateDataSourceRequest$Configuration": "<p>The connector configuration information that is required to access the repository.</p> <p>You can't specify the <code>Configuration</code> parameter when the <code>Type</code> parameter is set to <code>CUSTOM</code>. If you do, you receive a <code>ValidationException</code> exception.</p> <p>The <code>Configuration</code> parameter is required for all other data sources.</p>",
+        "DescribeDataSourceResponse$Configuration": "<p>Information that describes where the data source is located and how the data source is configured. The specific information in the description depends on the data source provider.</p>",
+        "UpdateDataSourceRequest$Configuration": null
+      }
+    },
+    "DataSourceDateFieldFormat": {
+      "base": null,
+      "refs": {
+        "ConfluenceAttachmentToIndexFieldMapping$DateFieldFormat": "<p>The format for date fields in the data source. If the field specified in <code>DataSourceFieldName</code> is a date field you must specify the date format. If the field is not a date field, an exception is thrown.</p>",
+        "ConfluenceBlogToIndexFieldMapping$DateFieldFormat": "<p>The format for date fields in the data source. If the field specified in <code>DataSourceFieldName</code> is a date field you must specify the date format. If the field is not a date field, an exception is thrown.</p>",
+        "ConfluencePageToIndexFieldMapping$DateFieldFormat": "<p>The format for date fields in the data source. If the field specified in <code>DataSourceFieldName</code> is a date field you must specify the date format. If the field is not a date field, an exception is thrown.</p>",
+        "ConfluenceSpaceToIndexFieldMapping$DateFieldFormat": "<p>The format for date fields in the data source. If the field specified in <code>DataSourceFieldName</code> is a date field you must specify the date format. If the field is not a date field, an exception is thrown.</p>",
+        "DataSourceToIndexFieldMapping$DateFieldFormat": "<p>The type of data stored in the column or attribute.</p>"
+      }
+    },
+    "DataSourceFieldName": {
+      "base": null,
+      "refs": {
+        "DataSourceToIndexFieldMapping$DataSourceFieldName": "<p>The name of the column or attribute in the data source.</p>",
+        "SalesforceChatterFeedConfiguration$DocumentDataFieldName": "<p>The name of the column in the Salesforce FeedItem table that contains the content to index. Typically this is the <code>Body</code> column.</p>",
+        "SalesforceChatterFeedConfiguration$DocumentTitleFieldName": "<p>The name of the column in the Salesforce FeedItem table that contains the title of the document. This is typically the <code>Title</code> collumn.</p>",
+        "SalesforceCustomKnowledgeArticleTypeConfiguration$DocumentDataFieldName": "<p>The name of the field in the custom knowledge article that contains the document data to index.</p>",
+        "SalesforceCustomKnowledgeArticleTypeConfiguration$DocumentTitleFieldName": "<p>The name of the field in the custom knowledge article that contains the document title.</p>",
+        "SalesforceStandardKnowledgeArticleTypeConfiguration$DocumentDataFieldName": "<p>The name of the field that contains the document data to index.</p>",
+        "SalesforceStandardKnowledgeArticleTypeConfiguration$DocumentTitleFieldName": "<p>The name of the field that contains the document title.</p>",
+        "SalesforceStandardObjectAttachmentConfiguration$DocumentTitleFieldName": "<p>The name of the field used for the document title.</p>",
+        "SalesforceStandardObjectConfiguration$DocumentDataFieldName": "<p>The name of the field in the standard object table that contains the document contents.</p>",
+        "SalesforceStandardObjectConfiguration$DocumentTitleFieldName": "<p>The name of the field in the standard object table that contains the document titleB.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$DocumentDataFieldName": "<p>The name of the ServiceNow field that is mapped to the index document contents field in the Amazon Kendra index.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$DocumentTitleFieldName": "<p>The name of the ServiceNow field that is mapped to the index document title field.</p>",
+        "ServiceNowServiceCatalogConfiguration$DocumentDataFieldName": "<p>The name of the ServiceNow field that is mapped to the index document contents field in the Amazon Kendra index.</p>",
+        "ServiceNowServiceCatalogConfiguration$DocumentTitleFieldName": "<p>The name of the ServiceNow field that is mapped to the index document title field.</p>",
+        "SharePointConfiguration$DocumentTitleFieldName": "<p>The Microsoft SharePoint attribute field that contains the title of the document.</p>"
+      }
+    },
+    "DataSourceId": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceResponse$Id": "<p>A unique identifier for the data source.</p>",
+        "DataSourceSummary$Id": "<p>The unique identifier for the data source.</p>",
+        "DataSourceSyncJobMetricTarget$DataSourceId": "<p>The ID of the data source that is running the sync job.</p>",
+        "DeleteDataSourceRequest$Id": "<p>The unique identifier of the data source to delete.</p>",
+        "DescribeDataSourceRequest$Id": "<p>The unique identifier of the data source to describe.</p>",
+        "DescribeDataSourceResponse$Id": "<p>The identifier of the data source.</p>",
+        "ListDataSourceSyncJobsRequest$Id": "<p>The identifier of the data source.</p>",
+        "StartDataSourceSyncJobRequest$Id": "<p>The identifier of the data source to synchronize.</p>",
+        "StopDataSourceSyncJobRequest$Id": "<p>The identifier of the data source for which to stop the synchronization jobs.</p>",
+        "UpdateDataSourceRequest$Id": "<p>The unique identifier of the data source to update.</p>"
+      }
+    },
+    "DataSourceInclusionsExclusionsStrings": {
+      "base": null,
+      "refs": {
+        "ConfluenceConfiguration$InclusionPatterns": "<p>A list of regular expression patterns that apply to a URL on the Confluence server. An inclusion pattern can apply to a blog post, a page, a space, or an attachment. Items that match the patterns are included in the index. Items that don't match the pattern are excluded from the index. If an item matches both an inclusion pattern and an exclusion pattern, the item isn't included in the index.</p>",
+        "ConfluenceConfiguration$ExclusionPatterns": "<p>A list of regular expression patterns that apply to a URL on the Confluence server. An exclusion pattern can apply to a blog post, a page, a space, or an attachment. Items that match the pattern are excluded from the index. Items that don't match the pattern are included in the index. If a item matches both an exclusion pattern and an inclusion pattern, the item isn't included in the index.</p>",
+        "OneDriveConfiguration$InclusionPatterns": "<p>A list of regular expression patterns. Documents that match the pattern are included in the index. Documents that don't match the pattern are excluded from the index. If a document matches both an inclusion pattern and an exclusion pattern, the document is not included in the index. </p> <p>The exclusion pattern is applied to the file name.</p>",
+        "OneDriveConfiguration$ExclusionPatterns": "<p>List of regular expressions applied to documents. Items that match the exclusion pattern are not indexed. If you provide both an inclusion pattern and an exclusion pattern, any item that matches the exclusion pattern isn't indexed. </p> <p>The exclusion pattern is applied to the file name.</p>",
+        "S3DataSourceConfiguration$InclusionPrefixes": "<p>A list of S3 prefixes for the documents that should be included in the index.</p>",
+        "S3DataSourceConfiguration$InclusionPatterns": "<p>A list of glob patterns for documents that should be indexed. If a document that matches an inclusion pattern also matches an exclusion pattern, the document is not indexed.</p> <p>For more information about glob patterns, see <a href=\"https://en.wikipedia.org/wiki/Glob_(programming)\">glob (programming)</a> in <i>Wikipedia</i>.</p>",
+        "S3DataSourceConfiguration$ExclusionPatterns": "<p>A list of glob patterns for documents that should not be indexed. If a document that matches an inclusion prefix or inclusion pattern also matches an exclusion pattern, the document is not indexed.</p> <p>For more information about glob patterns, see <a href=\"https://en.wikipedia.org/wiki/Glob_(programming)\">glob (programming)</a> in <i>Wikipedia</i>.</p>",
+        "SalesforceConfiguration$IncludeAttachmentFilePatterns": "<p>A list of regular expression patterns. Documents that match the patterns are included in the index. Documents that don't match the patterns are excluded from the index. If a document matches both an inclusion pattern and an exclusion pattern, the document is not included in the index.</p> <p>The regex is applied to the name of the attached file.</p>",
+        "SalesforceConfiguration$ExcludeAttachmentFilePatterns": "<p>A list of regular expression patterns. Documents that match the patterns are excluded from the index. Documents that don't match the patterns are included in the index. If a document matches both an exclusion pattern and an inclusion pattern, the document is not included in the index.</p> <p>The regex is applied to the name of the attached file.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$IncludeAttachmentFilePatterns": "<p>List of regular expressions applied to knowledge articles. Items that don't match the inclusion pattern are not indexed. The regex is applied to the field specified in the <code>PatternTargetField</code>.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$ExcludeAttachmentFilePatterns": "<p>List of regular expressions applied to knowledge articles. Items that don't match the inclusion pattern are not indexed. The regex is applied to the field specified in the <code>PatternTargetField</code> </p>",
+        "ServiceNowServiceCatalogConfiguration$IncludeAttachmentFilePatterns": "<p>Determines the types of file attachments that are included in the index. </p>",
+        "ServiceNowServiceCatalogConfiguration$ExcludeAttachmentFilePatterns": "<p>Determines the types of file attachments that are excluded from the index.</p>",
+        "SharePointConfiguration$InclusionPatterns": "<p>A list of regular expression patterns. Documents that match the patterns are included in the index. Documents that don't match the patterns are excluded from the index. If a document matches both an inclusion pattern and an exclusion pattern, the document is not included in the index.</p> <p>The regex is applied to the display URL of the SharePoint document.</p>",
+        "SharePointConfiguration$ExclusionPatterns": "<p>A list of regular expression patterns. Documents that match the patterns are excluded from the index. Documents that don't match the patterns are included in the index. If a document matches both an exclusion pattern and an inclusion pattern, the document is not included in the index.</p> <p>The regex is applied to the display URL of the SharePoint document.</p>"
+      }
+    },
+    "DataSourceInclusionsExclusionsStringsMember": {
+      "base": null,
+      "refs": {
+        "DataSourceInclusionsExclusionsStrings$member": null
+      }
+    },
+    "DataSourceName": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$Name": "<p>A unique name for the data source. A data source name can't be changed without deleting and recreating the data source.</p>",
+        "DataSourceSummary$Name": "<p>The name of the data source.</p>",
+        "DescribeDataSourceResponse$Name": "<p>The name that you gave the data source when it was created.</p>",
+        "UpdateDataSourceRequest$Name": "<p>The name of the data source to update. The name of the data source can't be updated. To rename a data source you must delete the data source and re-create it.</p>"
+      }
+    },
+    "DataSourceStatus": {
+      "base": null,
+      "refs": {
+        "DataSourceSummary$Status": "<p>The status of the data source. When the status is <code>ATIVE</code> the data source is ready to use.</p>",
+        "DescribeDataSourceResponse$Status": "<p>The current status of the data source. When the status is <code>ACTIVE</code> the data source is ready to use. When the status is <code>FAILED</code>, the <code>ErrorMessage</code> field contains the reason that the data source failed.</p>"
+      }
+    },
+    "DataSourceSummary": {
+      "base": "<p>Summary information for a Amazon Kendra data source. Returned in a call to .</p>",
+      "refs": {
+        "DataSourceSummaryList$member": null
+      }
+    },
+    "DataSourceSummaryList": {
+      "base": null,
+      "refs": {
+        "ListDataSourcesResponse$SummaryItems": "<p>An array of summary information for one or more data sources.</p>"
+      }
+    },
+    "DataSourceSyncJob": {
+      "base": "<p>Provides information about a synchronization job.</p>",
+      "refs": {
+        "DataSourceSyncJobHistoryList$member": null
+      }
+    },
+    "DataSourceSyncJobHistoryList": {
+      "base": null,
+      "refs": {
+        "ListDataSourceSyncJobsResponse$History": "<p>A history of synchronization jobs for the data source.</p>"
+      }
+    },
+    "DataSourceSyncJobId": {
+      "base": null,
+      "refs": {
+        "DataSourceSyncJobMetricTarget$DataSourceSyncJobId": "<p>The ID of the sync job that is running on the data source.</p>"
+      }
+    },
+    "DataSourceSyncJobMetricTarget": {
+      "base": "<p>Maps a particular data source sync job to a particular data source.</p>",
+      "refs": {
+        "BatchDeleteDocumentRequest$DataSourceSyncJobMetricTarget": null
+      }
+    },
+    "DataSourceSyncJobMetrics": {
+      "base": "<p>Maps a batch delete document request to a specific data source sync job. This is optional and should only be supplied when documents are deleted by a data source connector.</p>",
+      "refs": {
+        "DataSourceSyncJob$Metrics": "<p>Maps a batch delete document request to a specific data source sync job. This is optional and should only be supplied when documents are deleted by a data source connector.</p>"
+      }
+    },
+    "DataSourceSyncJobStatus": {
+      "base": null,
+      "refs": {
+        "DataSourceSyncJob$Status": "<p>The execution status of the synchronization job. When the <code>Status</code> field is set to <code>SUCCEEDED</code>, the synchronization job is done. If the status code is set to <code>FAILED</code>, the <code>ErrorCode</code> and <code>ErrorMessage</code> fields give you the reason for the failure.</p>",
+        "ListDataSourceSyncJobsRequest$StatusFilter": "<p>When specified, only returns synchronization jobs with the <code>Status</code> field equal to the specified status.</p>"
+      }
+    },
+    "DataSourceToIndexFieldMapping": {
+      "base": "<p>Maps a column or attribute in the data source to an index field. You must first create the fields in the index using the <a>UpdateIndex</a> operation.</p>",
+      "refs": {
+        "DataSourceToIndexFieldMappingList$member": null
+      }
+    },
+    "DataSourceToIndexFieldMappingList": {
+      "base": null,
+      "refs": {
+        "ColumnConfiguration$FieldMappings": "<p>An array of objects that map database column names to the corresponding fields in an index. You must first create the fields in the index using the <a>UpdateIndex</a> operation.</p>",
+        "OneDriveConfiguration$FieldMappings": "<p>A list of <code>DataSourceToIndexFieldMapping</code> objects that map Microsoft OneDrive fields to custom fields in the Amazon Kendra index. You must first create the index fields before you map OneDrive fields.</p>",
+        "SalesforceChatterFeedConfiguration$FieldMappings": "<p>Maps fields from a Salesforce chatter feed into Amazon Kendra index fields.</p>",
+        "SalesforceCustomKnowledgeArticleTypeConfiguration$FieldMappings": "<p>One or more objects that map fields in the custom knowledge article to fields in the Amazon Kendra index.</p>",
+        "SalesforceStandardKnowledgeArticleTypeConfiguration$FieldMappings": "<p>One or more objects that map fields in the knowledge article to Amazon Kendra index fields. The index field must exist before you can map a Salesforce field to it.</p>",
+        "SalesforceStandardObjectAttachmentConfiguration$FieldMappings": "<p>One or more objects that map fields in attachments to Amazon Kendra index fields.</p>",
+        "SalesforceStandardObjectConfiguration$FieldMappings": "<p>One or more objects that map fields in the standard object to Amazon Kendra index fields. The index field must exist before you can map a Salesforce field to it.</p>",
+        "ServiceNowKnowledgeArticleConfiguration$FieldMappings": "<p>Mapping between ServiceNow fields and Amazon Kendra index fields. You must create the index field before you map the field.</p>",
+        "ServiceNowServiceCatalogConfiguration$FieldMappings": "<p>Mapping between ServiceNow fields and Amazon Kendra index fields. You must create the index field before you map the field.</p>",
+        "SharePointConfiguration$FieldMappings": "<p>A list of <code>DataSourceToIndexFieldMapping</code> objects that map Microsoft SharePoint attributes to custom fields in the Amazon Kendra index. You must first create the index fields using the operation before you map SharePoint attributes. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/field-mapping.html\">Mapping Data Source Fields</a>.</p>"
+      }
+    },
+    "DataSourceType": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$Type": "<p>The type of repository that contains the data source.</p>",
+        "DataSourceSummary$Type": "<p>The type of the data source.</p>",
+        "DescribeDataSourceResponse$Type": "<p>The type of the data source.</p>"
+      }
+    },
+    "DataSourceVpcConfiguration": {
+      "base": "<p>Provides information for connecting to an Amazon VPC.</p>",
+      "refs": {
+        "ConfluenceConfiguration$VpcConfiguration": "<p>Specifies the information for connecting to an Amazon VPC.</p>",
+        "DatabaseConfiguration$VpcConfiguration": null,
+        "SharePointConfiguration$VpcConfiguration": null
+      }
+    },
+    "DatabaseConfiguration": {
+      "base": "<p>Provides the information necessary to connect a database to an index. </p>",
+      "refs": {
+        "DataSourceConfiguration$DatabaseConfiguration": "<p>Provides information necessary to create a data source connector for a database.</p>"
+      }
+    },
+    "DatabaseEngineType": {
+      "base": null,
+      "refs": {
+        "DatabaseConfiguration$DatabaseEngineType": "<p>The type of database engine that runs the database.</p>"
+      }
+    },
+    "DatabaseHost": {
+      "base": null,
+      "refs": {
+        "ConnectionConfiguration$DatabaseHost": "<p>The name of the host for the database. Can be either a string (host.subdomain.domain.tld) or an IPv4 or IPv6 address.</p>"
+      }
+    },
+    "DatabaseName": {
+      "base": null,
+      "refs": {
+        "ConnectionConfiguration$DatabaseName": "<p>The name of the database containing the document data.</p>"
+      }
+    },
+    "DatabasePort": {
+      "base": null,
+      "refs": {
+        "ConnectionConfiguration$DatabasePort": "<p>The port that the database uses for connections.</p>"
+      }
+    },
+    "DeleteDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFaqRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteIndexRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDataSourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFaqRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFaqResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIndexRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeIndexResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$Description": "<p>A description for the data source.</p>",
+        "CreateFaqRequest$Description": "<p>A description of the FAQ.</p>",
+        "CreateIndexRequest$Description": "<p>A description for the index.</p>",
+        "DescribeDataSourceResponse$Description": "<p>The description of the data source.</p>",
+        "DescribeFaqResponse$Description": "<p>The description of the FAQ that you provided when it was created.</p>",
+        "DescribeIndexResponse$Description": "<p>The description of the index.</p>",
+        "UpdateDataSourceRequest$Description": "<p>The new description for the data source.</p>",
+        "UpdateIndexRequest$Description": "<p>A new description for the index.</p>"
+      }
+    },
+    "Document": {
+      "base": "<p>A document in an index.</p>",
+      "refs": {
+        "DocumentList$member": null
+      }
+    },
+    "DocumentAttribute": {
+      "base": "<p>A custom attribute value assigned to a document. </p>",
+      "refs": {
+        "AttributeFilter$EqualsTo": "<p>Performs an equals operation on two document attributes.</p>",
+        "AttributeFilter$ContainsAll": "<p>Returns true when a document contains all of the specified document attributes. This filter is only applicable to <code>StringListValue</code> metadata.</p>",
+        "AttributeFilter$ContainsAny": "<p>Returns true when a document contains any of the specified document attributes. This filter is only applicable to <code>StringListValue</code> metadata.</p>",
+        "AttributeFilter$GreaterThan": "<p>Performs a greater than operation on two document attributes. Use with a document attribute of type <code>Integer</code> or <code>Long</code>.</p>",
+        "AttributeFilter$GreaterThanOrEquals": "<p>Performs a greater or equals than operation on two document attributes. Use with a document attribute of type <code>Integer</code> or <code>Long</code>.</p>",
+        "AttributeFilter$LessThan": "<p>Performs a less than operation on two document attributes. Use with a document attribute of type <code>Integer</code> or <code>Long</code>.</p>",
+        "AttributeFilter$LessThanOrEquals": "<p>Performs a less than or equals operation on two document attributes. Use with a document attribute of type <code>Integer</code> or <code>Long</code>.</p>",
+        "DocumentAttributeList$member": null
+      }
+    },
+    "DocumentAttributeKey": {
+      "base": null,
+      "refs": {
+        "DocumentAttribute$Key": "<p>The identifier for the attribute.</p>",
+        "DocumentAttributeKeyList$member": null,
+        "Facet$DocumentAttributeKey": "<p>The unique key for the document attribute.</p>",
+        "FacetResult$DocumentAttributeKey": "<p>The key for the facet values. This is the same as the <code>DocumentAttributeKey</code> provided in the query.</p>",
+        "SortingConfiguration$DocumentAttributeKey": "<p>The name of the document attribute used to sort the response. You can use any field that has the <code>Sortable</code> flag set to true.</p> <p>You can also sort by any of the following built-in attributes:</p> <ul> <li> <p>_category</p> </li> <li> <p>_created_at</p> </li> <li> <p>_last_updated_at</p> </li> <li> <p>_version</p> </li> <li> <p>_view_count</p> </li> </ul>"
+      }
+    },
+    "DocumentAttributeKeyList": {
+      "base": null,
+      "refs": {
+        "QueryRequest$RequestedDocumentAttributes": "<p>An array of document attributes to include in the response. No other document attributes are included in the response. By default all document attributes are included in the response. </p>"
+      }
+    },
+    "DocumentAttributeList": {
+      "base": null,
+      "refs": {
+        "Document$Attributes": "<p>Custom attributes to apply to the document. Use the custom attributes to provide additional information for searching, to provide facets for refining searches, and to provide additional information in the query response.</p>",
+        "QueryResultItem$DocumentAttributes": "<p>An array of document attributes for the document that the query result maps to. For example, the document author (Author) or the source URI (SourceUri) of the document.</p>"
+      }
+    },
+    "DocumentAttributeStringListValue": {
+      "base": null,
+      "refs": {
+        "DocumentAttributeValue$StringListValue": "<p>A list of strings. </p>"
+      }
+    },
+    "DocumentAttributeStringValue": {
+      "base": null,
+      "refs": {
+        "DocumentAttributeValue$StringValue": "<p>A string, such as \"department\".</p>"
+      }
+    },
+    "DocumentAttributeValue": {
+      "base": "<p>The value of a custom document attribute. You can only provide one value for a custom attribute.</p>",
+      "refs": {
+        "DocumentAttribute$Value": "<p>The value of the attribute.</p>",
+        "DocumentAttributeValueCountPair$DocumentAttributeValue": "<p>The value of the attribute. For example, \"HR.\"</p>"
+      }
+    },
+    "DocumentAttributeValueCountPair": {
+      "base": "<p>Provides the count of documents that match a particular attribute when doing a faceted search.</p>",
+      "refs": {
+        "DocumentAttributeValueCountPairList$member": null
+      }
+    },
+    "DocumentAttributeValueCountPairList": {
+      "base": null,
+      "refs": {
+        "FacetResult$DocumentAttributeValueCountPairs": "<p>An array of key/value pairs, where the key is the value of the attribute and the count is the number of documents that share the key value.</p>"
+      }
+    },
+    "DocumentAttributeValueType": {
+      "base": null,
+      "refs": {
+        "DocumentMetadataConfiguration$Type": "<p>The data type of the index field. </p>",
+        "FacetResult$DocumentAttributeValueType": "<p>The data type of the facet value. This is the same as the type defined for the index field when it was created.</p>"
+      }
+    },
+    "DocumentId": {
+      "base": null,
+      "refs": {
+        "BatchDeleteDocumentResponseFailedDocument$Id": "<p>The identifier of the document that couldn't be removed from the index.</p>",
+        "BatchPutDocumentResponseFailedDocument$Id": "<p>The unique identifier of the document.</p>",
+        "Document$Id": "<p>A unique identifier of the document in the index.</p>",
+        "DocumentIdList$member": null,
+        "QueryResultItem$DocumentId": "<p>The unique identifier for the document.</p>"
+      }
+    },
+    "DocumentIdList": {
+      "base": null,
+      "refs": {
+        "BatchDeleteDocumentRequest$DocumentIdList": "<p>One or more identifiers for documents to delete from the index.</p>"
+      }
+    },
+    "DocumentList": {
+      "base": null,
+      "refs": {
+        "BatchPutDocumentRequest$Documents": "<p>One or more documents to add to the index. </p> <p>Documents have the following file size limits.</p> <ul> <li> <p>5 MB total size for inline documents</p> </li> <li> <p>50 MB total size for files from an S3 bucket</p> </li> <li> <p>5 MB extracted text for any file</p> </li> </ul> <p>For more information about file size and transaction per second quotas, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/quotas.html\">Quotas</a>.</p>"
+      }
+    },
+    "DocumentMetadataBoolean": {
+      "base": null,
+      "refs": {
+        "Relevance$Freshness": "<p>Indicates that this field determines how \"fresh\" a document is. For example, if document 1 was created on November 5, and document 2 was created on October 31, document 1 is \"fresher\" than document 2. You can only set the <code>Freshness</code> field on one <code>DATE</code> type field. Only applies to <code>DATE</code> fields.</p>"
+      }
+    },
+    "DocumentMetadataConfiguration": {
+      "base": "<p>Specifies the properties of a custom index field.</p>",
+      "refs": {
+        "DocumentMetadataConfigurationList$member": null
+      }
+    },
+    "DocumentMetadataConfigurationList": {
+      "base": null,
+      "refs": {
+        "DescribeIndexResponse$DocumentMetadataConfigurations": "<p>Configuration settings for any metadata applied to the documents in the index.</p>",
+        "UpdateIndexRequest$DocumentMetadataConfigurationUpdates": "<p>The document metadata to update. </p>"
+      }
+    },
+    "DocumentMetadataConfigurationName": {
+      "base": null,
+      "refs": {
+        "DocumentMetadataConfiguration$Name": "<p>The name of the index field.</p>"
+      }
+    },
+    "DocumentsMetadataConfiguration": {
+      "base": "<p>Document metadata files that contain information such as the document access control information, source URI, document author, and custom attributes. Each metadata file contains metadata about a single document.</p>",
+      "refs": {
+        "S3DataSourceConfiguration$DocumentsMetadataConfiguration": null
+      }
+    },
+    "Duration": {
+      "base": null,
+      "refs": {
+        "Relevance$Duration": "<p>Specifies the time period that the boost applies to. For example, to make the boost apply to documents with the field value within the last month, you would use \"2628000s\". Once the field value is beyond the specified range, the effect of the boost drops off. The higher the importance, the faster the effect drops off. If you don't specify a value, the default is 3 months. The value of the field is a numeric string followed by the character \"s\", for example \"86400s\" for one day, or \"604800s\" for one week. </p> <p>Only applies to <code>DATE</code> fields.</p>"
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "BatchDeleteDocumentResponseFailedDocument$ErrorCode": "<p>The error code for why the document couldn't be removed from the index.</p>",
+        "BatchPutDocumentResponseFailedDocument$ErrorCode": "<p>The type of error that caused the document to fail to be indexed.</p>",
+        "DataSourceSyncJob$ErrorCode": "<p>If the <code>Status</code> field is set to <code>FAILED</code>, the <code>ErrorCode</code> field contains a the reason that the synchronization failed.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "BatchDeleteDocumentResponseFailedDocument$ErrorMessage": "<p>An explanation for why the document couldn't be removed from the index.</p>",
+        "BatchPutDocumentResponseFailedDocument$ErrorMessage": "<p>A description of the reason why the document could not be indexed.</p>",
+        "ConflictException$Message": null,
+        "DataSourceSyncJob$ErrorMessage": "<p>If the <code>Status</code> field is set to <code>ERROR</code>, the <code>ErrorMessage</code> field contains a description of the error that caused the synchronization to fail.</p>",
+        "DescribeDataSourceResponse$ErrorMessage": "<p>When the <code>Status</code> field value is <code>FAILED</code>, the <code>ErrorMessage</code> field contains a description of the error that caused the data source to fail.</p>",
+        "DescribeFaqResponse$ErrorMessage": "<p>If the <code>Status</code> field is <code>FAILED</code>, the <code>ErrorMessage</code> field contains the reason why the FAQ failed.</p>",
+        "DescribeIndexResponse$ErrorMessage": "<p>When th e<code>Status</code> field value is <code>FAILED</code>, the <code>ErrorMessage</code> field contains a message that explains why.</p>",
+        "InternalServerException$Message": null,
+        "ResourceAlreadyExistException$Message": null,
+        "ResourceInUseException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ResourceUnavailableException$Message": null,
+        "ServiceQuotaExceededException$Message": null,
+        "ThrottlingException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "Facet": {
+      "base": "<p>Information about a document attribute</p>",
+      "refs": {
+        "FacetList$member": null
+      }
+    },
+    "FacetList": {
+      "base": null,
+      "refs": {
+        "QueryRequest$Facets": "<p>An array of documents attributes. Amazon Kendra returns a count for each attribute key specified. You can use this information to help narrow the search for your user.</p>"
+      }
+    },
+    "FacetResult": {
+      "base": "<p>The facet values for the documents in the response.</p>",
+      "refs": {
+        "FacetResultList$member": null
+      }
+    },
+    "FacetResultList": {
+      "base": null,
+      "refs": {
+        "QueryResult$FacetResults": "<p>Contains the facet results. A <code>FacetResult</code> contains the counts for each attribute key that was specified in the <code>Facets</code> input parameter.</p>"
+      }
+    },
+    "FaqFileFormat": {
+      "base": null,
+      "refs": {
+        "CreateFaqRequest$FileFormat": "<p>The format of the input file. You can choose between a basic CSV format, a CSV format that includes customs attributes in a header, and a JSON format that includes custom attributes.</p> <p>The format must match the format of the file stored in the S3 bucket identified in the <code>S3Path</code> parameter.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/in-creating-faq.html\">Adding questions and answers</a>.</p>",
+        "DescribeFaqResponse$FileFormat": "<p>The file format used by the input files for the FAQ.</p>",
+        "FaqSummary$FileFormat": "<p>The file type used to create the FAQ. </p>"
+      }
+    },
+    "FaqId": {
+      "base": null,
+      "refs": {
+        "CreateFaqResponse$Id": "<p>The unique identifier of the FAQ.</p>",
+        "DeleteFaqRequest$Id": "<p>The identifier of the FAQ to remove.</p>",
+        "DescribeFaqRequest$Id": "<p>The unique identifier of the FAQ.</p>",
+        "DescribeFaqResponse$Id": "<p>The identifier of the FAQ.</p>",
+        "FaqSummary$Id": "<p>The unique identifier of the FAQ.</p>"
+      }
+    },
+    "FaqName": {
+      "base": null,
+      "refs": {
+        "CreateFaqRequest$Name": "<p>The name that should be associated with the FAQ.</p>",
+        "DescribeFaqResponse$Name": "<p>The name that you gave the FAQ when it was created.</p>",
+        "FaqSummary$Name": "<p>The name that you assigned the FAQ when you created or updated the FAQ.</p>"
+      }
+    },
+    "FaqStatistics": {
+      "base": "<p>Provides statistical information about the FAQ questions and answers contained in an index.</p>",
+      "refs": {
+        "IndexStatistics$FaqStatistics": "<p>The number of question and answer topics in the index.</p>"
+      }
+    },
+    "FaqStatus": {
+      "base": null,
+      "refs": {
+        "DescribeFaqResponse$Status": "<p>The status of the FAQ. It is ready to use when the status is <code>ACTIVE</code>.</p>",
+        "FaqSummary$Status": "<p>The current status of the FAQ. When the status is <code>ACTIVE</code> the FAQ is ready for use.</p>"
+      }
+    },
+    "FaqSummary": {
+      "base": "<p>Provides information about a frequently asked questions and answer contained in an index.</p>",
+      "refs": {
+        "FaqSummaryItems$member": null
+      }
+    },
+    "FaqSummaryItems": {
+      "base": null,
+      "refs": {
+        "ListFaqsResponse$FaqSummaryItems": "<p>information about the FAQs associated with the specified index.</p>"
+      }
+    },
+    "GroupAttributeField": {
+      "base": null,
+      "refs": {
+        "JwtTokenTypeConfiguration$GroupAttributeField": "<p>The group attribute field.</p>"
+      }
+    },
+    "Highlight": {
+      "base": "<p>Provides information that you can use to highlight a search result so that your users can quickly identify terms in the response.</p>",
+      "refs": {
+        "HighlightList$member": null
+      }
+    },
+    "HighlightList": {
+      "base": null,
+      "refs": {
+        "TextWithHighlights$Highlights": "<p>The beginning and end of the text that should be highlighted.</p>"
+      }
+    },
+    "Importance": {
+      "base": null,
+      "refs": {
+        "Relevance$Importance": "<p>The relative importance of the field in the search. Larger numbers provide more of a boost than smaller numbers.</p>",
+        "ValueImportanceMap$value": null
+      }
+    },
+    "IndexConfigurationSummary": {
+      "base": "<p>A summary of information about an index.</p>",
+      "refs": {
+        "IndexConfigurationSummaryList$member": null
+      }
+    },
+    "IndexConfigurationSummaryList": {
+      "base": null,
+      "refs": {
+        "ListIndicesResponse$IndexConfigurationSummaryItems": "<p>An array of summary information for one or more indexes.</p>"
+      }
+    },
+    "IndexEdition": {
+      "base": null,
+      "refs": {
+        "CreateIndexRequest$Edition": "<p>The Amazon Kendra edition to use for the index. Choose <code>DEVELOPER_EDITION</code> for indexes intended for development, testing, or proof of concept. Use <code>ENTERPRISE_EDITION</code> for your production databases. Once you set the edition for an index, it can't be changed. </p> <p>The <code>Edition</code> parameter is optional. If you don't supply a value, the default is <code>ENTERPRISE_EDITION</code>.</p>",
+        "DescribeIndexResponse$Edition": "<p>The Amazon Kendra edition used for the index. You decide the edition when you create the index.</p>",
+        "IndexConfigurationSummary$Edition": "<p>Indicates whether the index is a enterprise edition index or a developer edition index. </p>"
+      }
+    },
+    "IndexFieldName": {
+      "base": null,
+      "refs": {
+        "ConfluenceAttachmentToIndexFieldMapping$IndexFieldName": "<p>The name of the index field to map to the Confluence data source field. The index field type must match the Confluence field type.</p>",
+        "ConfluenceBlogToIndexFieldMapping$IndexFieldName": "<p>The name of the index field to map to the Confluence data source field. The index field type must match the Confluence field type.</p>",
+        "ConfluencePageToIndexFieldMapping$IndexFieldName": "<p>The name of the index field to map to the Confluence data source field. The index field type must match the Confluence field type.</p>",
+        "ConfluenceSpaceToIndexFieldMapping$IndexFieldName": "<p>The name of the index field to map to the Confluence data source field. The index field type must match the Confluence field type.</p>",
+        "DataSourceToIndexFieldMapping$IndexFieldName": "<p>The name of the field in the index.</p>"
+      }
+    },
+    "IndexId": {
+      "base": null,
+      "refs": {
+        "BatchDeleteDocumentRequest$IndexId": "<p>The identifier of the index that contains the documents to delete.</p>",
+        "BatchPutDocumentRequest$IndexId": "<p>The identifier of the index to add the documents to. You need to create the index first using the <a>CreateIndex</a> operation.</p>",
+        "CreateDataSourceRequest$IndexId": "<p>The identifier of the index that should be associated with this data source.</p>",
+        "CreateFaqRequest$IndexId": "<p>The identifier of the index that contains the FAQ.</p>",
+        "CreateIndexResponse$Id": "<p>The unique identifier of the index. Use this identifier when you query an index, set up a data source, or index a document.</p>",
+        "DeleteDataSourceRequest$IndexId": "<p>The unique identifier of the index associated with the data source.</p>",
+        "DeleteFaqRequest$IndexId": "<p>The index to remove the FAQ from.</p>",
+        "DeleteIndexRequest$Id": "<p>The identifier of the index to delete.</p>",
+        "DescribeDataSourceRequest$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "DescribeDataSourceResponse$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "DescribeFaqRequest$IndexId": "<p>The identifier of the index that contains the FAQ.</p>",
+        "DescribeFaqResponse$IndexId": "<p>The identifier of the index that contains the FAQ.</p>",
+        "DescribeIndexRequest$Id": "<p>The name of the index to describe.</p>",
+        "DescribeIndexResponse$Id": "<p>the name of the index.</p>",
+        "IndexConfigurationSummary$Id": "<p>A unique identifier for the index. Use this to identify the index when you are using operations such as <code>Query</code>, <code>DescribeIndex</code>, <code>UpdateIndex</code>, and <code>DeleteIndex</code>.</p>",
+        "ListDataSourceSyncJobsRequest$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "ListDataSourcesRequest$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "ListFaqsRequest$IndexId": "<p>The index that contains the FAQ lists.</p>",
+        "QueryRequest$IndexId": "<p>The unique identifier of the index to search. The identifier is returned in the response from the operation.</p>",
+        "StartDataSourceSyncJobRequest$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "StopDataSourceSyncJobRequest$IndexId": "<p>The identifier of the index that contains the data source.</p>",
+        "SubmitFeedbackRequest$IndexId": "<p>The identifier of the index that was queried.</p>",
+        "UpdateDataSourceRequest$IndexId": "<p>The identifier of the index that contains the data source to update.</p>",
+        "UpdateIndexRequest$Id": "<p>The identifier of the index to update.</p>"
+      }
+    },
+    "IndexName": {
+      "base": null,
+      "refs": {
+        "CreateIndexRequest$Name": "<p>The name for the new index.</p>",
+        "DescribeIndexResponse$Name": "<p>The name of the index.</p>",
+        "IndexConfigurationSummary$Name": "<p>The name of the index.</p>",
+        "UpdateIndexRequest$Name": "<p>The name of the index to update.</p>"
+      }
+    },
+    "IndexStatistics": {
+      "base": "<p>Provides information about the number of documents and the number of questions and answers in an index.</p>",
+      "refs": {
+        "DescribeIndexResponse$IndexStatistics": "<p>Provides information about the number of FAQ questions and answers and the number of text documents indexed.</p>"
+      }
+    },
+    "IndexStatus": {
+      "base": null,
+      "refs": {
+        "DescribeIndexResponse$Status": "<p>The current status of the index. When the value is <code>ACTIVE</code>, the index is ready for use. If the <code>Status</code> field value is <code>FAILED</code>, the <code>ErrorMessage</code> field contains a message that explains why.</p>",
+        "IndexConfigurationSummary$Status": "<p>The current status of the index. When the status is <code>ACTIVE</code>, the index is ready to search.</p>"
+      }
+    },
+    "IndexedQuestionAnswersCount": {
+      "base": null,
+      "refs": {
+        "FaqStatistics$IndexedQuestionAnswersCount": "<p>The total number of FAQ questions and answers contained in the index.</p>"
+      }
+    },
+    "IndexedTextBytes": {
+      "base": null,
+      "refs": {
+        "TextDocumentStatistics$IndexedTextBytes": "<p>The total size, in bytes, of the indexed documents.</p>"
+      }
+    },
+    "IndexedTextDocumentsCount": {
+      "base": null,
+      "refs": {
+        "TextDocumentStatistics$IndexedTextDocumentsCount": "<p>The number of text documents indexed.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "DocumentAttributeValueCountPair$Count": "<p>The number of documents in the response that have the attribute value for the key.</p>",
+        "Highlight$BeginOffset": "<p>The zero-based location in the response string where the highlight starts.</p>",
+        "Highlight$EndOffset": "<p>The zero-based location in the response string where the highlight ends.</p>",
+        "QueryRequest$PageNumber": "<p>Query results are returned in pages the size of the <code>PageSize</code> parameter. By default, Amazon Kendra returns the first page of results. Use this parameter to get result pages after the first one.</p>",
+        "QueryRequest$PageSize": "<p>Sets the number of results that are returned in each page of results. The default page size is 10. The maximum number of results returned is 100. If you ask for more than 100 results, only 100 are returned.</p>",
+        "QueryResult$TotalNumberOfResults": "<p>The total number of items found by the search; however, you can only retrieve up to 100 items. For example, if the search found 192 items, you can only retrieve the first 100 of the items.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "Issuer": {
+      "base": null,
+      "refs": {
+        "JwtTokenTypeConfiguration$Issuer": "<p>The issuer of the token.</p>"
+      }
+    },
+    "JsonTokenTypeConfiguration": {
+      "base": "<p>Configuration information for the JSON token type.</p>",
+      "refs": {
+        "UserTokenConfiguration$JsonTokenTypeConfiguration": "<p>Information about the JSON token type configuration.</p>"
+      }
+    },
+    "JwtTokenTypeConfiguration": {
+      "base": "<p>Configuration information for the JWT token type.</p>",
+      "refs": {
+        "UserTokenConfiguration$JwtTokenTypeConfiguration": "<p>Information about the JWT token type configuration.</p>"
+      }
+    },
+    "KeyLocation": {
+      "base": null,
+      "refs": {
+        "JwtTokenTypeConfiguration$KeyLocation": "<p>The location of the key.</p>"
+      }
+    },
+    "KmsKeyId": {
+      "base": null,
+      "refs": {
+        "ServerSideEncryptionConfiguration$KmsKeyId": "<p>The identifier of the AWS KMS customer master key (CMK). Amazon Kendra doesn't support asymmetric CMKs.</p>"
+      }
+    },
+    "ListDataSourceSyncJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDataSourceSyncJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDataSourcesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDataSourcesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFaqsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFaqsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIndicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListIndicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "DocumentAttributeValue$LongValue": "<p>A long integer value.</p>"
+      }
+    },
+    "MaxResultsIntegerForListDataSourceSyncJobsRequest": {
+      "base": null,
+      "refs": {
+        "ListDataSourceSyncJobsRequest$MaxResults": "<p>The maximum number of synchronization jobs to return in the response. If there are fewer results in the list, this response contains only the actual results.</p>"
+      }
+    },
+    "MaxResultsIntegerForListDataSourcesRequest": {
+      "base": null,
+      "refs": {
+        "ListDataSourcesRequest$MaxResults": "<p>The maximum number of data sources to return.</p>"
+      }
+    },
+    "MaxResultsIntegerForListFaqsRequest": {
+      "base": null,
+      "refs": {
+        "ListFaqsRequest$MaxResults": "<p>The maximum number of FAQs to return in the response. If there are fewer results in the list, this response contains only the actual results.</p>"
+      }
+    },
+    "MaxResultsIntegerForListIndicesRequest": {
+      "base": null,
+      "refs": {
+        "ListIndicesRequest$MaxResults": "<p>The maximum number of data sources to return.</p>"
+      }
+    },
+    "MetricValue": {
+      "base": null,
+      "refs": {
+        "DataSourceSyncJobMetrics$DocumentsAdded": "<p>The number of documents added from the data source up to now in the data source sync.</p>",
+        "DataSourceSyncJobMetrics$DocumentsModified": "<p>The number of documents modified in the data source up to now in the data source sync run.</p>",
+        "DataSourceSyncJobMetrics$DocumentsDeleted": "<p>The number of documents deleted from the data source up to now in the data source sync run.</p>",
+        "DataSourceSyncJobMetrics$DocumentsFailed": "<p>The number of documents that failed to sync from the data source up to now in the data source sync run.</p>",
+        "DataSourceSyncJobMetrics$DocumentsScanned": "<p>The current number of documents crawled by the current sync job in the data source.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListDataSourceSyncJobsRequest$NextToken": "<p>If the result of the previous request to <code>GetDataSourceSyncJobHistory</code> was truncated, include the <code>NextToken</code> to fetch the next set of jobs.</p>",
+        "ListDataSourceSyncJobsResponse$NextToken": "<p>The <code>GetDataSourceSyncJobHistory</code> operation returns a page of vocabularies at a time. The maximum size of the page is set by the <code>MaxResults</code> parameter. If there are more jobs in the list than the page size, Amazon Kendra returns the NextPage token. Include the token in the next request to the <code>GetDataSourceSyncJobHistory</code> operation to return in the next page of jobs.</p>",
+        "ListDataSourcesRequest$NextToken": "<p>If the previous response was incomplete (because there is more data to retrieve), Amazon Kendra returns a pagination token in the response. You can use this pagination token to retrieve the next set of data sources (<code>DataSourceSummaryItems</code>). </p>",
+        "ListDataSourcesResponse$NextToken": "<p>If the response is truncated, Amazon Kendra returns this token that you can use in the subsequent request to retrieve the next set of data sources. </p>",
+        "ListFaqsRequest$NextToken": "<p>If the result of the previous request to <code>ListFaqs</code> was truncated, include the <code>NextToken</code> to fetch the next set of FAQs.</p>",
+        "ListFaqsResponse$NextToken": "<p>The <code>ListFaqs</code> operation returns a page of FAQs at a time. The maximum size of the page is set by the <code>MaxResults</code> parameter. If there are more jobs in the list than the page size, Amazon Kendra returns the <code>NextPage</code> token. Include the token in the next request to the <code>ListFaqs</code> operation to return the next page of FAQs.</p>",
+        "ListIndicesRequest$NextToken": "<p>If the previous response was incomplete (because there is more data to retrieve), Amazon Kendra returns a pagination token in the response. You can use this pagination token to retrieve the next set of indexes (<code>DataSourceSummaryItems</code>). </p>",
+        "ListIndicesResponse$NextToken": "<p>If the response is truncated, Amazon Kendra returns this token that you can use in the subsequent request to retrieve the next set of indexes.</p>"
+      }
+    },
+    "OneDriveConfiguration": {
+      "base": "<p>Provides configuration information for data sources that connect to OneDrive.</p>",
+      "refs": {
+        "DataSourceConfiguration$OneDriveConfiguration": "<p>Provided configuration for data sources that connect to Microsoft OneDrive.</p>"
+      }
+    },
+    "OneDriveUser": {
+      "base": null,
+      "refs": {
+        "OneDriveUserList$member": null
+      }
+    },
+    "OneDriveUserList": {
+      "base": null,
+      "refs": {
+        "OneDriveUsers$OneDriveUserList": "<p>A list of users whose documents should be indexed. Specify the user names in email format, for example, <code>username@tenantdomain</code>. If you need to index the documents of more than 100 users, use the <code>OneDriveUserS3Path</code> field to specify the location of a file containing a list of users.</p>"
+      }
+    },
+    "OneDriveUsers": {
+      "base": "<p>User accounts whose documents should be indexed.</p>",
+      "refs": {
+        "OneDriveConfiguration$OneDriveUsers": "<p>A list of user accounts whose documents should be indexed.</p>"
+      }
+    },
+    "Order": {
+      "base": null,
+      "refs": {
+        "Relevance$RankOrder": "<p>Determines how values should be interpreted.</p> <p>When the <code>RankOrder</code> field is <code>ASCENDING</code>, higher numbers are better. For example, a document with a rating score of 10 is higher ranking than a document with a rating score of 1.</p> <p>When the <code>RankOrder</code> field is <code>DESCENDING</code>, lower numbers are better. For example, in a task tracking application, a priority 1 task is more important than a priority 5 task.</p> <p>Only applies to <code>LONG</code> and <code>DOUBLE</code> fields.</p>"
+      }
+    },
+    "Principal": {
+      "base": "<p>Provides user and group information for document access filtering.</p>",
+      "refs": {
+        "PrincipalList$member": null
+      }
+    },
+    "PrincipalList": {
+      "base": null,
+      "refs": {
+        "Document$AccessControlList": "<p>Information to use for user context filtering.</p>"
+      }
+    },
+    "PrincipalName": {
+      "base": null,
+      "refs": {
+        "Principal$Name": "<p>The name of the user or group.</p>"
+      }
+    },
+    "PrincipalType": {
+      "base": null,
+      "refs": {
+        "Principal$Type": "<p>The type of principal.</p>"
+      }
+    },
+    "QueryCapacityUnit": {
+      "base": null,
+      "refs": {
+        "CapacityUnitsConfiguration$QueryCapacityUnits": "<p>The amount of extra query capacity for an index. Each capacity unit provides 0.5 queries per second and 40,000 queries per day.</p>"
+      }
+    },
+    "QueryId": {
+      "base": null,
+      "refs": {
+        "QueryResult$QueryId": "<p>The unique identifier for the search. You use <code>QueryId</code> to identify the search when using the feedback API.</p>",
+        "SubmitFeedbackRequest$QueryId": "<p>The identifier of the specific query for which you are submitting feedback. The query ID is returned in the response to the operation.</p>"
+      }
+    },
+    "QueryIdentifiersEnclosingOption": {
+      "base": null,
+      "refs": {
+        "SqlConfiguration$QueryIdentifiersEnclosingOption": "<p>Determines whether Amazon Kendra encloses SQL identifiers for tables and column names in double quotes (\") when making a database query.</p> <p>By default, Amazon Kendra passes SQL identifiers the way that they are entered into the data source configuration. It does not change the case of identifiers or enclose them in quotes.</p> <p>PostgreSQL internally converts uppercase characters to lower case characters in identifiers unless they are quoted. Choosing this option encloses identifiers in quotes so that PostgreSQL does not convert the character's case.</p> <p>For MySQL databases, you must enable the <code>ansi_quotes</code> option when you set this field to <code>DOUBLE_QUOTES</code>.</p>"
+      }
+    },
+    "QueryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QueryResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QueryResultItem": {
+      "base": "<p>A single query result.</p> <p>A query result contains information about a document returned by the query. This includes the original location of the document, a list of attributes assigned to the document, and relevant text from the document that satisfies the query.</p>",
+      "refs": {
+        "QueryResultItemList$member": null
+      }
+    },
+    "QueryResultItemList": {
+      "base": null,
+      "refs": {
+        "QueryResult$ResultItems": "<p>The results of the search.</p>"
+      }
+    },
+    "QueryResultType": {
+      "base": null,
+      "refs": {
+        "QueryRequest$QueryResultTypeFilter": "<p>Sets the type of query. Only results for the specified query type are returned.</p>",
+        "QueryResultItem$Type": "<p>The type of document. </p>"
+      }
+    },
+    "QueryText": {
+      "base": null,
+      "refs": {
+        "QueryRequest$QueryText": "<p>The text to search for.</p>"
+      }
+    },
+    "ReadAccessType": {
+      "base": null,
+      "refs": {
+        "Principal$Access": "<p>Whether to allow or deny access to the principal.</p>"
+      }
+    },
+    "Relevance": {
+      "base": "<p>Provides information for manually tuning the relevance of a field in a search. When a query includes terms that match the field, the results are given a boost in the response based on these tuning parameters.</p>",
+      "refs": {
+        "DocumentMetadataConfiguration$Relevance": "<p>Provides manual tuning parameters to determine how the field affects the search results.</p>"
+      }
+    },
+    "RelevanceFeedback": {
+      "base": "<p>Provides feedback on how relevant a document is to a search. Your application uses the <a>SubmitFeedback</a> operation to provide relevance information.</p>",
+      "refs": {
+        "RelevanceFeedbackList$member": null
+      }
+    },
+    "RelevanceFeedbackList": {
+      "base": null,
+      "refs": {
+        "SubmitFeedbackRequest$RelevanceFeedbackItems": "<p>Provides Amazon Kendra with relevant or not relevant feedback for whether a particular item was relevant to the search.</p>"
+      }
+    },
+    "RelevanceType": {
+      "base": null,
+      "refs": {
+        "RelevanceFeedback$RelevanceValue": "<p>Whether to document was relevant or not relevant to the search.</p>"
+      }
+    },
+    "ResourceAlreadyExistException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceUnavailableException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResultId": {
+      "base": null,
+      "refs": {
+        "ClickFeedback$ResultId": "<p>The unique identifier of the search result that was clicked.</p>",
+        "QueryResultItem$Id": "<p>The unique identifier for the query result.</p>",
+        "RelevanceFeedback$ResultId": "<p>The unique identifier of the search result that the user provided relevance feedback for.</p>"
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "BatchPutDocumentRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of a role that is allowed to run the <code>BatchPutDocument</code> operation. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/iam-roles.html\">IAM Roles for Amazon Kendra</a>.</p>",
+        "CreateDataSourceRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of a role with permission to access the data source. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/iam-roles.html\">IAM Roles for Amazon Kendra</a>.</p> <p>You can't specify the <code>RoleArn</code> parameter when the <code>Type</code> parameter is set to <code>CUSTOM</code>. If you do, you receive a <code>ValidationException</code> exception.</p> <p>The <code>RoleArn</code> parameter is required for all other data sources.</p>",
+        "CreateFaqRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of a role with permission to access the S3 bucket that contains the FAQs. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/iam-roles.html\">IAM Roles for Amazon Kendra</a>.</p>",
+        "CreateIndexRequest$RoleArn": "<p>An AWS Identity and Access Management (IAM) role that gives Amazon Kendra permissions to access your Amazon CloudWatch logs and metrics. This is also the role used when you use the <code>BatchPutDocument</code> operation to index documents from an Amazon S3 bucket.</p>",
+        "DescribeDataSourceResponse$RoleArn": "<p>The Amazon Resource Name (ARN) of the role that enables the data source to access its resources.</p>",
+        "DescribeFaqResponse$RoleArn": "<p>The Amazon Resource Name (ARN) of the role that provides access to the S3 bucket containing the input files for the FAQ.</p>",
+        "DescribeIndexResponse$RoleArn": "<p>The Amazon Resource Name (ARN) of the IAM role that gives Amazon Kendra permission to write to your Amazon Cloudwatch logs.</p>",
+        "JwtTokenTypeConfiguration$SecretManagerArn": "<p>The Amazon Resource Name (arn) of the secret.</p>",
+        "UpdateDataSourceRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of the new role to use when the data source is accessing resources on your behalf.</p>",
+        "UpdateIndexRequest$RoleArn": "<p>A new IAM role that gives Amazon Kendra permission to access your Amazon CloudWatch logs.</p>"
+      }
+    },
+    "S3BucketName": {
+      "base": null,
+      "refs": {
+        "S3DataSourceConfiguration$BucketName": "<p>The name of the bucket that contains the documents.</p>",
+        "S3Path$Bucket": "<p>The name of the S3 bucket that contains the file.</p>"
+      }
+    },
+    "S3DataSourceConfiguration": {
+      "base": "<p>Provides configuration information for a data source to index documents in an Amazon S3 bucket.</p>",
+      "refs": {
+        "DataSourceConfiguration$S3Configuration": "<p>Provides information to create a data source connector for a document repository in an Amazon S3 bucket.</p>"
+      }
+    },
+    "S3ObjectKey": {
+      "base": null,
+      "refs": {
+        "AccessControlListConfiguration$KeyPath": "<p>Path to the AWS S3 bucket that contains the ACL files.</p>",
+        "DocumentsMetadataConfiguration$S3Prefix": "<p>A prefix used to filter metadata configuration files in the AWS S3 bucket. The S3 bucket might contain multiple metadata files. Use <code>S3Prefix</code> to include only the desired metadata files.</p>",
+        "S3Path$Key": "<p>The name of the file.</p>"
+      }
+    },
+    "S3Path": {
+      "base": "<p>Information required to find a specific file in an Amazon S3 bucket.</p>",
+      "refs": {
+        "CreateFaqRequest$S3Path": "<p>The S3 location of the FAQ input data.</p>",
+        "DescribeFaqResponse$S3Path": null,
+        "Document$S3Path": null,
+        "OneDriveUsers$OneDriveUserS3Path": "<p>The S3 bucket location of a file containing a list of users whose documents should be indexed.</p>"
+      }
+    },
+    "SalesforceChatterFeedConfiguration": {
+      "base": "<p>Defines configuration for syncing a Salesforce chatter feed. The contents of the object comes from the Salesforce FeedItem table.</p>",
+      "refs": {
+        "SalesforceConfiguration$ChatterFeedConfiguration": "<p>Specifies configuration information for Salesforce chatter feeds.</p>"
+      }
+    },
+    "SalesforceChatterFeedIncludeFilterType": {
+      "base": null,
+      "refs": {
+        "SalesforceChatterFeedIncludeFilterTypes$member": null
+      }
+    },
+    "SalesforceChatterFeedIncludeFilterTypes": {
+      "base": null,
+      "refs": {
+        "SalesforceChatterFeedConfiguration$IncludeFilterTypes": "<p>Filters the documents in the feed based on status of the user. When you specify <code>ACTIVE_USERS</code> only documents from users who have an active account are indexed. When you specify <code>STANDARD_USER</code> only documents for Salesforce standard users are documented. You can specify both.</p>"
+      }
+    },
+    "SalesforceConfiguration": {
+      "base": "<p>Provides configuration information for connecting to a Salesforce data source.</p>",
+      "refs": {
+        "DataSourceConfiguration$SalesforceConfiguration": "<p>Provides configuration information for data sources that connect to a Salesforce site.</p>"
+      }
+    },
+    "SalesforceCustomKnowledgeArticleTypeConfiguration": {
+      "base": "<p>Provides configuration information for indexing Salesforce custom articles.</p>",
+      "refs": {
+        "SalesforceCustomKnowledgeArticleTypeConfigurationList$member": null
+      }
+    },
+    "SalesforceCustomKnowledgeArticleTypeConfigurationList": {
+      "base": null,
+      "refs": {
+        "SalesforceKnowledgeArticleConfiguration$CustomKnowledgeArticleTypeConfigurations": "<p>Provides configuration information for custom Salesforce knowledge articles.</p>"
+      }
+    },
+    "SalesforceCustomKnowledgeArticleTypeName": {
+      "base": null,
+      "refs": {
+        "SalesforceCustomKnowledgeArticleTypeConfiguration$Name": "<p>The name of the configuration.</p>"
+      }
+    },
+    "SalesforceKnowledgeArticleConfiguration": {
+      "base": "<p>Specifies configuration information for the knowlege article types that Amazon Kendra indexes. Amazon Kendra indexes standard knowledge articles and the standard fields of knowledge articles, or the custom fields of custom knowledge articles, but not both </p>",
+      "refs": {
+        "SalesforceConfiguration$KnowledgeArticleConfiguration": "<p>Specifies configuration information for the knowlege article types that Amazon Kendra indexes. Amazon Kendra indexes standard knowledge articles and the standard fields of knowledge articles, or the custom fields of custom knowledge articles, but not both.</p>"
+      }
+    },
+    "SalesforceKnowledgeArticleState": {
+      "base": null,
+      "refs": {
+        "SalesforceKnowledgeArticleStateList$member": null
+      }
+    },
+    "SalesforceKnowledgeArticleStateList": {
+      "base": null,
+      "refs": {
+        "SalesforceKnowledgeArticleConfiguration$IncludedStates": "<p>Specifies the document states that should be included when Amazon Kendra indexes knowledge articles. You must specify at least one state.</p>"
+      }
+    },
+    "SalesforceStandardKnowledgeArticleTypeConfiguration": {
+      "base": "<p>Provides configuration information for standard Salesforce knowledge articles.</p>",
+      "refs": {
+        "SalesforceKnowledgeArticleConfiguration$StandardKnowledgeArticleTypeConfiguration": "<p>Provides configuration information for standard Salesforce knowledge articles.</p>"
+      }
+    },
+    "SalesforceStandardObjectAttachmentConfiguration": {
+      "base": "<p>Provides configuration information for processing attachments to Salesforce standard objects. </p>",
+      "refs": {
+        "SalesforceConfiguration$StandardObjectAttachmentConfiguration": "<p>Provides configuration information for processing attachments to Salesforce standard objects. </p>"
+      }
+    },
+    "SalesforceStandardObjectConfiguration": {
+      "base": "<p>Specifies confguration information for indexing a single standard object.</p>",
+      "refs": {
+        "SalesforceStandardObjectConfigurationList$member": null
+      }
+    },
+    "SalesforceStandardObjectConfigurationList": {
+      "base": null,
+      "refs": {
+        "SalesforceConfiguration$StandardObjectConfigurations": "<p>Specifies the Salesforce standard objects that Amazon Kendra indexes.</p>"
+      }
+    },
+    "SalesforceStandardObjectName": {
+      "base": null,
+      "refs": {
+        "SalesforceStandardObjectConfiguration$Name": "<p>The name of the standard object.</p>"
+      }
+    },
+    "ScanSchedule": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$Schedule": "<p>Sets the frequency that Amazon Kendra will check the documents in your repository and update the index. If you don't set a schedule Amazon Kendra will not periodically update the index. You can call the <code>StartDataSourceSyncJob</code> operation to update the index.</p> <p>You can't specify the <code>Schedule</code> parameter when the <code>Type</code> parameter is set to <code>CUSTOM</code>. If you do, you receive a <code>ValidationException</code> exception.</p>",
+        "DescribeDataSourceResponse$Schedule": "<p>The schedule that Amazon Kendra will update the data source.</p>",
+        "UpdateDataSourceRequest$Schedule": "<p>The new update schedule for the data source.</p>"
+      }
+    },
+    "ScoreAttributes": {
+      "base": "<p>Provides a relative ranking that indicates how confident Amazon Kendra is that the response matches the query.</p>",
+      "refs": {
+        "QueryResultItem$ScoreAttributes": "<p>Indicates the confidence that Amazon Kendra has that a result matches the query that you provided. Each result is placed into a bin that indicates the confidence, <code>VERY_HIGH</code>, <code>HIGH</code>, <code>MEDIUM</code> and <code>LOW</code>. You can use the score to determine if a response meets the confidence needed for your application.</p> <p>The field is only set to <code>LOW</code> when the <code>Type</code> field is set to <code>DOCUMENT</code> and Amazon Kendra is not confident that the result matches the query.</p>"
+      }
+    },
+    "ScoreConfidence": {
+      "base": "Enumeration for query score confidence.",
+      "refs": {
+        "ScoreAttributes$ScoreConfidence": "<p>A relative ranking for how well the response matches the query.</p>"
+      }
+    },
+    "Search": {
+      "base": "<p>Provides information about how a custom index field is used during a search.</p>",
+      "refs": {
+        "DocumentMetadataConfiguration$Search": "<p>Provides information about how the field is used during a search.</p>"
+      }
+    },
+    "SecretArn": {
+      "base": null,
+      "refs": {
+        "ConfluenceConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of an AWS Secrets Manager secret that contains the key/value pairs required to connect to your Confluence server. The secret must contain a JSON structure with the following keys:</p> <ul> <li> <p>username - The user name or email address of a user with administrative privileges for the Confluence server.</p> </li> <li> <p>password - The password associated with the user logging in to the Confluence server.</p> </li> </ul>",
+        "ConnectionConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of credentials stored in AWS Secrets Manager. The credentials should be a user/password pair. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/data-source-database.html\">Using a Database Data Source</a>. For more information about AWS Secrets Manager, see <a href=\"https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html\"> What Is AWS Secrets Manager </a> in the <i>AWS Secrets Manager</i> user guide.</p>",
+        "OneDriveConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of an AWS Secrets Manager secret that contains the user name and password to connect to OneDrive. The user namd should be the application ID for the OneDrive application, and the password is the application key for the OneDrive application.</p>",
+        "SalesforceConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of an AWS Secrets Manager secret that contains the key/value pairs required to connect to your Salesforce instance. The secret must contain a JSON structure with the following keys:</p> <ul> <li> <p>authenticationUrl - The OAUTH endpoint that Amazon Kendra connects to get an OAUTH token. </p> </li> <li> <p>consumerKey - The application public key generated when you created your Salesforce application.</p> </li> <li> <p>consumerSecret - The application private key generated when you created your Salesforce application.</p> </li> <li> <p>password - The password associated with the user logging in to the Salesforce instance.</p> </li> <li> <p>securityToken - The token associated with the user account logging in to the Salesforce instance.</p> </li> <li> <p>username - The user name of the user logging in to the Salesforce instance.</p> </li> </ul>",
+        "ServiceNowConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of the AWS Secret Manager secret that contains the user name and password required to connect to the ServiceNow instance.</p>",
+        "SharePointConfiguration$SecretArn": "<p>The Amazon Resource Name (ARN) of credentials stored in AWS Secrets Manager. The credentials should be a user/password pair. For more information, see <a href=\"https://docs.aws.amazon.com/kendra/latest/dg/data-source-sharepoint.html\">Using a Microsoft SharePoint Data Source</a>. For more information about AWS Secrets Manager, see <a href=\"https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html\"> What Is AWS Secrets Manager </a> in the <i>AWS Secrets Manager</i> user guide.</p>"
+      }
+    },
+    "SecurityGroupIdList": {
+      "base": null,
+      "refs": {
+        "DataSourceVpcConfiguration$SecurityGroupIds": "<p>A list of identifiers of security groups within your Amazon VPC. The security groups should enable Amazon Kendra to connect to the data source.</p>"
+      }
+    },
+    "ServerSideEncryptionConfiguration": {
+      "base": "<p>Provides the identifier of the AWS KMS customer master key (CMK) used to encrypt data indexed by Amazon Kendra. Amazon Kendra doesn't support asymmetric CMKs.</p>",
+      "refs": {
+        "CreateIndexRequest$ServerSideEncryptionConfiguration": "<p>The identifier of the AWS KMS customer managed key (CMK) to use to encrypt data indexed by Amazon Kendra. Amazon Kendra doesn't support asymmetric CMKs.</p>",
+        "DescribeIndexResponse$ServerSideEncryptionConfiguration": "<p>The identifier of the AWS KMS customer master key (CMK) used to encrypt your data. Amazon Kendra doesn't support asymmetric CMKs.</p>"
+      }
+    },
+    "ServiceNowBuildVersionType": {
+      "base": null,
+      "refs": {
+        "ServiceNowConfiguration$ServiceNowBuildVersion": "<p>The identifier of the release that the ServiceNow host is running. If the host is not running the <code>LONDON</code> release, use <code>OTHERS</code>.</p>"
+      }
+    },
+    "ServiceNowConfiguration": {
+      "base": "<p>Provides configuration information required to connect to a ServiceNow data source.</p>",
+      "refs": {
+        "DataSourceConfiguration$ServiceNowConfiguration": "<p>Provides configuration for data sources that connect to ServiceNow instances.</p>"
+      }
+    },
+    "ServiceNowHostUrl": {
+      "base": null,
+      "refs": {
+        "ServiceNowConfiguration$HostUrl": "<p>The ServiceNow instance that the data source connects to. The host endpoint should look like the following: <code>{instance}.service-now.com.</code> </p>"
+      }
+    },
+    "ServiceNowKnowledgeArticleConfiguration": {
+      "base": "<p>Provides configuration information for crawling knowledge articles in the ServiceNow site.</p>",
+      "refs": {
+        "ServiceNowConfiguration$KnowledgeArticleConfiguration": "<p>Provides configuration information for crawling knowledge articles in the ServiceNow site.</p>"
+      }
+    },
+    "ServiceNowServiceCatalogConfiguration": {
+      "base": "<p>Provides configuration information for crawling service catalog items in the ServiceNow site</p>",
+      "refs": {
+        "ServiceNowConfiguration$ServiceCatalogConfiguration": "<p>Provides configuration information for crawling service catalogs in the ServiceNow site.</p>"
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "SharePointConfiguration": {
+      "base": "<p>Provides configuration information for connecting to a Microsoft SharePoint data source.</p>",
+      "refs": {
+        "DataSourceConfiguration$SharePointConfiguration": "<p>Provides information necessary to create a data source connector for a Microsoft SharePoint site.</p>"
+      }
+    },
+    "SharePointUrlList": {
+      "base": null,
+      "refs": {
+        "SharePointConfiguration$Urls": "<p>The URLs of the Microsoft SharePoint site that contains the documents that should be indexed.</p>"
+      }
+    },
+    "SharePointVersion": {
+      "base": null,
+      "refs": {
+        "SharePointConfiguration$SharePointVersion": "<p>The version of Microsoft SharePoint that you are using as a data source.</p>"
+      }
+    },
+    "SortOrder": {
+      "base": null,
+      "refs": {
+        "SortingConfiguration$SortOrder": "<p>The order that the results should be returned in. In case of ties, the relevance assigned to the result by Amazon Kendra is used as the tie-breaker.</p>"
+      }
+    },
+    "SortingConfiguration": {
+      "base": "<p>Specifies the document attribute to use to sort the response to a Amazon Kendra query. You can specify a single attribute for sorting. The attribute must have the <code>Sortable</code> flag set to <code>true</code>, otherwise Amazon Kendra returns an exception.</p> <p>You can sort attributes of the following types.</p> <ul> <li> <p>Date value</p> </li> <li> <p>Long value</p> </li> <li> <p>String value</p> </li> </ul> <p>You can't sort attributes of the following type.</p> <ul> <li> <p>String list value</p> </li> </ul>",
+      "refs": {
+        "QueryRequest$SortingConfiguration": "<p>Provides information that determines how the results of the query are sorted. You can set the field that Amazon Kendra should sort the results on, and specify whether the results should be sorted in ascending or descending order. In the case of ties in sorting the results, the results are sorted by relevance.</p> <p>If you don't provide sorting configuration, the results are sorted by the relevance that Amazon Kendra determines for the result.</p>"
+      }
+    },
+    "SqlConfiguration": {
+      "base": "<p>Provides information that configures Amazon Kendra to use a SQL database.</p>",
+      "refs": {
+        "DatabaseConfiguration$SqlConfiguration": "<p>Provides information about how Amazon Kendra uses quote marks around SQL identifiers when querying a database data source.</p>"
+      }
+    },
+    "StartDataSourceSyncJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartDataSourceSyncJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopDataSourceSyncJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StorageCapacityUnit": {
+      "base": null,
+      "refs": {
+        "CapacityUnitsConfiguration$StorageCapacityUnits": "<p>The amount of extra storage capacity for an index. Each capacity unit provides 150 Gb of storage space or 500,000 documents, whichever is reached first.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AdditionalResultAttribute$Key": "<p>The key that identifies the attribute.</p>",
+        "DataSourceSyncJob$ExecutionId": "<p>A unique identifier for the synchronization job.</p>",
+        "DataSourceSyncJob$DataSourceErrorCode": "<p>If the reason that the synchronization failed is due to an error with the underlying data source, this field contains a code that identifies the error.</p>",
+        "DocumentAttributeStringListValue$member": null,
+        "JsonTokenTypeConfiguration$UserNameAttributeField": "<p>The user name attribute field.</p>",
+        "JsonTokenTypeConfiguration$GroupAttributeField": "<p>The group attribute field.</p>",
+        "StartDataSourceSyncJobResponse$ExecutionId": "<p>Identifies a particular synchronization job.</p>",
+        "TextWithHighlights$Text": "<p>The text to display to the user.</p>"
+      }
+    },
+    "SubmitFeedbackRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "SubnetIdList$member": null
+      }
+    },
+    "SubnetIdList": {
+      "base": null,
+      "refs": {
+        "DataSourceVpcConfiguration$SubnetIds": "<p>A list of identifiers for subnets within your Amazon VPC. The subnets should be able to connect to each other in the VPC, and they should have outgoing access to the Internet through a NAT device.</p>"
+      }
+    },
+    "TableName": {
+      "base": null,
+      "refs": {
+        "ConnectionConfiguration$TableName": "<p>The name of the table that contains the document data.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A list of key/value pairs that identify an index, FAQ, or data source. Tag keys and values can consist of Unicode letters, digits, white space, and any of the following symbols: _ . : / = + - @.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key for the tag. Keys are not case sensitive and must be unique for the index, FAQ, or data source.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>A list of tag keys to remove from the index, FAQ, or data source. If a tag key does not exist on the resource, it is ignored.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateDataSourceRequest$Tags": "<p>A list of key-value pairs that identify the data source. You can use the tags to identify and organize your resources and to control access to resources.</p>",
+        "CreateFaqRequest$Tags": "<p>A list of key-value pairs that identify the FAQ. You can use the tags to identify and organize your resources and to control access to resources.</p>",
+        "CreateIndexRequest$Tags": "<p>A list of key-value pairs that identify the index. You can use the tags to identify and organize your resources and to control access to resources.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>A list of tags associated with the index, FAQ, or data source.</p>",
+        "TagResourceRequest$Tags": "<p>A list of tag keys to add to the index, FAQ, or data source. If a tag already exists, the existing value is replaced with the new value.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value associated with the tag. The value may be an empty string but it can't be null.</p>"
+      }
+    },
+    "TenantDomain": {
+      "base": null,
+      "refs": {
+        "OneDriveConfiguration$TenantDomain": "<p>Tha Azure Active Directory domain of the organization. </p>"
+      }
+    },
+    "TextDocumentStatistics": {
+      "base": "<p>Provides information about text documents indexed in an index.</p>",
+      "refs": {
+        "IndexStatistics$TextDocumentStatistics": "<p>The number of text documents indexed.</p>"
+      }
+    },
+    "TextWithHighlights": {
+      "base": "<p>Provides text and information about where to highlight the text.</p>",
+      "refs": {
+        "AdditionalResultAttributeValue$TextWithHighlightsValue": "<p>The text associated with the attribute and information about the highlight to apply to the text.</p>",
+        "QueryResultItem$DocumentTitle": "<p>The title of the document. Contains the text of the title and information for highlighting the relevant terms in the title.</p>",
+        "QueryResultItem$DocumentExcerpt": "<p>An extract of the text in the document. Contains information about highlighting the relevant terms in the excerpt.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "TimeRange": {
+      "base": "<p>Provides a range of time.</p>",
+      "refs": {
+        "ListDataSourceSyncJobsRequest$StartTimeFilter": "<p>When specified, the synchronization jobs returned in the list are limited to jobs between the specified dates. </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "ClickFeedback$ClickTime": "<p>The Unix timestamp of the date and time that the result was clicked.</p>",
+        "DataSourceSummary$CreatedAt": "<p>The UNIX datetime that the data source was created.</p>",
+        "DataSourceSummary$UpdatedAt": "<p>The UNIX datetime that the data source was lasted updated. </p>",
+        "DataSourceSyncJob$StartTime": "<p>The UNIX datetime that the synchronization job was started.</p>",
+        "DataSourceSyncJob$EndTime": "<p>The UNIX datetime that the synchronization job was completed.</p>",
+        "DescribeDataSourceResponse$CreatedAt": "<p>The Unix timestamp of when the data source was created.</p>",
+        "DescribeDataSourceResponse$UpdatedAt": "<p>The Unix timestamp of when the data source was last updated.</p>",
+        "DescribeFaqResponse$CreatedAt": "<p>The date and time that the FAQ was created.</p>",
+        "DescribeFaqResponse$UpdatedAt": "<p>The date and time that the FAQ was last updated.</p>",
+        "DescribeIndexResponse$CreatedAt": "<p>The Unix datetime that the index was created.</p>",
+        "DescribeIndexResponse$UpdatedAt": "<p>The Unix datetime that the index was last updated.</p>",
+        "DocumentAttributeValue$DateValue": "<p>A date expressed as an ISO 8601 string.</p>",
+        "FaqSummary$CreatedAt": "<p>The UNIX datetime that the FAQ was added to the index.</p>",
+        "FaqSummary$UpdatedAt": "<p>The UNIX datetime that the FAQ was last updated.</p>",
+        "IndexConfigurationSummary$CreatedAt": "<p>The Unix timestamp when the index was created.</p>",
+        "IndexConfigurationSummary$UpdatedAt": "<p>The Unix timestamp when the index was last updated by the <code>UpdateIndex</code> operation.</p>",
+        "TimeRange$StartTime": "<p>The UNIX datetime of the beginning of the time range.</p>",
+        "TimeRange$EndTime": "<p>The UNIX datetime of the end of the time range.</p>"
+      }
+    },
+    "Title": {
+      "base": null,
+      "refs": {
+        "Document$Title": "<p>The title of the document.</p>"
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "UserContext$Token": "<p>The user context token. It must be a JWT or a JSON token.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDataSourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateIndexRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Url": {
+      "base": null,
+      "refs": {
+        "ConfluenceConfiguration$ServerUrl": "<p>The URL of your Confluence instance. Use the full URL of the server. For example, <code>https://server.example.com:port/</code>. You can also use an IP address, for example, <code>https://192.168.1.113/</code>.</p>",
+        "JwtTokenTypeConfiguration$URL": "<p>The signing key URL.</p>",
+        "QueryResultItem$DocumentURI": "<p>The URI of the original location of the document.</p>",
+        "SalesforceConfiguration$ServerUrl": "<p>The instance URL for the Salesforce site that you want to index.</p>",
+        "SharePointUrlList$member": null
+      }
+    },
+    "UserContext": {
+      "base": "<p>Provides information about the user context for a Amazon Kendra index.</p>",
+      "refs": {
+        "QueryRequest$UserContext": "<p>The user context token.</p>"
+      }
+    },
+    "UserContextPolicy": {
+      "base": null,
+      "refs": {
+        "CreateIndexRequest$UserContextPolicy": "<p>The user context policy.</p> <dl> <dt>ATTRIBUTE_FILTER</dt> <dd> <p>All indexed content is searchable and displayable for all users. If there is an access control list, it is ignored. You can filter on user and group attributes. </p> </dd> <dt>USER_TOKEN</dt> <dd> <p>Enables SSO and token-based user access control. All documents with no access control and all documents accessible to the user will be searchable and displayable. </p> </dd> </dl>",
+        "DescribeIndexResponse$UserContextPolicy": "<p>The user context policy for the Amazon Kendra index.</p>",
+        "UpdateIndexRequest$UserContextPolicy": "<p>The user user token context policy.</p>"
+      }
+    },
+    "UserNameAttributeField": {
+      "base": null,
+      "refs": {
+        "JwtTokenTypeConfiguration$UserNameAttributeField": "<p>The user name attribute field.</p>"
+      }
+    },
+    "UserTokenConfiguration": {
+      "base": "<p>Provides configuration information for a token configuration.</p>",
+      "refs": {
+        "UserTokenConfigurationList$member": null
+      }
+    },
+    "UserTokenConfigurationList": {
+      "base": null,
+      "refs": {
+        "CreateIndexRequest$UserTokenConfigurations": "<p>The user token configuration.</p>",
+        "DescribeIndexResponse$UserTokenConfigurations": "<p>The user token configuration for the Amazon Kendra index.</p>",
+        "UpdateIndexRequest$UserTokenConfigurations": "<p>The user token configuration.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ValueImportanceMap": {
+      "base": null,
+      "refs": {
+        "Relevance$ValueImportanceMap": "<p>A list of values that should be given a different boost when they appear in the result list. For example, if you are boosting a field called \"department,\" query terms that match the department field are boosted in the result. However, you can add entries from the department field to boost documents with those values higher. </p> <p>For example, you can add entries to the map with names of departments. If you add \"HR\",5 and \"Legal\",3 those departments are given special attention when they appear in the metadata of a document. When those terms appear they are given the specified importance instead of the regular importance for the boost.</p>"
+      }
+    },
+    "ValueImportanceMapKey": {
+      "base": null,
+      "refs": {
+        "ValueImportanceMap$key": null
+      }
+    },
+    "VpcSecurityGroupId": {
+      "base": null,
+      "refs": {
+        "SecurityGroupIdList$member": null
+      }
+    }
+  }
+}

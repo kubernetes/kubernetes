@@ -1,0 +1,505 @@
+{
+  "version": "2.0",
+  "service": "<p>For more information about AWS CloudHSM, see <a href=\"http://aws.amazon.com/cloudhsm/\">AWS CloudHSM</a> and the <a href=\"https://docs.aws.amazon.com/cloudhsm/latest/userguide/\">AWS CloudHSM User Guide</a>.</p>",
+  "operations": {
+    "CopyBackupToRegion": "<p>Copy an AWS CloudHSM cluster backup to a different region.</p>",
+    "CreateCluster": "<p>Creates a new AWS CloudHSM cluster.</p>",
+    "CreateHsm": "<p>Creates a new hardware security module (HSM) in the specified AWS CloudHSM cluster.</p>",
+    "DeleteBackup": "<p>Deletes a specified AWS CloudHSM backup. A backup can be restored up to 7 days after the DeleteBackup request is made. For more information on restoring a backup, see <a>RestoreBackup</a>.</p>",
+    "DeleteCluster": "<p>Deletes the specified AWS CloudHSM cluster. Before you can delete a cluster, you must delete all HSMs in the cluster. To see if the cluster contains any HSMs, use <a>DescribeClusters</a>. To delete an HSM, use <a>DeleteHsm</a>.</p>",
+    "DeleteHsm": "<p>Deletes the specified HSM. To specify an HSM, you can use its identifier (ID), the IP address of the HSM's elastic network interface (ENI), or the ID of the HSM's ENI. You need to specify only one of these values. To find these values, use <a>DescribeClusters</a>.</p>",
+    "DescribeBackups": "<p>Gets information about backups of AWS CloudHSM clusters.</p> <p>This is a paginated operation, which means that each response might contain only a subset of all the backups. When the response contains only a subset of backups, it includes a <code>NextToken</code> value. Use this value in a subsequent <code>DescribeBackups</code> request to get more backups. When you receive a response with no <code>NextToken</code> (or an empty or null value), that means there are no more backups to get.</p>",
+    "DescribeClusters": "<p>Gets information about AWS CloudHSM clusters.</p> <p>This is a paginated operation, which means that each response might contain only a subset of all the clusters. When the response contains only a subset of clusters, it includes a <code>NextToken</code> value. Use this value in a subsequent <code>DescribeClusters</code> request to get more clusters. When you receive a response with no <code>NextToken</code> (or an empty or null value), that means there are no more clusters to get.</p>",
+    "InitializeCluster": "<p>Claims an AWS CloudHSM cluster by submitting the cluster certificate issued by your issuing certificate authority (CA) and the CA's root certificate. Before you can claim a cluster, you must sign the cluster's certificate signing request (CSR) with your issuing CA. To get the cluster's CSR, use <a>DescribeClusters</a>.</p>",
+    "ListTags": "<p>Gets a list of tags for the specified AWS CloudHSM cluster.</p> <p>This is a paginated operation, which means that each response might contain only a subset of all the tags. When the response contains only a subset of tags, it includes a <code>NextToken</code> value. Use this value in a subsequent <code>ListTags</code> request to get more tags. When you receive a response with no <code>NextToken</code> (or an empty or null value), that means there are no more tags to get.</p>",
+    "RestoreBackup": "<p>Restores a specified AWS CloudHSM backup that is in the <code>PENDING_DELETION</code> state. For mor information on deleting a backup, see <a>DeleteBackup</a>.</p>",
+    "TagResource": "<p>Adds or overwrites one or more tags for the specified AWS CloudHSM cluster.</p>",
+    "UntagResource": "<p>Removes the specified tag or tags from the specified AWS CloudHSM cluster.</p>"
+  },
+  "shapes": {
+    "Backup": {
+      "base": "<p>Contains information about a backup of an AWS CloudHSM cluster. All backup objects contain the BackupId, BackupState, ClusterId, and CreateTimestamp parameters. Backups that were copied into a destination region additionally contain the CopyTimestamp, SourceBackup, SourceCluster, and SourceRegion paramters. A backup that is pending deletion will include the DeleteTimestamp parameter.</p>",
+      "refs": {
+        "Backups$member": null,
+        "DeleteBackupResponse$Backup": "<p>Information on the <code>Backup</code> object deleted.</p>",
+        "RestoreBackupResponse$Backup": "<p>Information on the <code>Backup</code> object created.</p>"
+      }
+    },
+    "BackupId": {
+      "base": null,
+      "refs": {
+        "Backup$BackupId": "<p>The identifier (ID) of the backup.</p>",
+        "Backup$SourceBackup": "<p>The identifier (ID) of the source backup from which the new backup was copied.</p>",
+        "Cluster$SourceBackupId": "<p>The identifier (ID) of the backup used to create the cluster. This value exists only when the cluster was created from a backup.</p>",
+        "CopyBackupToRegionRequest$BackupId": "<p>The ID of the backup that will be copied to the destination region. </p>",
+        "CreateClusterRequest$SourceBackupId": "<p>The identifier (ID) of the cluster backup to restore. Use this value to restore the cluster from a backup instead of creating a new cluster. To find the backup ID, use <a>DescribeBackups</a>.</p>",
+        "DeleteBackupRequest$BackupId": "<p>The ID of the backup to be deleted. To find the ID of a backup, use the <a>DescribeBackups</a> operation.</p>",
+        "DestinationBackup$SourceBackup": "<p>The identifier (ID) of the source backup from which the new backup was copied.</p>",
+        "RestoreBackupRequest$BackupId": "<p>The ID of the backup to be restored. To find the ID of a backup, use the <a>DescribeBackups</a> operation.</p>"
+      }
+    },
+    "BackupPolicy": {
+      "base": null,
+      "refs": {
+        "Cluster$BackupPolicy": "<p>The cluster's backup policy.</p>"
+      }
+    },
+    "BackupState": {
+      "base": null,
+      "refs": {
+        "Backup$BackupState": "<p>The state of the backup.</p>"
+      }
+    },
+    "Backups": {
+      "base": null,
+      "refs": {
+        "DescribeBackupsResponse$Backups": "<p>A list of backups.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "DescribeBackupsRequest$SortAscending": "<p>Designates whether or not to sort the return backups by ascending chronological order of generation.</p>"
+      }
+    },
+    "Cert": {
+      "base": null,
+      "refs": {
+        "Certificates$ClusterCsr": "<p>The cluster's certificate signing request (CSR). The CSR exists only when the cluster's state is <code>UNINITIALIZED</code>.</p>",
+        "Certificates$HsmCertificate": "<p>The HSM certificate issued (signed) by the HSM hardware.</p>",
+        "Certificates$AwsHardwareCertificate": "<p>The HSM hardware certificate issued (signed) by AWS CloudHSM.</p>",
+        "Certificates$ManufacturerHardwareCertificate": "<p>The HSM hardware certificate issued (signed) by the hardware manufacturer.</p>",
+        "Certificates$ClusterCertificate": "<p>The cluster certificate issued (signed) by the issuing certificate authority (CA) of the cluster's owner.</p>",
+        "InitializeClusterRequest$SignedCert": "<p>The cluster certificate issued (signed) by your issuing certificate authority (CA). The certificate must be in PEM format and can contain a maximum of 5000 characters.</p>",
+        "InitializeClusterRequest$TrustAnchor": "<p>The issuing certificate of the issuing certificate authority (CA) that issued (signed) the cluster certificate. You must use a self-signed certificate. The certificate used to sign the HSM CSR must be directly available, and thus must be the root certificate. The certificate must be in PEM format and can contain a maximum of 5000 characters.</p>"
+      }
+    },
+    "Certificates": {
+      "base": "<p>Contains one or more certificates or a certificate signing request (CSR).</p>",
+      "refs": {
+        "Cluster$Certificates": "<p>Contains one or more certificates or a certificate signing request (CSR).</p>"
+      }
+    },
+    "CloudHsmAccessDeniedException": {
+      "base": "<p>The request was rejected because the requester does not have permission to perform the requested operation.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmInternalFailureException": {
+      "base": "<p>The request was rejected because of an AWS CloudHSM internal failure. The request can be retried.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmInvalidRequestException": {
+      "base": "<p>The request was rejected because it is not a valid request.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmResourceNotFoundException": {
+      "base": "<p>The request was rejected because it refers to a resource that cannot be found.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmServiceException": {
+      "base": "<p>The request was rejected because an error occurred.</p>",
+      "refs": {
+      }
+    },
+    "CloudHsmTagException": {
+      "base": "<p>The request was rejected because of a tagging failure. Verify the tag conditions in all applicable policies, and then retry the request.</p>",
+      "refs": {
+      }
+    },
+    "Cluster": {
+      "base": "<p>Contains information about an AWS CloudHSM cluster.</p>",
+      "refs": {
+        "Clusters$member": null,
+        "CreateClusterResponse$Cluster": "<p>Information about the cluster that was created.</p>",
+        "DeleteClusterResponse$Cluster": "<p>Information about the cluster that was deleted.</p>"
+      }
+    },
+    "ClusterId": {
+      "base": null,
+      "refs": {
+        "Backup$ClusterId": "<p>The identifier (ID) of the cluster that was backed up.</p>",
+        "Backup$SourceCluster": "<p>The identifier (ID) of the cluster containing the source backup from which the new backup was copied.</p>",
+        "Cluster$ClusterId": "<p>The cluster's identifier (ID).</p>",
+        "CreateHsmRequest$ClusterId": "<p>The identifier (ID) of the HSM's cluster. To find the cluster ID, use <a>DescribeClusters</a>.</p>",
+        "DeleteClusterRequest$ClusterId": "<p>The identifier (ID) of the cluster that you are deleting. To find the cluster ID, use <a>DescribeClusters</a>.</p>",
+        "DeleteHsmRequest$ClusterId": "<p>The identifier (ID) of the cluster that contains the HSM that you are deleting.</p>",
+        "DestinationBackup$SourceCluster": "<p>The identifier (ID) of the cluster containing the source backup from which the new backup was copied.</p>",
+        "Hsm$ClusterId": "<p>The identifier (ID) of the cluster that contains the HSM.</p>",
+        "InitializeClusterRequest$ClusterId": "<p>The identifier (ID) of the cluster that you are claiming. To find the cluster ID, use <a>DescribeClusters</a>.</p>"
+      }
+    },
+    "ClusterState": {
+      "base": null,
+      "refs": {
+        "Cluster$State": "<p>The cluster's state.</p>",
+        "InitializeClusterResponse$State": "<p>The cluster's state.</p>"
+      }
+    },
+    "Clusters": {
+      "base": null,
+      "refs": {
+        "DescribeClustersResponse$Clusters": "<p>A list of clusters.</p>"
+      }
+    },
+    "CopyBackupToRegionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyBackupToRegionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateClusterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateClusterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateHsmRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateHsmResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBackupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBackupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteClusterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteClusterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteHsmRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteHsmResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeBackupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeBackupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClustersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClustersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DestinationBackup": {
+      "base": "<p>Contains information about the backup that will be copied and created by the <a>CopyBackupToRegion</a> operation.</p>",
+      "refs": {
+        "CopyBackupToRegionResponse$DestinationBackup": "<p>Information on the backup that will be copied to the destination region, including CreateTimestamp, SourceBackup, SourceCluster, and Source Region. CreateTimestamp of the destination backup will be the same as that of the source backup.</p> <p>You will need to use the <code>sourceBackupID</code> returned in this operation to use the <a>DescribeBackups</a> operation on the backup that will be copied to the destination region.</p>"
+      }
+    },
+    "EniId": {
+      "base": null,
+      "refs": {
+        "DeleteHsmRequest$EniId": "<p>The identifier (ID) of the elastic network interface (ENI) of the HSM that you are deleting.</p>",
+        "Hsm$EniId": "<p>The identifier (ID) of the HSM's elastic network interface (ENI).</p>"
+      }
+    },
+    "ExternalAz": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$AvailabilityZone": "<p>The Availability Zone where you are creating the HSM. To find the cluster's Availability Zones, use <a>DescribeClusters</a>.</p>",
+        "ExternalSubnetMapping$key": null,
+        "Hsm$AvailabilityZone": "<p>The Availability Zone that contains the HSM.</p>"
+      }
+    },
+    "ExternalSubnetMapping": {
+      "base": null,
+      "refs": {
+        "Cluster$SubnetMapping": "<p>A map from availability zone to the cluster’s subnet in that availability zone.</p>"
+      }
+    },
+    "Field": {
+      "base": null,
+      "refs": {
+        "Filters$key": null
+      }
+    },
+    "Filters": {
+      "base": null,
+      "refs": {
+        "DescribeBackupsRequest$Filters": "<p>One or more filters to limit the items returned in the response.</p> <p>Use the <code>backupIds</code> filter to return only the specified backups. Specify backups by their backup identifier (ID).</p> <p>Use the <code>sourceBackupIds</code> filter to return only the backups created from a source backup. The <code>sourceBackupID</code> of a source backup is returned by the <a>CopyBackupToRegion</a> operation.</p> <p>Use the <code>clusterIds</code> filter to return only the backups for the specified clusters. Specify clusters by their cluster identifier (ID).</p> <p>Use the <code>states</code> filter to return only backups that match the specified state.</p>",
+        "DescribeClustersRequest$Filters": "<p>One or more filters to limit the items returned in the response.</p> <p>Use the <code>clusterIds</code> filter to return only the specified clusters. Specify clusters by their cluster identifier (ID).</p> <p>Use the <code>vpcIds</code> filter to return only the clusters in the specified virtual private clouds (VPCs). Specify VPCs by their VPC identifier (ID).</p> <p>Use the <code>states</code> filter to return only clusters that match the specified state.</p>"
+      }
+    },
+    "Hsm": {
+      "base": "<p>Contains information about a hardware security module (HSM) in an AWS CloudHSM cluster.</p>",
+      "refs": {
+        "CreateHsmResponse$Hsm": "<p>Information about the HSM that was created.</p>",
+        "Hsms$member": null
+      }
+    },
+    "HsmId": {
+      "base": null,
+      "refs": {
+        "DeleteHsmRequest$HsmId": "<p>The identifier (ID) of the HSM that you are deleting.</p>",
+        "DeleteHsmResponse$HsmId": "<p>The identifier (ID) of the HSM that was deleted.</p>",
+        "Hsm$HsmId": "<p>The HSM's identifier (ID).</p>"
+      }
+    },
+    "HsmState": {
+      "base": null,
+      "refs": {
+        "Hsm$State": "<p>The HSM's state.</p>"
+      }
+    },
+    "HsmType": {
+      "base": null,
+      "refs": {
+        "Cluster$HsmType": "<p>The type of HSM that the cluster contains.</p>",
+        "CreateClusterRequest$HsmType": "<p>The type of HSM to use in the cluster. Currently the only allowed value is <code>hsm1.medium</code>.</p>"
+      }
+    },
+    "Hsms": {
+      "base": null,
+      "refs": {
+        "Cluster$Hsms": "<p>Contains information about the HSMs in the cluster.</p>"
+      }
+    },
+    "InitializeClusterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InitializeClusterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IpAddress": {
+      "base": null,
+      "refs": {
+        "CreateHsmRequest$IpAddress": "<p>The HSM's IP address. If you specify an IP address, use an available address from the subnet that maps to the Availability Zone where you are creating the HSM. If you don't specify an IP address, one is chosen for you from that subnet.</p>",
+        "DeleteHsmRequest$EniIp": "<p>The IP address of the elastic network interface (ENI) of the HSM that you are deleting.</p>",
+        "Hsm$EniIp": "<p>The IP address of the HSM's elastic network interface (ENI).</p>"
+      }
+    },
+    "ListTagsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxSize": {
+      "base": null,
+      "refs": {
+        "DescribeBackupsRequest$MaxResults": "<p>The maximum number of backups to return in the response. When there are more backups than the number you specify, the response contains a <code>NextToken</code> value.</p>",
+        "DescribeClustersRequest$MaxResults": "<p>The maximum number of clusters to return in the response. When there are more clusters than the number you specify, the response contains a <code>NextToken</code> value.</p>",
+        "ListTagsRequest$MaxResults": "<p>The maximum number of tags to return in the response. When there are more tags than the number you specify, the response contains a <code>NextToken</code> value.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "DescribeBackupsRequest$NextToken": "<p>The <code>NextToken</code> value that you received in the previous response. Use this value to get more backups.</p>",
+        "DescribeBackupsResponse$NextToken": "<p>An opaque string that indicates that the response contains only a subset of backups. Use this value in a subsequent <code>DescribeBackups</code> request to get more backups.</p>",
+        "DescribeClustersRequest$NextToken": "<p>The <code>NextToken</code> value that you received in the previous response. Use this value to get more clusters.</p>",
+        "DescribeClustersResponse$NextToken": "<p>An opaque string that indicates that the response contains only a subset of clusters. Use this value in a subsequent <code>DescribeClusters</code> request to get more clusters.</p>",
+        "ListTagsRequest$NextToken": "<p>The <code>NextToken</code> value that you received in the previous response. Use this value to get more tags.</p>",
+        "ListTagsResponse$NextToken": "<p>An opaque string that indicates that the response contains only a subset of tags. Use this value in a subsequent <code>ListTags</code> request to get more tags.</p>"
+      }
+    },
+    "PreCoPassword": {
+      "base": null,
+      "refs": {
+        "Cluster$PreCoPassword": "<p>The default password for the cluster's Pre-Crypto Officer (PRECO) user.</p>"
+      }
+    },
+    "Region": {
+      "base": null,
+      "refs": {
+        "Backup$SourceRegion": "<p>The AWS Region that contains the source backup from which the new backup was copied.</p>",
+        "CopyBackupToRegionRequest$DestinationRegion": "<p>The AWS region that will contain your copied CloudHSM cluster backup.</p>",
+        "DestinationBackup$SourceRegion": "<p>The AWS region that contains the source backup from which the new backup was copied.</p>"
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "ListTagsRequest$ResourceId": "<p>The cluster identifier (ID) for the cluster whose tags you are getting. To find the cluster ID, use <a>DescribeClusters</a>.</p>",
+        "TagResourceRequest$ResourceId": "<p>The cluster identifier (ID) for the cluster that you are tagging. To find the cluster ID, use <a>DescribeClusters</a>.</p>",
+        "UntagResourceRequest$ResourceId": "<p>The cluster identifier (ID) for the cluster whose tags you are removing. To find the cluster ID, use <a>DescribeClusters</a>.</p>"
+      }
+    },
+    "RestoreBackupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreBackupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SecurityGroup": {
+      "base": null,
+      "refs": {
+        "Cluster$SecurityGroup": "<p>The identifier (ID) of the cluster's security group.</p>"
+      }
+    },
+    "StateMessage": {
+      "base": null,
+      "refs": {
+        "Cluster$StateMessage": "<p>A description of the cluster's state.</p>",
+        "InitializeClusterResponse$StateMessage": "<p>A description of the cluster's state.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Hsm$StateMessage": "<p>A description of the HSM's state.</p>",
+        "Strings$member": null
+      }
+    },
+    "Strings": {
+      "base": null,
+      "refs": {
+        "Filters$value": null
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "ExternalSubnetMapping$value": null,
+        "Hsm$SubnetId": "<p>The subnet that contains the HSM's elastic network interface (ENI).</p>",
+        "SubnetIds$member": null
+      }
+    },
+    "SubnetIds": {
+      "base": null,
+      "refs": {
+        "CreateClusterRequest$SubnetIds": "<p>The identifiers (IDs) of the subnets where you are creating the cluster. You must specify at least one subnet. If you specify multiple subnets, they must meet the following criteria:</p> <ul> <li> <p>All subnets must be in the same virtual private cloud (VPC).</p> </li> <li> <p>You can specify only one subnet per Availability Zone.</p> </li> </ul>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Contains a tag. A tag is a key-value pair.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeyList": "<p>A list of one or more tag keys for the tags that you are removing. Specify only the tag keys, not the tag values.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "Backup$TagList": "<p>The list of tags for the backup.</p>",
+        "Cluster$TagList": "<p>The list of tags for the cluster.</p>",
+        "CopyBackupToRegionRequest$TagList": "<p>Tags to apply to the destination backup during creation. If you specify tags, only these tags will be applied to the destination backup. If you do not specify tags, the service copies tags from the source backup to the destination backup.</p>",
+        "CreateClusterRequest$TagList": "<p>Tags to apply to the CloudHSM cluster during creation.</p>",
+        "ListTagsResponse$TagList": "<p>A list of tags.</p>",
+        "TagResourceRequest$TagList": "<p>A list of one or more tags.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Backup$CreateTimestamp": "<p>The date and time when the backup was created.</p>",
+        "Backup$CopyTimestamp": "<p>The date and time when the backup was copied from a source backup.</p>",
+        "Backup$DeleteTimestamp": "<p>The date and time when the backup will be permanently deleted.</p>",
+        "Cluster$CreateTimestamp": "<p>The date and time when the cluster was created.</p>",
+        "DestinationBackup$CreateTimestamp": "<p>The date and time when both the source backup was created.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VpcId": {
+      "base": null,
+      "refs": {
+        "Cluster$VpcId": "<p>The identifier (ID) of the virtual private cloud (VPC) that contains the cluster.</p>"
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "CloudHsmAccessDeniedException$Message": null,
+        "CloudHsmInternalFailureException$Message": null,
+        "CloudHsmInvalidRequestException$Message": null,
+        "CloudHsmResourceNotFoundException$Message": null,
+        "CloudHsmServiceException$Message": null,
+        "CloudHsmTagException$Message": null
+      }
+    }
+  }
+}

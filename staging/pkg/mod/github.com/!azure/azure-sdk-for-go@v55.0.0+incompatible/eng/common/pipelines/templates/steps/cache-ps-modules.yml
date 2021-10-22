@@ -1,0 +1,10 @@
+steps:
+- pwsh: |
+    . ./eng/common/scripts/Helpers/PSModule-Helpers.ps1
+    Write-Host "##vso[task.setvariable variable=CachedPSModulePath]$global:CurrentUserModulePath"
+  displayName: Set PS Modules Cache Directory
+- task: Cache@2
+  inputs:
+    key: 'PSModulePath | $(CacheSalt) | $(Agent.OS) | $(Build.SourcesDirectory)/eng/common/scripts/Import-AzModules.ps1'
+    path: $(CachedPSModulePath)
+  displayName: Cache PS Modules

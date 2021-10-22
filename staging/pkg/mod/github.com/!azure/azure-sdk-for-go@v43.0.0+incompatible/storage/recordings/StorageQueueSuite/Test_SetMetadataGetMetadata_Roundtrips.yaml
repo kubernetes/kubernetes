@@ -1,0 +1,139 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:7RXfGDJvy+kBp1LbLUIvXIgm672FO95+uBikq+BpY+I=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:09 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-156storagequeuesuitetestsetmetadatagetmetadataroundtrips
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c47aa04a-a003-0042-26a5-15418d000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:/awVBgiE747MEtHwbFKoJPLRjYkzzSXJlOvYgswb9MU=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:09 GMT
+      x-ms-meta-Lol1:
+      - rofl1
+      x-ms-meta-lolBaz:
+      - rofl
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-156storagequeuesuitetestsetmetadatagetmetadataroundtrips?comp=metadata
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c47aa054-a003-0042-2ca5-15418d000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:KPv1PQqLo/2bsB2vxQUpKTdmDPckJrtKT2alQPJ3uIM=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:10 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-156storagequeuesuitetestsetmetadatagetmetadataroundtrips?comp=metadata
+    method: GET
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Approximate-Messages-Count:
+      - "0"
+      X-Ms-Meta-Lol1:
+      - rofl1
+      X-Ms-Meta-Lolbaz:
+      - rofl
+      X-Ms-Request-Id:
+      - c47aa060-a003-0042-38a5-15418d000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:u8fKZu/M6E4xf8hKrUyp2ztOZ8U8ew246ZUv+/Ah9Xg=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        queue
+      x-ms-date:
+      - Tue, 28 May 2019 22:36:10 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.queue.core.windows.net/queue-156storagequeuesuitetestsetmetadatagetmetadataroundtrips
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:36:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - c47aa064-a003-0042-3ca5-15418d000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 204 No Content
+    code: 204
+    duration: ""

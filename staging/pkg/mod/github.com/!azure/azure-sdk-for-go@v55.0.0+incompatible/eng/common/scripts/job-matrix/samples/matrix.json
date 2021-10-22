@@ -1,0 +1,28 @@
+{
+  "displayNames": {
+    "/p:UseProjectReferenceToAzureClients=true": "UseProjectRef"
+  },
+  "matrix": {
+    "Agent": {
+      "ubuntu": { "OSVmImage": "ubuntu-18.04", "Pool": "Azure Pipelines" },
+      "windows": { "OSVmImage": "windows-2019", "Pool": "Azure Pipelines" },
+      "macOS": { "OSVmImage": "macOS-10.15", "Pool": "Azure Pipelines" }
+    },
+    "TestTargetFramework": [ "netcoreapp2.1", "net461", "net5.0" ]
+  },
+  "include": [
+    {
+      "Agent": {
+        "windows": { "OSVmImage": "windows-2019", "Pool": "Azure Pipelines" }
+      },
+      "TestTargetFramework": [ "net461", "net5.0" ],
+      "AdditionalTestArguments": "/p:UseProjectReferenceToAzureClients=true"
+    }
+  ],
+  "exclude": [
+    {
+      "OSVmImage": "MMS2019",
+      "framework": "netcoreapp2.1"
+    }
+  ]
+}

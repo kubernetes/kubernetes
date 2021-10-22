@@ -1,0 +1,231 @@
+# basics
+fr, en-GB, en ; 	en-GB ; 	en-GB
+fr, en-GB, en ; 	en-US ; 	en
+fr, en-GB, en ; 	fr-FR ; 	fr
+fr, en-GB, en ; 	ja-JP ; 	fr
+
+# script fallbacks
+zh-CN, zh-TW, iw ; 	zh-Hant ; 	zh-TW
+zh-CN, zh-TW, iw ; 	zh ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh-Hans-CN ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh-Hant-HK ; 	zh-TW
+zh-CN, zh-TW, iw ; 	he-IT ; 	iw ; iw-u-rg-itzzzz
+
+# language-specific script fallbacks 1
+en, sr, nl ; 	sr-Latn ; 	sr
+en, sr, nl ; 	sh ; 	sr   # different script, but seems okay and is as CLDR suggests
+en, sr, nl ; 	hr ; 	en
+en, sr, nl ; 	bs ; 	en
+en, sr, nl ; 	nl-Cyrl ; 	sr
+
+# language-specific script fallbacks 2
+en, sh ; 	sr ; 	sh
+en, sh ; 	sr-Cyrl ; 	sh
+en, sh ; 	hr ; 	sh
+
+# don't match hr to sr-Latn
+en, sr-Latn ; 	hr ; 	en
+
+# both deprecated and not
+fil, tl, iw, he ; 	he-IT ; 	he
+fil, tl, iw, he ; 	he ; 	he
+fil, tl, iw, he ; 	iw ; 	iw
+fil, tl, iw, he ; 	fil-IT ; 	fil
+fil, tl, iw, he ; 	fil ; 	fil
+fil, tl, iw, he ; 	tl ; 	tl
+
+# nearby languages
+en, fil, ro, nn ; 	tl ; 	fil
+en, fil, ro, nn ; 	mo ; 	ro
+en, fil, ro, nn ; 	nb ; 	nn
+en, fil, ro, nn ; 	ja ; 	en
+
+# nearby languages: Nynorsk to Bokmål
+en, nb ; 	nn ; 	nb
+
+# nearby languages: Danish does not match nn
+en, nn ; 	da ; 	en
+
+# nearby languages: Danish matches no
+en, no ; 	da ; 	no
+
+# nearby languages: Danish matches nb
+en, nb ; 	da ; 	nb
+
+# prefer matching languages over language variants.
+nn, en-GB ; 	no, en-US ; 	en-GB
+nn, en-GB ; 	nb, en-US ; 	en-GB
+
+# deprecated version is closer than same language with other differences
+nl, he, en-GB ; 	iw, en-US ; 	he
+
+# macro equivalent is closer than same language with other differences
+nl, zh, en-GB, no ; 	cmn, en-US ; 	zh
+nl, zh, en-GB, no ; 	nb, en-US ; 	no
+
+# legacy equivalent is closer than same language with other differences
+nl, fil, en-GB ; 	tl, en-US ; 	fil
+
+# distinguish near equivalents
+en, ro, mo, ro-MD ; 	ro ; 	ro
+en, ro, mo, ro-MD ; 	mo ; 	mo
+en, ro, mo, ro-MD ; 	ro-MD ; 	ro-MD
+
+# maximization of legacy
+sr-Cyrl, sr-Latn, ro, ro-MD ; 	sh ; 	sr-Latn
+sr-Cyrl, sr-Latn, ro, ro-MD ; 	mo ; 	ro-MD
+
+# empty
+ ; 	fr ; 	und
+ ; 	en ; 	und
+
+# private use subtags
+fr, en-GB, x-bork, es-ES, es-419 ; 	x-piglatin ; 	fr
+fr, en-GB, x-bork, es-ES, es-419 ; 	x-bork ; 	x-bork
+
+# grandfathered codes
+fr, i-klingon, en-Latn-US ; 	en-GB-oed ; 	en-Latn-US
+fr, i-klingon, en-Latn-US ; 	i-klingon ; 	tlh
+
+
+# simple variant match
+fr, en-GB, ja, es-ES, es-MX ; 	de, en-US ; 	en-GB
+fr, en-GB, ja, es-ES, es-MX ; 	de, zh ; 	fr
+
+# best match for traditional Chinese
+fr, zh-Hans-CN, en-US ; 	zh-TW ; 	zh-Hans-CN
+fr, zh-Hans-CN, en-US ; 	zh-Hant ; 	zh-Hans-CN
+fr, zh-Hans-CN, en-US ; 	zh-TW, en ; 	en-US
+fr, zh-Hans-CN, en-US ; 	zh-Hant-CN, en ; 	en-US
+fr, zh-Hans-CN, en-US ; 	zh-Hans, en ; 	zh-Hans-CN
+
+# more specific script should win in case regions are identical
+af, af-Latn, af-Arab ; 	af ; 	af
+af, af-Latn, af-Arab ; 	af-ZA ; 	af
+af, af-Latn, af-Arab ; 	af-Latn-ZA ; 	af-Latn
+af, af-Latn, af-Arab ; 	af-Latn ; 	af-Latn
+
+# more specific region should win
+nl, nl-NL, nl-BE ; 	nl ; 	nl
+nl, nl-NL, nl-BE ; 	nl-Latn ; 	nl
+nl, nl-NL, nl-BE ; 	nl-Latn-NL ; 	nl-NL
+nl, nl-NL, nl-BE ; 	nl-NL ; 	nl-NL
+
+# region may replace matched if matched is enclosing
+es-419,es ; 	es-MX ; 	es-419 ; es-MX
+es-419,es ; 	es-SG ; 	es
+
+# more specific region wins over more specific script
+nl, nl-Latn, nl-NL, nl-BE ; 	nl ; 	nl
+nl, nl-Latn, nl-NL, nl-BE ; 	nl-Latn ; 	nl-Latn
+nl, nl-Latn, nl-NL, nl-BE ; 	nl-NL ; 	nl-NL
+nl, nl-Latn, nl-NL, nl-BE ; 	nl-Latn-NL ; 	nl-NL
+
+# region distance Portuguese
+pt, pt-PT ; 	pt-ES ; 	pt-PT
+
+# if no preferred locale specified, pick top language, not regional
+en, fr, fr-CA, fr-CH ; 	fr-US ; 	fr  ; fr-u-rg-uszzzz
+
+# region distance German
+de-AT, de-DE, de-CH ; 	de ; 	de-DE
+
+# en-AU is closer to en-GB than to en (which is en-US)
+en, en-GB, es-ES, es-419 ; 	en-AU ; 	en-GB
+en, en-GB, es-ES, es-419 ; 	es-MX ; 	es-419 ; es-MX
+en, en-GB, es-ES, es-419 ; 	es-PT ; 	es-ES
+
+# undefined
+it, fr ; 	und ; 	it
+
+# und does not match en
+it, en ; 	und ; 	it
+
+# undefined in priority list
+it, und ; 	und ; 	und
+it, und ; 	en ; 	it
+
+# undefined
+it, fr, zh ; 	und-FR ; 	fr
+it, fr, zh ; 	und-CN ; 	zh
+it, fr, zh ; 	und-Hans ; 	zh
+it, fr, zh ; 	und-Hant ; 	zh
+it, fr, zh ; 	und-Latn ; 	it
+
+# match on maximized tag
+fr, en-GB, ja, es-ES, es-MX ; 	ja-JP, en-GB ; 	ja
+fr, en-GB, ja, es-ES, es-MX ; 	ja-Jpan-JP, en-GB ; 	ja
+
+# pick best maximized tag
+ja, ja-Jpan-US, ja-JP, en, ru ; 	ja-Jpan, ru ; 	ja
+ja, ja-Jpan-US, ja-JP, en, ru ; 	ja-JP, ru ; 	ja-JP
+ja, ja-Jpan-US, ja-JP, en, ru ; 	ja-US, ru ; 	ja-Jpan-US
+
+# termination: pick best maximized match
+ja, ja-Jpan, ja-JP, en, ru ; 	ja-Jpan-JP, ru ; 	ja-JP
+ja, ja-Jpan, ja-JP, en, ru ; 	ja-Jpan, ru ; 	ja-Jpan
+
+# same language over exact, but distinguish when user is explicit
+fr, en-GB, ja, es-ES, es-MX ; 	ja, de ; 	ja
+en, de, fr, ja ; 	de-CH, fr ; 	de # TODO: ; de-u-rg-CH
+en-GB, nl ; 	en, nl ; en-GB
+en-GB, nl ; 	en, nl, en-GB ; nl
+
+# parent relation preserved
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-150 ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-AU ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-BE ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-GG ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-GI ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-HK ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-IE ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-IM ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-IN ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-JE ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-MT ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-NZ ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-PK ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-SG ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-DE ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	en-MT ; 	en-GB
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-AR ; 	es-419 ; es-AR
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-BO ; 	es-419 ; es-BO
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-CL ; 	es-419 ; es-CL
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-CO ; 	es-419 ; es-CO
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-CR ; 	es-419 ; es-CR
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-CU ; 	es-419 ; es-CU
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-DO ; 	es-419 ; es-DO
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-EC ; 	es-419 ; es-EC
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-GT ; 	es-419 ; es-GT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-HN ; 	es-419 ; es-HN
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-MX ; 	es-419 ; es-MX
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-NI ; 	es-419 ; es-NI
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-PA ; 	es-419 ; es-PA
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-PE ; 	es-419 ; es-PE
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-PR ; 	es-419 ; es-PR
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-PT ; 	es
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-PY ; 	es-419 ; es-PY
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-SV ; 	es-419 ; es-SV
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-US ; 	es-419
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-UY ; 	es-419 ; es-UY
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	es-VE ; 	es-419 ; es-VE
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-AO ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-CV ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-GW ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-MO ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-MZ ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-ST ; 	pt-PT
+en, en-US, en-GB, es, es-419, pt, pt-BR, pt-PT, zh,  zh-Hant, zh-Hant-HK ; 	pt-TL ; 	pt-PT
+
+# preserve extensions
+en, de, sl-nedis ; 	de-FR-u-co-phonebk ; 	de ; de-u-co-phonebk-rg-frzzzz
+en, de, sl-nedis ; 	sl-nedis-u-cu-eur ; 	sl-nedis ; sl-nedis-u-cu-eur
+en, de, sl-nedis ; 	sl-u-cu-eur ; 	sl-nedis ; sl-nedis-u-cu-eur
+en, de, sl-nedis ; 	sl-HR-nedis-u-cu-eur ; 	sl-nedis ; sl-nedis-u-cu-eur-rg-hrzzzz
+en, de, sl-nedis ; 	de-t-m0-iso-i0-pinyin ; 	de ; de-t-m0-iso-i0-pinyin
+
+und, nl ; 	nl-BE-fonipa ; 	nl ; 	nl-u-rg-bezzzz
+und, nl-CA ;	nl-BE-fonipa ; 	nl-CA ; 	nl-CA-u-rg-bezzzz
+und, nl-fonupa ; 	nl-BE-fonipa ; 	nl-fonupa ; 	nl-fonupa-u-rg-bezzzz
+und, no ; 	nn-DK-fonipa ; 	no ; 	no-u-rg-dkzzzz
+und, en-GB-u-sd-usca ; 	en-US-fonipa-u-nu-Arab-ca-buddhist-sd-usdc-t-m0-iso-i0-pinyin ; 	en-GB-u-sd-usca ; 	en-GB-t-m0-iso-i0-pinyin-u-ca-buddhist-nu-Arab-rg-uszzzz-sd-usca

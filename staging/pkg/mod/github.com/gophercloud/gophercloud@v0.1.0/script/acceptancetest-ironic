@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+set -x
+
+source `dirname $0`/stackenv
+
+timeout="60m"
+failed=
+
+# Run the Ironic acceptance tests.
+# Check the error code after each suite, but do not exit early if a suite failed.
+
+ACCEPTANCE_TESTS=(
+acceptance/openstack/baremetal/v1
+)
+
+for acceptance_test in ${ACCEPTANCE_TESTS[@]}; do
+  go test -v -timeout $timeout -tags "fixtures acceptance" ./${acceptance_test}
+  if [[ $? != 0 ]]; then
+    failed=1
+  fi
+done
+
+# If any of the test suites failed, exit 1
+if [[ -n $failed ]]; then
+  exit 1
+fi
+
+exit 0

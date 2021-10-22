@@ -1,0 +1,90 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS EC2 Connect Service is a service that enables system administrators to publish temporary SSH keys to their EC2 instances in order to establish connections to their instances without leaving a permanent authentication option.</p>",
+  "operations": {
+    "SendSSHPublicKey": "<p>Pushes an SSH public key to a particular OS user on a given EC2 instance for 60 seconds.</p>"
+  },
+  "shapes": {
+    "AuthException": {
+      "base": "<p>Indicates that either your AWS credentials are invalid or you do not have access to the EC2 instance.</p>",
+      "refs": {
+      }
+    },
+    "AvailabilityZone": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyRequest$AvailabilityZone": "<p>The availability zone the EC2 instance was launched in.</p>"
+      }
+    },
+    "EC2InstanceNotFoundException": {
+      "base": "<p>Indicates that the instance requested was not found in the given zone. Check that you have provided a valid instance ID and the correct zone.</p>",
+      "refs": {
+      }
+    },
+    "InstanceId": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyRequest$InstanceId": "<p>The EC2 instance you wish to publish the SSH key to.</p>"
+      }
+    },
+    "InstanceOSUser": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyRequest$InstanceOSUser": "<p>The OS user on the EC2 instance whom the key may be used to authenticate as.</p>"
+      }
+    },
+    "InvalidArgsException": {
+      "base": "<p>Indicates that you provided bad input. Ensure you have a valid instance ID, the correct zone, and a valid SSH public key.</p>",
+      "refs": {
+      }
+    },
+    "RequestId": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyResponse$RequestId": "<p>The request ID as logged by EC2 Connect. Please provide this when contacting AWS Support.</p>"
+      }
+    },
+    "SSHPublicKey": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyRequest$SSHPublicKey": "<p>The public key to be published to the instance. To use it after publication you must have the matching private key.</p>"
+      }
+    },
+    "SendSSHPublicKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendSSHPublicKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ServiceException": {
+      "base": "<p>Indicates that the service encountered an error. Follow the message's instructions and try again.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AuthException$Message": null,
+        "EC2InstanceNotFoundException$Message": null,
+        "InvalidArgsException$Message": null,
+        "ServiceException$Message": null,
+        "ThrottlingException$Message": null
+      }
+    },
+    "Success": {
+      "base": null,
+      "refs": {
+        "SendSSHPublicKeyResponse$Success": "<p>Indicates request success.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Indicates you have been making requests too frequently and have been throttled. Wait for a while and try again. If higher call volume is warranted contact AWS Support.</p>",
+      "refs": {
+      }
+    }
+  }
+}

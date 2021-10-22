@@ -1,0 +1,5 @@
+Errors reading examples/errors/petstore-badproperties.yaml
+[3,3] $root.info is missing required property: version
+[3,3] $root.info has invalid property: myproperty
+[23,11] $root.paths./pets.get.parameters contains an invalid ParametersItem
+[44,7] $root.paths./pets.post has unexpected value for tags: pets (string)

@@ -1,0 +1,475 @@
+{
+  "version": "2.0",
+  "service": "<p>The AWS IoT 1-Click Projects API Reference</p>",
+  "operations": {
+    "AssociateDeviceWithPlacement": "<p>Associates a physical device with a placement.</p>",
+    "CreatePlacement": "<p>Creates an empty placement.</p>",
+    "CreateProject": "<p>Creates an empty project with a placement template. A project contains zero or more placements that adhere to the placement template defined in the project.</p>",
+    "DeletePlacement": "<p>Deletes a placement. To delete a placement, it must not have any devices associated with it.</p> <note> <p>When you delete a placement, all associated data becomes irretrievable.</p> </note>",
+    "DeleteProject": "<p>Deletes a project. To delete a project, it must not have any placements associated with it.</p> <note> <p>When you delete a project, all associated data becomes irretrievable.</p> </note>",
+    "DescribePlacement": "<p>Describes a placement in a project.</p>",
+    "DescribeProject": "<p>Returns an object describing a project.</p>",
+    "DisassociateDeviceFromPlacement": "<p>Removes a physical device from a placement.</p>",
+    "GetDevicesInPlacement": "<p>Returns an object enumerating the devices in a placement.</p>",
+    "ListPlacements": "<p>Lists the placement(s) of a project.</p>",
+    "ListProjects": "<p>Lists the AWS IoT 1-Click project(s) associated with your AWS account and region.</p>",
+    "ListTagsForResource": "<p>Lists the tags (metadata key/value pairs) which you have assigned to the resource.</p>",
+    "TagResource": "<p>Creates or modifies tags for a resource. Tags are key/value pairs (metadata) that can be used to manage a resource. For more information, see <a href=\"https://aws.amazon.com/answers/account-management/aws-tagging-strategies/\">AWS Tagging Strategies</a>.</p>",
+    "UntagResource": "<p>Removes one or more tags (metadata key/value pairs) from a resource.</p>",
+    "UpdatePlacement": "<p>Updates a placement with the given attributes. To clear an attribute, pass an empty value (i.e., \"\").</p>",
+    "UpdateProject": "<p>Updates a project associated with your AWS account and region. With the exception of device template names, you can pass just the values that need to be updated because the update request will change only the values that are provided. To clear a value, pass the empty string (i.e., <code>\"\"</code>).</p>"
+  },
+  "shapes": {
+    "AssociateDeviceWithPlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDeviceWithPlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AttributeDefaultValue": {
+      "base": null,
+      "refs": {
+        "DefaultPlacementAttributeMap$value": null
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "DefaultPlacementAttributeMap$key": null,
+        "PlacementAttributeMap$key": null
+      }
+    },
+    "AttributeValue": {
+      "base": null,
+      "refs": {
+        "PlacementAttributeMap$value": null
+      }
+    },
+    "Code": {
+      "base": null,
+      "refs": {
+        "InternalFailureException$code": null,
+        "InvalidRequestException$code": null,
+        "ResourceConflictException$code": null,
+        "ResourceNotFoundException$code": null,
+        "TooManyRequestsException$code": null
+      }
+    },
+    "CreatePlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreatePlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DefaultPlacementAttributeMap": {
+      "base": null,
+      "refs": {
+        "PlacementTemplate$defaultAttributes": "<p>The default attributes (key/value pairs) to be applied to all placements using this template.</p>"
+      }
+    },
+    "DeletePlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeletePlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribePlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$description": "<p>An optional description for the project.</p>",
+        "ProjectDescription$description": "<p>The description of the project.</p>",
+        "UpdateProjectRequest$description": "<p>An optional user-defined description for the project.</p>"
+      }
+    },
+    "DeviceCallbackKey": {
+      "base": null,
+      "refs": {
+        "DeviceCallbackOverrideMap$key": null
+      }
+    },
+    "DeviceCallbackOverrideMap": {
+      "base": null,
+      "refs": {
+        "DeviceTemplate$callbackOverrides": "<p>An optional Lambda function to invoke instead of the default Lambda function provided by the placement template.</p>"
+      }
+    },
+    "DeviceCallbackValue": {
+      "base": null,
+      "refs": {
+        "DeviceCallbackOverrideMap$value": null
+      }
+    },
+    "DeviceId": {
+      "base": null,
+      "refs": {
+        "AssociateDeviceWithPlacementRequest$deviceId": "<p>The ID of the physical device to be associated with the given placement in the project. Note that a mandatory 4 character prefix is required for all <code>deviceId</code> values.</p>",
+        "DeviceMap$value": null
+      }
+    },
+    "DeviceMap": {
+      "base": null,
+      "refs": {
+        "GetDevicesInPlacementResponse$devices": "<p>An object containing the devices (zero or more) within the placement.</p>"
+      }
+    },
+    "DeviceTemplate": {
+      "base": "<p>An object representing a device for a placement template (see <a>PlacementTemplate</a>).</p>",
+      "refs": {
+        "DeviceTemplateMap$value": null
+      }
+    },
+    "DeviceTemplateMap": {
+      "base": null,
+      "refs": {
+        "PlacementTemplate$deviceTemplates": "<p>An object specifying the <a>DeviceTemplate</a> for all placements using this (<a>PlacementTemplate</a>) template.</p>"
+      }
+    },
+    "DeviceTemplateName": {
+      "base": null,
+      "refs": {
+        "AssociateDeviceWithPlacementRequest$deviceTemplateName": "<p>The device template name to associate with the device ID.</p>",
+        "DeviceMap$key": null,
+        "DeviceTemplateMap$key": null,
+        "DisassociateDeviceFromPlacementRequest$deviceTemplateName": "<p>The device ID that should be removed from the placement.</p>"
+      }
+    },
+    "DeviceType": {
+      "base": null,
+      "refs": {
+        "DeviceTemplate$deviceType": "<p>The device type, which currently must be <code>\"button\"</code>.</p>"
+      }
+    },
+    "DisassociateDeviceFromPlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDeviceFromPlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicesInPlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicesInPlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalFailureException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "InvalidRequestException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ListPlacementsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListPlacementsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListPlacementsRequest$maxResults": "<p>The maximum number of results to return per request. If not set, a default value of 100 is used.</p>",
+        "ListProjectsRequest$maxResults": "<p>The maximum number of results to return per request. If not set, a default value of 100 is used.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "InternalFailureException$message": null,
+        "InvalidRequestException$message": null,
+        "ResourceConflictException$message": null,
+        "ResourceNotFoundException$message": null,
+        "TooManyRequestsException$message": null
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListPlacementsRequest$nextToken": "<p>The token to retrieve the next set of results.</p>",
+        "ListPlacementsResponse$nextToken": "<p>The token used to retrieve the next set of results - will be effectively empty if there are no further results.</p>",
+        "ListProjectsRequest$nextToken": "<p>The token to retrieve the next set of results.</p>",
+        "ListProjectsResponse$nextToken": "<p>The token used to retrieve the next set of results - will be effectively empty if there are no further results.</p>"
+      }
+    },
+    "PlacementAttributeMap": {
+      "base": null,
+      "refs": {
+        "CreatePlacementRequest$attributes": "<p>Optional user-defined key/value pairs providing contextual data (such as location or function) for the placement.</p>",
+        "PlacementDescription$attributes": "<p>The user-defined attributes associated with the placement.</p>",
+        "UpdatePlacementRequest$attributes": "<p>The user-defined object of attributes used to update the placement. The maximum number of key/value pairs is 50.</p>"
+      }
+    },
+    "PlacementDescription": {
+      "base": "<p>An object describing a project's placement.</p>",
+      "refs": {
+        "DescribePlacementResponse$placement": "<p>An object describing the placement.</p>"
+      }
+    },
+    "PlacementName": {
+      "base": null,
+      "refs": {
+        "AssociateDeviceWithPlacementRequest$placementName": "<p>The name of the placement in which to associate the device.</p>",
+        "CreatePlacementRequest$placementName": "<p>The name of the placement to be created.</p>",
+        "DeletePlacementRequest$placementName": "<p>The name of the empty placement to delete.</p>",
+        "DescribePlacementRequest$placementName": "<p>The name of the placement within a project.</p>",
+        "DisassociateDeviceFromPlacementRequest$placementName": "<p>The name of the placement that the device should be removed from.</p>",
+        "GetDevicesInPlacementRequest$placementName": "<p>The name of the placement to get the devices from.</p>",
+        "PlacementDescription$placementName": "<p>The name of the placement.</p>",
+        "PlacementSummary$placementName": "<p>The name of the placement being summarized.</p>",
+        "UpdatePlacementRequest$placementName": "<p>The name of the placement to update.</p>"
+      }
+    },
+    "PlacementSummary": {
+      "base": "<p>An object providing summary information for a particular placement.</p>",
+      "refs": {
+        "PlacementSummaryList$member": null
+      }
+    },
+    "PlacementSummaryList": {
+      "base": null,
+      "refs": {
+        "ListPlacementsResponse$placements": "<p>An object listing the requested placements.</p>"
+      }
+    },
+    "PlacementTemplate": {
+      "base": "<p>An object defining the template for a placement.</p>",
+      "refs": {
+        "CreateProjectRequest$placementTemplate": "<p>The schema defining the placement to be created. A placement template defines placement default attributes and device templates. You cannot add or remove device templates after the project has been created. However, you can update <code>callbackOverrides</code> for the device templates using the <code>UpdateProject</code> API.</p>",
+        "ProjectDescription$placementTemplate": "<p>An object describing the project's placement specifications.</p>",
+        "UpdateProjectRequest$placementTemplate": "<p>An object defining the project update. Once a project has been created, you cannot add device template names to the project. However, for a given <code>placementTemplate</code>, you can update the associated <code>callbackOverrides</code> for the device definition using this API.</p>"
+      }
+    },
+    "ProjectArn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$resourceArn": "<p>The ARN of the resource whose tags you want to list.</p>",
+        "ProjectDescription$arn": "<p>The ARN of the project.</p>",
+        "ProjectSummary$arn": "<p>The ARN of the project.</p>",
+        "TagResourceRequest$resourceArn": "<p>The ARN of the resouce for which tag(s) should be added or modified.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The ARN of the resource whose tag you want to remove.</p>"
+      }
+    },
+    "ProjectDescription": {
+      "base": "<p>An object providing detailed information for a particular project associated with an AWS account and region.</p>",
+      "refs": {
+        "DescribeProjectResponse$project": "<p>An object describing the project.</p>"
+      }
+    },
+    "ProjectName": {
+      "base": null,
+      "refs": {
+        "AssociateDeviceWithPlacementRequest$projectName": "<p>The name of the project containing the placement in which to associate the device.</p>",
+        "CreatePlacementRequest$projectName": "<p>The name of the project in which to create the placement.</p>",
+        "CreateProjectRequest$projectName": "<p>The name of the project to create.</p>",
+        "DeletePlacementRequest$projectName": "<p>The project containing the empty placement to delete.</p>",
+        "DeleteProjectRequest$projectName": "<p>The name of the empty project to delete.</p>",
+        "DescribePlacementRequest$projectName": "<p>The project containing the placement to be described.</p>",
+        "DescribeProjectRequest$projectName": "<p>The name of the project to be described.</p>",
+        "DisassociateDeviceFromPlacementRequest$projectName": "<p>The name of the project that contains the placement.</p>",
+        "GetDevicesInPlacementRequest$projectName": "<p>The name of the project containing the placement.</p>",
+        "ListPlacementsRequest$projectName": "<p>The project containing the placements to be listed.</p>",
+        "PlacementDescription$projectName": "<p>The name of the project containing the placement.</p>",
+        "PlacementSummary$projectName": "<p>The name of the project containing the placement.</p>",
+        "ProjectDescription$projectName": "<p>The name of the project for which to obtain information from.</p>",
+        "ProjectSummary$projectName": "<p>The name of the project being summarized.</p>",
+        "UpdatePlacementRequest$projectName": "<p>The name of the project containing the placement to be updated.</p>",
+        "UpdateProjectRequest$projectName": "<p>The name of the project to be updated.</p>"
+      }
+    },
+    "ProjectSummary": {
+      "base": "<p>An object providing summary information for a particular project for an associated AWS account and region.</p>",
+      "refs": {
+        "ProjectSummaryList$member": null
+      }
+    },
+    "ProjectSummaryList": {
+      "base": null,
+      "refs": {
+        "ListProjectsResponse$projects": "<p>An object containing the list of projects.</p>"
+      }
+    },
+    "ResourceConflictException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagKeyList$member": null,
+        "TagMap$key": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The keys of those tags which you want to remove.</p>"
+      }
+    },
+    "TagMap": {
+      "base": null,
+      "refs": {
+        "CreateProjectRequest$tags": "<p>Optional tags (metadata key/value pairs) to be associated with the project. For example, <code>{ {\"key1\": \"value1\", \"key2\": \"value2\"} }</code>. For more information, see <a href=\"https://aws.amazon.com/answers/account-management/aws-tagging-strategies/\">AWS Tagging Strategies</a>.</p>",
+        "ListTagsForResourceResponse$tags": "<p>The tags (metadata key/value pairs) which you have assigned to the resource.</p>",
+        "ProjectDescription$tags": "<p>The tags (metadata key/value pairs) associated with the project.</p>",
+        "ProjectSummary$tags": "<p>The tags (metadata key/value pairs) associated with the project.</p>",
+        "TagResourceRequest$tags": "<p>The new or modifying tag(s) for the resource. See <a href=\"https://docs.aws.amazon.com/iot-1-click/latest/developerguide/1click-appendix.html#1click-limits\">AWS IoT 1-Click Service Limits</a> for the maximum number of tags allowed per resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "TagMap$value": null
+      }
+    },
+    "Time": {
+      "base": null,
+      "refs": {
+        "PlacementDescription$createdDate": "<p>The date when the placement was initially created, in UNIX epoch time format.</p>",
+        "PlacementDescription$updatedDate": "<p>The date when the placement was last updated, in UNIX epoch time format. If the placement was not updated, then <code>createdDate</code> and <code>updatedDate</code> are the same.</p>",
+        "PlacementSummary$createdDate": "<p>The date when the placement was originally created, in UNIX epoch time format.</p>",
+        "PlacementSummary$updatedDate": "<p>The date when the placement was last updated, in UNIX epoch time format. If the placement was not updated, then <code>createdDate</code> and <code>updatedDate</code> are the same.</p>",
+        "ProjectDescription$createdDate": "<p>The date when the project was originally created, in UNIX epoch time format.</p>",
+        "ProjectDescription$updatedDate": "<p>The date when the project was last updated, in UNIX epoch time format. If the project was not updated, then <code>createdDate</code> and <code>updatedDate</code> are the same.</p>",
+        "ProjectSummary$createdDate": "<p>The date when the project was originally created, in UNIX epoch time format.</p>",
+        "ProjectSummary$updatedDate": "<p>The date when the project was last updated, in UNIX epoch time format. If the project was not updated, then <code>createdDate</code> and <code>updatedDate</code> are the same.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePlacementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdatePlacementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectResponse": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

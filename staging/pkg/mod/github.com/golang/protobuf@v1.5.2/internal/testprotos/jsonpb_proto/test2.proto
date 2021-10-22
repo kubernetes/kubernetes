@@ -1,0 +1,154 @@
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+syntax = "proto2";
+
+option go_package = "github.com/golang/protobuf/internal/testprotos/jsonpb_proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+package jsonpb_test;
+
+// Test message for holding primitive types.
+message Simple {
+  optional bool o_bool = 1;
+  optional int32 o_int32 = 2;
+  optional int32 o_int32_str = 3;
+  optional int64 o_int64 = 4;
+  optional int64 o_int64_str = 5;
+  optional uint32 o_uint32 = 6;
+  optional uint32 o_uint32_str = 7;
+  optional uint64 o_uint64 = 8;
+  optional uint64 o_uint64_str = 9;
+  optional sint32 o_sint32 = 10;
+  optional sint32 o_sint32_str = 11;
+  optional sint64 o_sint64 = 12;
+  optional sint64 o_sint64_str = 13;
+  optional float o_float = 14;
+  optional float o_float_str = 15;
+  optional double o_double = 16;
+  optional double o_double_str = 17;
+  optional string o_string = 18;
+  optional bytes o_bytes = 19;
+}
+
+// Test message for holding special non-finites primitives.
+message NonFinites {
+    optional float f_nan = 1;
+    optional float f_pinf = 2;
+    optional float f_ninf = 3;
+    optional double d_nan = 4;
+    optional double d_pinf = 5;
+    optional double d_ninf = 6;
+}
+
+// Test message for holding repeated primitives.
+message Repeats {
+  repeated bool r_bool = 1;
+  repeated int32 r_int32 = 2;
+  repeated int64 r_int64 = 3;
+  repeated uint32 r_uint32 = 4;
+  repeated uint64 r_uint64 = 5;
+  repeated sint32 r_sint32 = 6;
+  repeated sint64 r_sint64 = 7;
+  repeated float r_float = 8;
+  repeated double r_double = 9;
+  repeated string r_string = 10;
+  repeated bytes r_bytes = 11;
+}
+
+// Test message for holding enums and nested messages.
+message Widget {
+  enum Color {
+    RED = 0;
+    GREEN = 1;
+    BLUE = 2;
+  };
+  optional Color color = 1;
+  repeated Color r_color = 2;
+
+  optional Simple simple = 10;
+  repeated Simple r_simple = 11;
+
+  optional Repeats repeats = 20;
+  repeated Repeats r_repeats = 21;
+}
+
+message Maps {
+  map<int64, string> m_int64_str = 1;
+  map<bool, Simple> m_bool_simple = 2;
+}
+
+message MsgWithOneof {
+  oneof union {
+    string title = 1;
+    int64 salary = 2;
+    string Country = 3;
+    string home_address = 4;
+    MsgWithRequired msg_with_required = 5;
+  }
+}
+
+message Real {
+  optional double value = 1;
+  extensions 100 to max;
+}
+
+extend Real {
+  optional string name = 124;
+}
+
+message Complex {
+  extend Real {
+    optional Complex real_extension = 123;
+  }
+  optional double imaginary = 1;
+  extensions 100 to max;
+}
+
+message KnownTypes {
+  optional google.protobuf.Any an = 14;
+  optional google.protobuf.Duration dur = 1;
+  optional google.protobuf.Struct st = 12;
+  optional google.protobuf.Timestamp ts = 2;
+  optional google.protobuf.ListValue lv = 15;
+  optional google.protobuf.Value val = 16;
+
+  optional google.protobuf.DoubleValue dbl = 3;
+  optional google.protobuf.FloatValue flt = 4;
+  optional google.protobuf.Int64Value i64 = 5;
+  optional google.protobuf.UInt64Value u64 = 6;
+  optional google.protobuf.Int32Value i32 = 7;
+  optional google.protobuf.UInt32Value u32 = 8;
+  optional google.protobuf.BoolValue bool = 9;
+  optional google.protobuf.StringValue str = 10;
+  optional google.protobuf.BytesValue bytes = 11;
+}
+
+// Test messages for marshaling/unmarshaling required fields.
+message MsgWithRequired {
+  required string str = 1;
+}
+
+message MsgWithIndirectRequired {
+  optional MsgWithRequired subm = 1;
+  map<string, MsgWithRequired> map_field = 2;
+  repeated MsgWithRequired slice_field = 3;
+}
+
+message MsgWithRequiredBytes {
+  required bytes byts = 1;
+}
+
+message MsgWithRequiredWKT {
+  required google.protobuf.StringValue str = 1;
+}
+
+extend Real {
+  optional MsgWithRequired extm = 125;
+}

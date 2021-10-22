@@ -1,0 +1,3 @@
+[arn:aws:sts::1234:assumed-role/My-Role/session-name]
+region = "foo-region"
+arn = arn:aws:sts::1234:assumed-role/My-Role/session-name

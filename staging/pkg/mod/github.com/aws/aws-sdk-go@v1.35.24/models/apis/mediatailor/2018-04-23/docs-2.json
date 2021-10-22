@@ -1,0 +1,163 @@
+{
+    "operations": {
+        "DeletePlaybackConfiguration": "<p>Deletes the playback configuration for the specified name. </p>", 
+        "GetPlaybackConfiguration": "<p>Returns the playback configuration for the specified name. </p>", 
+        "ListPlaybackConfigurations": "<p>Returns a list of the playback configurations defined in AWS Elemental MediaTailor. You can specify a maximum number of configurations to return at a time. The default maximum is 50. Results are returned in pagefuls. If MediaTailor has more configurations than the specified maximum, it provides parameters in the response that you can use to retrieve the next pageful. </p>", 
+        "ListTagsForResource": "<p>Returns a list of the tags assigned to the specified playback configuration resource. </p>", 
+        "PutPlaybackConfiguration": "<p>Adds a new playback configuration to AWS Elemental MediaTailor. </p>", 
+        "TagResource": "<p>Adds tags to the specified playback configuration resource. You can specify one or more tags to add. </p>", 
+        "UntagResource": "<p>Removes tags from the specified playback configuration resource. You can specify one or more tags to remove. </p>"
+    }, 
+    "service": "<p>Use the AWS Elemental MediaTailor SDK to configure scalable ad insertion for your live and VOD content. With AWS Elemental MediaTailor, you can serve targeted ads to viewers while maintaining broadcast quality in over-the-top (OTT) video applications. For information about using the service, including detailed information about the settings covered in this guide, see the AWS Elemental MediaTailor User Guide.<p>Through the SDK, you manage AWS Elemental MediaTailor configurations the same as you do through the console. For example, you specify ad insertion behavior and mapping information for the origin server and the ad decision server (ADS).</p>", 
+    "shapes": {
+        "AdMarkerPassthrough" : {
+          "base" : null,
+          "refs" : {
+            "ManifestProcessingRules$AdMarkerPassthrough" : "<p>For HLS, when set to <code>true</code>, MediaTailor passes through EXT-X-CUE-IN, EXT-X-CUE-OUT, and EXT-X-SPLICEPOINT-SCTE35 ad markers from the origin manifest to the MediaTailor personalized manifest.</p><p>No logic is applied to these ad markers. For example, if EXT-X-CUE-OUT has a value of <code>60</code>, but no ads are filled for that ad break, MediaTailor will not set the value to 0.</p>"
+          }
+        },
+        "AvailSuppression": {
+          "base": null,
+          "refs": {
+            "GetPlaybackConfigurationResponse$AvailSuppression": "<p>The configuration for Avail Suppression.</p>",
+            "PutPlaybackConfigurationRequest$AvailSuppression": "<p>The configuration for Avail Suppression.</p>"
+          }
+        },
+        "BadRequestException": {
+            "base": "<p>One of the parameters in the request is invalid.</p>", 
+            "refs": {}
+        }, 
+        "Bumper": {
+            "base": "<p>The configuration for bumpers. Bumpers are short audio or video clips that play at the start or before the end of an ad break. </p>",
+            "refs": {
+                "GetPlaybackConfigurationResponse$Bumper": "<p>The configuration for bumpers. Bumpers are short audio or video clips that play at the start or before the end of an ad break. </p>",
+                "PutPlaybackConfigurationRequest$Bumper": "<p>The configuration for bumpers. Bumpers are short audio or video clips that play at the start or before the end of an ad break. </p>"
+            }
+        },
+        "CdnConfiguration": {
+            "base": "<p>The configuration for using a content delivery network (CDN), like Amazon CloudFront, for content and ad segment management. </p>", 
+            "refs": {
+                "GetPlaybackConfigurationResponse$CdnConfiguration": "<p>The configuration for using a content delivery network (CDN), like Amazon CloudFront, for content and ad segment management. </p>", 
+                "PutPlaybackConfigurationRequest$CdnConfiguration": "<p>The configuration for using a content delivery network (CDN), like Amazon CloudFront, for content and ad segment management. </p>"
+            }
+        }, 
+        "DashConfiguration": {
+            "base": "<p>The configuration for DASH content. </p>", 
+            "refs": {
+                "GetPlaybackConfigurationResponse$DashConfiguration": "<p>The configuration for DASH content. </p>"
+            }
+        }, 
+        "DashConfigurationForPut": {
+            "base": "<p>The configuration for DASH PUT operations. </p>", 
+            "refs": {
+                "PutPlaybackConfigurationRequest$DashConfiguration": "<p>The configuration for DASH content. </p>"
+            }
+        }, 
+        "DeletePlaybackConfigurationResponse": {
+            "base": null, 
+            "refs": {}
+        }, 
+        "GetPlaybackConfigurationResponse": {
+            "base": null, 
+            "refs": {}
+        }, 
+        "HlsConfiguration": {
+            "base": "<p>The configuration for HLS content. </p>", 
+            "refs": {
+                "GetPlaybackConfigurationResponse$HlsConfiguration": "<p>The configuration for HLS content. </p>"
+            }
+        }, 
+        "ListPlaybackConfigurationsResponse": {
+            "base": null, 
+            "refs": {}
+        },
+        "LivePreRollConfiguration" : {
+            "base" : "<p>The configuration for pre-roll ad insertion.</p>",
+            "refs" : {
+                "GetPlaybackConfigurationResponse$LivePreRollConfiguration" : "<p>The configuration for pre-roll ad insertion.</p>",
+                "PutPlaybackConfigurationRequest$LivePreRollConfiguration" : "<p>The configuration for pre-roll ad insertion.</p>"
+            }
+        },
+        "ManifestProcessingRules" : {
+          "base" : "The configuration for manifest processing rules. Manifest processing rules enable customization of the personalized manifests created by MediaTailor.",
+          "refs" : {
+            "GetPlaybackConfigurationResponse$ManifestProcessingRules" : "The configuration for manifest processing rules. Manifest processing rules enable customization of the personalized manifests created by MediaTailor.",
+            "PutPlaybackConfigurationRequest$ManifestProcessingRules" : "The configuration for manifest processing rules. Manifest processing rules enable customization of the personalized manifests created by MediaTailor."
+          }
+        },
+        "OriginManifestType": {
+            "base": null, 
+            "refs": {
+                "DashConfiguration$OriginManifestType": "<p>The setting that controls whether MediaTailor handles manifests from the origin server as multi-period manifests or single-period manifests. If your origin server produces single-period manifests, set this to SINGLE_PERIOD. The default setting is MULTI_PERIOD. For multi-period manifests, omit this setting or set it to MULTI_PERIOD. </p>", 
+                "DashConfigurationForPut$OriginManifestType": "<p>The setting that controls whether MediaTailor handles manifests from the origin server as multi-period manifests or single-period manifests. If your origin server produces single-period manifests, set this to SINGLE_PERIOD. The default setting is MULTI_PERIOD. For multi-period manifests, omit this setting or set it to MULTI_PERIOD. </p>"
+            }
+        }, 
+        "PlaybackConfiguration": {
+            "refs": {
+                "__listOfPlaybackConfigurations$member": "<p>The AWSMediaTailor configuration. </p>"
+            }
+        }, 
+        "PutPlaybackConfigurationRequest": {
+            "base": null, 
+            "refs": {}
+        }, 
+        "TagsModel": {
+            "base": "<p>A set of tags assigned to a resource. </p>", 
+            "refs": {}
+        },
+        "__integer" : {
+            "base" : null,
+            "refs" : {
+                "LivePreRollConfiguration$MaxDurationSeconds" : "The maximum allowed duration for the pre-roll ad avail. AWS Elemental MediaTailor won't play pre-roll ads to exceed this duration, regardless of the total duration of ads that the ADS returns.",
+                "GetPlaybackConfigurationResponse$PersonalizationThresholdSeconds" : "The maximum duration of underfilled ad time (in seconds) allowed in an ad break.",
+                "PutPlaybackConfigurationRequest$PersonalizationThresholdSeconds" : "The maximum duration of underfilled ad time (in seconds) allowed in an ad break."
+            }
+        },
+        "__listOfPlaybackConfigurations": {
+            "base": null, 
+            "refs": {
+                "ListPlaybackConfigurationsResponse$Items": "<p>Array of playback configurations. This might be all the available configurations or a subset, depending on the settings that you provide and the total number of configurations stored. </p>"
+            }
+        }, 
+        "__mapOf__string": {
+            "base": null, 
+            "refs": {
+                "GetPlaybackConfigurationResponse$Tags": "<p>The tags assigned to the playback configuration. </p>", 
+                "PutPlaybackConfigurationRequest$Tags": "<p>The tags to assign to the playback configuration. </p>", 
+                "TagsModel$Tags": "<p>A comma-separated list of tag key:value pairs. For example: \n {\n \"Key1\": \"Value1\",\n \"Key2\": \"Value2\"\n }\n </p>"
+            }
+        }, 
+        "__string": {
+            "base": null, 
+            "refs": {
+                "AvailSuppression$Value" : "Sets the mode for avail suppression, also known as ad suppression. By default, ad suppression is off and all ad breaks are filled by MediaTailor with ads or slate.",
+                "BadRequestException$Message": "<p>One of the parameters in the request is invalid.</p>", 
+                "CdnConfiguration$AdSegmentUrlPrefix": "<p>A non-default content delivery network (CDN) to serve ad segments. By default, AWS Elemental MediaTailor uses Amazon CloudFront with default cache settings as its CDN for ad segments. To set up an alternate CDN, create a rule in your CDN for the following origin: ads.mediatailor.&lt;region>.amazonaws.com. Then specify the rule's name in this AdSegmentUrlPrefix. When AWS Elemental MediaTailor serves a manifest, it reports your CDN as the source for ad segments.</p>", 
+                "CdnConfiguration$ContentSegmentUrlPrefix": "<p>A content delivery network (CDN) to cache content segments, so that content requests don’t always have to go to the origin server. First, create a rule in your CDN for the content segment origin server. Then specify the rule's name in this ContentSegmentUrlPrefix. When AWS Elemental MediaTailor serves a manifest, it reports your CDN as the source for content segments.</p>", 
+                "DashConfiguration$ManifestEndpointPrefix": "<p>The URL generated by MediaTailor to initiate a playback session. The session uses server-side reporting. This setting is ignored in PUT operations. </p>", 
+                "DashConfiguration$MpdLocation": "<p>The setting that controls whether MediaTailor includes the Location tag in DASH manifests. MediaTailor populates the Location tag with the URL for manifest update requests, to be used by players that don't support sticky redirects. Disable this if you have CDN routing rules set up for accessing MediaTailor manifests, and you are either using client-side reporting or your players support sticky HTTP redirects. Valid values are DISABLED and EMT_DEFAULT. The EMT_DEFAULT setting enables the inclusion of the tag and is the default value. </p>", 
+                "DashConfigurationForPut$MpdLocation": "<p>The setting that controls whether MediaTailor includes the Location tag in DASH manifests. MediaTailor populates the Location tag with the URL for manifest update requests, to be used by players that don't support sticky redirects. Disable this if you have CDN routing rules set up for accessing MediaTailor manifests, and you are either using client-side reporting or your players support sticky HTTP redirects. Valid values are DISABLED and EMT_DEFAULT. The EMT_DEFAULT setting enables the inclusion of the tag and is the default value. </p>", 
+                "GetPlaybackConfigurationResponse$AdDecisionServerUrl": "<p>The URL for the ad decision server (ADS). This includes the specification of static parameters and placeholders for dynamic parameters. AWS Elemental MediaTailor substitutes player-specific and session-specific parameters as needed when calling the ADS. Alternately, for testing, you can provide a static VAST URL. The maximum length is 25,000 characters.</p>", 
+                "GetPlaybackConfigurationResponse$Name": "<p>The identifier for the playback configuration.</p>", 
+                "GetPlaybackConfigurationResponse$PlaybackConfigurationArn": "<p>The Amazon Resource Name (ARN) for the playback configuration. </p>", 
+                "GetPlaybackConfigurationResponse$PlaybackEndpointPrefix": "<p>The URL that the player accesses to get a manifest from AWS Elemental MediaTailor. This session will use server-side reporting. </p>", 
+                "GetPlaybackConfigurationResponse$SessionInitializationEndpointPrefix": "<p>The URL that the player uses to initialize a session that uses client-side reporting. </p>", 
+                "GetPlaybackConfigurationResponse$SlateAdUrl": "<p>The URL for a high-quality video asset to transcode and use to fill in time that's not used by ads. AWS Elemental MediaTailor shows the slate to fill in gaps in media content. Configuring the slate is optional for non-VPAID playback configurations. For VPAID, the slate is required because MediaTailor provides it in the slots designated for dynamic ad content. The slate must be a high-quality asset that contains both audio and video. </p>", 
+                "GetPlaybackConfigurationResponse$TranscodeProfileName": "<p>The name that is used to associate this playback configuration with a custom transcode profile. This overrides the dynamic transcoding defaults of MediaTailor. Use this only if you have already set up custom profiles with the help of AWS Support.</p>", 
+                "GetPlaybackConfigurationResponse$PersonalizationThresholdSeconds": "<p>The maximum duration of underfilled ad time (in seconds) allowed in an ad break. </p>", 
+                "GetPlaybackConfigurationResponse$VideoContentSourceUrl": "<p>The URL prefix for the master playlist for the stream, minus the asset ID. The maximum length is 512 characters.</p>", 
+                "HlsConfiguration$ManifestEndpointPrefix": "<p>The URL that is used to initiate a playback session for devices that support Apple HLS. The session uses server-side reporting.</p>", 
+                "ListPlaybackConfigurationsResponse$NextToken": "<p>Pagination token returned by the GET list request when results exceed the maximum allowed. Use the token to fetch the next page of results.</p>",
+                "LivePreRollConfiguration$AdDecisionServerUrl" : "<p>The URL for the ad decision server (ADS) for pre-roll ads. This includes the specification of static parameters and placeholders for dynamic parameters. AWS Elemental MediaTailor substitutes player-specific and session-specific parameters as needed when calling the ADS. Alternately, for testing, you can provide a static VAST URL. The maximum length is 25,000 characters.</p>",
+                "PutPlaybackConfigurationRequest$AdDecisionServerUrl": "<p>The URL for the ad decision server (ADS). This includes the specification of static parameters and placeholders for dynamic parameters. AWS Elemental MediaTailor substitutes player-specific and session-specific parameters as needed when calling the ADS. Alternately, for testing you can provide a static VAST URL. The maximum length is 25,000 characters.</p>", 
+                "PutPlaybackConfigurationRequest$Name": "<p>The identifier for the playback configuration.</p>", 
+                "PutPlaybackConfigurationRequest$SlateAdUrl": "<p>The URL for a high-quality video asset to transcode and use to fill in time that's not used by ads. AWS Elemental MediaTailor shows the slate to fill in gaps in media content. Configuring the slate is optional for non-VPAID configurations. For VPAID, the slate is required because MediaTailor provides it in the slots that are designated for dynamic ad content. The slate must be a high-quality asset that contains both audio and video. </p>", 
+                "PutPlaybackConfigurationRequest$TranscodeProfileName": "<p>The name that is used to associate this playback configuration with a custom transcode profile. This overrides the dynamic transcoding defaults of MediaTailor. Use this only if you have already set up custom profiles with the help of AWS Support.</p>", 
+                "PutPlaybackConfigurationRequest$PersonalizationThresholdSeconds": "<p>The maximum duration of underfilled ad time (in seconds) allowed in an ad break. </p>",
+                "PutPlaybackConfigurationRequest$VideoContentSourceUrl": "<p>The URL prefix for the master playlist for the stream, minus the asset ID. The maximum length is 512 characters.</p>", 
+                "__mapOf__string$member": null
+            }
+        }
+    }, 
+    "version": "2.0"
+}

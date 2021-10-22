@@ -1,0 +1,1 @@
+sum(array[].to_number(@))

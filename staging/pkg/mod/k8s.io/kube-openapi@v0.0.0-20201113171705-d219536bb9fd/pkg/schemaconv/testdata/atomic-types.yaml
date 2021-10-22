@@ -1,0 +1,33 @@
+types:
+- name: io.k8s.testcase.AtomicMapField
+  map:
+    fields:
+    - name: atomicField
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.testcase.DeclaredAtomicMap
+  map:
+    elementRelationship: atomic
+- name: __untyped_atomic_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+- name: __untyped_deduced_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable

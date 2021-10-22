@@ -1,0 +1,283 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS IoT Secure Tunneling</fullname> <p>AWS IoT Secure Tunnling enables you to create remote connections to devices deployed in the field.</p> <p>For more information about how AWS IoT Secure Tunneling works, see the <a href=\"https://docs.aws.amazon.com/secure-tunneling/latest/ug/what-is-secure-tunneling.html\">User Guide</a>.</p>",
+  "operations": {
+    "CloseTunnel": "<p>Closes a tunnel identified by the unique tunnel id. When a <code>CloseTunnel</code> request is received, we close the WebSocket connections between the client and proxy server so no data can be transmitted.</p>",
+    "DescribeTunnel": "<p>Gets information about a tunnel identified by the unique tunnel id.</p>",
+    "ListTagsForResource": "<p>Lists the tags for the specified resource.</p>",
+    "ListTunnels": "<p>List all tunnels for an AWS account. Tunnels are listed by creation time in descending order, newer tunnels will be listed before older tunnels.</p>",
+    "OpenTunnel": "<p>Creates a new tunnel, and returns two client access tokens for clients to use to connect to the AWS IoT Secure Tunneling proxy server. .</p>",
+    "TagResource": "<p>A resource tag.</p>",
+    "UntagResource": "<p>Removes a tag from a resource.</p>"
+  },
+  "shapes": {
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$resourceArn": "<p>The resource ARN.</p>",
+        "TagResourceRequest$resourceArn": "<p>The ARN of the resource.</p>",
+        "UntagResourceRequest$resourceArn": "<p>The resource ARN.</p>"
+      }
+    },
+    "ClientAccessToken": {
+      "base": null,
+      "refs": {
+        "OpenTunnelResponse$sourceAccessToken": "<p>The access token the source local proxy uses to connect to AWS IoT Secure Tunneling.</p>",
+        "OpenTunnelResponse$destinationAccessToken": "<p>The access token the destination local proxy uses to connect to AWS IoT Secure Tunneling.</p>"
+      }
+    },
+    "CloseTunnelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CloseTunnelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConnectionState": {
+      "base": "<p>The state of a connection.</p>",
+      "refs": {
+        "Tunnel$sourceConnectionState": "<p>The connection state of the source application.</p>",
+        "Tunnel$destinationConnectionState": "<p>The connection state of the destination application.</p>"
+      }
+    },
+    "ConnectionStatus": {
+      "base": null,
+      "refs": {
+        "ConnectionState$status": "<p>The connection status of the tunnel. Valid values are <code>CONNECTED</code> and <code>DISCONNECTED</code>.</p>"
+      }
+    },
+    "DateType": {
+      "base": null,
+      "refs": {
+        "ConnectionState$lastUpdatedAt": "<p>The last time the connection status was updated.</p>",
+        "Tunnel$createdAt": "<p>The time when the tunnel was created.</p>",
+        "Tunnel$lastUpdatedAt": "<p>The last time the tunnel was updated.</p>",
+        "TunnelSummary$createdAt": "<p>The time the tunnel was created.</p>",
+        "TunnelSummary$lastUpdatedAt": "<p>The time the tunnel was last updated.</p>"
+      }
+    },
+    "DeleteFlag": {
+      "base": null,
+      "refs": {
+        "CloseTunnelRequest$delete": "<p>When set to true, AWS IoT Secure Tunneling deletes the tunnel data immediately.</p>"
+      }
+    },
+    "DescribeTunnelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTunnelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "OpenTunnelRequest$description": "<p>A short text description of the tunnel. </p>",
+        "Tunnel$description": "<p>A description of the tunnel.</p>",
+        "TunnelSummary$description": "<p>A description of the tunnel.</p>"
+      }
+    },
+    "DestinationConfig": {
+      "base": "<p>The destination configuration.</p>",
+      "refs": {
+        "OpenTunnelRequest$destinationConfig": "<p>The destination configuration for the OpenTunnel request.</p>",
+        "Tunnel$destinationConfig": "<p>The destination configuration that specifies the thing name of the destination device and a service name that the local proxy uses to connect to the destination application.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "LimitExceededException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>Thrown when a tunnel limit is exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTunnelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTunnelsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListTunnelsRequest$maxResults": "<p>The maximum number of results to return at once.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListTunnelsRequest$nextToken": "<p>A token to retrieve the next set of results.</p>",
+        "ListTunnelsResponse$nextToken": "<p>A token to used to retrieve the next set of results.</p>"
+      }
+    },
+    "OpenTunnelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "OpenTunnelResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Thrown when an operation is attempted on a resource that does not exist.</p>",
+      "refs": {
+      }
+    },
+    "Service": {
+      "base": null,
+      "refs": {
+        "ServiceList$member": null
+      }
+    },
+    "ServiceList": {
+      "base": null,
+      "refs": {
+        "DestinationConfig$services": "<p>A list of service names that identity the target application. Currently, you can only specify a single name. The AWS IoT client running on the destination device reads this value and uses it to look up a port or an IP address and a port. The AWS IoT client instantiates the local proxy which uses this information to connect to the destination application.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>An arbitary key/value pair used to add searchable metadata to secure tunnel resources.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>The key of the tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The keys of the tags to remove.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceResponse$tags": "<p>The tags for the specified resource.</p>",
+        "OpenTunnelRequest$tags": "<p>A collection of tag metadata.</p>",
+        "TagResourceRequest$tags": "<p>The tags for the resource.</p>",
+        "Tunnel$tags": "<p>A list of tag metadata associated with the secure tunnel.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>The value of the tag.</p>"
+      }
+    },
+    "ThingName": {
+      "base": null,
+      "refs": {
+        "DestinationConfig$thingName": "<p>The name of the IoT thing to which you want to connect.</p>",
+        "ListTunnelsRequest$thingName": "<p>The name of the IoT thing associated with the destination device.</p>"
+      }
+    },
+    "TimeoutConfig": {
+      "base": "<p>Tunnel timeout configuration.</p>",
+      "refs": {
+        "OpenTunnelRequest$timeoutConfig": "<p>Timeout configuration for a tunnel.</p>",
+        "Tunnel$timeoutConfig": "<p>Timeout configuration for the tunnel.</p>"
+      }
+    },
+    "TimeoutInMin": {
+      "base": null,
+      "refs": {
+        "TimeoutConfig$maxLifetimeTimeoutMinutes": "<p>The maximum amount of time (in minutes) a tunnel can remain open. If not specified, maxLifetimeTimeoutMinutes defaults to 720 minutes. Valid values are from 1 minute to 12 hours (720 minutes) </p>"
+      }
+    },
+    "Tunnel": {
+      "base": "<p>A connection between a source computer and a destination device.</p>",
+      "refs": {
+        "DescribeTunnelResponse$tunnel": "<p>The tunnel being described.</p>"
+      }
+    },
+    "TunnelArn": {
+      "base": null,
+      "refs": {
+        "OpenTunnelResponse$tunnelArn": "<p>The Amazon Resource Name for the tunnel. The tunnel ARN format is <code>arn:aws:tunnel:&lt;region&gt;:&lt;account-id&gt;:tunnel/&lt;tunnel-id&gt;</code> </p>",
+        "Tunnel$tunnelArn": "<p>The Amazon Resource Name (ARN) of a tunnel. The tunnel ARN format is <code>arn:aws:tunnel:&lt;region&gt;:&lt;account-id&gt;:tunnel/&lt;tunnel-id&gt;</code> </p>",
+        "TunnelSummary$tunnelArn": "<p>The Amazon Resource Name of the tunnel. The tunnel ARN format is <code>arn:aws:tunnel:&lt;region&gt;:&lt;account-id&gt;:tunnel/&lt;tunnel-id&gt;</code> </p>"
+      }
+    },
+    "TunnelId": {
+      "base": null,
+      "refs": {
+        "CloseTunnelRequest$tunnelId": "<p>The ID of the tunnel to close.</p>",
+        "DescribeTunnelRequest$tunnelId": "<p>The tunnel to describe.</p>",
+        "OpenTunnelResponse$tunnelId": "<p>A unique alpha-numeric tunnel ID.</p>",
+        "Tunnel$tunnelId": "<p>A unique alpha-numeric ID that identifies a tunnel.</p>",
+        "TunnelSummary$tunnelId": "<p>The unique alpha-numeric identifier for the tunnel.</p>"
+      }
+    },
+    "TunnelStatus": {
+      "base": null,
+      "refs": {
+        "Tunnel$status": "<p>The status of a tunnel. Valid values are: Open and Closed.</p>",
+        "TunnelSummary$status": "<p>The status of a tunnel. Valid values are: Open and Closed.</p>"
+      }
+    },
+    "TunnelSummary": {
+      "base": "<p>Information about the tunnel.</p>",
+      "refs": {
+        "TunnelSummaryList$member": null
+      }
+    },
+    "TunnelSummaryList": {
+      "base": null,
+      "refs": {
+        "ListTunnelsResponse$tunnelSummaries": "<p>A short description of the tunnels in an AWS account.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

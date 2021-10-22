@@ -1,0 +1,4 @@
+test.pb.go and test.proto are third-party data.
+
+SOURCE: https://github.com/golang/protobuf
+REVISION: bf531ff1a004f24ee53329dfd5ce0b41bfdc17df

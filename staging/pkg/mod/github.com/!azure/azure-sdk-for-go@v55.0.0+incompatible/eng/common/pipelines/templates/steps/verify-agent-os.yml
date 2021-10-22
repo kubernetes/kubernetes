@@ -1,0 +1,18 @@
+parameters:
+  - name: ScriptDirectory
+    type: string
+    default: 'eng/common/scripts'
+  - name: AgentImage
+    type: string
+
+steps:
+  - task: PowerShell@2
+    displayName: Verify agent OS
+    inputs:
+      pwsh: true
+      workingDirectory: $(System.DefaultWorkingDirectory)
+      filePath: ${{ parameters.ScriptDirectory }}/Verify-AgentOS.ps1
+      arguments: >
+        -AgentImage "${{ parameters.AgentImage }}"
+
+  - template: /eng/common/pipelines/templates/steps/bypass-local-dns.yml

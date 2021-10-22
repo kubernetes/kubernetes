@@ -1,0 +1,5 @@
+basic_auth:
+  username: username
+  password: "mysecret"
+bearer_token: mysecret
+bearer_token_file: file

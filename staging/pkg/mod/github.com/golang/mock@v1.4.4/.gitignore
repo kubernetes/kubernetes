@@ -1,0 +1,21 @@
+# Object files and binaries from go.
+*.[568]
+
+# Library files.
+*.a
+
+# Any file prefixed by an underscore.
+*/_*
+
+# Vim temporary files.
+.*.swp
+
+# The mockgen binary.
+mockgen/mockgen
+
+# A binary produced by gotest.
+#gomock/[568]\.out
+
+# Editors
+.vscode
+.idea

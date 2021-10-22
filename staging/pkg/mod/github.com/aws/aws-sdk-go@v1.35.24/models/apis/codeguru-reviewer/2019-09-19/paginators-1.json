@@ -1,0 +1,25 @@
+{
+  "pagination": {
+    "ListCodeReviews": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListRecommendationFeedback": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListRecommendations": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListRepositoryAssociations": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "RepositoryAssociationSummaries"
+    }
+  }
+}

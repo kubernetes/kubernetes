@@ -1,0 +1,494 @@
+{
+  "basePath": "/pagespeedonline/v2/",
+  "baseUrl": "https://www.googleapis.com/pagespeedonline/v2/",
+  "batchPath": "batch/pagespeedonline/v2",
+  "description": "Analyzes the performance of a web page and provides tailored suggestions to make that page faster.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/speed/docs/insights/v2/getting-started",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/VlzMX-4kDqDio9JdX3IzThUK4nY\"",
+  "icons": {
+    "x16": "https://www.google.com/images/icons/product/pagespeed-16.png",
+    "x32": "https://www.google.com/images/icons/product/pagespeed-32.png"
+  },
+  "id": "pagespeedonline:v2",
+  "kind": "discovery#restDescription",
+  "name": "pagespeedonline",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "pagespeedapi": {
+      "methods": {
+        "runpagespeed": {
+          "description": "Runs PageSpeed analysis on the page at the specified URL, and returns PageSpeed scores, a list of suggestions to make that page faster, and other information.",
+          "httpMethod": "GET",
+          "id": "pagespeedonline.pagespeedapi.runpagespeed",
+          "parameterOrder": [
+            "url"
+          ],
+          "parameters": {
+            "filter_third_party_resources": {
+              "default": "false",
+              "description": "Indicates if third party resources should be filtered out before PageSpeed analysis.",
+              "location": "query",
+              "type": "boolean"
+            },
+            "locale": {
+              "description": "The locale used to localize formatted results",
+              "location": "query",
+              "pattern": "[a-zA-Z]+(_[a-zA-Z]+)?",
+              "type": "string"
+            },
+            "rule": {
+              "description": "A PageSpeed rule to run; if none are given, all rules are run",
+              "location": "query",
+              "pattern": "[a-zA-Z]+",
+              "repeated": true,
+              "type": "string"
+            },
+            "screenshot": {
+              "default": "false",
+              "description": "Indicates if binary data containing a screenshot should be included",
+              "location": "query",
+              "type": "boolean"
+            },
+            "strategy": {
+              "description": "The analysis strategy to use",
+              "enum": [
+                "desktop",
+                "mobile"
+              ],
+              "enumDescriptions": [
+                "Fetch and analyze the URL for desktop browsers",
+                "Fetch and analyze the URL for mobile devices"
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "url": {
+              "description": "The URL to fetch and analyze",
+              "location": "query",
+              "pattern": "(?i)http(s)?://.*",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "runPagespeed",
+          "response": {
+            "$ref": "Result"
+          }
+        }
+      }
+    }
+  },
+  "revision": "20180315",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "PagespeedApiFormatStringV2": {
+      "id": "PagespeedApiFormatStringV2",
+      "properties": {
+        "args": {
+          "description": "List of arguments for the format string.",
+          "items": {
+            "properties": {
+              "key": {
+                "description": "The placeholder key for this arg, as a string.",
+                "type": "string"
+              },
+              "rects": {
+                "description": "The screen rectangles being referred to, with dimensions measured in CSS pixels. This is only ever used for SNAPSHOT_RECT arguments. If this is absent for a SNAPSHOT_RECT argument, it means that that argument refers to the entire snapshot.",
+                "items": {
+                  "properties": {
+                    "height": {
+                      "description": "The height of the rect.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "left": {
+                      "description": "The left coordinate of the rect, in page coordinates.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "top": {
+                      "description": "The top coordinate of the rect, in page coordinates.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "width": {
+                      "description": "The width of the rect.",
+                      "format": "int32",
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "secondary_rects": {
+                "description": "Secondary screen rectangles being referred to, with dimensions measured in CSS pixels. This is only ever used for SNAPSHOT_RECT arguments.",
+                "items": {
+                  "properties": {
+                    "height": {
+                      "description": "The height of the rect.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "left": {
+                      "description": "The left coordinate of the rect, in page coordinates.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "top": {
+                      "description": "The top coordinate of the rect, in page coordinates.",
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "width": {
+                      "description": "The width of the rect.",
+                      "format": "int32",
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "type": {
+                "description": "Type of argument. One of URL, STRING_LITERAL, INT_LITERAL, BYTES, DURATION, VERBATIM_STRING, PERCENTAGE, HYPERLINK, or SNAPSHOT_RECT.",
+                "type": "string"
+              },
+              "value": {
+                "description": "Argument value, as a localized string.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "format": {
+          "description": "A localized format string with {{FOO}} placeholders, where 'FOO' is the key of the argument whose value should be substituted. For HYPERLINK arguments, the format string will instead contain {{BEGIN_FOO}} and {{END_FOO}} for the argument with key 'FOO'.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PagespeedApiImageV2": {
+      "id": "PagespeedApiImageV2",
+      "properties": {
+        "data": {
+          "description": "Image data base64 encoded.",
+          "format": "byte",
+          "type": "string"
+        },
+        "height": {
+          "description": "Height of screenshot in pixels.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "key": {
+          "description": "Unique string key, if any, identifying this image.",
+          "type": "string"
+        },
+        "mime_type": {
+          "description": "Mime type of image data (e.g. \"image/jpeg\").",
+          "type": "string"
+        },
+        "page_rect": {
+          "description": "The region of the page that is captured by this image, with dimensions measured in CSS pixels.",
+          "properties": {
+            "height": {
+              "description": "The height of the rect.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "left": {
+              "description": "The left coordinate of the rect, in page coordinates.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "top": {
+              "description": "The top coordinate of the rect, in page coordinates.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "width": {
+              "description": "The width of the rect.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "width": {
+          "description": "Width of screenshot in pixels.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Result": {
+      "id": "Result",
+      "properties": {
+        "captchaResult": {
+          "description": "The captcha verify result",
+          "type": "string"
+        },
+        "formattedResults": {
+          "description": "Localized PageSpeed results. Contains a ruleResults entry for each PageSpeed rule instantiated and run by the server.",
+          "properties": {
+            "locale": {
+              "description": "The locale of the formattedResults, e.g. \"en_US\".",
+              "type": "string"
+            },
+            "ruleResults": {
+              "additionalProperties": {
+                "description": "The enum-like identifier for this rule. For instance \"EnableKeepAlive\" or \"AvoidCssImport\". Not localized.",
+                "properties": {
+                  "groups": {
+                    "description": "List of rule groups that this rule belongs to. Each entry in the list is one of \"SPEED\" or \"USABILITY\".",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "localizedRuleName": {
+                    "description": "Localized name of the rule, intended for presentation to a user.",
+                    "type": "string"
+                  },
+                  "ruleImpact": {
+                    "description": "The impact (unbounded floating point value) that implementing the suggestions for this rule would have on making the page faster. Impact is comparable between rules to determine which rule's suggestions would have a higher or lower impact on making a page faster. For instance, if enabling compression would save 1MB, while optimizing images would save 500kB, the enable compression rule would have 2x the impact of the image optimization rule, all other things being equal.",
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "summary": {
+                    "$ref": "PagespeedApiFormatStringV2",
+                    "description": "A brief summary description for the rule, indicating at a high level what should be done to follow the rule and what benefit can be gained by doing so."
+                  },
+                  "urlBlocks": {
+                    "description": "List of blocks of URLs. Each block may contain a heading and a list of URLs. Each URL may optionally include additional details.",
+                    "items": {
+                      "properties": {
+                        "header": {
+                          "$ref": "PagespeedApiFormatStringV2",
+                          "description": "Heading to be displayed with the list of URLs."
+                        },
+                        "urls": {
+                          "description": "List of entries that provide information about URLs in the url block. Optional.",
+                          "items": {
+                            "properties": {
+                              "details": {
+                                "description": "List of entries that provide additional details about a single URL. Optional.",
+                                "items": {
+                                  "$ref": "PagespeedApiFormatStringV2"
+                                },
+                                "type": "array"
+                              },
+                              "result": {
+                                "$ref": "PagespeedApiFormatStringV2",
+                                "description": "A format string that gives information about the URL, and a list of arguments for that format string."
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "description": "Dictionary of formatted rule results, with one entry for each PageSpeed rule instantiated and run by the server.",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "description": "Canonicalized and final URL for the document, after following page redirects (if any).",
+          "type": "string"
+        },
+        "invalidRules": {
+          "description": "List of rules that were specified in the request, but which the server did not know how to instantiate.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "pagespeedonline#result",
+          "description": "Kind of result.",
+          "type": "string"
+        },
+        "pageStats": {
+          "description": "Summary statistics for the page, such as number of JavaScript bytes, number of HTML bytes, etc.",
+          "properties": {
+            "cssResponseBytes": {
+              "description": "Number of uncompressed response bytes for CSS resources on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "flashResponseBytes": {
+              "description": "Number of response bytes for flash resources on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "htmlResponseBytes": {
+              "description": "Number of uncompressed response bytes for the main HTML document and all iframes on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "imageResponseBytes": {
+              "description": "Number of response bytes for image resources on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "javascriptResponseBytes": {
+              "description": "Number of uncompressed response bytes for JS resources on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "numberCssResources": {
+              "description": "Number of CSS resources referenced by the page.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "numberHosts": {
+              "description": "Number of unique hosts referenced by the page.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "numberJsResources": {
+              "description": "Number of JavaScript resources referenced by the page.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "numberResources": {
+              "description": "Number of HTTP resources loaded by the page.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "numberStaticResources": {
+              "description": "Number of static (i.e. cacheable) resources on the page.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "otherResponseBytes": {
+              "description": "Number of response bytes for other resources on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "textResponseBytes": {
+              "description": "Number of uncompressed response bytes for text resources not covered by other statistics (i.e non-HTML, non-script, non-CSS resources) on the page.",
+              "format": "int64",
+              "type": "string"
+            },
+            "totalRequestBytes": {
+              "description": "Total size of all request bytes sent by the page.",
+              "format": "int64",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "responseCode": {
+          "description": "Response code for the document. 200 indicates a normal page load. 4xx/5xx indicates an error.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "ruleGroups": {
+          "additionalProperties": {
+            "description": "The name of this rule group: one of \"SPEED\" or \"USABILITY\".",
+            "properties": {
+              "score": {
+                "description": "The score (0-100) for this rule group, which indicates how much better a page could be in that category (e.g. how much faster, or how much more usable). A high score indicates little room for improvement, while a lower score indicates more room for improvement.",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "description": "A map with one entry for each rule group in these results.",
+          "type": "object"
+        },
+        "screenshot": {
+          "$ref": "PagespeedApiImageV2",
+          "description": "Base64-encoded screenshot of the page that was analyzed."
+        },
+        "title": {
+          "description": "Title of the page, as displayed in the browser's title bar.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version of PageSpeed used to generate these results.",
+          "properties": {
+            "major": {
+              "description": "The major version number of PageSpeed used to generate these results.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "minor": {
+              "description": "The minor version number of PageSpeed used to generate these results.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "pagespeedonline/v2/",
+  "title": "PageSpeed Insights API",
+  "version": "v2"
+}

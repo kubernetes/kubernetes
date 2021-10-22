@@ -1,0 +1,31 @@
+parameters:
+  Directory: 'not-specified'
+  IgnoreLinksFile: '$(Build.SourcesDirectory)/eng/ignore-links.txt'
+  WorkingDirectory: '$(System.DefaultWorkingDirectory)'
+  ScriptDirectory: 'eng/common/scripts'
+  Recursive: $false
+  CheckLinkGuidance: $true
+  Urls: '(Get-ChildItem -Path ./ -Recurse -Include *.md)'
+  BranchReplaceRegex: "^(${env:SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI}.*/(?:blob|tree)/)$(DefaultBranch)(/.*)$"
+  BranchReplacementName: "${env:SYSTEM_PULLREQUEST_SOURCECOMMITID}"
+  Condition: succeeded() # If you want to run on failure for the link checker, set it to `Condition: succeededOrFailed()`.
+
+steps:
+  - template: /eng/common/pipelines/templates/steps/set-default-branch.yml
+  - task: PowerShell@2
+    displayName: Link verification check
+    condition: ${{ parameters.Condition }}
+    inputs:
+      pwsh: true
+      workingDirectory: '${{ parameters.WorkingDirectory }}/${{ parameters.Directory }}'
+      filePath: ${{ parameters.ScriptDirectory }}/Verify-Links.ps1
+      arguments: >
+        -urls ${{ parameters.Urls }}
+        -rootUrl "file://${{ parameters.WorkingDirectory }}/${{ parameters.Directory }}"
+        -recursive: ${{ parameters.Recursive }}
+        -ignoreLinksFile ${{ parameters.IgnoreLinksFile }}
+        -branchReplaceRegex "${{ parameters.BranchReplaceRegex }}"
+        -branchReplacementName ${{ parameters.BranchReplacementName }}
+        -devOpsLogging: $true
+        -checkLinkGuidance: ${{ parameters.CheckLinkGuidance }}
+        -inputCacheFile "https://azuresdkartifacts.blob.core.windows.net/verify-links-cache/verify-links-cache.txt"

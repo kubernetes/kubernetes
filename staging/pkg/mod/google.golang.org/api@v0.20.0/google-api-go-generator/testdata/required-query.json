@@ -1,0 +1,43 @@
+{
+  "name": "tshealth",
+  "discoveryVersion": "v1",
+  "id": "tshealth:v1",
+  "basePath": "/_ah/api/tshealth/v1/",
+  "baseUrl": "https://ths-prod.googleplex.com/_ah/api/tshealth/v1/",
+  "servicePath": "tshealth/v1/",
+  "resources": {
+    "techs": {
+      "methods": {
+        "count": {
+          "description": "Counts the number of techs matching the constraints.",
+          "httpMethod": "GET",
+          "id": "tshealth.techs.count",
+          "parameters": {
+            "manager": {
+              "location": "query",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "techs/count",
+          "response": {
+            "$ref": "Google3CorpSupportToolsTshealthServiceApiV1TechsMessagesTechsCountResponse"
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Google3CorpSupportToolsTshealthServiceApiV1TechsMessagesTechsCountResponse": {
+      "description": "Response for a tech count request.",
+      "id": "Google3CorpSupportToolsTshealthServiceApiV1TechsMessagesTechsCountResponse",
+      "properties": {
+        "count": {
+          "format": "int64",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

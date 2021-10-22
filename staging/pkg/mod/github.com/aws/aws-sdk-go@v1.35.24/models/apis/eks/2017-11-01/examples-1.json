@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "examples": {
+    "CreateCluster": [
+      {
+        "input": {
+          "version": "1.10",
+          "name": "prod",
+          "clientRequestToken": "1d2129a1-3d38-460a-9756-e5b91fddb951",
+          "resourcesVpcConfig": {
+            "securityGroupIds": [
+              "sg-6979fe18"
+            ],
+            "subnetIds": [
+              "subnet-6782e71e",
+              "subnet-e7e761ac"
+            ]
+          },
+          "roleArn": "arn:aws:iam::012345678910:role/eks-service-role-AWSServiceRoleForAmazonEKS-J7ONKE3BQ4PI"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example creates an Amazon EKS cluster called prod.",
+        "id": "to-create-a-new-cluster-1527868185648",
+        "title": "To create a new cluster"
+      }
+    ],
+    "DeleteCluster": [
+      {
+        "input": {
+          "name": "devel"
+        },
+        "output": {
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example command deletes a cluster named `devel` in your default region.",
+        "id": "to-delete-a-cluster-1527868641252",
+        "title": "To delete a cluster"
+      }
+    ],
+    "DescribeCluster": [
+      {
+        "input": {
+          "name": "devel"
+        },
+        "output": {
+          "cluster": {
+            "version": "1.10",
+            "name": "devel",
+            "arn": "arn:aws:eks:us-west-2:012345678910:cluster/devel",
+            "certificateAuthority": {
+              "data": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFNE1EVXpNVEl6TVRFek1Wb1hEVEk0TURVeU9ESXpNVEV6TVZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTTZWCjVUaG4rdFcySm9Xa2hQMzRlVUZMNitaRXJOZGIvWVdrTmtDdWNGS2RaaXl2TjlMVmdvUmV2MjlFVFZlN1ZGbSsKUTJ3ZURyRXJiQyt0dVlibkFuN1ZLYmE3ay9hb1BHekZMdmVnb0t6b0M1N2NUdGVwZzRIazRlK2tIWHNaME10MApyb3NzcjhFM1ROeExETnNJTThGL1cwdjhsTGNCbWRPcjQyV2VuTjFHZXJnaDNSZ2wzR3JIazBnNTU0SjFWenJZCm9hTi8zODFUczlOTFF2QTBXb0xIcjBFRlZpTFdSZEoyZ3lXaC9ybDVyOFNDOHZaQXg1YW1BU0hVd01aTFpWRC8KTDBpOW4wRVM0MkpVdzQyQmxHOEdpd3NhTkJWV3lUTHZKclNhRXlDSHFtVVZaUTFDZkFXUjl0L3JleVVOVXM3TApWV1FqM3BFbk9RMitMSWJrc0RzQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFNZ3RsQ1dIQ2U2YzVHMXl2YlFTS0Q4K2hUalkKSm1NSG56L2EvRGt0WG9YUjFVQzIrZUgzT1BZWmVjRVZZZHVaSlZCckNNQ2VWR0ZkeWdBYlNLc1FxWDg0S2RXbAp1MU5QaERDSmEyRHliN2pVMUV6VThTQjFGZUZ5ZFE3a0hNS1E1blpBRVFQOTY4S01hSGUrSm0yQ2x1UFJWbEJVCjF4WlhTS1gzTVZ0K1Q0SU1EV2d6c3JRSjVuQkRjdEtLcUZtM3pKdVVubHo5ZEpVckdscEltMjVJWXJDckxYUFgKWkUwRUtRNWEzMHhkVWNrTHRGQkQrOEtBdFdqSS9yZUZPNzM1YnBMdVoyOTBaNm42QlF3elRrS0p4cnhVc3QvOAppNGsxcnlsaUdWMm5SSjBUYjNORkczNHgrYWdzYTRoSTFPbU90TFM0TmgvRXJxT3lIUXNDc2hEQUtKUT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+            },
+            "createdAt": 1527807879.988,
+            "endpoint": "https://A0DCCD80A04F01705DD065655C30CC3D.yl4.us-west-2.eks.amazonaws.com",
+            "resourcesVpcConfig": {
+              "securityGroupIds": [
+                "sg-6979fe18"
+              ],
+              "subnetIds": [
+                "subnet-6782e71e",
+                "subnet-e7e761ac"
+              ],
+              "vpcId": "vpc-950809ec"
+            },
+            "roleArn": "arn:aws:iam::012345678910:role/eks-service-role-AWSServiceRoleForAmazonEKS-J7ONKE3BQ4PI",
+            "status": "ACTIVE"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example command provides a description of the specified cluster in your default region.",
+        "id": "to-describe-a-cluster-1527868708512",
+        "title": "To describe a cluster"
+      }
+    ],
+    "ListClusters": [
+      {
+        "input": {
+        },
+        "output": {
+          "clusters": [
+            "devel",
+            "prod"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example command lists all of your available clusters in your default region.",
+        "id": "to-list-your-available-clusters-1527868801040",
+        "title": "To list your available clusters"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "resourceArn": "arn:aws:eks:us-west-2:012345678910:cluster/beta"
+        },
+        "output": {
+          "tags": {
+            "aws:tag:domain": "beta"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example lists all of the tags for the `beta` cluster.",
+        "id": "to-list-tags-for-a-cluster-1568666903378",
+        "title": "To list tags for a cluster"
+      }
+    ]
+  }
+}

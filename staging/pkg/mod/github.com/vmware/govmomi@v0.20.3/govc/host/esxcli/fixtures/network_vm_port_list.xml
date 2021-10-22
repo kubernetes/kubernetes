@@ -1,0 +1,12 @@
+<obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="ArrayOfDataObject">
+ <DataObject xsi:type="VimEsxCLInetworkvmportlistPort">
+  <DVPortID></DVPortID>
+  <IPAddress>192.168.247.149</IPAddress>
+  <MACAddress>00:0c:29:12:b2:cf</MACAddress>
+  <PortID>33554438</PortID>
+  <Portgroup>VM Network</Portgroup>
+  <TeamUplink>vmnic0</TeamUplink>
+  <UplinkPortID>33554434</UplinkPortID>
+  <vSwitch>vSwitch0</vSwitch>
+ </DataObject>
+</obj>

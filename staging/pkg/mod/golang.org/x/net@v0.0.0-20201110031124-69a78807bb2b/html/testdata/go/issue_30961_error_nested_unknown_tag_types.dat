@@ -1,0 +1,11 @@
+#data
+<html><head></head><body><tag1><tag2 /><p></p></tag1><div></div></body></html>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <tag1>
+|       <tag2>
+|         <p>
+|     <div>

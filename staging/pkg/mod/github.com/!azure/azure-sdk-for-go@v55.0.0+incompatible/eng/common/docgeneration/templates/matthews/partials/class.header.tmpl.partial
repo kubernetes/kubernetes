@@ -1,0 +1,100 @@
+<h1 id="{{id}}" data-uid="{{uid}}">{{>partials/title}}</h1>
+<div class="markdown level0 summary">{{{summary}}}</div>
+<div class="markdown level0 conceptual">{{{conceptual}}}</div>
+
+{{#inClass}}
+<div class="inheritance">
+  <h5>{{__global.inheritance}}</h5>
+  {{#inheritance}}
+  <div class="level{{index}}">{{{specName.0.value}}}</div>
+  {{/inheritance}}
+  <div class="level{{level}}"><span class="xref">{{name.0.value}}</span></div>
+</div>
+{{/inClass}}
+
+{{#derivedClasses}}
+    <div class="level{{index}}">{{{specName.0.value}}}</div>
+{{/derivedClasses}}
+
+{{#inheritedMembers.0}}
+<div class="inheritedMembers">
+  <h5>{{__global.inheritedMembers}}</h5>
+{{/inheritedMembers.0}}
+{{#inheritedMembers}}
+  <div>
+  {{#definition}}
+    <xref uid="{{definition}}" text="{{nameWithType.0.value}}" alt="{{fullName.0.value}}"/>
+  {{/definition}}
+  {{^definition}}
+    <xref uid="{{uid}}" text="{{nameWithType.0.value}}" alt="{{fullName.0.value}}"/>
+  {{/definition}}
+  </div>
+{{/inheritedMembers}}
+{{#inheritedMembers.0}}
+</div>
+{{/inheritedMembers.0}}
+
+<h6><strong>{{__global.namespace}}</strong>: {{namespace}}</h6>
+<h6><strong>{{__global.assembly}}</strong>: {{assemblies.0}}.dll</h6>
+
+<h5 id="{{id}}_syntax">{{__global.syntax}}</h5>
+<div class="codewrapper">
+  <pre><code class="lang-{{_lang}} hljs">{{syntax.content.0.value}}</code></pre>
+</div>
+
+{{#syntax.parameters.0}}
+<h5 class="parameters">{{__global.parameters}}</h5>
+<table>
+{{/syntax.parameters.0}}
+{{#syntax.parameters}}
+  <tr>
+    <td>
+      <span class="pull-right">{{{type.specName.0.value}}}</span>
+      <span class="parametername">{{{id}}}</span>
+      <p>{{{description}}}</p>
+    </td>
+  </tr>
+{{/syntax.parameters}}
+{{#syntax.parameters.0}}
+</table>
+{{/syntax.parameters.0}}
+
+{{#syntax.return}}
+<h5 class="returns">{{__global.returns}}</h5>
+<table>
+  <tr>
+    <td>
+      {{{type.specName.0.value}}}
+      <p>{{{description}}}</p>
+    </td>
+  </tr>
+</table>
+{{/syntax.return}}
+
+{{#syntax.typeParameters.0}}
+<h5 class="typeParameters">{{__global.typeParameters}}</h5>
+<table>
+{{/syntax.typeParameters.0}}
+{{#syntax.typeParameters}}
+  <tr>
+    <td>
+      <span class="parametername">{{{id}}}</span>
+      <p>{{{description}}}</p>
+    </td>
+  </tr>
+{{/syntax.typeParameters}}
+{{#syntax.typeParameters.0}}
+</table>
+{{/syntax.typeParameters.0}}
+
+{{#remarks}}
+<h5 id="{{id}}_remarks"><strong>{{__global.remarks}}</strong></h5>
+<div class="markdown level0 remarks">{{{remarks}}}</div>
+{{/remarks}}
+
+{{#example.0}}
+<h5 id="{{id}}_examples"><strong>{{__global.examples}}</strong></h5>
+{{/example.0}}
+{{#example}}
+{{{.}}}
+{{/example}}

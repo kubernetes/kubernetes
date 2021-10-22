@@ -1,0 +1,731 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Shield Advanced</fullname> <p>This is the <i>AWS Shield Advanced API Reference</i>. This guide is for developers who need detailed information about the AWS Shield Advanced API actions, data types, and errors. For detailed information about AWS WAF and AWS Shield Advanced features and an overview of how to use the AWS WAF and AWS Shield Advanced APIs, see the <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/\">AWS WAF and AWS Shield Developer Guide</a>.</p>",
+  "operations": {
+    "AssociateDRTLogBucket": "<p>Authorizes the DDoS Response Team (DRT) to access the specified Amazon S3 bucket containing your AWS WAF logs. You can associate up to 10 Amazon S3 buckets with your subscription.</p> <p>To use the services of the DRT and make an <code>AssociateDRTLogBucket</code> request, you must be subscribed to the <a href=\"https://aws.amazon.com/premiumsupport/business-support/\">Business Support plan</a> or the <a href=\"https://aws.amazon.com/premiumsupport/enterprise-support/\">Enterprise Support plan</a>.</p>",
+    "AssociateDRTRole": "<p>Authorizes the DDoS Response Team (DRT), using the specified role, to access your AWS account to assist with DDoS attack mitigation during potential attacks. This enables the DRT to inspect your AWS WAF configuration and create or update AWS WAF rules and web ACLs.</p> <p>You can associate only one <code>RoleArn</code> with your subscription. If you submit an <code>AssociateDRTRole</code> request for an account that already has an associated role, the new <code>RoleArn</code> will replace the existing <code>RoleArn</code>. </p> <p>Prior to making the <code>AssociateDRTRole</code> request, you must attach the <a href=\"https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/service-role/AWSShieldDRTAccessPolicy\">AWSShieldDRTAccessPolicy</a> managed policy to the role you will specify in the request. For more information see <a href=\" https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-attach-detach.html\">Attaching and Detaching IAM Policies</a>. The role must also trust the service principal <code> drt.shield.amazonaws.com</code>. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html\">IAM JSON Policy Elements: Principal</a>.</p> <p>The DRT will have access only to your AWS WAF and Shield resources. By submitting this request, you authorize the DRT to inspect your AWS WAF and Shield configuration and create and update AWS WAF rules and web ACLs on your behalf. The DRT takes these actions only if explicitly authorized by you.</p> <p>You must have the <code>iam:PassRole</code> permission to make an <code>AssociateDRTRole</code> request. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html\">Granting a User Permissions to Pass a Role to an AWS Service</a>. </p> <p>To use the services of the DRT and make an <code>AssociateDRTRole</code> request, you must be subscribed to the <a href=\"https://aws.amazon.com/premiumsupport/business-support/\">Business Support plan</a> or the <a href=\"https://aws.amazon.com/premiumsupport/enterprise-support/\">Enterprise Support plan</a>.</p>",
+    "AssociateHealthCheck": "<p>Adds health-based detection to the Shield Advanced protection for a resource. Shield Advanced health-based detection uses the health of your AWS resource to improve responsiveness and accuracy in attack detection and mitigation. </p> <p>You define the health check in Route 53 and then associate it with your Shield Advanced protection. For more information, see <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/ddos-overview.html#ddos-advanced-health-check-option\">Shield Advanced Health-Based Detection</a> in the <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/\">AWS WAF and AWS Shield Developer Guide</a>. </p>",
+    "AssociateProactiveEngagementDetails": "<p>Initializes proactive engagement and sets the list of contacts for the DDoS Response Team (DRT) to use. You must provide at least one phone number in the emergency contact list. </p> <p>After you have initialized proactive engagement using this call, to disable or enable proactive engagement, use the calls <code>DisableProactiveEngagement</code> and <code>EnableProactiveEngagement</code>. </p> <note> <p>This call defines the list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you for escalations to the DRT and to initiate proactive customer support.</p> <p>The contacts that you provide in the request replace any contacts that were already defined. If you already have contacts defined and want to use them, retrieve the list using <code>DescribeEmergencyContactSettings</code> and then provide it to this call. </p> </note>",
+    "CreateProtection": "<p>Enables AWS Shield Advanced for a specific AWS resource. The resource can be an Amazon CloudFront distribution, Elastic Load Balancing load balancer, AWS Global Accelerator accelerator, Elastic IP Address, or an Amazon Route 53 hosted zone.</p> <p>You can add protection to only a single resource with each CreateProtection request. If you want to add protection to multiple resources at once, use the <a href=\"https://console.aws.amazon.com/waf/\">AWS WAF console</a>. For more information see <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/getting-started-ddos.html\">Getting Started with AWS Shield Advanced</a> and <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/configure-new-protection.html\">Add AWS Shield Advanced Protection to more AWS Resources</a>.</p>",
+    "CreateSubscription": "<p>Activates AWS Shield Advanced for an account.</p> <p>When you initally create a subscription, your subscription is set to be automatically renewed at the end of the existing subscription period. You can change this by submitting an <code>UpdateSubscription</code> request. </p>",
+    "DeleteProtection": "<p>Deletes an AWS Shield Advanced <a>Protection</a>.</p>",
+    "DeleteSubscription": "<p>Removes AWS Shield Advanced from an account. AWS Shield Advanced requires a 1-year subscription commitment. You cannot delete a subscription prior to the completion of that commitment. </p>",
+    "DescribeAttack": "<p>Describes the details of a DDoS attack. </p>",
+    "DescribeDRTAccess": "<p>Returns the current role and list of Amazon S3 log buckets used by the DDoS Response Team (DRT) to access your AWS account while assisting with attack mitigation.</p>",
+    "DescribeEmergencyContactSettings": "<p>A list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you if you have proactive engagement enabled, for escalations to the DRT and to initiate proactive customer support.</p>",
+    "DescribeProtection": "<p>Lists the details of a <a>Protection</a> object.</p>",
+    "DescribeSubscription": "<p>Provides details about the AWS Shield Advanced subscription for an account.</p>",
+    "DisableProactiveEngagement": "<p>Removes authorization from the DDoS Response Team (DRT) to notify contacts about escalations to the DRT and to initiate proactive customer support.</p>",
+    "DisassociateDRTLogBucket": "<p>Removes the DDoS Response Team's (DRT) access to the specified Amazon S3 bucket containing your AWS WAF logs.</p> <p>To make a <code>DisassociateDRTLogBucket</code> request, you must be subscribed to the <a href=\"https://aws.amazon.com/premiumsupport/business-support/\">Business Support plan</a> or the <a href=\"https://aws.amazon.com/premiumsupport/enterprise-support/\">Enterprise Support plan</a>. However, if you are not subscribed to one of these support plans, but had been previously and had granted the DRT access to your account, you can submit a <code>DisassociateDRTLogBucket</code> request to remove this access.</p>",
+    "DisassociateDRTRole": "<p>Removes the DDoS Response Team's (DRT) access to your AWS account.</p> <p>To make a <code>DisassociateDRTRole</code> request, you must be subscribed to the <a href=\"https://aws.amazon.com/premiumsupport/business-support/\">Business Support plan</a> or the <a href=\"https://aws.amazon.com/premiumsupport/enterprise-support/\">Enterprise Support plan</a>. However, if you are not subscribed to one of these support plans, but had been previously and had granted the DRT access to your account, you can submit a <code>DisassociateDRTRole</code> request to remove this access.</p>",
+    "DisassociateHealthCheck": "<p>Removes health-based detection from the Shield Advanced protection for a resource. Shield Advanced health-based detection uses the health of your AWS resource to improve responsiveness and accuracy in attack detection and mitigation. </p> <p>You define the health check in Route 53 and then associate or disassociate it with your Shield Advanced protection. For more information, see <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/ddos-overview.html#ddos-advanced-health-check-option\">Shield Advanced Health-Based Detection</a> in the <a href=\"https://docs.aws.amazon.com/waf/latest/developerguide/\">AWS WAF and AWS Shield Developer Guide</a>. </p>",
+    "EnableProactiveEngagement": "<p>Authorizes the DDoS Response Team (DRT) to use email and phone to notify contacts about escalations to the DRT and to initiate proactive customer support.</p>",
+    "GetSubscriptionState": "<p>Returns the <code>SubscriptionState</code>, either <code>Active</code> or <code>Inactive</code>.</p>",
+    "ListAttacks": "<p>Returns all ongoing DDoS attacks or all DDoS attacks during a specified time period.</p>",
+    "ListProtections": "<p>Lists all <a>Protection</a> objects for the account.</p>",
+    "UpdateEmergencyContactSettings": "<p>Updates the details of the list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you if you have proactive engagement enabled, for escalations to the DRT and to initiate proactive customer support.</p>",
+    "UpdateSubscription": "<p>Updates the details of an existing subscription. Only enter values for parameters you want to change. Empty parameters are not updated.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>Exception that indicates the specified <code>AttackId</code> does not exist, or the requester does not have the appropriate permissions to access the <code>AttackId</code>.</p>",
+      "refs": {
+      }
+    },
+    "AccessDeniedForDependencyException": {
+      "base": "<p>In order to grant the necessary access to the DDoS Response Team (DRT), the user submitting the request must have the <code>iam:PassRole</code> permission. This error indicates the user did not have the appropriate permissions. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html\">Granting a User Permissions to Pass a Role to an AWS Service</a>. </p>",
+      "refs": {
+      }
+    },
+    "AssociateDRTLogBucketRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDRTLogBucketResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDRTRoleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateDRTRoleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateHealthCheckRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateHealthCheckResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateProactiveEngagementDetailsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AssociateProactiveEngagementDetailsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AttackDetail": {
+      "base": "<p>The details of a DDoS attack.</p>",
+      "refs": {
+        "DescribeAttackResponse$Attack": "<p>The attack that is described.</p>"
+      }
+    },
+    "AttackId": {
+      "base": null,
+      "refs": {
+        "AttackDetail$AttackId": "<p>The unique identifier (ID) of the attack.</p>",
+        "DescribeAttackRequest$AttackId": "<p>The unique identifier (ID) for the attack that to be described.</p>"
+      }
+    },
+    "AttackLayer": {
+      "base": null,
+      "refs": {
+        "AttackProperty$AttackLayer": "<p>The type of distributed denial of service (DDoS) event that was observed. <code>NETWORK</code> indicates layer 3 and layer 4 events and <code>APPLICATION</code> indicates layer 7 events.</p>"
+      }
+    },
+    "AttackProperties": {
+      "base": null,
+      "refs": {
+        "AttackDetail$AttackProperties": "<p>The array of <a>AttackProperty</a> objects.</p>"
+      }
+    },
+    "AttackProperty": {
+      "base": "<p>Details of the described attack.</p>",
+      "refs": {
+        "AttackProperties$member": null
+      }
+    },
+    "AttackPropertyIdentifier": {
+      "base": null,
+      "refs": {
+        "AttackProperty$AttackPropertyIdentifier": "<p>Defines the DDoS attack property information that is provided. The <code>WORDPRESS_PINGBACK_REFLECTOR</code> and <code>WORDPRESS_PINGBACK_SOURCE</code> values are valid only for WordPress reflective pingback DDoS attacks.</p>"
+      }
+    },
+    "AttackSummaries": {
+      "base": null,
+      "refs": {
+        "ListAttacksResponse$AttackSummaries": "<p>The attack information for the specified time range.</p>"
+      }
+    },
+    "AttackSummary": {
+      "base": "<p>Summarizes all DDoS attacks for a specified time period.</p>",
+      "refs": {
+        "AttackSummaries$member": null
+      }
+    },
+    "AttackTimestamp": {
+      "base": null,
+      "refs": {
+        "AttackDetail$StartTime": "<p>The time the attack started, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "AttackDetail$EndTime": "<p>The time the attack ended, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "AttackSummary$StartTime": "<p>The start time of the attack, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "AttackSummary$EndTime": "<p>The end time of the attack, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "TimeRange$FromInclusive": "<p>The start time, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "TimeRange$ToExclusive": "<p>The end time, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>"
+      }
+    },
+    "AttackVectorDescription": {
+      "base": "<p>Describes the attack.</p>",
+      "refs": {
+        "AttackVectorDescriptionList$member": null
+      }
+    },
+    "AttackVectorDescriptionList": {
+      "base": null,
+      "refs": {
+        "AttackSummary$AttackVectors": "<p>The list of attacks for a specified time period.</p>"
+      }
+    },
+    "AutoRenew": {
+      "base": null,
+      "refs": {
+        "Subscription$AutoRenew": "<p>If <code>ENABLED</code>, the subscription will be automatically renewed at the end of the existing subscription period.</p> <p>When you initally create a subscription, <code>AutoRenew</code> is set to <code>ENABLED</code>. You can change this by submitting an <code>UpdateSubscription</code> request. If the <code>UpdateSubscription</code> request does not included a value for <code>AutoRenew</code>, the existing value for <code>AutoRenew</code> remains unchanged.</p>",
+        "UpdateSubscriptionRequest$AutoRenew": "<p>When you initally create a subscription, <code>AutoRenew</code> is set to <code>ENABLED</code>. If <code>ENABLED</code>, the subscription will be automatically renewed at the end of the existing subscription period. You can change this by submitting an <code>UpdateSubscription</code> request. If the <code>UpdateSubscription</code> request does not included a value for <code>AutoRenew</code>, the existing value for <code>AutoRenew</code> remains unchanged.</p>"
+      }
+    },
+    "ContactNotes": {
+      "base": null,
+      "refs": {
+        "EmergencyContact$ContactNotes": "<p>Additional notes regarding the contact. </p>"
+      }
+    },
+    "Contributor": {
+      "base": "<p>A contributor to the attack and their contribution.</p>",
+      "refs": {
+        "TopContributors$member": null
+      }
+    },
+    "CreateProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAttackRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAttackResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDRTAccessRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDRTAccessResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEmergencyContactSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEmergencyContactSettingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableProactiveEngagementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableProactiveEngagementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDRTLogBucketRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDRTLogBucketResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDRTRoleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateDRTRoleResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateHealthCheckRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateHealthCheckResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "SummarizedCounter$Max": "<p>The maximum value of the counter for a specified time period.</p>",
+        "SummarizedCounter$Average": "<p>The average value of the counter for a specified time period.</p>",
+        "SummarizedCounter$Sum": "<p>The total of counter values for a specified time period.</p>"
+      }
+    },
+    "DurationInSeconds": {
+      "base": null,
+      "refs": {
+        "Subscription$TimeCommitmentInSeconds": "<p>The length, in seconds, of the AWS Shield Advanced subscription for the account.</p>"
+      }
+    },
+    "EmailAddress": {
+      "base": null,
+      "refs": {
+        "EmergencyContact$EmailAddress": "<p>The email address for the contact.</p>"
+      }
+    },
+    "EmergencyContact": {
+      "base": "<p>Contact information that the DRT can use to contact you if you have proactive engagement enabled, for escalations to the DRT and to initiate proactive customer support.</p>",
+      "refs": {
+        "EmergencyContactList$member": null
+      }
+    },
+    "EmergencyContactList": {
+      "base": null,
+      "refs": {
+        "AssociateProactiveEngagementDetailsRequest$EmergencyContactList": "<p>A list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you for escalations to the DRT and to initiate proactive customer support. </p> <p>To enable proactive engagement, the contact list must include at least one phone number.</p> <note> <p>The contacts that you provide here replace any contacts that were already defined. If you already have contacts defined and want to use them, retrieve the list using <code>DescribeEmergencyContactSettings</code> and then provide it here. </p> </note>",
+        "DescribeEmergencyContactSettingsResponse$EmergencyContactList": "<p>A list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you if you have proactive engagement enabled, for escalations to the DRT and to initiate proactive customer support.</p>",
+        "UpdateEmergencyContactSettingsRequest$EmergencyContactList": "<p>A list of email addresses and phone numbers that the DDoS Response Team (DRT) can use to contact you if you have proactive engagement enabled, for escalations to the DRT and to initiate proactive customer support.</p> <p>If you have proactive engagement enabled, the contact list must include at least one phone number.</p>"
+      }
+    },
+    "EnableProactiveEngagementRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnableProactiveEngagementResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSubscriptionStateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSubscriptionStateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HealthCheckArn": {
+      "base": null,
+      "refs": {
+        "AssociateHealthCheckRequest$HealthCheckArn": "<p>The Amazon Resource Name (ARN) of the health check to associate with the protection.</p>",
+        "DisassociateHealthCheckRequest$HealthCheckArn": "<p>The Amazon Resource Name (ARN) of the health check that is associated with the protection.</p>"
+      }
+    },
+    "HealthCheckId": {
+      "base": null,
+      "refs": {
+        "HealthCheckIds$member": null
+      }
+    },
+    "HealthCheckIds": {
+      "base": null,
+      "refs": {
+        "Protection$HealthCheckIds": "<p>The unique identifier (ID) for the Route 53 health check that's associated with the protection. </p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "SummarizedCounter$N": "<p>The number of counters for a specified time period.</p>"
+      }
+    },
+    "InternalErrorException": {
+      "base": "<p>Exception that indicates that a problem occurred with the service infrastructure. You can retry the request.</p>",
+      "refs": {
+      }
+    },
+    "InvalidOperationException": {
+      "base": "<p>Exception that indicates that the operation would not cause any change to occur.</p>",
+      "refs": {
+      }
+    },
+    "InvalidPaginationTokenException": {
+      "base": "<p>Exception that indicates that the NextToken specified in the request is invalid. Submit the request using the NextToken value that was returned in the response.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>Exception that indicates that the parameters passed to the API are invalid. </p>",
+      "refs": {
+      }
+    },
+    "InvalidResourceException": {
+      "base": "<p>Exception that indicates that the resource is invalid. You might not have access to the resource, or the resource might not exist.</p>",
+      "refs": {
+      }
+    },
+    "Limit": {
+      "base": "<p>Specifies how many protections of a given type you can create.</p>",
+      "refs": {
+        "Limits$member": null
+      }
+    },
+    "LimitNumber": {
+      "base": null,
+      "refs": {
+        "LimitsExceededException$Limit": null
+      }
+    },
+    "LimitType": {
+      "base": null,
+      "refs": {
+        "LimitsExceededException$Type": null
+      }
+    },
+    "Limits": {
+      "base": null,
+      "refs": {
+        "Subscription$Limits": "<p>Specifies how many protections of a given type you can create.</p>"
+      }
+    },
+    "LimitsExceededException": {
+      "base": "<p>Exception that indicates that the operation would exceed a limit.</p> <p> <code>Type</code> is the type of limit that would be exceeded.</p> <p> <code>Limit</code> is the threshold that would be exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListAttacksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAttacksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProtectionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProtectionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LockedSubscriptionException": {
+      "base": "<p>You are trying to update a subscription that has not yet completed the 1-year commitment. You can change the <code>AutoRenew</code> parameter during the last 30 days of your subscription. This exception indicates that you are attempting to change <code>AutoRenew</code> prior to that period.</p>",
+      "refs": {
+      }
+    },
+    "LogBucket": {
+      "base": null,
+      "refs": {
+        "AssociateDRTLogBucketRequest$LogBucket": "<p>The Amazon S3 bucket that contains your AWS WAF logs.</p>",
+        "DisassociateDRTLogBucketRequest$LogBucket": "<p>The Amazon S3 bucket that contains your AWS WAF logs.</p>",
+        "LogBucketList$member": null
+      }
+    },
+    "LogBucketList": {
+      "base": null,
+      "refs": {
+        "DescribeDRTAccessResponse$LogBucketList": "<p>The list of Amazon S3 buckets accessed by the DRT.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "AttackProperty$Total": "<p>The total contributions made to this attack by all contributors, not just the five listed in the <code>TopContributors</code> list.</p>",
+        "Contributor$Value": "<p>The contribution of this contributor expressed in <a>Protection</a> units. For example <code>10,000</code>.</p>",
+        "Limit$Max": "<p>The maximum number of protections that can be created for the specified <code>Type</code>.</p>"
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$MaxResults": "<p>The maximum number of <a>AttackSummary</a> objects to be returned. If this is left blank, the first 20 results will be returned.</p> <p>This is a maximum value; it is possible that AWS WAF will return the results in smaller batches. That is, the number of <a>AttackSummary</a> objects returned could be less than <code>MaxResults</code>, even if there are still more <a>AttackSummary</a> objects yet to return. If there are more <a>AttackSummary</a> objects to return, AWS WAF will always also return a <code>NextToken</code>.</p>",
+        "ListProtectionsRequest$MaxResults": "<p>The maximum number of <a>Protection</a> objects to be returned. If this is left blank the first 20 results will be returned.</p> <p>This is a maximum value; it is possible that AWS WAF will return the results in smaller batches. That is, the number of <a>Protection</a> objects returned could be less than <code>MaxResults</code>, even if there are still more <a>Protection</a> objects yet to return. If there are more <a>Protection</a> objects to return, AWS WAF will always also return a <code>NextToken</code>.</p>"
+      }
+    },
+    "Mitigation": {
+      "base": "<p>The mitigation applied to a DDoS attack.</p>",
+      "refs": {
+        "MitigationList$member": null
+      }
+    },
+    "MitigationList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$Mitigations": "<p>List of mitigation actions taken for the attack.</p>"
+      }
+    },
+    "NoAssociatedRoleException": {
+      "base": "<p>The ARN of the role that you specifed does not exist.</p>",
+      "refs": {
+      }
+    },
+    "OptimisticLockException": {
+      "base": "<p>Exception that indicates that the resource state has been modified by another client. Retrieve the resource and then retry your request.</p>",
+      "refs": {
+      }
+    },
+    "PhoneNumber": {
+      "base": null,
+      "refs": {
+        "EmergencyContact$PhoneNumber": "<p>The phone number for the contact.</p>"
+      }
+    },
+    "ProactiveEngagementStatus": {
+      "base": null,
+      "refs": {
+        "Subscription$ProactiveEngagementStatus": "<p>If <code>ENABLED</code>, the DDoS Response Team (DRT) will use email and phone to notify contacts about escalations to the DRT and to initiate proactive customer support.</p> <p>If <code>PENDING</code>, you have requested proactive engagement and the request is pending. The status changes to <code>ENABLED</code> when your request is fully processed.</p> <p>If <code>DISABLED</code>, the DRT will not proactively notify contacts about escalations or to initiate proactive customer support. </p>"
+      }
+    },
+    "Protection": {
+      "base": "<p>An object that represents a resource that is under DDoS protection.</p>",
+      "refs": {
+        "DescribeProtectionResponse$Protection": "<p>The <a>Protection</a> object that is described.</p>",
+        "Protections$member": null
+      }
+    },
+    "ProtectionId": {
+      "base": null,
+      "refs": {
+        "AssociateHealthCheckRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object to add the health check association to. </p>",
+        "CreateProtectionResponse$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object that is created.</p>",
+        "DeleteProtectionRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object to be deleted.</p>",
+        "DescribeProtectionRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object that is described. When submitting the <code>DescribeProtection</code> request you must provide either the <code>ResourceArn</code> or the <code>ProtectionID</code>, but not both.</p>",
+        "DisassociateHealthCheckRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object to remove the health check association from. </p>",
+        "Protection$Id": "<p>The unique identifier (ID) of the protection.</p>"
+      }
+    },
+    "ProtectionName": {
+      "base": null,
+      "refs": {
+        "CreateProtectionRequest$Name": "<p>Friendly name for the <code>Protection</code> you are creating.</p>",
+        "Protection$Name": "<p>The friendly name of the protection. For example, <code>My CloudFront distributions</code>.</p>"
+      }
+    },
+    "Protections": {
+      "base": null,
+      "refs": {
+        "ListProtectionsResponse$Protections": "<p>The array of enabled <a>Protection</a> objects.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>Exception indicating the specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "AttackDetail$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource that was attacked.</p>",
+        "CreateProtectionRequest$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource to be protected.</p> <p>The ARN should be in one of the following formats:</p> <ul> <li> <p>For an Application Load Balancer: <code>arn:aws:elasticloadbalancing:<i>region</i>:<i>account-id</i>:loadbalancer/app/<i>load-balancer-name</i>/<i>load-balancer-id</i> </code> </p> </li> <li> <p>For an Elastic Load Balancer (Classic Load Balancer): <code>arn:aws:elasticloadbalancing:<i>region</i>:<i>account-id</i>:loadbalancer/<i>load-balancer-name</i> </code> </p> </li> <li> <p>For an AWS CloudFront distribution: <code>arn:aws:cloudfront::<i>account-id</i>:distribution/<i>distribution-id</i> </code> </p> </li> <li> <p>For an AWS Global Accelerator accelerator: <code>arn:aws:globalaccelerator::<i>account-id</i>:accelerator/<i>accelerator-id</i> </code> </p> </li> <li> <p>For Amazon Route 53: <code>arn:aws:route53:::hostedzone/<i>hosted-zone-id</i> </code> </p> </li> <li> <p>For an Elastic IP address: <code>arn:aws:ec2:<i>region</i>:<i>account-id</i>:eip-allocation/<i>allocation-id</i> </code> </p> </li> </ul>",
+        "DescribeProtectionRequest$ResourceArn": "<p>The ARN (Amazon Resource Name) of the AWS resource for the <a>Protection</a> object that is described. When submitting the <code>DescribeProtection</code> request you must provide either the <code>ResourceArn</code> or the <code>ProtectionID</code>, but not both.</p>",
+        "Protection$ResourceArn": "<p>The ARN (Amazon Resource Name) of the AWS resource that is protected.</p>",
+        "ResourceArnFilterList$member": null
+      }
+    },
+    "ResourceArnFilterList": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$ResourceArns": "<p>The ARN (Amazon Resource Name) of the resource that was attacked. If this is left blank, all applicable resources for this account will be included.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Exception indicating the specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "AssociateDRTRoleRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of the role the DRT will use to access your AWS account.</p> <p>Prior to making the <code>AssociateDRTRole</code> request, you must attach the <a href=\"https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/service-role/AWSShieldDRTAccessPolicy\">AWSShieldDRTAccessPolicy</a> managed policy to this role. For more information see <a href=\" https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-attach-detach.html\">Attaching and Detaching IAM Policies</a>.</p>",
+        "DescribeDRTAccessResponse$RoleArn": "<p>The Amazon Resource Name (ARN) of the role the DRT used to access your AWS account.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AttackSummary$AttackId": "<p>The unique identifier (ID) of the attack.</p>",
+        "AttackSummary$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource that was attacked.</p>",
+        "AttackVectorDescription$VectorType": "<p>The attack type. Valid values:</p> <ul> <li> <p>UDP_TRAFFIC</p> </li> <li> <p>UDP_FRAGMENT</p> </li> <li> <p>GENERIC_UDP_REFLECTION</p> </li> <li> <p>DNS_REFLECTION</p> </li> <li> <p>NTP_REFLECTION</p> </li> <li> <p>CHARGEN_REFLECTION</p> </li> <li> <p>SSDP_REFLECTION</p> </li> <li> <p>PORT_MAPPER</p> </li> <li> <p>RIP_REFLECTION</p> </li> <li> <p>SNMP_REFLECTION</p> </li> <li> <p>MSSQL_REFLECTION</p> </li> <li> <p>NET_BIOS_REFLECTION</p> </li> <li> <p>SYN_FLOOD</p> </li> <li> <p>ACK_FLOOD</p> </li> <li> <p>REQUEST_FLOOD</p> </li> <li> <p>HTTP_REFLECTION</p> </li> <li> <p>UDS_REFLECTION</p> </li> <li> <p>MEMCACHED_REFLECTION</p> </li> </ul>",
+        "Contributor$Name": "<p>The name of the contributor. This is dependent on the <code>AttackPropertyIdentifier</code>. For example, if the <code>AttackPropertyIdentifier</code> is <code>SOURCE_COUNTRY</code>, the <code>Name</code> could be <code>United States</code>.</p>",
+        "Limit$Type": "<p>The type of protection.</p>",
+        "Mitigation$MitigationName": "<p>The name of the mitigation taken for this attack.</p>",
+        "SubResourceSummary$Id": "<p>The unique identifier (ID) of the <code>SubResource</code>.</p>",
+        "SummarizedAttackVector$VectorType": "<p>The attack type, for example, SNMP reflection or SYN flood.</p>",
+        "SummarizedCounter$Name": "<p>The counter name.</p>",
+        "SummarizedCounter$Unit": "<p>The unit of the counters.</p>"
+      }
+    },
+    "SubResourceSummary": {
+      "base": "<p>The attack information for the specified SubResource.</p>",
+      "refs": {
+        "SubResourceSummaryList$member": null
+      }
+    },
+    "SubResourceSummaryList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$SubResources": "<p>If applicable, additional detail about the resource being attacked, for example, IP address or URL.</p>"
+      }
+    },
+    "SubResourceType": {
+      "base": null,
+      "refs": {
+        "SubResourceSummary$Type": "<p>The <code>SubResource</code> type.</p>"
+      }
+    },
+    "Subscription": {
+      "base": "<p>Information about the AWS Shield Advanced subscription for an account.</p>",
+      "refs": {
+        "DescribeSubscriptionResponse$Subscription": "<p>The AWS Shield Advanced subscription details for an account.</p>"
+      }
+    },
+    "SubscriptionState": {
+      "base": null,
+      "refs": {
+        "GetSubscriptionStateResponse$SubscriptionState": "<p>The status of the subscription.</p>"
+      }
+    },
+    "SummarizedAttackVector": {
+      "base": "<p>A summary of information about the attack.</p>",
+      "refs": {
+        "SummarizedAttackVectorList$member": null
+      }
+    },
+    "SummarizedAttackVectorList": {
+      "base": null,
+      "refs": {
+        "SubResourceSummary$AttackVectors": "<p>The list of attack types and associated counters.</p>"
+      }
+    },
+    "SummarizedCounter": {
+      "base": "<p>The counter that describes a DDoS attack.</p>",
+      "refs": {
+        "SummarizedCounterList$member": null
+      }
+    },
+    "SummarizedCounterList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$AttackCounters": "<p>List of counters that describe the attack for the specified time period.</p>",
+        "SubResourceSummary$Counters": "<p>The counters that describe the details of the attack.</p>",
+        "SummarizedAttackVector$VectorCounters": "<p>The list of counters that describe the details of the attack.</p>"
+      }
+    },
+    "TimeRange": {
+      "base": "<p>The time range.</p>",
+      "refs": {
+        "ListAttacksRequest$StartTime": "<p>The start of the time period for the attacks. This is a <code>timestamp</code> type. The sample request above indicates a <code>number</code> type because the default used by WAF is Unix time in seconds. However any valid <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp format</a> is allowed. </p>",
+        "ListAttacksRequest$EndTime": "<p>The end of the time period for the attacks. This is a <code>timestamp</code> type. The sample request above indicates a <code>number</code> type because the default used by WAF is Unix time in seconds. However any valid <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp format</a> is allowed. </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Subscription$StartTime": "<p>The start time of the subscription, in Unix time in seconds. For more information see <a href=\"http://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html#parameter-types\">timestamp</a>.</p>",
+        "Subscription$EndTime": "<p>The date and time your subscription will end.</p>"
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$NextToken": "<p>The <code>ListAttacksRequest.NextMarker</code> value from a previous call to <code>ListAttacksRequest</code>. Pass null if this is the first call.</p>",
+        "ListAttacksResponse$NextToken": "<p>The token returned by a previous call to indicate that there is more data available. If not null, more results are available. Pass this value for the <code>NextMarker</code> parameter in a subsequent call to <code>ListAttacks</code> to retrieve the next set of items.</p> <p>AWS WAF might return the list of <a>AttackSummary</a> objects in batches smaller than the number specified by MaxResults. If there are more <a>AttackSummary</a> objects to return, AWS WAF will always also return a <code>NextToken</code>.</p>",
+        "ListProtectionsRequest$NextToken": "<p>The <code>ListProtectionsRequest.NextToken</code> value from a previous call to <code>ListProtections</code>. Pass null if this is the first call.</p>",
+        "ListProtectionsResponse$NextToken": "<p>If you specify a value for <code>MaxResults</code> and you have more Protections than the value of MaxResults, AWS Shield Advanced returns a NextToken value in the response that allows you to list another group of Protections. For the second and subsequent ListProtections requests, specify the value of NextToken from the previous response to get information about another batch of Protections.</p> <p>AWS WAF might return the list of <a>Protection</a> objects in batches smaller than the number specified by MaxResults. If there are more <a>Protection</a> objects to return, AWS WAF will always also return a <code>NextToken</code>.</p>"
+      }
+    },
+    "TopContributors": {
+      "base": null,
+      "refs": {
+        "AttackProperty$TopContributors": "<p>The array of <a>Contributor</a> objects that includes the top five contributors to an attack. </p>"
+      }
+    },
+    "Unit": {
+      "base": null,
+      "refs": {
+        "AttackProperty$Unit": "<p>The unit of the <code>Value</code> of the contributions.</p>"
+      }
+    },
+    "UpdateEmergencyContactSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEmergencyContactSettingsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "AccessDeniedForDependencyException$message": null,
+        "InternalErrorException$message": null,
+        "InvalidOperationException$message": null,
+        "InvalidPaginationTokenException$message": null,
+        "InvalidParameterException$message": null,
+        "InvalidResourceException$message": null,
+        "LimitsExceededException$message": null,
+        "LockedSubscriptionException$message": null,
+        "NoAssociatedRoleException$message": null,
+        "OptimisticLockException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    }
+  }
+}

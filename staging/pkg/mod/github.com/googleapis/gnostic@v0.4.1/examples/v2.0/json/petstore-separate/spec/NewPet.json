@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "Pet.json"
+    },
+    {
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "description": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    }
+  ]
+}

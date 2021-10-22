@@ -1,0 +1,11 @@
+{
+  "commit": "b08824e05817297a4b2874d8db5e6fc8c29349c9",
+  "readme": "/_/azure-rest-api-specs/specification/containerservice/resource-manager/readme.md",
+  "tag": "package-2020-12",
+  "use": "@microsoft.azure/autorest.go@2.1.183",
+  "repository_url": "https://github.com/Azure/azure-rest-api-specs.git",
+  "autorest_command": "autorest --use=@microsoft.azure/autorest.go@2.1.183 --tag=package-2020-12 --go-sdk-folder=/_/azure-sdk-for-go --go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION /_/azure-rest-api-specs/specification/containerservice/resource-manager/readme.md",
+  "additional_properties": {
+    "additional_options": "--go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION"
+  }
+}

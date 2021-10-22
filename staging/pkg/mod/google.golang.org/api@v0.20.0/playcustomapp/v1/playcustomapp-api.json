@@ -1,0 +1,149 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/androidpublisher": {
+          "description": "View and manage your Google Play Developer account"
+        }
+      }
+    }
+  },
+  "basePath": "/playcustomapp/v1/accounts/",
+  "baseUrl": "https://www.googleapis.com/playcustomapp/v1/accounts/",
+  "batchPath": "batch/playcustomapp/v1",
+  "description": "An API to publish custom Android apps.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/android/work/play/custom-app-api",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/ywOAt8XWKM4cusVP0mF5yu49aEk\"",
+  "icons": {
+    "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+    "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+  },
+  "id": "playcustomapp:v1",
+  "kind": "discovery#restDescription",
+  "name": "playcustomapp",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "accounts": {
+      "resources": {
+        "customApps": {
+          "methods": {
+            "create": {
+              "description": "Create and publish a new custom app.",
+              "httpMethod": "POST",
+              "id": "playcustomapp.accounts.customApps.create",
+              "mediaUpload": {
+                "accept": [
+                  "*/*"
+                ],
+                "maxSize": "100MB",
+                "protocols": {
+                  "resumable": {
+                    "multipart": true,
+                    "path": "/resumable/upload/playcustomapp/v1/accounts/{account}/customApps"
+                  },
+                  "simple": {
+                    "multipart": true,
+                    "path": "/upload/playcustomapp/v1/accounts/{account}/customApps"
+                  }
+                }
+              },
+              "parameterOrder": [
+                "account"
+              ],
+              "parameters": {
+                "account": {
+                  "description": "Developer account ID.",
+                  "format": "int64",
+                  "location": "path",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "{account}/customApps",
+              "request": {
+                "$ref": "CustomApp"
+              },
+              "response": {
+                "$ref": "CustomApp"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/androidpublisher"
+              ],
+              "supportsMediaUpload": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "revision": "20170622",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "CustomApp": {
+      "description": "This resource represents a custom app.",
+      "id": "CustomApp",
+      "properties": {
+        "languageCode": {
+          "description": "Default listing language in BCP 47 format.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Title for the Android app.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "playcustomapp/v1/accounts/",
+  "title": "Google Play Custom App Publishing API",
+  "version": "v1"
+}

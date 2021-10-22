@@ -1,0 +1,16 @@
+{
+  "pagination": {
+    "ListSignalingChannels": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ChannelInfoList"
+    },
+    "ListStreams": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "StreamInfoList"
+    }
+  }
+}

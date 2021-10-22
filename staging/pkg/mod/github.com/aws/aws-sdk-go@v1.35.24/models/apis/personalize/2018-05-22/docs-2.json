@@ -1,0 +1,1467 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Personalize is a machine learning service that makes it easy to add individualized recommendations to customers.</p>",
+  "operations": {
+    "CreateBatchInferenceJob": "<p>Creates a batch inference job. The operation can handle up to 50 million records and the input file must be in JSON format. For more information, see <a>recommendations-batch</a>.</p>",
+    "CreateCampaign": "<p>Creates a campaign by deploying a solution version. When a client calls the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_RS_GetRecommendations.html\">GetRecommendations</a> and <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_RS_GetPersonalizedRanking.html\">GetPersonalizedRanking</a> APIs, a campaign is specified in the request.</p> <p> <b>Minimum Provisioned TPS and Auto-Scaling</b> </p> <p>A transaction is a single <code>GetRecommendations</code> or <code>GetPersonalizedRanking</code> call. Transactions per second (TPS) is the throughput and unit of billing for Amazon Personalize. The minimum provisioned TPS (<code>minProvisionedTPS</code>) specifies the baseline throughput provisioned by Amazon Personalize, and thus, the minimum billing charge. If your TPS increases beyond <code>minProvisionedTPS</code>, Amazon Personalize auto-scales the provisioned capacity up and down, but never below <code>minProvisionedTPS</code>, to maintain a 70% utilization. There's a short time delay while the capacity is increased that might cause loss of transactions. It's recommended to start with a low <code>minProvisionedTPS</code>, track your usage using Amazon CloudWatch metrics, and then increase the <code>minProvisionedTPS</code> as necessary.</p> <p> <b>Status</b> </p> <p>A campaign can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul> <p>To get the campaign status, call <a>DescribeCampaign</a>.</p> <note> <p>Wait until the <code>status</code> of the campaign is <code>ACTIVE</code> before asking the campaign for recommendations.</p> </note> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListCampaigns</a> </p> </li> <li> <p> <a>DescribeCampaign</a> </p> </li> <li> <p> <a>UpdateCampaign</a> </p> </li> <li> <p> <a>DeleteCampaign</a> </p> </li> </ul>",
+    "CreateDataset": "<p>Creates an empty dataset and adds it to the specified dataset group. Use <a>CreateDatasetImportJob</a> to import your training data to a dataset.</p> <p>There are three types of datasets:</p> <ul> <li> <p>Interactions</p> </li> <li> <p>Items</p> </li> <li> <p>Users</p> </li> </ul> <p>Each dataset type has an associated schema with required field types. Only the <code>Interactions</code> dataset is required in order to train a model (also referred to as creating a solution).</p> <p>A dataset can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul> <p>To get the status of the dataset, call <a>DescribeDataset</a>.</p> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>CreateDatasetGroup</a> </p> </li> <li> <p> <a>ListDatasets</a> </p> </li> <li> <p> <a>DescribeDataset</a> </p> </li> <li> <p> <a>DeleteDataset</a> </p> </li> </ul>",
+    "CreateDatasetGroup": "<p>Creates an empty dataset group. A dataset group contains related datasets that supply data for training a model. A dataset group can contain at most three datasets, one for each type of dataset:</p> <ul> <li> <p>Interactions</p> </li> <li> <p>Items</p> </li> <li> <p>Users</p> </li> </ul> <p>To train a model (create a solution), a dataset group that contains an <code>Interactions</code> dataset is required. Call <a>CreateDataset</a> to add a dataset to the group.</p> <p>A dataset group can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING</p> </li> </ul> <p>To get the status of the dataset group, call <a>DescribeDatasetGroup</a>. If the status shows as CREATE FAILED, the response includes a <code>failureReason</code> key, which describes why the creation failed.</p> <note> <p>You must wait until the <code>status</code> of the dataset group is <code>ACTIVE</code> before adding a dataset to the group.</p> </note> <p>You can specify an AWS Key Management Service (KMS) key to encrypt the datasets in the group. If you specify a KMS key, you must also include an AWS Identity and Access Management (IAM) role that has permission to access the key.</p> <p class=\"title\"> <b>APIs that require a dataset group ARN in the request</b> </p> <ul> <li> <p> <a>CreateDataset</a> </p> </li> <li> <p> <a>CreateEventTracker</a> </p> </li> <li> <p> <a>CreateSolution</a> </p> </li> </ul> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListDatasetGroups</a> </p> </li> <li> <p> <a>DescribeDatasetGroup</a> </p> </li> <li> <p> <a>DeleteDatasetGroup</a> </p> </li> </ul>",
+    "CreateDatasetImportJob": "<p>Creates a job that imports training data from your data source (an Amazon S3 bucket) to an Amazon Personalize dataset. To allow Amazon Personalize to import the training data, you must specify an AWS Identity and Access Management (IAM) role that has permission to read from the data source, as Amazon Personalize makes a copy of your data and processes it in an internal AWS system.</p> <important> <p>The dataset import job replaces any previous data in the dataset.</p> </important> <p> <b>Status</b> </p> <p>A dataset import job can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul> <p>To get the status of the import job, call <a>DescribeDatasetImportJob</a>, providing the Amazon Resource Name (ARN) of the dataset import job. The dataset import is complete when the status shows as ACTIVE. If the status shows as CREATE FAILED, the response includes a <code>failureReason</code> key, which describes why the job failed.</p> <note> <p>Importing takes time. You must wait until the status shows as ACTIVE before training a model using the dataset.</p> </note> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListDatasetImportJobs</a> </p> </li> <li> <p> <a>DescribeDatasetImportJob</a> </p> </li> </ul>",
+    "CreateEventTracker": "<p>Creates an event tracker that you use when sending event data to the specified dataset group using the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_UBS_PutEvents.html\">PutEvents</a> API.</p> <p>When Amazon Personalize creates an event tracker, it also creates an <i>event-interactions</i> dataset in the dataset group associated with the event tracker. The event-interactions dataset stores the event data from the <code>PutEvents</code> call. The contents of this dataset are not available to the user.</p> <note> <p>Only one event tracker can be associated with a dataset group. You will get an error if you call <code>CreateEventTracker</code> using the same dataset group as an existing event tracker.</p> </note> <p>When you send event data you include your tracking ID. The tracking ID identifies the customer and authorizes the customer to send the data.</p> <p>The event tracker can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul> <p>To get the status of the event tracker, call <a>DescribeEventTracker</a>.</p> <note> <p>The event tracker must be in the ACTIVE state before using the tracking ID.</p> </note> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListEventTrackers</a> </p> </li> <li> <p> <a>DescribeEventTracker</a> </p> </li> <li> <p> <a>DeleteEventTracker</a> </p> </li> </ul>",
+    "CreateFilter": "<p>Creates a recommendation filter. For more information, see <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/filters.html\">Using Filters with Amazon Personalize</a>.</p>",
+    "CreateSchema": "<p>Creates an Amazon Personalize schema from the specified schema string. The schema you create must be in Avro JSON format.</p> <p>Amazon Personalize recognizes three schema variants. Each schema is associated with a dataset type and has a set of required field and keywords. You specify a schema when you call <a>CreateDataset</a>.</p> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListSchemas</a> </p> </li> <li> <p> <a>DescribeSchema</a> </p> </li> <li> <p> <a>DeleteSchema</a> </p> </li> </ul>",
+    "CreateSolution": "<p>Creates the configuration for training a model. A trained model is known as a solution. After the configuration is created, you train the model (create a solution) by calling the <a>CreateSolutionVersion</a> operation. Every time you call <code>CreateSolutionVersion</code>, a new version of the solution is created.</p> <p>After creating a solution version, you check its accuracy by calling <a>GetSolutionMetrics</a>. When you are satisfied with the version, you deploy it using <a>CreateCampaign</a>. The campaign provides recommendations to a client through the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_RS_GetRecommendations.html\">GetRecommendations</a> API.</p> <p>To train a model, Amazon Personalize requires training data and a recipe. The training data comes from the dataset group that you provide in the request. A recipe specifies the training algorithm and a feature transformation. You can specify one of the predefined recipes provided by Amazon Personalize. Alternatively, you can specify <code>performAutoML</code> and Amazon Personalize will analyze your data and select the optimum USER_PERSONALIZATION recipe for you.</p> <p> <b>Status</b> </p> <p>A solution can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul> <p>To get the status of the solution, call <a>DescribeSolution</a>. Wait until the status shows as ACTIVE before calling <code>CreateSolutionVersion</code>.</p> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListSolutions</a> </p> </li> <li> <p> <a>CreateSolutionVersion</a> </p> </li> <li> <p> <a>DescribeSolution</a> </p> </li> <li> <p> <a>DeleteSolution</a> </p> </li> </ul> <ul> <li> <p> <a>ListSolutionVersions</a> </p> </li> <li> <p> <a>DescribeSolutionVersion</a> </p> </li> </ul>",
+    "CreateSolutionVersion": "<p>Trains or retrains an active solution. A solution is created using the <a>CreateSolution</a> operation and must be in the ACTIVE state before calling <code>CreateSolutionVersion</code>. A new version of the solution is created every time you call this operation.</p> <p> <b>Status</b> </p> <p>A solution version can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul> <p>To get the status of the version, call <a>DescribeSolutionVersion</a>. Wait until the status shows as ACTIVE before calling <code>CreateCampaign</code>.</p> <p>If the status shows as CREATE FAILED, the response includes a <code>failureReason</code> key, which describes why the job failed.</p> <p class=\"title\"> <b>Related APIs</b> </p> <ul> <li> <p> <a>ListSolutionVersions</a> </p> </li> <li> <p> <a>DescribeSolutionVersion</a> </p> </li> </ul> <ul> <li> <p> <a>ListSolutions</a> </p> </li> <li> <p> <a>CreateSolution</a> </p> </li> <li> <p> <a>DescribeSolution</a> </p> </li> <li> <p> <a>DeleteSolution</a> </p> </li> </ul>",
+    "DeleteCampaign": "<p>Removes a campaign by deleting the solution deployment. The solution that the campaign is based on is not deleted and can be redeployed when needed. A deleted campaign can no longer be specified in a <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_RS_GetRecommendations.html\">GetRecommendations</a> request. For more information on campaigns, see <a>CreateCampaign</a>.</p>",
+    "DeleteDataset": "<p>Deletes a dataset. You can't delete a dataset if an associated <code>DatasetImportJob</code> or <code>SolutionVersion</code> is in the CREATE PENDING or IN PROGRESS state. For more information on datasets, see <a>CreateDataset</a>.</p>",
+    "DeleteDatasetGroup": "<p>Deletes a dataset group. Before you delete a dataset group, you must delete the following:</p> <ul> <li> <p>All associated event trackers.</p> </li> <li> <p>All associated solutions.</p> </li> <li> <p>All datasets in the dataset group.</p> </li> </ul>",
+    "DeleteEventTracker": "<p>Deletes the event tracker. Does not delete the event-interactions dataset from the associated dataset group. For more information on event trackers, see <a>CreateEventTracker</a>.</p>",
+    "DeleteFilter": "<p>Deletes a filter.</p>",
+    "DeleteSchema": "<p>Deletes a schema. Before deleting a schema, you must delete all datasets referencing the schema. For more information on schemas, see <a>CreateSchema</a>.</p>",
+    "DeleteSolution": "<p>Deletes all versions of a solution and the <code>Solution</code> object itself. Before deleting a solution, you must delete all campaigns based on the solution. To determine what campaigns are using the solution, call <a>ListCampaigns</a> and supply the Amazon Resource Name (ARN) of the solution. You can't delete a solution if an associated <code>SolutionVersion</code> is in the CREATE PENDING or IN PROGRESS state. For more information on solutions, see <a>CreateSolution</a>.</p>",
+    "DescribeAlgorithm": "<p>Describes the given algorithm.</p>",
+    "DescribeBatchInferenceJob": "<p>Gets the properties of a batch inference job including name, Amazon Resource Name (ARN), status, input and output configurations, and the ARN of the solution version used to generate the recommendations.</p>",
+    "DescribeCampaign": "<p>Describes the given campaign, including its status.</p> <p>A campaign can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul> <p>When the <code>status</code> is <code>CREATE FAILED</code>, the response includes the <code>failureReason</code> key, which describes why.</p> <p>For more information on campaigns, see <a>CreateCampaign</a>.</p>",
+    "DescribeDataset": "<p>Describes the given dataset. For more information on datasets, see <a>CreateDataset</a>.</p>",
+    "DescribeDatasetGroup": "<p>Describes the given dataset group. For more information on dataset groups, see <a>CreateDatasetGroup</a>.</p>",
+    "DescribeDatasetImportJob": "<p>Describes the dataset import job created by <a>CreateDatasetImportJob</a>, including the import job status.</p>",
+    "DescribeEventTracker": "<p>Describes an event tracker. The response includes the <code>trackingId</code> and <code>status</code> of the event tracker. For more information on event trackers, see <a>CreateEventTracker</a>.</p>",
+    "DescribeFeatureTransformation": "<p>Describes the given feature transformation.</p>",
+    "DescribeFilter": "<p>Describes a filter's properties.</p>",
+    "DescribeRecipe": "<p>Describes a recipe.</p> <p>A recipe contains three items:</p> <ul> <li> <p>An algorithm that trains a model.</p> </li> <li> <p>Hyperparameters that govern the training.</p> </li> <li> <p>Feature transformation information for modifying the input data before training.</p> </li> </ul> <p>Amazon Personalize provides a set of predefined recipes. You specify a recipe when you create a solution with the <a>CreateSolution</a> API. <code>CreateSolution</code> trains a model by using the algorithm in the specified recipe and a training dataset. The solution, when deployed as a campaign, can provide recommendations using the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_RS_GetRecommendations.html\">GetRecommendations</a> API.</p>",
+    "DescribeSchema": "<p>Describes a schema. For more information on schemas, see <a>CreateSchema</a>.</p>",
+    "DescribeSolution": "<p>Describes a solution. For more information on solutions, see <a>CreateSolution</a>.</p>",
+    "DescribeSolutionVersion": "<p>Describes a specific version of a solution. For more information on solutions, see <a>CreateSolution</a>.</p>",
+    "GetSolutionMetrics": "<p>Gets the metrics for the specified solution version.</p>",
+    "ListBatchInferenceJobs": "<p>Gets a list of the batch inference jobs that have been performed off of a solution version.</p>",
+    "ListCampaigns": "<p>Returns a list of campaigns that use the given solution. When a solution is not specified, all the campaigns associated with the account are listed. The response provides the properties for each campaign, including the Amazon Resource Name (ARN). For more information on campaigns, see <a>CreateCampaign</a>.</p>",
+    "ListDatasetGroups": "<p>Returns a list of dataset groups. The response provides the properties for each dataset group, including the Amazon Resource Name (ARN). For more information on dataset groups, see <a>CreateDatasetGroup</a>.</p>",
+    "ListDatasetImportJobs": "<p>Returns a list of dataset import jobs that use the given dataset. When a dataset is not specified, all the dataset import jobs associated with the account are listed. The response provides the properties for each dataset import job, including the Amazon Resource Name (ARN). For more information on dataset import jobs, see <a>CreateDatasetImportJob</a>. For more information on datasets, see <a>CreateDataset</a>.</p>",
+    "ListDatasets": "<p>Returns the list of datasets contained in the given dataset group. The response provides the properties for each dataset, including the Amazon Resource Name (ARN). For more information on datasets, see <a>CreateDataset</a>.</p>",
+    "ListEventTrackers": "<p>Returns the list of event trackers associated with the account. The response provides the properties for each event tracker, including the Amazon Resource Name (ARN) and tracking ID. For more information on event trackers, see <a>CreateEventTracker</a>.</p>",
+    "ListFilters": "<p>Lists all filters that belong to a given dataset group.</p>",
+    "ListRecipes": "<p>Returns a list of available recipes. The response provides the properties for each recipe, including the recipe's Amazon Resource Name (ARN).</p>",
+    "ListSchemas": "<p>Returns the list of schemas associated with the account. The response provides the properties for each schema, including the Amazon Resource Name (ARN). For more information on schemas, see <a>CreateSchema</a>.</p>",
+    "ListSolutionVersions": "<p>Returns a list of solution versions for the given solution. When a solution is not specified, all the solution versions associated with the account are listed. The response provides the properties for each solution version, including the Amazon Resource Name (ARN). For more information on solutions, see <a>CreateSolution</a>.</p>",
+    "ListSolutions": "<p>Returns a list of solutions that use the given dataset group. When a dataset group is not specified, all the solutions associated with the account are listed. The response provides the properties for each solution, including the Amazon Resource Name (ARN). For more information on solutions, see <a>CreateSolution</a>.</p>",
+    "UpdateCampaign": "<p>Updates a campaign by either deploying a new solution or changing the value of the campaign's <code>minProvisionedTPS</code> parameter.</p> <p>To update a campaign, the campaign status must be ACTIVE or CREATE FAILED. Check the campaign status using the <a>DescribeCampaign</a> API.</p> <note> <p>You must wait until the <code>status</code> of the updated campaign is <code>ACTIVE</code> before asking the campaign for recommendations.</p> </note> <p>For more information on campaigns, see <a>CreateCampaign</a>.</p>"
+  },
+  "shapes": {
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "EventTracker$accountId": "<p>The Amazon AWS account that owns the event tracker.</p>"
+      }
+    },
+    "Algorithm": {
+      "base": "<p>Describes a custom algorithm.</p>",
+      "refs": {
+        "DescribeAlgorithmResponse$algorithm": "<p>A listing of the properties of the algorithm.</p>"
+      }
+    },
+    "AlgorithmImage": {
+      "base": "<p>Describes an algorithm image.</p>",
+      "refs": {
+        "Algorithm$algorithmImage": "<p>The URI of the Docker container for the algorithm image.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "Algorithm$algorithmArn": "<p>The Amazon Resource Name (ARN) of the algorithm.</p>",
+        "Algorithm$roleArn": "<p>The Amazon Resource Name (ARN) of the role.</p>",
+        "ArnList$member": null,
+        "AutoMLResult$bestRecipeArn": "<p>The Amazon Resource Name (ARN) of the best recipe.</p>",
+        "BatchInferenceJob$batchInferenceJobArn": "<p>The Amazon Resource Name (ARN) of the batch inference job.</p>",
+        "BatchInferenceJob$filterArn": "<p>The ARN of the filter used on the batch inference job.</p>",
+        "BatchInferenceJob$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version from which the batch inference job was created.</p>",
+        "BatchInferenceJobSummary$batchInferenceJobArn": "<p>The Amazon Resource Name (ARN) of the batch inference job.</p>",
+        "BatchInferenceJobSummary$solutionVersionArn": "<p>The ARN of the solution version used by the batch inference job.</p>",
+        "Campaign$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign. </p>",
+        "Campaign$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of a specific version of the solution.</p>",
+        "CampaignSummary$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign.</p>",
+        "CampaignUpdateSummary$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the deployed solution version.</p>",
+        "CreateBatchInferenceJobRequest$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version that will be used to generate the batch inference recommendations.</p>",
+        "CreateBatchInferenceJobRequest$filterArn": "<p>The ARN of the filter to apply to the batch inference job. For more information on using filters, see Using Filters with Amazon Personalize.</p>",
+        "CreateBatchInferenceJobResponse$batchInferenceJobArn": "<p>The ARN of the batch inference job.</p>",
+        "CreateCampaignRequest$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version to deploy.</p>",
+        "CreateCampaignResponse$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign.</p>",
+        "CreateDatasetGroupResponse$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the new dataset group.</p>",
+        "CreateDatasetImportJobRequest$datasetArn": "<p>The ARN of the dataset that receives the imported data.</p>",
+        "CreateDatasetImportJobResponse$datasetImportJobArn": "<p>The ARN of the dataset import job.</p>",
+        "CreateDatasetRequest$schemaArn": "<p>The ARN of the schema to associate with the dataset. The schema defines the dataset fields.</p>",
+        "CreateDatasetRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group to add the dataset to.</p>",
+        "CreateDatasetResponse$datasetArn": "<p>The ARN of the dataset.</p>",
+        "CreateEventTrackerRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group that receives the event data.</p>",
+        "CreateEventTrackerResponse$eventTrackerArn": "<p>The ARN of the event tracker.</p>",
+        "CreateFilterRequest$datasetGroupArn": "<p>The ARN of the dataset group that the filter will belong to.</p>",
+        "CreateFilterResponse$filterArn": "<p>The ARN of the new filter.</p>",
+        "CreateSchemaResponse$schemaArn": "<p>The Amazon Resource Name (ARN) of the created schema.</p>",
+        "CreateSolutionRequest$recipeArn": "<p>The ARN of the recipe to use for model training. Only specified when <code>performAutoML</code> is false.</p>",
+        "CreateSolutionRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group that provides the training data.</p>",
+        "CreateSolutionResponse$solutionArn": "<p>The ARN of the solution.</p>",
+        "CreateSolutionVersionRequest$solutionArn": "<p>The Amazon Resource Name (ARN) of the solution containing the training configuration information.</p>",
+        "CreateSolutionVersionResponse$solutionVersionArn": "<p>The ARN of the new solution version.</p>",
+        "Dataset$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset that you want metadata for.</p>",
+        "Dataset$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group.</p>",
+        "Dataset$schemaArn": "<p>The ARN of the associated schema.</p>",
+        "DatasetGroup$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group.</p>",
+        "DatasetGroupSummary$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group.</p>",
+        "DatasetImportJob$datasetImportJobArn": "<p>The ARN of the dataset import job.</p>",
+        "DatasetImportJob$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset that receives the imported data.</p>",
+        "DatasetImportJob$roleArn": "<p>The ARN of the AWS Identity and Access Management (IAM) role that has permissions to read from the Amazon S3 data source.</p>",
+        "DatasetImportJobSummary$datasetImportJobArn": "<p>The Amazon Resource Name (ARN) of the dataset import job.</p>",
+        "DatasetSchema$schemaArn": "<p>The Amazon Resource Name (ARN) of the schema.</p>",
+        "DatasetSchemaSummary$schemaArn": "<p>The Amazon Resource Name (ARN) of the schema.</p>",
+        "DatasetSummary$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset.</p>",
+        "DeleteCampaignRequest$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign to delete.</p>",
+        "DeleteDatasetGroupRequest$datasetGroupArn": "<p>The ARN of the dataset group to delete.</p>",
+        "DeleteDatasetRequest$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset to delete.</p>",
+        "DeleteEventTrackerRequest$eventTrackerArn": "<p>The Amazon Resource Name (ARN) of the event tracker to delete.</p>",
+        "DeleteFilterRequest$filterArn": "<p>The ARN of the filter to delete.</p>",
+        "DeleteSchemaRequest$schemaArn": "<p>The Amazon Resource Name (ARN) of the schema to delete.</p>",
+        "DeleteSolutionRequest$solutionArn": "<p>The ARN of the solution to delete.</p>",
+        "DescribeAlgorithmRequest$algorithmArn": "<p>The Amazon Resource Name (ARN) of the algorithm to describe.</p>",
+        "DescribeBatchInferenceJobRequest$batchInferenceJobArn": "<p>The ARN of the batch inference job to describe.</p>",
+        "DescribeCampaignRequest$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign.</p>",
+        "DescribeDatasetGroupRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group to describe.</p>",
+        "DescribeDatasetImportJobRequest$datasetImportJobArn": "<p>The Amazon Resource Name (ARN) of the dataset import job to describe.</p>",
+        "DescribeDatasetRequest$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset to describe.</p>",
+        "DescribeEventTrackerRequest$eventTrackerArn": "<p>The Amazon Resource Name (ARN) of the event tracker to describe.</p>",
+        "DescribeFeatureTransformationRequest$featureTransformationArn": "<p>The Amazon Resource Name (ARN) of the feature transformation to describe.</p>",
+        "DescribeFilterRequest$filterArn": "<p>The ARN of the filter to describe.</p>",
+        "DescribeRecipeRequest$recipeArn": "<p>The Amazon Resource Name (ARN) of the recipe to describe.</p>",
+        "DescribeSchemaRequest$schemaArn": "<p>The Amazon Resource Name (ARN) of the schema to retrieve.</p>",
+        "DescribeSolutionRequest$solutionArn": "<p>The Amazon Resource Name (ARN) of the solution to describe.</p>",
+        "DescribeSolutionVersionRequest$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version.</p>",
+        "EventTracker$eventTrackerArn": "<p>The ARN of the event tracker.</p>",
+        "EventTracker$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group that receives the event data.</p>",
+        "EventTrackerSummary$eventTrackerArn": "<p>The Amazon Resource Name (ARN) of the event tracker.</p>",
+        "FeatureTransformation$featureTransformationArn": "<p>The Amazon Resource Name (ARN) of the FeatureTransformation object.</p>",
+        "Filter$filterArn": "<p>The ARN of the filter.</p>",
+        "Filter$datasetGroupArn": "<p>The ARN of the dataset group to which the filter belongs.</p>",
+        "FilterSummary$filterArn": "<p>The ARN of the filter.</p>",
+        "FilterSummary$datasetGroupArn": "<p>The ARN of the dataset group to which the filter belongs.</p>",
+        "GetSolutionMetricsRequest$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version for which to get metrics.</p>",
+        "GetSolutionMetricsResponse$solutionVersionArn": "<p>The same solution version ARN as specified in the request.</p>",
+        "ListBatchInferenceJobsRequest$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version from which the batch inference jobs were created.</p>",
+        "ListCampaignsRequest$solutionArn": "<p>The Amazon Resource Name (ARN) of the solution to list the campaigns for. When a solution is not specified, all the campaigns associated with the account are listed.</p>",
+        "ListDatasetImportJobsRequest$datasetArn": "<p>The Amazon Resource Name (ARN) of the dataset to list the dataset import jobs for.</p>",
+        "ListDatasetsRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group that contains the datasets to list.</p>",
+        "ListEventTrackersRequest$datasetGroupArn": "<p>The ARN of a dataset group used to filter the response.</p>",
+        "ListFiltersRequest$datasetGroupArn": "<p>The ARN of the dataset group that contains the filters.</p>",
+        "ListSolutionVersionsRequest$solutionArn": "<p>The Amazon Resource Name (ARN) of the solution.</p>",
+        "ListSolutionsRequest$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group.</p>",
+        "Recipe$recipeArn": "<p>The Amazon Resource Name (ARN) of the recipe.</p>",
+        "Recipe$algorithmArn": "<p>The Amazon Resource Name (ARN) of the algorithm that Amazon Personalize uses to train the model.</p>",
+        "Recipe$featureTransformationArn": "<p>The ARN of the FeatureTransformation object.</p>",
+        "RecipeSummary$recipeArn": "<p>The Amazon Resource Name (ARN) of the recipe.</p>",
+        "Solution$solutionArn": "<p>The ARN of the solution.</p>",
+        "Solution$recipeArn": "<p>The ARN of the recipe used to create the solution.</p>",
+        "Solution$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group that provides the training data.</p>",
+        "SolutionSummary$solutionArn": "<p>The Amazon Resource Name (ARN) of the solution.</p>",
+        "SolutionVersion$solutionVersionArn": "<p>The ARN of the solution version.</p>",
+        "SolutionVersion$solutionArn": "<p>The ARN of the solution.</p>",
+        "SolutionVersion$recipeArn": "<p>The ARN of the recipe used in the solution.</p>",
+        "SolutionVersion$datasetGroupArn": "<p>The Amazon Resource Name (ARN) of the dataset group providing the training data.</p>",
+        "SolutionVersionSummary$solutionVersionArn": "<p>The Amazon Resource Name (ARN) of the solution version.</p>",
+        "UpdateCampaignRequest$campaignArn": "<p>The Amazon Resource Name (ARN) of the campaign.</p>",
+        "UpdateCampaignRequest$solutionVersionArn": "<p>The ARN of a new solution version to deploy.</p>",
+        "UpdateCampaignResponse$campaignArn": "<p>The same campaign ARN as given in the request.</p>"
+      }
+    },
+    "ArnList": {
+      "base": null,
+      "refs": {
+        "AutoMLConfig$recipeList": "<p>The list of candidate recipes.</p>"
+      }
+    },
+    "AutoMLConfig": {
+      "base": "<p>When the solution performs AutoML (<code>performAutoML</code> is true in <a>CreateSolution</a>), Amazon Personalize determines which recipe, from the specified list, optimizes the given metric. Amazon Personalize then uses that recipe for the solution.</p>",
+      "refs": {
+        "SolutionConfig$autoMLConfig": "<p>The <a>AutoMLConfig</a> object containing a list of recipes to search when AutoML is performed.</p>"
+      }
+    },
+    "AutoMLResult": {
+      "base": "<p>When the solution performs AutoML (<code>performAutoML</code> is true in <a>CreateSolution</a>), specifies the recipe that best optimized the specified metric.</p>",
+      "refs": {
+        "Solution$autoMLResult": "<p>When <code>performAutoML</code> is true, specifies the best recipe found.</p>"
+      }
+    },
+    "AvroSchema": {
+      "base": null,
+      "refs": {
+        "CreateSchemaRequest$schema": "<p>A schema in Avro JSON format.</p>",
+        "DatasetSchema$schema": "<p>The schema.</p>"
+      }
+    },
+    "BatchInferenceJob": {
+      "base": "<p>Contains information on a batch inference job.</p>",
+      "refs": {
+        "DescribeBatchInferenceJobResponse$batchInferenceJob": "<p>Information on the specified batch inference job.</p>"
+      }
+    },
+    "BatchInferenceJobConfig": {
+      "base": "<p>The configuration details of a batch inference job.</p>",
+      "refs": {
+        "BatchInferenceJob$batchInferenceJobConfig": "<p>A string to string map of the configuration details of a batch inference job.</p>",
+        "CreateBatchInferenceJobRequest$batchInferenceJobConfig": "<p>The configuration details of a batch inference job.</p>"
+      }
+    },
+    "BatchInferenceJobInput": {
+      "base": "<p>The input configuration of a batch inference job.</p>",
+      "refs": {
+        "BatchInferenceJob$jobInput": "<p>The Amazon S3 path that leads to the input data used to generate the batch inference job.</p>",
+        "CreateBatchInferenceJobRequest$jobInput": "<p>The Amazon S3 path that leads to the input file to base your recommendations on. The input material must be in JSON format.</p>"
+      }
+    },
+    "BatchInferenceJobOutput": {
+      "base": "<p>The output configuration parameters of a batch inference job.</p>",
+      "refs": {
+        "BatchInferenceJob$jobOutput": "<p>The Amazon S3 bucket that contains the output data generated by the batch inference job.</p>",
+        "CreateBatchInferenceJobRequest$jobOutput": "<p>The path to the Amazon S3 bucket where the job's output will be stored.</p>"
+      }
+    },
+    "BatchInferenceJobSummary": {
+      "base": "<p>A truncated version of the <a>BatchInferenceJob</a> datatype. The <a>ListBatchInferenceJobs</a> operation returns a list of batch inference job summaries.</p>",
+      "refs": {
+        "BatchInferenceJobs$member": null
+      }
+    },
+    "BatchInferenceJobs": {
+      "base": null,
+      "refs": {
+        "ListBatchInferenceJobsResponse$batchInferenceJobs": "<p>A list containing information on each job that is returned.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "CreateSolutionRequest$performHPO": "<p>Whether to perform hyperparameter optimization (HPO) on the specified or selected recipe. The default is <code>false</code>.</p> <p>When performing AutoML, this parameter is always <code>true</code> and you should not set it to <code>false</code>.</p>"
+      }
+    },
+    "Campaign": {
+      "base": "<p>Describes a deployed solution version, otherwise known as a campaign. For more information on campaigns, see <a>CreateCampaign</a>.</p>",
+      "refs": {
+        "DescribeCampaignResponse$campaign": "<p>The properties of the campaign.</p>"
+      }
+    },
+    "CampaignConfig": {
+      "base": "<p>The configuration details of a campaign.</p>",
+      "refs": {
+        "Campaign$campaignConfig": "<p>The configuration details of a campaign.</p>",
+        "CampaignUpdateSummary$campaignConfig": null,
+        "CreateCampaignRequest$campaignConfig": "<p>The configuration details of a campaign.</p>",
+        "UpdateCampaignRequest$campaignConfig": "<p>The configuration details of a campaign.</p>"
+      }
+    },
+    "CampaignSummary": {
+      "base": "<p>Provides a summary of the properties of a campaign. For a complete listing, call the <a>DescribeCampaign</a> API.</p>",
+      "refs": {
+        "Campaigns$member": null
+      }
+    },
+    "CampaignUpdateSummary": {
+      "base": "<p>Provides a summary of the properties of a campaign update. For a complete listing, call the <a>DescribeCampaign</a> API.</p>",
+      "refs": {
+        "Campaign$latestCampaignUpdate": null
+      }
+    },
+    "Campaigns": {
+      "base": null,
+      "refs": {
+        "ListCampaignsResponse$campaigns": "<p>A list of the campaigns.</p>"
+      }
+    },
+    "CategoricalHyperParameterRange": {
+      "base": "<p>Provides the name and range of a categorical hyperparameter.</p>",
+      "refs": {
+        "CategoricalHyperParameterRanges$member": null
+      }
+    },
+    "CategoricalHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "HyperParameterRanges$categoricalHyperParameterRanges": "<p>The categorical hyperparameters and their ranges.</p>"
+      }
+    },
+    "CategoricalValue": {
+      "base": null,
+      "refs": {
+        "CategoricalValues$member": null
+      }
+    },
+    "CategoricalValues": {
+      "base": null,
+      "refs": {
+        "CategoricalHyperParameterRange$values": "<p>A list of the categories for the hyperparameter.</p>",
+        "DefaultCategoricalHyperParameterRange$values": "<p>A list of the categories for the hyperparameter.</p>"
+      }
+    },
+    "ContinuousHyperParameterRange": {
+      "base": "<p>Provides the name and range of a continuous hyperparameter.</p>",
+      "refs": {
+        "ContinuousHyperParameterRanges$member": null
+      }
+    },
+    "ContinuousHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "HyperParameterRanges$continuousHyperParameterRanges": "<p>The continuous hyperparameters and their ranges.</p>"
+      }
+    },
+    "ContinuousMaxValue": {
+      "base": null,
+      "refs": {
+        "ContinuousHyperParameterRange$maxValue": "<p>The maximum allowable value for the hyperparameter.</p>",
+        "DefaultContinuousHyperParameterRange$maxValue": "<p>The maximum allowable value for the hyperparameter.</p>"
+      }
+    },
+    "ContinuousMinValue": {
+      "base": null,
+      "refs": {
+        "ContinuousHyperParameterRange$minValue": "<p>The minimum allowable value for the hyperparameter.</p>",
+        "DefaultContinuousHyperParameterRange$minValue": "<p>The minimum allowable value for the hyperparameter.</p>"
+      }
+    },
+    "CreateBatchInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateBatchInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateCampaignRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateCampaignResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetImportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetImportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDatasetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEventTrackerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEventTrackerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSchemaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSchemaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSolutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSolutionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSolutionVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSolutionVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DataSource": {
+      "base": "<p>Describes the data source that contains the data to upload to a dataset.</p>",
+      "refs": {
+        "CreateDatasetImportJobRequest$dataSource": "<p>The Amazon S3 bucket that contains the training data to import.</p>",
+        "DatasetImportJob$dataSource": "<p>The Amazon S3 bucket that contains the training data to import.</p>"
+      }
+    },
+    "Dataset": {
+      "base": "<p>Provides metadata for a dataset.</p>",
+      "refs": {
+        "DescribeDatasetResponse$dataset": "<p>A listing of the dataset's properties.</p>"
+      }
+    },
+    "DatasetGroup": {
+      "base": "<p>A dataset group is a collection of related datasets (Interactions, User, and Item). You create a dataset group by calling <a>CreateDatasetGroup</a>. You then create a dataset and add it to a dataset group by calling <a>CreateDataset</a>. The dataset group is used to create and train a solution by calling <a>CreateSolution</a>. A dataset group can contain only one of each type of dataset.</p> <p>You can specify an AWS Key Management Service (KMS) key to encrypt the datasets in the group.</p>",
+      "refs": {
+        "DescribeDatasetGroupResponse$datasetGroup": "<p>A listing of the dataset group's properties.</p>"
+      }
+    },
+    "DatasetGroupSummary": {
+      "base": "<p>Provides a summary of the properties of a dataset group. For a complete listing, call the <a>DescribeDatasetGroup</a> API.</p>",
+      "refs": {
+        "DatasetGroups$member": null
+      }
+    },
+    "DatasetGroups": {
+      "base": null,
+      "refs": {
+        "ListDatasetGroupsResponse$datasetGroups": "<p>The list of your dataset groups.</p>"
+      }
+    },
+    "DatasetImportJob": {
+      "base": "<p>Describes a job that imports training data from a data source (Amazon S3 bucket) to an Amazon Personalize dataset. For more information, see <a>CreateDatasetImportJob</a>.</p> <p>A dataset import job can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul>",
+      "refs": {
+        "DescribeDatasetImportJobResponse$datasetImportJob": "<p>Information about the dataset import job, including the status.</p> <p>The status is one of the following values:</p> <ul> <li> <p>CREATE PENDING</p> </li> <li> <p>CREATE IN_PROGRESS</p> </li> <li> <p>ACTIVE</p> </li> <li> <p>CREATE FAILED</p> </li> </ul>"
+      }
+    },
+    "DatasetImportJobSummary": {
+      "base": "<p>Provides a summary of the properties of a dataset import job. For a complete listing, call the <a>DescribeDatasetImportJob</a> API.</p>",
+      "refs": {
+        "DatasetImportJobs$member": null
+      }
+    },
+    "DatasetImportJobs": {
+      "base": null,
+      "refs": {
+        "ListDatasetImportJobsResponse$datasetImportJobs": "<p>The list of dataset import jobs.</p>"
+      }
+    },
+    "DatasetSchema": {
+      "base": "<p>Describes the schema for a dataset. For more information on schemas, see <a>CreateSchema</a>.</p>",
+      "refs": {
+        "DescribeSchemaResponse$schema": "<p>The requested schema.</p>"
+      }
+    },
+    "DatasetSchemaSummary": {
+      "base": "<p>Provides a summary of the properties of a dataset schema. For a complete listing, call the <a>DescribeSchema</a> API.</p>",
+      "refs": {
+        "Schemas$member": null
+      }
+    },
+    "DatasetSummary": {
+      "base": "<p>Provides a summary of the properties of a dataset. For a complete listing, call the <a>DescribeDataset</a> API.</p>",
+      "refs": {
+        "Datasets$member": null
+      }
+    },
+    "DatasetType": {
+      "base": null,
+      "refs": {
+        "CreateDatasetRequest$datasetType": "<p>The type of dataset.</p> <p>One of the following (case insensitive) values:</p> <ul> <li> <p>Interactions</p> </li> <li> <p>Items</p> </li> <li> <p>Users</p> </li> </ul>",
+        "Dataset$datasetType": "<p>One of the following values:</p> <ul> <li> <p>Interactions</p> </li> <li> <p>Items</p> </li> <li> <p>Users</p> </li> </ul>",
+        "DatasetSummary$datasetType": "<p>The dataset type. One of the following values:</p> <ul> <li> <p>Interactions</p> </li> <li> <p>Items</p> </li> <li> <p>Users</p> </li> <li> <p>Event-Interactions</p> </li> </ul>"
+      }
+    },
+    "Datasets": {
+      "base": null,
+      "refs": {
+        "ListDatasetsResponse$datasets": "<p>An array of <code>Dataset</code> objects. Each object provides metadata information.</p>"
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "Algorithm$creationDateTime": "<p>The date and time (in Unix time) that the algorithm was created.</p>",
+        "Algorithm$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the algorithm was last updated.</p>",
+        "BatchInferenceJob$creationDateTime": "<p>The time at which the batch inference job was created.</p>",
+        "BatchInferenceJob$lastUpdatedDateTime": "<p>The time at which the batch inference job was last updated.</p>",
+        "BatchInferenceJobSummary$creationDateTime": "<p>The time at which the batch inference job was created.</p>",
+        "BatchInferenceJobSummary$lastUpdatedDateTime": "<p>The time at which the batch inference job was last updated.</p>",
+        "Campaign$creationDateTime": "<p>The date and time (in Unix format) that the campaign was created.</p>",
+        "Campaign$lastUpdatedDateTime": "<p>The date and time (in Unix format) that the campaign was last updated.</p>",
+        "CampaignSummary$creationDateTime": "<p>The date and time (in Unix time) that the campaign was created.</p>",
+        "CampaignSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the campaign was last updated.</p>",
+        "CampaignUpdateSummary$creationDateTime": "<p>The date and time (in Unix time) that the campaign update was created.</p>",
+        "CampaignUpdateSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the campaign update was last updated.</p>",
+        "Dataset$creationDateTime": "<p>The creation date and time (in Unix time) of the dataset.</p>",
+        "Dataset$lastUpdatedDateTime": "<p>A time stamp that shows when the dataset was updated.</p>",
+        "DatasetGroup$creationDateTime": "<p>The creation date and time (in Unix time) of the dataset group.</p>",
+        "DatasetGroup$lastUpdatedDateTime": "<p>The last update date and time (in Unix time) of the dataset group.</p>",
+        "DatasetGroupSummary$creationDateTime": "<p>The date and time (in Unix time) that the dataset group was created.</p>",
+        "DatasetGroupSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the dataset group was last updated.</p>",
+        "DatasetImportJob$creationDateTime": "<p>The creation date and time (in Unix time) of the dataset import job.</p>",
+        "DatasetImportJob$lastUpdatedDateTime": "<p>The date and time (in Unix time) the dataset was last updated.</p>",
+        "DatasetImportJobSummary$creationDateTime": "<p>The date and time (in Unix time) that the dataset import job was created.</p>",
+        "DatasetImportJobSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the dataset was last updated.</p>",
+        "DatasetSchema$creationDateTime": "<p>The date and time (in Unix time) that the schema was created.</p>",
+        "DatasetSchema$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the schema was last updated.</p>",
+        "DatasetSchemaSummary$creationDateTime": "<p>The date and time (in Unix time) that the schema was created.</p>",
+        "DatasetSchemaSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the schema was last updated.</p>",
+        "DatasetSummary$creationDateTime": "<p>The date and time (in Unix time) that the dataset was created.</p>",
+        "DatasetSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the dataset was last updated.</p>",
+        "EventTracker$creationDateTime": "<p>The date and time (in Unix format) that the event tracker was created.</p>",
+        "EventTracker$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the event tracker was last updated.</p>",
+        "EventTrackerSummary$creationDateTime": "<p>The date and time (in Unix time) that the event tracker was created.</p>",
+        "EventTrackerSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the event tracker was last updated.</p>",
+        "FeatureTransformation$creationDateTime": "<p>The creation date and time (in Unix time) of the feature transformation.</p>",
+        "FeatureTransformation$lastUpdatedDateTime": "<p>The last update date and time (in Unix time) of the feature transformation.</p>",
+        "Filter$creationDateTime": "<p>The time at which the filter was created.</p>",
+        "Filter$lastUpdatedDateTime": "<p>The time at which the filter was last updated.</p>",
+        "FilterSummary$creationDateTime": "<p>The time at which the filter was created.</p>",
+        "FilterSummary$lastUpdatedDateTime": "<p>The time at which the filter was last updated.</p>",
+        "Recipe$creationDateTime": "<p>The date and time (in Unix format) that the recipe was created.</p>",
+        "Recipe$lastUpdatedDateTime": "<p>The date and time (in Unix format) that the recipe was last updated.</p>",
+        "RecipeSummary$creationDateTime": "<p>The date and time (in Unix time) that the recipe was created.</p>",
+        "RecipeSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the recipe was last updated.</p>",
+        "Solution$creationDateTime": "<p>The creation date and time (in Unix time) of the solution.</p>",
+        "Solution$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the solution was last updated.</p>",
+        "SolutionSummary$creationDateTime": "<p>The date and time (in Unix time) that the solution was created.</p>",
+        "SolutionSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the solution was last updated.</p>",
+        "SolutionVersion$creationDateTime": "<p>The date and time (in Unix time) that this version of the solution was created.</p>",
+        "SolutionVersion$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the solution was last updated.</p>",
+        "SolutionVersionSummary$creationDateTime": "<p>The date and time (in Unix time) that this version of a solution was created.</p>",
+        "SolutionVersionSummary$lastUpdatedDateTime": "<p>The date and time (in Unix time) that the solution version was last updated.</p>"
+      }
+    },
+    "DefaultCategoricalHyperParameterRange": {
+      "base": "<p>Provides the name and default range of a categorical hyperparameter and whether the hyperparameter is tunable. A tunable hyperparameter can have its value determined during hyperparameter optimization (HPO).</p>",
+      "refs": {
+        "DefaultCategoricalHyperParameterRanges$member": null
+      }
+    },
+    "DefaultCategoricalHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "DefaultHyperParameterRanges$categoricalHyperParameterRanges": "<p>The categorical hyperparameters and their default ranges.</p>"
+      }
+    },
+    "DefaultContinuousHyperParameterRange": {
+      "base": "<p>Provides the name and default range of a continuous hyperparameter and whether the hyperparameter is tunable. A tunable hyperparameter can have its value determined during hyperparameter optimization (HPO).</p>",
+      "refs": {
+        "DefaultContinuousHyperParameterRanges$member": null
+      }
+    },
+    "DefaultContinuousHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "DefaultHyperParameterRanges$continuousHyperParameterRanges": "<p>The continuous hyperparameters and their default ranges.</p>"
+      }
+    },
+    "DefaultHyperParameterRanges": {
+      "base": "<p>Specifies the hyperparameters and their default ranges. Hyperparameters can be categorical, continuous, or integer-valued.</p>",
+      "refs": {
+        "Algorithm$defaultHyperParameterRanges": "<p>Specifies the default hyperparameters, their ranges, and whether they are tunable. A tunable hyperparameter can have its value determined during hyperparameter optimization (HPO).</p>"
+      }
+    },
+    "DefaultIntegerHyperParameterRange": {
+      "base": "<p>Provides the name and default range of a integer-valued hyperparameter and whether the hyperparameter is tunable. A tunable hyperparameter can have its value determined during hyperparameter optimization (HPO).</p>",
+      "refs": {
+        "DefaultIntegerHyperParameterRanges$member": null
+      }
+    },
+    "DefaultIntegerHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "DefaultHyperParameterRanges$integerHyperParameterRanges": "<p>The integer-valued hyperparameters and their default ranges.</p>"
+      }
+    },
+    "DeleteCampaignRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDatasetGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDatasetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventTrackerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSchemaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSolutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAlgorithmRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAlgorithmResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeBatchInferenceJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeBatchInferenceJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCampaignRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCampaignResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetImportJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetImportJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDatasetResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventTrackerRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventTrackerResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFeatureTransformationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFeatureTransformationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRecipeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeRecipeResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSchemaRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSchemaResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSolutionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSolutionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSolutionVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSolutionVersionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": null,
+      "refs": {
+        "Recipe$description": "<p>The description of the recipe.</p>"
+      }
+    },
+    "DockerURI": {
+      "base": null,
+      "refs": {
+        "AlgorithmImage$dockerURI": "<p>The URI of the Docker container for the algorithm image.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InvalidInputException$message": null,
+        "InvalidNextTokenException$message": null,
+        "LimitExceededException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceInUseException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "EventTracker": {
+      "base": "<p>Provides information about an event tracker.</p>",
+      "refs": {
+        "DescribeEventTrackerResponse$eventTracker": "<p>An object that describes the event tracker.</p>"
+      }
+    },
+    "EventTrackerSummary": {
+      "base": "<p>Provides a summary of the properties of an event tracker. For a complete listing, call the <a>DescribeEventTracker</a> API.</p>",
+      "refs": {
+        "EventTrackers$member": null
+      }
+    },
+    "EventTrackers": {
+      "base": null,
+      "refs": {
+        "ListEventTrackersResponse$eventTrackers": "<p>A list of event trackers.</p>"
+      }
+    },
+    "EventType": {
+      "base": null,
+      "refs": {
+        "CreateSolutionRequest$eventType": "<p>When your have multiple event types (using an <code>EVENT_TYPE</code> schema field), this parameter specifies which event type (for example, 'click' or 'like') is used for training the model.</p>",
+        "Solution$eventType": "<p>The event type (for example, 'click' or 'like') that is used for training the model.</p>",
+        "SolutionVersion$eventType": "<p>The event type (for example, 'click' or 'like') that is used for training the model.</p>"
+      }
+    },
+    "EventValueThreshold": {
+      "base": null,
+      "refs": {
+        "SolutionConfig$eventValueThreshold": "<p>Only events with a value greater than or equal to this threshold are used for training a model.</p>"
+      }
+    },
+    "FailureReason": {
+      "base": null,
+      "refs": {
+        "BatchInferenceJob$failureReason": "<p>If the batch inference job failed, the reason for the failure.</p>",
+        "BatchInferenceJobSummary$failureReason": "<p>If the batch inference job failed, the reason for the failure.</p>",
+        "Campaign$failureReason": "<p>If a campaign fails, the reason behind the failure.</p>",
+        "CampaignSummary$failureReason": "<p>If a campaign fails, the reason behind the failure.</p>",
+        "CampaignUpdateSummary$failureReason": "<p>If a campaign update fails, the reason behind the failure.</p>",
+        "DatasetGroup$failureReason": "<p>If creating a dataset group fails, provides the reason why.</p>",
+        "DatasetGroupSummary$failureReason": "<p>If creating a dataset group fails, the reason behind the failure.</p>",
+        "DatasetImportJob$failureReason": "<p>If a dataset import job fails, provides the reason why.</p>",
+        "DatasetImportJobSummary$failureReason": "<p>If a dataset import job fails, the reason behind the failure.</p>",
+        "Filter$failureReason": "<p>If the filter failed, the reason for its failure.</p>",
+        "FilterSummary$failureReason": "<p>If the filter failed, the reason for the failure.</p>",
+        "SolutionVersion$failureReason": "<p>If training a solution version fails, the reason for the failure.</p>",
+        "SolutionVersionSummary$failureReason": "<p>If a solution version fails, the reason behind the failure.</p>"
+      }
+    },
+    "FeatureTransformation": {
+      "base": "<p>Provides feature transformation information. Feature transformation is the process of modifying raw input data into a form more suitable for model training.</p>",
+      "refs": {
+        "DescribeFeatureTransformationResponse$featureTransformation": "<p>A listing of the FeatureTransformation properties.</p>"
+      }
+    },
+    "FeatureTransformationParameters": {
+      "base": null,
+      "refs": {
+        "SolutionConfig$featureTransformationParameters": "<p>Lists the feature transformation parameters.</p>"
+      }
+    },
+    "FeaturizationParameters": {
+      "base": null,
+      "refs": {
+        "FeatureTransformation$defaultParameters": "<p>Provides the default parameters for feature transformation.</p>"
+      }
+    },
+    "Filter": {
+      "base": "<p>Contains information on a recommendation filter, including its ARN, status, and filter expression.</p>",
+      "refs": {
+        "DescribeFilterResponse$filter": "<p>The filter's details.</p>"
+      }
+    },
+    "FilterExpression": {
+      "base": null,
+      "refs": {
+        "CreateFilterRequest$filterExpression": "<p>The filter expression that designates the interaction types that the filter will filter out. A filter expression must follow the following format:</p> <p> <code>EXCLUDE itemId WHERE INTERACTIONS.event_type in (\"EVENT_TYPE\")</code> </p> <p>Where \"EVENT_TYPE\" is the type of event to filter out. To filter out all items with any interactions history, set <code>\"*\"</code> as the EVENT_TYPE. For more information, see <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/filters.html\">Using Filters with Amazon Personalize</a>.</p>",
+        "Filter$filterExpression": "<p>Specifies the type of item interactions to filter out of recommendation results. The filter expression must follow the following format:</p> <p> <code>EXCLUDE itemId WHERE INTERACTIONS.event_type in (\"EVENT_TYPE\")</code> </p> <p>Where \"EVENT_TYPE\" is the type of event to filter out. For more information, see <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/filters.html\">Using Filters with Amazon Personalize</a>.</p>"
+      }
+    },
+    "FilterSummary": {
+      "base": "<p>A short summary of a filter's attributes.</p>",
+      "refs": {
+        "Filters$member": null
+      }
+    },
+    "Filters": {
+      "base": null,
+      "refs": {
+        "ListFiltersResponse$Filters": "<p>A list of returned filters.</p>"
+      }
+    },
+    "GetSolutionMetricsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetSolutionMetricsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "HPOConfig": {
+      "base": "<p>Describes the properties for hyperparameter optimization (HPO). For use with the bring-your-own-recipe feature. Do not use for Amazon Personalize native recipes.</p>",
+      "refs": {
+        "SolutionConfig$hpoConfig": "<p>Describes the properties for hyperparameter optimization (HPO).</p>"
+      }
+    },
+    "HPOObjective": {
+      "base": "<p>The metric to optimize during hyperparameter optimization (HPO).</p>",
+      "refs": {
+        "HPOConfig$hpoObjective": "<p>The metric to optimize during HPO.</p>"
+      }
+    },
+    "HPOObjectiveType": {
+      "base": null,
+      "refs": {
+        "HPOObjective$type": "<p>The type of the metric. Valid values are <code>Maximize</code> and <code>Minimize</code>.</p>"
+      }
+    },
+    "HPOResource": {
+      "base": null,
+      "refs": {
+        "HPOResourceConfig$maxNumberOfTrainingJobs": "<p>The maximum number of training jobs when you create a solution version. The maximum value for <code>maxNumberOfTrainingJobs</code> is <code>40</code>.</p>",
+        "HPOResourceConfig$maxParallelTrainingJobs": "<p>The maximum number of parallel training jobs when you create a solution version. The maximum value for <code>maxParallelTrainingJobs</code> is <code>10</code>.</p>"
+      }
+    },
+    "HPOResourceConfig": {
+      "base": "<p>Describes the resource configuration for hyperparameter optimization (HPO).</p>",
+      "refs": {
+        "HPOConfig$hpoResourceConfig": "<p>Describes the resource configuration for HPO.</p>"
+      }
+    },
+    "HyperParameterRanges": {
+      "base": "<p>Specifies the hyperparameters and their ranges. Hyperparameters can be categorical, continuous, or integer-valued.</p>",
+      "refs": {
+        "HPOConfig$algorithmHyperParameterRanges": "<p>The hyperparameters and their allowable ranges.</p>"
+      }
+    },
+    "HyperParameters": {
+      "base": null,
+      "refs": {
+        "Algorithm$defaultHyperParameters": "<p>Specifies the default hyperparameters.</p>",
+        "BatchInferenceJobConfig$itemExplorationConfig": "<p>A string to string map specifying the inference hyperparameters you wish to use for hyperparameter optimization. See <a>customizing-solution-config-hpo</a>.</p>",
+        "CampaignConfig$itemExplorationConfig": "<p>A string to string map specifying the inference hyperparameters you wish to use for hyperparameter optimization. See <a>customizing-solution-config-hpo</a>.</p>",
+        "SolutionConfig$algorithmHyperParameters": "<p>Lists the hyperparameter names and ranges.</p>",
+        "TunedHPOParams$algorithmHyperParameters": "<p>A list of the hyperparameter values of the best performing model.</p>"
+      }
+    },
+    "IntegerHyperParameterRange": {
+      "base": "<p>Provides the name and range of an integer-valued hyperparameter.</p>",
+      "refs": {
+        "IntegerHyperParameterRanges$member": null
+      }
+    },
+    "IntegerHyperParameterRanges": {
+      "base": null,
+      "refs": {
+        "HyperParameterRanges$integerHyperParameterRanges": "<p>The integer-valued hyperparameters and their ranges.</p>"
+      }
+    },
+    "IntegerMaxValue": {
+      "base": null,
+      "refs": {
+        "DefaultIntegerHyperParameterRange$maxValue": "<p>The maximum allowable value for the hyperparameter.</p>",
+        "IntegerHyperParameterRange$maxValue": "<p>The maximum allowable value for the hyperparameter.</p>"
+      }
+    },
+    "IntegerMinValue": {
+      "base": null,
+      "refs": {
+        "DefaultIntegerHyperParameterRange$minValue": "<p>The minimum allowable value for the hyperparameter.</p>",
+        "IntegerHyperParameterRange$minValue": "<p>The minimum allowable value for the hyperparameter.</p>"
+      }
+    },
+    "InvalidInputException": {
+      "base": "<p>Provide a valid value for the field or parameter.</p>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The token is not valid.</p>",
+      "refs": {
+      }
+    },
+    "KmsKeyArn": {
+      "base": null,
+      "refs": {
+        "CreateDatasetGroupRequest$kmsKeyArn": "<p>The Amazon Resource Name (ARN) of a KMS key used to encrypt the datasets.</p>",
+        "DatasetGroup$kmsKeyArn": "<p>The Amazon Resource Name (ARN) of the KMS key used to encrypt the datasets.</p>",
+        "S3DataConfig$kmsKeyArn": "<p>The Amazon Resource Name (ARN) of the Amazon Key Management Service (KMS) key that Amazon Personalize uses to encrypt or decrypt the input and output files of a batch inference job.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The limit on the number of requests per second has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListBatchInferenceJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBatchInferenceJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCampaignsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCampaignsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetGroupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetImportJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetImportJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDatasetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEventTrackersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEventTrackersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFiltersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListFiltersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRecipesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRecipesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSchemasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSchemasResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSolutionVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSolutionVersionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSolutionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSolutionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListBatchInferenceJobsRequest$maxResults": "<p>The maximum number of batch inference job results to return in each page. The default value is 100.</p>",
+        "ListCampaignsRequest$maxResults": "<p>The maximum number of campaigns to return.</p>",
+        "ListDatasetGroupsRequest$maxResults": "<p>The maximum number of dataset groups to return.</p>",
+        "ListDatasetImportJobsRequest$maxResults": "<p>The maximum number of dataset import jobs to return.</p>",
+        "ListDatasetsRequest$maxResults": "<p>The maximum number of datasets to return.</p>",
+        "ListEventTrackersRequest$maxResults": "<p>The maximum number of event trackers to return.</p>",
+        "ListFiltersRequest$maxResults": "<p>The maximum number of filters to return.</p>",
+        "ListRecipesRequest$maxResults": "<p>The maximum number of recipes to return.</p>",
+        "ListSchemasRequest$maxResults": "<p>The maximum number of schemas to return.</p>",
+        "ListSolutionVersionsRequest$maxResults": "<p>The maximum number of solution versions to return.</p>",
+        "ListSolutionsRequest$maxResults": "<p>The maximum number of solutions to return.</p>"
+      }
+    },
+    "MetricName": {
+      "base": null,
+      "refs": {
+        "AutoMLConfig$metricName": "<p>The metric to optimize.</p>",
+        "HPOObjective$metricName": "<p>The name of the metric.</p>",
+        "Metrics$key": null
+      }
+    },
+    "MetricRegex": {
+      "base": null,
+      "refs": {
+        "HPOObjective$metricRegex": "<p>A regular expression for finding the metric in the training job logs.</p>"
+      }
+    },
+    "MetricValue": {
+      "base": null,
+      "refs": {
+        "Metrics$value": null
+      }
+    },
+    "Metrics": {
+      "base": null,
+      "refs": {
+        "GetSolutionMetricsResponse$metrics": "<p>The metrics for the solution version.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "Algorithm$name": "<p>The name of the algorithm.</p>",
+        "AlgorithmImage$name": "<p>The name of the algorithm image.</p>",
+        "BatchInferenceJob$jobName": "<p>The name of the batch inference job.</p>",
+        "BatchInferenceJobSummary$jobName": "<p>The name of the batch inference job.</p>",
+        "Campaign$name": "<p>The name of the campaign.</p>",
+        "CampaignSummary$name": "<p>The name of the campaign.</p>",
+        "CreateBatchInferenceJobRequest$jobName": "<p>The name of the batch inference job to create.</p>",
+        "CreateCampaignRequest$name": "<p>A name for the new campaign. The campaign name must be unique within your account.</p>",
+        "CreateDatasetGroupRequest$name": "<p>The name for the new dataset group.</p>",
+        "CreateDatasetImportJobRequest$jobName": "<p>The name for the dataset import job.</p>",
+        "CreateDatasetRequest$name": "<p>The name for the dataset.</p>",
+        "CreateEventTrackerRequest$name": "<p>The name for the event tracker.</p>",
+        "CreateFilterRequest$name": "<p>The name of the filter to create.</p>",
+        "CreateSchemaRequest$name": "<p>The name for the schema.</p>",
+        "CreateSolutionRequest$name": "<p>The name for the solution.</p>",
+        "Dataset$name": "<p>The name of the dataset.</p>",
+        "DatasetGroup$name": "<p>The name of the dataset group.</p>",
+        "DatasetGroupSummary$name": "<p>The name of the dataset group.</p>",
+        "DatasetImportJob$jobName": "<p>The name of the import job.</p>",
+        "DatasetImportJobSummary$jobName": "<p>The name of the dataset import job.</p>",
+        "DatasetSchema$name": "<p>The name of the schema.</p>",
+        "DatasetSchemaSummary$name": "<p>The name of the schema.</p>",
+        "DatasetSummary$name": "<p>The name of the dataset.</p>",
+        "EventTracker$name": "<p>The name of the event tracker.</p>",
+        "EventTrackerSummary$name": "<p>The name of the event tracker.</p>",
+        "FeatureTransformation$name": "<p>The name of the feature transformation.</p>",
+        "Filter$name": "<p>The name of the filter.</p>",
+        "FilterSummary$name": "<p>The name of the filter.</p>",
+        "Recipe$name": "<p>The name of the recipe.</p>",
+        "RecipeSummary$name": "<p>The name of the recipe.</p>",
+        "Solution$name": "<p>The name of the solution.</p>",
+        "SolutionSummary$name": "<p>The name of the solution.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListBatchInferenceJobsRequest$nextToken": "<p>The token to request the next page of results.</p>",
+        "ListBatchInferenceJobsResponse$nextToken": "<p>The token to use to retreive the next page of results. The value is <code>null</code> when there are no more results to return.</p>",
+        "ListCampaignsRequest$nextToken": "<p>A token returned from the previous call to <code>ListCampaigns</code> for getting the next set of campaigns (if they exist).</p>",
+        "ListCampaignsResponse$nextToken": "<p>A token for getting the next set of campaigns (if they exist).</p>",
+        "ListDatasetGroupsRequest$nextToken": "<p>A token returned from the previous call to <code>ListDatasetGroups</code> for getting the next set of dataset groups (if they exist).</p>",
+        "ListDatasetGroupsResponse$nextToken": "<p>A token for getting the next set of dataset groups (if they exist).</p>",
+        "ListDatasetImportJobsRequest$nextToken": "<p>A token returned from the previous call to <code>ListDatasetImportJobs</code> for getting the next set of dataset import jobs (if they exist).</p>",
+        "ListDatasetImportJobsResponse$nextToken": "<p>A token for getting the next set of dataset import jobs (if they exist).</p>",
+        "ListDatasetsRequest$nextToken": "<p>A token returned from the previous call to <code>ListDatasetImportJobs</code> for getting the next set of dataset import jobs (if they exist).</p>",
+        "ListDatasetsResponse$nextToken": "<p>A token for getting the next set of datasets (if they exist).</p>",
+        "ListEventTrackersRequest$nextToken": "<p>A token returned from the previous call to <code>ListEventTrackers</code> for getting the next set of event trackers (if they exist).</p>",
+        "ListEventTrackersResponse$nextToken": "<p>A token for getting the next set of event trackers (if they exist).</p>",
+        "ListFiltersRequest$nextToken": "<p>A token returned from the previous call to <code>ListFilters</code> for getting the next set of filters (if they exist).</p>",
+        "ListFiltersResponse$nextToken": "<p>A token for getting the next set of filters (if they exist).</p>",
+        "ListRecipesRequest$nextToken": "<p>A token returned from the previous call to <code>ListRecipes</code> for getting the next set of recipes (if they exist).</p>",
+        "ListRecipesResponse$nextToken": "<p>A token for getting the next set of recipes.</p>",
+        "ListSchemasRequest$nextToken": "<p>A token returned from the previous call to <code>ListSchemas</code> for getting the next set of schemas (if they exist).</p>",
+        "ListSchemasResponse$nextToken": "<p>A token used to get the next set of schemas (if they exist).</p>",
+        "ListSolutionVersionsRequest$nextToken": "<p>A token returned from the previous call to <code>ListSolutionVersions</code> for getting the next set of solution versions (if they exist).</p>",
+        "ListSolutionVersionsResponse$nextToken": "<p>A token for getting the next set of solution versions (if they exist).</p>",
+        "ListSolutionsRequest$nextToken": "<p>A token returned from the previous call to <code>ListSolutions</code> for getting the next set of solutions (if they exist).</p>",
+        "ListSolutionsResponse$nextToken": "<p>A token for getting the next set of solutions (if they exist).</p>"
+      }
+    },
+    "NumBatchResults": {
+      "base": null,
+      "refs": {
+        "BatchInferenceJob$numResults": "<p>The number of recommendations generated by the batch inference job. This number includes the error messages generated for failed input records.</p>",
+        "CreateBatchInferenceJobRequest$numResults": "<p>The number of recommendations to retreive.</p>"
+      }
+    },
+    "ParameterName": {
+      "base": null,
+      "refs": {
+        "CategoricalHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "ContinuousHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "DefaultCategoricalHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "DefaultContinuousHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "DefaultIntegerHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "FeatureTransformationParameters$key": null,
+        "FeaturizationParameters$key": null,
+        "HyperParameters$key": null,
+        "IntegerHyperParameterRange$name": "<p>The name of the hyperparameter.</p>",
+        "ResourceConfig$key": null
+      }
+    },
+    "ParameterValue": {
+      "base": null,
+      "refs": {
+        "FeatureTransformationParameters$value": null,
+        "FeaturizationParameters$value": null,
+        "HyperParameters$value": null,
+        "ResourceConfig$value": null
+      }
+    },
+    "PerformAutoML": {
+      "base": null,
+      "refs": {
+        "CreateSolutionRequest$performAutoML": "<p>Whether to perform automated machine learning (AutoML). The default is <code>false</code>. For this case, you must specify <code>recipeArn</code>.</p> <p>When set to <code>true</code>, Amazon Personalize analyzes your training data and selects the optimal USER_PERSONALIZATION recipe and hyperparameters. In this case, you must omit <code>recipeArn</code>. Amazon Personalize determines the optimal recipe by running tests with different values for the hyperparameters. AutoML lengthens the training process as compared to selecting a specific recipe.</p>",
+        "Solution$performAutoML": "<p>When true, Amazon Personalize performs a search for the best USER_PERSONALIZATION recipe from the list specified in the solution configuration (<code>recipeArn</code> must not be specified). When false (the default), Amazon Personalize uses <code>recipeArn</code> for training.</p>",
+        "SolutionVersion$performAutoML": "<p>When true, Amazon Personalize searches for the most optimal recipe according to the solution configuration. When false (the default), Amazon Personalize uses <code>recipeArn</code>.</p>"
+      }
+    },
+    "PerformHPO": {
+      "base": null,
+      "refs": {
+        "Solution$performHPO": "<p>Whether to perform hyperparameter optimization (HPO) on the chosen recipe. The default is <code>false</code>.</p>",
+        "SolutionVersion$performHPO": "<p>Whether to perform hyperparameter optimization (HPO) on the chosen recipe. The default is <code>false</code>.</p>"
+      }
+    },
+    "Recipe": {
+      "base": "<p>Provides information about a recipe. Each recipe provides an algorithm that Amazon Personalize uses in model training when you use the <a>CreateSolution</a> operation. </p>",
+      "refs": {
+        "DescribeRecipeResponse$recipe": "<p>An object that describes the recipe.</p>"
+      }
+    },
+    "RecipeProvider": {
+      "base": null,
+      "refs": {
+        "ListRecipesRequest$recipeProvider": "<p>The default is <code>SERVICE</code>.</p>"
+      }
+    },
+    "RecipeSummary": {
+      "base": "<p>Provides a summary of the properties of a recipe. For a complete listing, call the <a>DescribeRecipe</a> API.</p>",
+      "refs": {
+        "Recipes$member": null
+      }
+    },
+    "RecipeType": {
+      "base": null,
+      "refs": {
+        "Recipe$recipeType": "<p>One of the following values:</p> <ul> <li> <p>PERSONALIZED_RANKING</p> </li> <li> <p>RELATED_ITEMS</p> </li> <li> <p>USER_PERSONALIZATION</p> </li> </ul>"
+      }
+    },
+    "Recipes": {
+      "base": null,
+      "refs": {
+        "ListRecipesResponse$recipes": "<p>The list of available recipes.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceConfig": {
+      "base": null,
+      "refs": {
+        "Algorithm$defaultResourceConfig": "<p>Specifies the default maximum number of training jobs and parallel training jobs.</p>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The specified resource is in use.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Could not find the specified resource.</p>",
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "BatchInferenceJob$roleArn": "<p>The ARN of the Amazon Identity and Access Management (IAM) role that requested the batch inference job.</p>",
+        "CreateBatchInferenceJobRequest$roleArn": "<p>The ARN of the Amazon Identity and Access Management role that has permissions to read and write to your input and out Amazon S3 buckets respectively.</p>",
+        "CreateDatasetGroupRequest$roleArn": "<p>The ARN of the IAM role that has permissions to access the KMS key. Supplying an IAM role is only valid when also specifying a KMS key.</p>",
+        "CreateDatasetImportJobRequest$roleArn": "<p>The ARN of the IAM role that has permissions to read from the Amazon S3 data source.</p>",
+        "DatasetGroup$roleArn": "<p>The ARN of the IAM role that has permissions to create the dataset group.</p>"
+      }
+    },
+    "S3DataConfig": {
+      "base": "<p>The configuration details of an Amazon S3 input or output bucket.</p>",
+      "refs": {
+        "BatchInferenceJobInput$s3DataSource": "<p>The URI of the Amazon S3 location that contains your input data. The Amazon S3 bucket must be in the same region as the API endpoint you are calling.</p>",
+        "BatchInferenceJobOutput$s3DataDestination": "<p>Information on the Amazon S3 bucket in which the batch inference job's output is stored.</p>"
+      }
+    },
+    "S3Location": {
+      "base": null,
+      "refs": {
+        "DataSource$dataLocation": "<p>The path to the Amazon S3 bucket where the data that you want to upload to your dataset is stored. For example: </p> <p> <code>s3://bucket-name/training-data.csv</code> </p>",
+        "S3DataConfig$path": "<p>The file path of the Amazon S3 bucket.</p>"
+      }
+    },
+    "Schemas": {
+      "base": null,
+      "refs": {
+        "ListSchemasResponse$schemas": "<p>A list of schemas.</p>"
+      }
+    },
+    "Solution": {
+      "base": "<p>An object that provides information about a solution. A solution is a trained model that can be deployed as a campaign.</p>",
+      "refs": {
+        "DescribeSolutionResponse$solution": "<p>An object that describes the solution.</p>"
+      }
+    },
+    "SolutionConfig": {
+      "base": "<p>Describes the configuration properties for the solution.</p>",
+      "refs": {
+        "CreateSolutionRequest$solutionConfig": "<p>The configuration to use with the solution. When <code>performAutoML</code> is set to true, Amazon Personalize only evaluates the <code>autoMLConfig</code> section of the solution configuration.</p>",
+        "Solution$solutionConfig": "<p>Describes the configuration properties for the solution.</p>",
+        "SolutionVersion$solutionConfig": "<p>Describes the configuration properties for the solution.</p>"
+      }
+    },
+    "SolutionSummary": {
+      "base": "<p>Provides a summary of the properties of a solution. For a complete listing, call the <a>DescribeSolution</a> API.</p>",
+      "refs": {
+        "Solutions$member": null
+      }
+    },
+    "SolutionVersion": {
+      "base": "<p>An object that provides information about a specific version of a <a>Solution</a>.</p>",
+      "refs": {
+        "DescribeSolutionVersionResponse$solutionVersion": "<p>The solution version.</p>"
+      }
+    },
+    "SolutionVersionSummary": {
+      "base": "<p>Provides a summary of the properties of a solution version. For a complete listing, call the <a>DescribeSolutionVersion</a> API.</p>",
+      "refs": {
+        "Solution$latestSolutionVersion": "<p>Describes the latest version of the solution, including the status and the ARN.</p>",
+        "SolutionVersions$member": null
+      }
+    },
+    "SolutionVersions": {
+      "base": null,
+      "refs": {
+        "ListSolutionVersionsResponse$solutionVersions": "<p>A list of solution versions describing the version properties.</p>"
+      }
+    },
+    "Solutions": {
+      "base": null,
+      "refs": {
+        "ListSolutionsResponse$solutions": "<p>A list of the current solutions.</p>"
+      }
+    },
+    "Status": {
+      "base": null,
+      "refs": {
+        "BatchInferenceJob$status": "<p>The status of the batch inference job. The status is one of the following values:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>IN PROGRESS</p> </li> <li> <p>ACTIVE</p> </li> <li> <p>CREATE FAILED</p> </li> </ul>",
+        "BatchInferenceJobSummary$status": "<p>The status of the batch inference job. The status is one of the following values:</p> <ul> <li> <p>PENDING</p> </li> <li> <p>IN PROGRESS</p> </li> <li> <p>ACTIVE</p> </li> <li> <p>CREATE FAILED</p> </li> </ul>",
+        "Campaign$status": "<p>The status of the campaign.</p> <p>A campaign can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "CampaignSummary$status": "<p>The status of the campaign.</p> <p>A campaign can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "CampaignUpdateSummary$status": "<p>The status of the campaign update.</p> <p>A campaign update can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "Dataset$status": "<p>The status of the dataset.</p> <p>A dataset can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "DatasetGroup$status": "<p>The current status of the dataset group.</p> <p>A dataset group can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING</p> </li> </ul>",
+        "DatasetGroupSummary$status": "<p>The status of the dataset group.</p> <p>A dataset group can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING</p> </li> </ul>",
+        "DatasetImportJob$status": "<p>The status of the dataset import job.</p> <p>A dataset import job can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul>",
+        "DatasetImportJobSummary$status": "<p>The status of the dataset import job.</p> <p>A dataset import job can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul>",
+        "DatasetSummary$status": "<p>The status of the dataset.</p> <p>A dataset can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "EventTracker$status": "<p>The status of the event tracker.</p> <p>An event tracker can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "EventTrackerSummary$status": "<p>The status of the event tracker.</p> <p>An event tracker can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "FeatureTransformation$status": "<p>The status of the feature transformation.</p> <p>A feature transformation can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul>",
+        "Filter$status": "<p>The status of the filter.</p>",
+        "FilterSummary$status": "<p>The status of the filter.</p>",
+        "Recipe$status": "<p>The status of the recipe.</p>",
+        "RecipeSummary$status": "<p>The status of the recipe.</p>",
+        "Solution$status": "<p>The status of the solution.</p> <p>A solution can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "SolutionSummary$status": "<p>The status of the solution.</p> <p>A solution can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> <li> <p>DELETE PENDING &gt; DELETE IN_PROGRESS</p> </li> </ul>",
+        "SolutionVersion$status": "<p>The status of the solution version.</p> <p>A solution version can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING</p> </li> <li> <p>CREATE IN_PROGRESS</p> </li> <li> <p>ACTIVE</p> </li> <li> <p>CREATE FAILED</p> </li> </ul>",
+        "SolutionVersionSummary$status": "<p>The status of the solution version.</p> <p>A solution version can be in one of the following states:</p> <ul> <li> <p>CREATE PENDING &gt; CREATE IN_PROGRESS &gt; ACTIVE -or- CREATE FAILED</p> </li> </ul>"
+      }
+    },
+    "TrackingId": {
+      "base": null,
+      "refs": {
+        "CreateEventTrackerResponse$trackingId": "<p>The ID of the event tracker. Include this ID in requests to the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_UBS_PutEvents.html\">PutEvents</a> API.</p>",
+        "EventTracker$trackingId": "<p>The ID of the event tracker. Include this ID in requests to the <a href=\"https://docs.aws.amazon.com/personalize/latest/dg/API_UBS_PutEvents.html\">PutEvents</a> API.</p>"
+      }
+    },
+    "TrainingHours": {
+      "base": null,
+      "refs": {
+        "SolutionVersion$trainingHours": "<p>The time used to train the model. You are billed for the time it takes to train a model. This field is visible only after Amazon Personalize successfully trains a model.</p>"
+      }
+    },
+    "TrainingInputMode": {
+      "base": null,
+      "refs": {
+        "Algorithm$trainingInputMode": "<p>The training input mode.</p>"
+      }
+    },
+    "TrainingMode": {
+      "base": null,
+      "refs": {
+        "CreateSolutionVersionRequest$trainingMode": "<p>The scope of training to be performed when creating the solution version. The <code>FULL</code> option trains the solution version based on the entirety of the input solution's training data, while the <code>UPDATE</code> option processes only the data that has changed in comparison to the input solution. Choose <code>UPDATE</code> when you want to incrementally update your solution version instead of creating an entirely new one.</p> <important> <p>The <code>UPDATE</code> option can only be used when you already have an active solution version created from the input solution using the <code>FULL</code> option and the input solution was trained with the <a>native-recipe-hrnn-coldstart</a> recipe.</p> </important>",
+        "SolutionVersion$trainingMode": "<p>The scope of training used to create the solution version. The <code>FULL</code> option trains the solution version based on the entirety of the input solution's training data, while the <code>UPDATE</code> option processes only the training data that has changed since the creation of the last solution version. Choose <code>UPDATE</code> when you want to start recommending items added to the dataset without retraining the model.</p> <important> <p>The <code>UPDATE</code> option can only be used after you've created a solution version with the <code>FULL</code> option and the training solution uses the <a>native-recipe-hrnn-coldstart</a>.</p> </important>"
+      }
+    },
+    "TransactionsPerSecond": {
+      "base": null,
+      "refs": {
+        "Campaign$minProvisionedTPS": "<p>Specifies the requested minimum provisioned transactions (recommendations) per second.</p>",
+        "CampaignUpdateSummary$minProvisionedTPS": "<p>Specifies the requested minimum provisioned transactions (recommendations) per second that Amazon Personalize will support.</p>",
+        "CreateCampaignRequest$minProvisionedTPS": "<p>Specifies the requested minimum provisioned transactions (recommendations) per second that Amazon Personalize will support.</p>",
+        "UpdateCampaignRequest$minProvisionedTPS": "<p>Specifies the requested minimum provisioned transactions (recommendations) per second that Amazon Personalize will support.</p>"
+      }
+    },
+    "Tunable": {
+      "base": null,
+      "refs": {
+        "DefaultCategoricalHyperParameterRange$isTunable": "<p>Whether the hyperparameter is tunable.</p>",
+        "DefaultContinuousHyperParameterRange$isTunable": "<p>Whether the hyperparameter is tunable.</p>",
+        "DefaultIntegerHyperParameterRange$isTunable": "<p>Indicates whether the hyperparameter is tunable.</p>"
+      }
+    },
+    "TunedHPOParams": {
+      "base": "<p>If hyperparameter optimization (HPO) was performed, contains the hyperparameter values of the best performing model.</p>",
+      "refs": {
+        "SolutionVersion$tunedHPOParams": "<p>If hyperparameter optimization was performed, contains the hyperparameter values of the best performing model.</p>"
+      }
+    },
+    "UpdateCampaignRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateCampaignResponse": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

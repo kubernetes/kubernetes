@@ -1,0 +1,257 @@
+#data
+<menuitem>
+#errors
+10: Start tag seen without seeing a doctype first. Expected “<!DOCTYPE html>”.
+10: End of file seen and there were open elements.
+10: Unclosed element “menuitem”.
+#document
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+
+#data
+</menuitem>
+#errors
+11: End tag seen without seeing a doctype first. Expected “<!DOCTYPE html>”.
+11: Stray end tag “menuitem”.
+#document
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE html><body><menuitem>A
+#errors
+32: End of file seen and there were open elements.
+31: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       "A"
+
+#data
+<!DOCTYPE html><body><menuitem>A<menuitem>B
+#errors
+43: End of file seen and there were open elements.
+42: Unclosed element “menuitem”.
+31: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       "A"
+|       <menuitem>
+|         "B"
+
+#data
+<!DOCTYPE html><body><menuitem>A<menu>B</menu>
+#errors
+46: End of file seen and there were open elements.
+31: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       "A"
+|       <menu>
+|         "B"
+
+#data
+<!DOCTYPE html><body><menuitem>A<hr>B
+#errors
+37: End of file seen and there were open elements.
+31: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       "A"
+|       <hr>
+|       "B"
+
+#data
+<!DOCTYPE html><li><menuitem><li>
+#errors
+33: End tag “li” implied, but there were open elements.
+29: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <li>
+|       <menuitem>
+|     <li>
+
+#data
+<!DOCTYPE html><menuitem><p></menuitem>x
+#errors
+39: Stray end tag “menuitem”.
+40: End of file seen and there were open elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       <p>
+|         "x"
+
+#data
+<!DOCTYPE html><p><b></p><menuitem>
+#errors
+25: End tag “p” seen, but there were open elements.
+21: Unclosed element “b”.
+35: End of file seen and there were open elements.
+35: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <b>
+|     <b>
+|       <menuitem>
+
+#data
+<!DOCTYPE html><menuitem><asdf></menuitem>x
+#errors
+42: End tag “menuitem” seen, but there were open elements.
+31: Unclosed element “asdf”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       <asdf>
+|     "x"
+
+#data
+<!DOCTYPE html></menuitem>
+#errors
+26: Stray end tag “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE html><html></menuitem>
+#errors
+26: Stray end tag “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE html><head></menuitem>
+#errors
+26: Stray end tag “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!DOCTYPE html><select><menuitem></select>
+#errors
+33: Stray start tag “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+
+#data
+<!DOCTYPE html><option><menuitem>
+#errors
+33: End of file seen and there were open elements.
+33: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <option>
+|       <menuitem>
+
+#data
+<!DOCTYPE html><menuitem><option>
+#errors
+33: End of file seen and there were open elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       <option>
+
+#data
+<!DOCTYPE html><menuitem></body>
+#errors
+32: End tag for  “body” seen, but there were unclosed elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+
+#data
+<!DOCTYPE html><menuitem></html>
+#errors
+32: End tag for  “html” seen, but there were unclosed elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+
+#data
+<!DOCTYPE html><menuitem><p>
+#errors
+28: End of file seen and there were open elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       <p>
+
+#data
+<!DOCTYPE html><menuitem><li>
+#errors
+29: End of file seen and there were open elements.
+25: Unclosed element “menuitem”.
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menuitem>
+|       <li>

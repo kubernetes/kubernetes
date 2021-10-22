@@ -1,0 +1,8 @@
+{
+  "total_length": 16,
+  "headers_length": 0,
+  "prelude_crc": 96618731,
+  "headers": [  ],
+  "payload": "",
+  "message_crc": 2107164927
+}

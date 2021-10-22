@@ -1,0 +1,58 @@
+{
+  "total_length": 204,
+  "headers_length": 175,
+  "prelude_crc": 263087306,
+  "headers": [    {
+      "name": "event-type",
+      "type": 4,
+      "value": 40972
+    },
+    {
+      "name": "content-type",
+      "type": 7,
+      "value": "YXBwbGljYXRpb24vanNvbg=="
+    },
+    {
+      "name": "bool false",
+      "type": 1,
+      "value": false
+    },
+    {
+      "name": "bool true",
+      "type": 0,
+      "value": true
+    },
+    {
+      "name": "byte",
+      "type": 2,
+      "value": -49
+    },
+    {
+      "name": "byte buf",
+      "type": 6,
+      "value": "SSdtIGEgbGl0dGxlIHRlYXBvdCE="
+    },
+    {
+      "name": "timestamp",
+      "type": 8,
+      "value": 8675309
+    },
+    {
+      "name": "int16",
+      "type": 3,
+      "value": 42
+    },
+    {
+      "name": "int64",
+      "type": 5,
+      "value": 42424242
+    },
+    {
+      "name": "uuid",
+      "type": 9,
+      "value": "AQIDBAUGBwgJCgsMDQ4PEA=="
+    }
+  ],
+  "payload": "eydmb28nOidiYXInfQ==",
+  "message_crc": -1415188212
+}

@@ -1,0 +1,210 @@
+#data
+<style> <!-- </style>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       " <!-- "
+|   <body>
+|     "x"
+
+#data
+<style> <!-- </style> --> </style>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,34): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       " <!-- "
+|     " "
+|   <body>
+|     "--> x"
+
+#data
+<style> <!--> </style>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       " <!--> "
+|   <body>
+|     "x"
+
+#data
+<style> <!---> </style>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       " <!---> "
+|   <body>
+|     "x"
+
+#data
+<iframe> <!---> </iframe>x
+#errors
+(1,8): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <iframe>
+|       " <!---> "
+|     "x"
+
+#data
+<iframe> <!--- </iframe>->x</iframe> --> </iframe>x
+#errors
+(1,8): expected-doctype-but-got-start-tag
+(1,36): unexpected-end-tag
+(1,50): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <iframe>
+|       " <!--- "
+|     "->x --> x"
+
+#data
+<script> <!-- </script> --> </script>x
+#errors
+(1,8): expected-doctype-but-got-start-tag
+(1,37): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|     <script>
+|       " <!-- "
+|     " "
+|   <body>
+|     "--> x"
+
+#data
+<title> <!-- </title> --> </title>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,34): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|     <title>
+|       " <!-- "
+|     " "
+|   <body>
+|     "--> x"
+
+#data
+<textarea> <!--- </textarea>->x</textarea> --> </textarea>x
+#errors
+(1,10): expected-doctype-but-got-start-tag
+(1,42): unexpected-end-tag
+(1,58): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       " <!--- "
+|     "->x --> x"
+
+#data
+<style> <!</-- </style>x
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       " <!</-- "
+|   <body>
+|     "x"
+
+#data
+<p><xmp></xmp>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <xmp>
+
+#data
+<xmp> <!-- > --> </xmp>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <xmp>
+|       " <!-- > --> "
+
+#data
+<title>&amp;</title>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <title>
+|       "&"
+|   <body>
+
+#data
+<title><!--&amp;--></title>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <title>
+|       "<!--&-->"
+|   <body>
+
+#data
+<title><!--</title>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <title>
+|       "<!--"
+|   <body>
+
+#data
+<noscript><!--</noscript>--></noscript>
+#errors
+(1,10): expected-doctype-but-got-start-tag
+(1,39): unexpected-end-tag
+#script-on
+#document
+| <html>
+|   <head>
+|     <noscript>
+|       "<!--"
+|   <body>
+|     "-->"
+
+#data
+<noscript><!--</noscript>--></noscript>
+#errors
+(1,10): expected-doctype-but-got-start-tag
+#script-off
+#document
+| <html>
+|   <head>
+|     <noscript>
+|       <!-- </noscript> -->
+|   <body>

@@ -1,0 +1,539 @@
+{
+  "basePath": "",
+  "baseUrl": "https://www.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Tool Results",
+  "description": "API to publish and access results from developer tools.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://firebase.google.com/docs/test-lab/",
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "toolresults:v1",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://www.mtls.googleapis.com/",
+  "name": "toolresults",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {},
+  "revision": "20200224",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "ANR": {
+      "description": "Additional details for an ANR crash.",
+      "id": "ANR",
+      "properties": {
+        "stackTrace": {
+          "$ref": "StackTrace",
+          "description": "The stack trace of the ANR crash.\nOptional."
+        }
+      },
+      "type": "object"
+    },
+    "AvailableDeepLinks": {
+      "description": "A suggestion to use deep links for a Robo run.",
+      "id": "AvailableDeepLinks",
+      "properties": {},
+      "type": "object"
+    },
+    "BlankScreen": {
+      "description": "A warning that Robo encountered a screen that was mostly blank; this may\nindicate a problem with the app.",
+      "id": "BlankScreen",
+      "properties": {
+        "screenId": {
+          "description": "The screen id of the element",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CrashDialogError": {
+      "description": "Crash dialog was detected during the test execution",
+      "id": "CrashDialogError",
+      "properties": {
+        "crashPackage": {
+          "description": "The name of the package that caused the dialog.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "EncounteredLoginScreen": {
+      "description": "Additional details about encountered login screens.",
+      "id": "EncounteredLoginScreen",
+      "properties": {
+        "distinctScreens": {
+          "description": "Number of encountered distinct login screens.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "screenIds": {
+          "description": "Subset of login screens.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "EncounteredNonAndroidUiWidgetScreen": {
+      "description": "Additional details about encountered screens with elements that are not\nAndroid UI widgets.",
+      "id": "EncounteredNonAndroidUiWidgetScreen",
+      "properties": {
+        "distinctScreens": {
+          "description": "Number of encountered distinct screens with non Android UI widgets.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "screenIds": {
+          "description": "Subset of screens which contain non Android UI widgets.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "FailedToInstall": {
+      "description": "Failed to install the APK.",
+      "id": "FailedToInstall",
+      "properties": {},
+      "type": "object"
+    },
+    "FatalException": {
+      "description": "Additional details for a fatal exception.",
+      "id": "FatalException",
+      "properties": {
+        "stackTrace": {
+          "$ref": "StackTrace",
+          "description": "The stack trace of the fatal exception.\nOptional."
+        }
+      },
+      "type": "object"
+    },
+    "InAppPurchasesFound": {
+      "description": "Additional details of in-app purchases encountered during the crawl.",
+      "id": "InAppPurchasesFound",
+      "properties": {
+        "inAppPurchasesFlowsExplored": {
+          "description": "The total number of in-app purchases flows explored: how many times the\nrobo tries to buy a SKU.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "inAppPurchasesFlowsStarted": {
+          "description": "The total number of in-app purchases flows started.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "InsufficientCoverage": {
+      "description": "A warning that Robo did not crawl potentially important parts of the app.",
+      "id": "InsufficientCoverage",
+      "properties": {},
+      "type": "object"
+    },
+    "IosAppCrashed": {
+      "description": "Additional details for an iOS app crash.",
+      "id": "IosAppCrashed",
+      "properties": {
+        "stackTrace": {
+          "$ref": "StackTrace",
+          "description": "The stack trace, if one is available.\nOptional."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherActivityNotFound": {
+      "description": "Failed to find the launcher activity of an app.",
+      "id": "LauncherActivityNotFound",
+      "properties": {},
+      "type": "object"
+    },
+    "NativeCrash": {
+      "description": "Additional details for a native crash.",
+      "id": "NativeCrash",
+      "properties": {
+        "stackTrace": {
+          "$ref": "StackTrace",
+          "description": "The stack trace of the native crash.\nOptional."
+        }
+      },
+      "type": "object"
+    },
+    "NonSdkApi": {
+      "description": "A non-sdk API and examples of it being called along with other metadata\nSee\nhttps://developer.android.com/distribute/best-practices/develop/restrictions-non-sdk-interfaces",
+      "id": "NonSdkApi",
+      "properties": {
+        "apiSignature": {
+          "description": "The signature of the Non-SDK API",
+          "type": "string"
+        },
+        "exampleStackTraces": {
+          "description": "Example stack traces of this API being called.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "insights": {
+          "description": "Optional debugging insights for non-SDK API violations.",
+          "items": {
+            "$ref": "NonSdkApiInsight"
+          },
+          "type": "array"
+        },
+        "invocationCount": {
+          "description": "The total number of times this API was observed to have been called.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "list": {
+          "description": "Which list this API appears on",
+          "enum": [
+            "NONE",
+            "WHITE",
+            "BLACK",
+            "GREY",
+            "GREY_MAX_O",
+            "GREY_MAX_P",
+            "GREY_MAX_Q"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NonSdkApiInsight": {
+      "description": "Non-SDK API insights (to address debugging solutions).",
+      "id": "NonSdkApiInsight",
+      "properties": {
+        "exampleTraceMessages": {
+          "description": "Optional sample stack traces, for which this insight applies (there\nshould be at least one).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "matcherId": {
+          "description": "A unique ID, to be used for determining the effectiveness of this\nparticular insight in the context of a matcher. (required)",
+          "type": "string"
+        },
+        "pendingGoogleUpdateInsight": {
+          "$ref": "PendingGoogleUpdateInsight",
+          "description": "An insight indicating that the hidden API usage originates from a\nGoogle-provided library."
+        },
+        "upgradeInsight": {
+          "$ref": "UpgradeInsight",
+          "description": "An insight indicating that the hidden API usage originates from the\nuse of a library that needs to be upgraded."
+        }
+      },
+      "type": "object"
+    },
+    "NonSdkApiUsageViolation": {
+      "description": "Additional details for a non-sdk API usage violation.",
+      "id": "NonSdkApiUsageViolation",
+      "properties": {
+        "apiSignatures": {
+          "description": "Signatures of a subset of those hidden API's.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "uniqueApis": {
+          "description": "Total number of unique hidden API's accessed.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "NonSdkApiUsageViolationReport": {
+      "description": "Contains a summary and examples of non-sdk API usage violations.",
+      "id": "NonSdkApiUsageViolationReport",
+      "properties": {
+        "exampleApis": {
+          "description": "Examples of the detected API usages.",
+          "items": {
+            "$ref": "NonSdkApi"
+          },
+          "type": "array"
+        },
+        "minSdkVersion": {
+          "description": "Minimum API level required for the application to run.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "targetSdkVersion": {
+          "description": "Specifies the API Level on which the application is designed to run.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "uniqueApis": {
+          "description": "Total number of unique Non-SDK API's accessed.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "OverlappingUIElements": {
+      "description": "A warning that Robo encountered a screen that has overlapping clickable\nelements; this may indicate a potential UI issue.",
+      "id": "OverlappingUIElements",
+      "properties": {
+        "resourceName": {
+          "description": "Resource names of the overlapping screen elements",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "screenId": {
+          "description": "The screen id of the elements",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PendingGoogleUpdateInsight": {
+      "description": "This insight indicates that the hidden API usage originates from a\nGoogle-provided library. Users need not take any action.",
+      "id": "PendingGoogleUpdateInsight",
+      "properties": {
+        "nameOfGoogleLibrary": {
+          "description": "The name of the Google-provided library with the non-SDK API dependency.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PerformedGoogleLogin": {
+      "description": "A notification that Robo signed in with Google.",
+      "id": "PerformedGoogleLogin",
+      "properties": {},
+      "type": "object"
+    },
+    "PerformedMonkeyActions": {
+      "description": "A notification that Robo performed some monkey actions.",
+      "id": "PerformedMonkeyActions",
+      "properties": {
+        "totalActions": {
+          "description": "The total number of monkey actions performed during the crawl.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "RoboScriptExecution": {
+      "description": "Execution stats for a user-provided Robo script.",
+      "id": "RoboScriptExecution",
+      "properties": {
+        "successfulActions": {
+          "description": "The number of Robo script actions executed successfully.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "totalActions": {
+          "description": "The total number of actions in the Robo script.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "StackTrace": {
+      "description": "A stacktrace.",
+      "id": "StackTrace",
+      "properties": {
+        "exception": {
+          "description": "The stack trace message.\n\nRequired",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StartActivityNotFound": {
+      "description": "User provided intent failed to resolve to an activity.",
+      "id": "StartActivityNotFound",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UIElementTooDeep": {
+      "description": "A warning that the screen hierarchy is deeper than the recommended threshold.",
+      "id": "UIElementTooDeep",
+      "properties": {
+        "depth": {
+          "description": "The depth of the screen element",
+          "format": "int32",
+          "type": "integer"
+        },
+        "screenId": {
+          "description": "The screen id of the element",
+          "type": "string"
+        },
+        "screenStateId": {
+          "description": "The screen state id of the element",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UnspecifiedWarning": {
+      "description": "Default unspecified warning.",
+      "id": "UnspecifiedWarning",
+      "properties": {},
+      "type": "object"
+    },
+    "UnusedRoboDirective": {
+      "description": "Additional details of an unused robodirective.",
+      "id": "UnusedRoboDirective",
+      "properties": {
+        "resourceName": {
+          "description": "The name of the resource that was unused.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UpgradeInsight": {
+      "description": "This insight is a recommendation to upgrade a given library to the specified\nversion, in order to avoid dependencies on non-SDK APIs.",
+      "id": "UpgradeInsight",
+      "properties": {
+        "packageName": {
+          "description": "The name of the package to be upgraded.",
+          "type": "string"
+        },
+        "upgradeToVersion": {
+          "description": "The suggested version to upgrade to.\nOptional: In case we are not sure which version solves this problem",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UsedRoboDirective": {
+      "description": "Additional details of a used Robo directive.",
+      "id": "UsedRoboDirective",
+      "properties": {
+        "resourceName": {
+          "description": "The name of the resource that was used.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UsedRoboIgnoreDirective": {
+      "description": "Additional details of a used Robo directive with an ignore action.\nNote: This is a different scenario than unused directive.",
+      "id": "UsedRoboIgnoreDirective",
+      "properties": {
+        "resourceName": {
+          "description": "The name of the resource that was ignored.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Tool Results API",
+  "version": "v1",
+  "version_module": true
+}

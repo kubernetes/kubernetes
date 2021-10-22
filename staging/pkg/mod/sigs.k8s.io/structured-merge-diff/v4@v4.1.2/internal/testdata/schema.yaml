@@ -1,0 +1,96 @@
+types:
+- name: schema
+  map:
+    fields:
+      - name: types
+        type:
+          list:
+            elementRelationship: associative
+            elementType:
+              namedType: typeDef
+            keys:
+            - name
+- name: typeDef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: scalar
+      type:
+        scalar: string
+    - name: list
+      type:
+        namedType: list
+    - name: map
+      type:
+        namedType: map
+    - name: untyped
+      type:
+        namedType: untyped
+- name: typeRef
+  map:
+    fields:
+    - name: namedType
+      type:
+        scalar: string
+    - name: scalar
+      type:
+        scalar: string
+    - name: list
+      type:
+        namedType: list
+    - name: map
+      type:
+        namedType: map
+    - name: untyped
+      type:
+        namedType: untyped
+- name: scalar
+  scalar: string
+- name: map
+  map:
+    fields:
+    - name: fields
+      type:
+        list:
+          elementType:
+            namedType: structField
+          elementRelationship: associative
+          keys: [ "name" ]
+    - name: elementType
+      type:
+        namedType: typeRef
+    - name: elementRelationship
+      type:
+        scalar: string
+- name: structField
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: type
+      type:
+        namedType: typeRef
+- name: list
+  map:
+    fields:
+    - name: elementType
+      type:
+        namedType: typeRef
+    - name: elementRelationship
+      type:
+        scalar: string
+    - name: keys
+      type:
+        list:
+          elementType:
+            scalar: string
+- name: untyped
+  map:
+    fields:
+    - name: elementRelationship
+      type:
+        scalar: string
+

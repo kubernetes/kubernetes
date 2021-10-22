@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "GetDomainNames",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "CreateUsagePlanKey",
+            "input": {
+                "usagePlanId": "foo",
+                "keyId": "bar",
+                "keyType": "fixx"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

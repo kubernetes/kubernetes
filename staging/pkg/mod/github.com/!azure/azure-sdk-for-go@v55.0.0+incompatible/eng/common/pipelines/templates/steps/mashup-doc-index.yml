@@ -1,0 +1,81 @@
+parameters: 
+  TargetFolder: ''
+
+steps:
+  - task: PythonScript@0
+    displayName: MashUp Generated Index Site so its served from default site location
+    inputs:
+      scriptSource: inline
+      script: |
+        import argparse
+        import os
+        import logging
+        import re
+        import shutil
+        from io import open
+
+        SITE_INDEX = r'${{ parameters.SourceDirectory }}\docfx_project\_site'
+        TOC_HTML_REGEX = r"\.\./toc.html"
+        NAV_TOC_HTML_REGEX = r"api/"
+        PREV_DIR_REGEX = r"\.\./"
+
+        def locate_htmlfiles(directory):
+            html_set = []
+            for root, dirs, files in os.walk(directory):
+                for file in files:
+                    html_set.append(os.path.join(root, file))
+            return html_set
+    
+        def process_html(content):
+            content = re.sub(TOC_HTML_REGEX, 'navtoc.html', content)
+            content = re.sub(PREV_DIR_REGEX, '', content)
+            return content
+    
+        def process_navtoc(content):
+            content = re.sub(NAV_TOC_HTML_REGEX, '', content)
+            return content
+
+        if __name__ == "__main__":
+            html_files = locate_htmlfiles(os.path.join(SITE_INDEX, 'api'))
+            navtoc_location = os.path.join(SITE_INDEX, 'toc.html')
+
+            # Process the main toc.html and rename it to navtoc.html
+            try:
+                logging.info(
+                    "Process {}.".format(navtoc_location)
+                )
+                with open(navtoc_location, "r", encoding="utf8") as navtoc_stream:
+                    navtoc_content = navtoc_stream.read()
+                new_navtoc_content = process_navtoc(navtoc_content)
+                logging.info("Process {}.".format(navtoc_content))
+                with open(navtoc_location, "w", encoding="utf8") as html_stream:
+                    html_stream.write(new_navtoc_content)
+            except Exception as e:
+                logging.error(e)
+                exit(1)
+
+            # Rename main toc.html to navtoc.html
+            os.rename(navtoc_location, os.path.join(SITE_INDEX, 'navtoc.html'))
+
+            # Process all html in api directory
+            for html_location in html_files:
+                try:
+                    logging.info(
+                        "Process {}.".format(html_location)
+                    )
+                    with open(html_location, "r", encoding="utf8") as html_stream:
+                        html_content = html_stream.read()
+                    new_content = process_html(html_content)
+                    logging.info("Process {}.".format(html_location))
+                    with open(html_location, "w", encoding="utf8") as html_stream:
+                        html_stream.write(new_content)
+                except Exception as e:
+                    logging.error(e)
+                    exit(1)
+    
+            # Move all files from api to main site home directory
+            for html_location in html_files:
+                shutil.copy(html_location, SITE_INDEX)
+    
+            # Delete API Directory
+            shutil.rmtree(os.path.join(SITE_INDEX, 'api'))

@@ -1,0 +1,184 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/androidpublisher": {
+          "description": "View and manage your Google Play Developer account"
+        }
+      }
+    }
+  },
+  "basePath": "/androidpublisher/v1/applications/",
+  "baseUrl": "https://www.googleapis.com/androidpublisher/v1/applications/",
+  "batchPath": "batch/androidpublisher/v1",
+  "canonicalName": "Android Publisher",
+  "description": "Accesses Android application developers' Google Play accounts.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/android-publisher",
+  "etag": "\"J3WqvAcMk4eQjJXvfSI4Yr8VouA/fparelneh7TE9qKzoMjEcU2XZ9o\"",
+  "icons": {
+    "x16": "https://www.google.com/images/icons/product/android-16.png",
+    "x32": "https://www.google.com/images/icons/product/android-32.png"
+  },
+  "id": "androidpublisher:v1",
+  "kind": "discovery#restDescription",
+  "name": "androidpublisher",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "purchases": {
+      "methods": {
+        "cancel": {
+          "description": "Cancels a user's subscription purchase. The subscription remains valid until its expiration time.",
+          "httpMethod": "POST",
+          "id": "androidpublisher.purchases.cancel",
+          "parameterOrder": [
+            "packageName",
+            "subscriptionId",
+            "token"
+          ],
+          "parameters": {
+            "packageName": {
+              "description": "The package name of the application for which this subscription was purchased (for example, 'com.some.thing').",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "subscriptionId": {
+              "description": "The purchased subscription ID (for example, 'monthly001').",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "token": {
+              "description": "The token provided to the user's device when the subscription was purchased.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{packageName}/subscriptions/{subscriptionId}/purchases/{token}/cancel",
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        },
+        "get": {
+          "description": "Checks whether a user's subscription purchase is valid and returns its expiry time.",
+          "httpMethod": "GET",
+          "id": "androidpublisher.purchases.get",
+          "parameterOrder": [
+            "packageName",
+            "subscriptionId",
+            "token"
+          ],
+          "parameters": {
+            "packageName": {
+              "description": "The package name of the application for which this subscription was purchased (for example, 'com.some.thing').",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "subscriptionId": {
+              "description": "The purchased subscription ID (for example, 'monthly001').",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "token": {
+              "description": "The token provided to the user's device when the subscription was purchased.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{packageName}/subscriptions/{subscriptionId}/purchases/{token}",
+          "response": {
+            "$ref": "SubscriptionPurchase"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/androidpublisher"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20181009",
+  "rootUrl": "https://www.googleapis.com/",
+  "schemas": {
+    "SubscriptionPurchase": {
+      "description": "A SubscriptionPurchase resource indicates the status of a user's subscription purchase.",
+      "id": "SubscriptionPurchase",
+      "properties": {
+        "autoRenewing": {
+          "description": "Whether the subscription will automatically be renewed when it reaches its current expiry time.",
+          "type": "boolean"
+        },
+        "initiationTimestampMsec": {
+          "description": "Time at which the subscription was granted, in milliseconds since the Epoch.",
+          "format": "int64",
+          "type": "string"
+        },
+        "kind": {
+          "default": "androidpublisher#subscriptionPurchase",
+          "description": "This kind represents a subscriptionPurchase object in the androidpublisher service.",
+          "type": "string"
+        },
+        "validUntilTimestampMsec": {
+          "description": "Time at which the subscription will expire, in milliseconds since the Epoch.",
+          "format": "int64",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "androidpublisher/v1/applications/",
+  "title": "Google Play Developer API",
+  "version": "v1"
+}

@@ -1,0 +1,11 @@
+{
+    "galleryEndpoint":"https://portal.local.azurestack.external:30015/",
+    "graphEndpoint":"https://graph.windows.net/",
+    "portalEndpoint":"https://portal.local.azurestack.external/",
+    "authentication":{
+        "loginEndpoint":"https://login.windows.net/",
+        "audiences":[
+            "https://management.azurestackci04.onmicrosoft.com/3ee899c8-c137-4ce4-b230-619961a09a73"
+        ]
+    }
+}

@@ -1,0 +1,1801 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS CodeBuild</fullname> <p>AWS CodeBuild is a fully managed build service in the cloud. AWS CodeBuild compiles your source code, runs unit tests, and produces artifacts that are ready to deploy. AWS CodeBuild eliminates the need to provision, manage, and scale your own build servers. It provides prepackaged build environments for the most popular programming languages and build tools, such as Apache Maven, Gradle, and more. You can also fully customize build environments in AWS CodeBuild to use your own build tools. AWS CodeBuild scales automatically to meet peak build requests. You pay only for the build time you consume. For more information about AWS CodeBuild, see the <i> <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/welcome.html\">AWS CodeBuild User Guide</a>.</i> </p> <p>AWS CodeBuild supports these operations:</p> <ul> <li> <p> <code>BatchDeleteBuilds</code>: Deletes one or more builds.</p> </li> <li> <p> <code>BatchGetBuilds</code>: Gets information about one or more builds.</p> </li> <li> <p> <code>BatchGetProjects</code>: Gets information about one or more build projects. A <i>build project</i> defines how AWS CodeBuild runs a build. This includes information such as where to get the source code to build, the build environment to use, the build commands to run, and where to store the build output. A <i>build environment</i> is a representation of operating system, programming language runtime, and tools that AWS CodeBuild uses to run a build. You can add tags to build projects to help manage your resources and costs.</p> </li> <li> <p> <code>BatchGetReportGroups</code>: Returns an array of report groups. </p> </li> <li> <p> <code>BatchGetReports</code>: Returns an array of reports. </p> </li> <li> <p> <code>CreateProject</code>: Creates a build project.</p> </li> <li> <p> <code>CreateReportGroup</code>: Creates a report group. A report group contains a collection of reports. </p> </li> <li> <p> <code>CreateWebhook</code>: For an existing AWS CodeBuild build project that has its source code stored in a GitHub or Bitbucket repository, enables AWS CodeBuild to start rebuilding the source code every time a code change is pushed to the repository.</p> </li> <li> <p> <code>DeleteProject</code>: Deletes a build project.</p> </li> <li> <p> <code>DeleteReport</code>: Deletes a report. </p> </li> <li> <p> <code>DeleteReportGroup</code>: Deletes a report group. </p> </li> <li> <p> <code>DeleteResourcePolicy</code>: Deletes a resource policy that is identified by its resource ARN. </p> </li> <li> <p> <code>DeleteSourceCredentials</code>: Deletes a set of GitHub, GitHub Enterprise, or Bitbucket source credentials.</p> </li> <li> <p> <code>DeleteWebhook</code>: For an existing AWS CodeBuild build project that has its source code stored in a GitHub or Bitbucket repository, stops AWS CodeBuild from rebuilding the source code every time a code change is pushed to the repository.</p> </li> <li> <p> <code>DescribeTestCases</code>: Returns a list of details about test cases for a report. </p> </li> <li> <p> <code>GetResourcePolicy</code>: Gets a resource policy that is identified by its resource ARN. </p> </li> <li> <p> <code>ImportSourceCredentials</code>: Imports the source repository credentials for an AWS CodeBuild project that has its source code stored in a GitHub, GitHub Enterprise, or Bitbucket repository.</p> </li> <li> <p> <code>InvalidateProjectCache</code>: Resets the cache for a project.</p> </li> <li> <p> <code>ListBuilds</code>: Gets a list of build IDs, with each build ID representing a single build.</p> </li> <li> <p> <code>ListBuildsForProject</code>: Gets a list of build IDs for the specified build project, with each build ID representing a single build.</p> </li> <li> <p> <code>ListCuratedEnvironmentImages</code>: Gets information about Docker images that are managed by AWS CodeBuild.</p> </li> <li> <p> <code>ListProjects</code>: Gets a list of build project names, with each build project name representing a single build project.</p> </li> <li> <p> <code>ListReportGroups</code>: Gets a list ARNs for the report groups in the current AWS account. </p> </li> <li> <p> <code>ListReports</code>: Gets a list ARNs for the reports in the current AWS account. </p> </li> <li> <p> <code>ListReportsForReportGroup</code>: Returns a list of ARNs for the reports that belong to a <code>ReportGroup</code>. </p> </li> <li> <p> <code>ListSharedProjects</code>: Gets a list of ARNs associated with projects shared with the current AWS account or user.</p> </li> <li> <p> <code>ListSharedReportGroups</code>: Gets a list of ARNs associated with report groups shared with the current AWS account or user</p> </li> <li> <p> <code>ListSourceCredentials</code>: Returns a list of <code>SourceCredentialsInfo</code> objects. Each <code>SourceCredentialsInfo</code> object includes the authentication type, token ARN, and type of source provider for one set of credentials.</p> </li> <li> <p> <code>PutResourcePolicy</code>: Stores a resource policy for the ARN of a <code>Project</code> or <code>ReportGroup</code> object. </p> </li> <li> <p> <code>StartBuild</code>: Starts running a build.</p> </li> <li> <p> <code>StopBuild</code>: Attempts to stop running a build.</p> </li> <li> <p> <code>UpdateProject</code>: Changes the settings of an existing build project.</p> </li> <li> <p> <code>UpdateReportGroup</code>: Changes a report group.</p> </li> <li> <p> <code>UpdateWebhook</code>: Changes the settings of an existing webhook.</p> </li> </ul>",
+  "operations": {
+    "BatchDeleteBuilds": "<p>Deletes one or more builds.</p>",
+    "BatchGetBuildBatches": "<p>Retrieves information about one or more batch builds.</p>",
+    "BatchGetBuilds": "<p>Gets information about one or more builds.</p>",
+    "BatchGetProjects": "<p>Gets information about one or more build projects.</p>",
+    "BatchGetReportGroups": "<p> Returns an array of report groups. </p>",
+    "BatchGetReports": "<p> Returns an array of reports. </p>",
+    "CreateProject": "<p>Creates a build project.</p>",
+    "CreateReportGroup": "<p> Creates a report group. A report group contains a collection of reports. </p>",
+    "CreateWebhook": "<p>For an existing AWS CodeBuild build project that has its source code stored in a GitHub or Bitbucket repository, enables AWS CodeBuild to start rebuilding the source code every time a code change is pushed to the repository.</p> <important> <p>If you enable webhooks for an AWS CodeBuild project, and the project is used as a build step in AWS CodePipeline, then two identical builds are created for each commit. One build is triggered through webhooks, and one through AWS CodePipeline. Because billing is on a per-build basis, you are billed for both builds. Therefore, if you are using AWS CodePipeline, we recommend that you disable webhooks in AWS CodeBuild. In the AWS CodeBuild console, clear the Webhook box. For more information, see step 5 in <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/change-project.html#change-project-console\">Change a Build Project's Settings</a>.</p> </important>",
+    "DeleteBuildBatch": "<p>Deletes a batch build.</p>",
+    "DeleteProject": "<p> Deletes a build project. When you delete a project, its builds are not deleted. </p>",
+    "DeleteReport": "<p> Deletes a report. </p>",
+    "DeleteReportGroup": "<p>Deletes a report group. Before you delete a report group, you must delete its reports. </p>",
+    "DeleteResourcePolicy": "<p> Deletes a resource policy that is identified by its resource ARN. </p>",
+    "DeleteSourceCredentials": "<p> Deletes a set of GitHub, GitHub Enterprise, or Bitbucket source credentials. </p>",
+    "DeleteWebhook": "<p>For an existing AWS CodeBuild build project that has its source code stored in a GitHub or Bitbucket repository, stops AWS CodeBuild from rebuilding the source code every time a code change is pushed to the repository.</p>",
+    "DescribeCodeCoverages": "<p>Retrieves one or more code coverage reports.</p>",
+    "DescribeTestCases": "<p> Returns a list of details about test cases for a report. </p>",
+    "GetResourcePolicy": "<p> Gets a resource policy that is identified by its resource ARN. </p>",
+    "ImportSourceCredentials": "<p> Imports the source repository credentials for an AWS CodeBuild project that has its source code stored in a GitHub, GitHub Enterprise, or Bitbucket repository. </p>",
+    "InvalidateProjectCache": "<p>Resets the cache for a project.</p>",
+    "ListBuildBatches": "<p>Retrieves the identifiers of your build batches in the current region.</p>",
+    "ListBuildBatchesForProject": "<p>Retrieves the identifiers of the build batches for a specific project.</p>",
+    "ListBuilds": "<p>Gets a list of build IDs, with each build ID representing a single build.</p>",
+    "ListBuildsForProject": "<p>Gets a list of build IDs for the specified build project, with each build ID representing a single build.</p>",
+    "ListCuratedEnvironmentImages": "<p>Gets information about Docker images that are managed by AWS CodeBuild.</p>",
+    "ListProjects": "<p>Gets a list of build project names, with each build project name representing a single build project.</p>",
+    "ListReportGroups": "<p> Gets a list ARNs for the report groups in the current AWS account. </p>",
+    "ListReports": "<p> Returns a list of ARNs for the reports in the current AWS account. </p>",
+    "ListReportsForReportGroup": "<p> Returns a list of ARNs for the reports that belong to a <code>ReportGroup</code>. </p>",
+    "ListSharedProjects": "<p> Gets a list of projects that are shared with other AWS accounts or users. </p>",
+    "ListSharedReportGroups": "<p> Gets a list of report groups that are shared with other AWS accounts or users. </p>",
+    "ListSourceCredentials": "<p> Returns a list of <code>SourceCredentialsInfo</code> objects. </p>",
+    "PutResourcePolicy": "<p> Stores a resource policy for the ARN of a <code>Project</code> or <code>ReportGroup</code> object. </p>",
+    "RetryBuild": "<p>Restarts a build.</p>",
+    "RetryBuildBatch": "<p>Restarts a batch build.</p>",
+    "StartBuild": "<p>Starts running a build.</p>",
+    "StartBuildBatch": "<p>Starts a batch build for a project.</p>",
+    "StopBuild": "<p>Attempts to stop running a build.</p>",
+    "StopBuildBatch": "<p>Stops a running batch build.</p>",
+    "UpdateProject": "<p>Changes the settings of a build project.</p>",
+    "UpdateReportGroup": "<p> Updates a report group. </p>",
+    "UpdateWebhook": "<p> Updates the webhook associated with an AWS CodeBuild build project. </p> <note> <p> If you use Bitbucket for your repository, <code>rotateSecret</code> is ignored. </p> </note>"
+  },
+  "shapes": {
+    "AccountLimitExceededException": {
+      "base": "<p>An AWS service limit was exceeded for the calling AWS account.</p>",
+      "refs": {
+      }
+    },
+    "ArtifactNamespace": {
+      "base": null,
+      "refs": {
+        "ProjectArtifacts$namespaceType": "<p>Along with <code>path</code> and <code>name</code>, the pattern that AWS CodeBuild uses to determine the name and location to store the output artifact:</p> <ul> <li> <p>If <code>type</code> is set to <code>CODEPIPELINE</code>, AWS CodePipeline ignores this value if specified. This is because AWS CodePipeline manages its build output names instead of AWS CodeBuild.</p> </li> <li> <p>If <code>type</code> is set to <code>NO_ARTIFACTS</code>, this value is ignored if specified, because no build output is produced.</p> </li> <li> <p>If <code>type</code> is set to <code>S3</code>, valid values include:</p> <ul> <li> <p> <code>BUILD_ID</code>: Include the build ID in the location of the build output artifact.</p> </li> <li> <p> <code>NONE</code>: Do not include the build ID. This is the default if <code>namespaceType</code> is not specified.</p> </li> </ul> </li> </ul> <p>For example, if <code>path</code> is set to <code>MyArtifacts</code>, <code>namespaceType</code> is set to <code>BUILD_ID</code>, and <code>name</code> is set to <code>MyArtifact.zip</code>, the output artifact is stored in <code>MyArtifacts/&lt;build-ID&gt;/MyArtifact.zip</code>.</p>"
+      }
+    },
+    "ArtifactPackaging": {
+      "base": null,
+      "refs": {
+        "ProjectArtifacts$packaging": "<p>The type of build output artifact to create:</p> <ul> <li> <p>If <code>type</code> is set to <code>CODEPIPELINE</code>, AWS CodePipeline ignores this value if specified. This is because AWS CodePipeline manages its build output artifacts instead of AWS CodeBuild.</p> </li> <li> <p>If <code>type</code> is set to <code>NO_ARTIFACTS</code>, this value is ignored if specified, because no build output is produced.</p> </li> <li> <p>If <code>type</code> is set to <code>S3</code>, valid values include:</p> <ul> <li> <p> <code>NONE</code>: AWS CodeBuild creates in the output bucket a folder that contains the build output. This is the default if <code>packaging</code> is not specified.</p> </li> <li> <p> <code>ZIP</code>: AWS CodeBuild creates in the output bucket a ZIP file that contains the build output.</p> </li> </ul> </li> </ul>"
+      }
+    },
+    "ArtifactsType": {
+      "base": null,
+      "refs": {
+        "ProjectArtifacts$type": "<p>The type of build output artifact. Valid values include:</p> <ul> <li> <p> <code>CODEPIPELINE</code>: The build project has build output generated through AWS CodePipeline. </p> <note> <p>The <code>CODEPIPELINE</code> type is not supported for <code>secondaryArtifacts</code>.</p> </note> </li> <li> <p> <code>NO_ARTIFACTS</code>: The build project does not produce any build output.</p> </li> <li> <p> <code>S3</code>: The build project stores build output in Amazon Simple Storage Service (Amazon S3).</p> </li> </ul>",
+        "ResolvedArtifact$type": "<p>Specifies the type of artifact.</p>"
+      }
+    },
+    "AuthType": {
+      "base": null,
+      "refs": {
+        "ImportSourceCredentialsInput$authType": "<p> The type of authentication used to connect to a GitHub, GitHub Enterprise, or Bitbucket repository. An OAUTH connection is not supported by the API and must be created using the AWS CodeBuild console. </p>",
+        "SourceCredentialsInfo$authType": "<p> The type of authentication used by the credentials. Valid options are OAUTH, BASIC_AUTH, or PERSONAL_ACCESS_TOKEN. </p>"
+      }
+    },
+    "BatchDeleteBuildsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchDeleteBuildsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetBuildBatchesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetBuildBatchesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetBuildsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetBuildsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetProjectsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetProjectsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetReportGroupsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetReportGroupsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetReportsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetReportsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchRestrictions": {
+      "base": "<p>Specifies restrictions for the batch build.</p>",
+      "refs": {
+        "ProjectBuildBatchConfig$restrictions": "<p>A <code>BatchRestrictions</code> object that specifies the restrictions for the batch build.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "Build$buildComplete": "<p>Whether the build is complete. True if complete; otherwise, false.</p>",
+        "BuildBatch$complete": "<p>Indicates if the batch build is complete.</p>",
+        "BuildGroup$ignoreFailure": "<p>Specifies if failures in this build group can be ignored.</p>",
+        "DeleteReportGroupInput$deleteReports": "<p>If <code>true</code>, deletes any reports that belong to a report group before deleting the report group. </p> <p>If <code>false</code>, you must delete any reports in the report group. Use <a href=\"https://docs.aws.amazon.com/codebuild/latest/APIReference/API_ListReportsForReportGroup.html\">ListReportsForReportGroup</a> to get the reports in a report group. Use <a href=\"https://docs.aws.amazon.com/codebuild/latest/APIReference/API_DeleteReport.html\">DeleteReport</a> to delete the reports. If you call <code>DeleteReportGroup</code> for a report group that contains one or more reports, an exception is thrown. </p>",
+        "ProjectBadge$badgeEnabled": "<p>Set this to true to generate a publicly accessible URL for your project's build badge.</p>",
+        "UpdateWebhookInput$rotateSecret": "<p> A boolean value that specifies whether the associated GitHub repository's secret token should be updated. If you use Bitbucket for your repository, <code>rotateSecret</code> is ignored. </p>"
+      }
+    },
+    "Build": {
+      "base": "<p>Information about a build.</p>",
+      "refs": {
+        "Builds$member": null,
+        "RetryBuildOutput$build": null,
+        "StartBuildOutput$build": "<p>Information about the build to be run.</p>",
+        "StopBuildOutput$build": "<p>Information about the build.</p>"
+      }
+    },
+    "BuildArtifacts": {
+      "base": "<p>Information about build output artifacts.</p>",
+      "refs": {
+        "Build$artifacts": "<p>Information about the output artifacts for the build.</p>",
+        "BuildArtifactsList$member": null,
+        "BuildBatch$artifacts": "<p>A <code>BuildArtifacts</code> object the defines the build artifacts for this batch build.</p>"
+      }
+    },
+    "BuildArtifactsList": {
+      "base": null,
+      "refs": {
+        "Build$secondaryArtifacts": "<p> An array of <code>ProjectArtifacts</code> objects. </p>",
+        "BuildBatch$secondaryArtifacts": "<p>An array of <code>BuildArtifacts</code> objects the define the build artifacts for this batch build.</p>"
+      }
+    },
+    "BuildBatch": {
+      "base": "<p>Contains information about a batch build.</p>",
+      "refs": {
+        "BuildBatches$member": null,
+        "RetryBuildBatchOutput$buildBatch": null,
+        "StartBuildBatchOutput$buildBatch": "<p>A <code>BuildBatch</code> object that contains information about the batch build.</p>",
+        "StopBuildBatchOutput$buildBatch": null
+      }
+    },
+    "BuildBatchFilter": {
+      "base": "<p>Specifies filters when retrieving batch builds.</p>",
+      "refs": {
+        "ListBuildBatchesForProjectInput$filter": "<p>A <code>BuildBatchFilter</code> object that specifies the filters for the search.</p>",
+        "ListBuildBatchesInput$filter": "<p>A <code>BuildBatchFilter</code> object that specifies the filters for the search.</p>"
+      }
+    },
+    "BuildBatchIds": {
+      "base": null,
+      "refs": {
+        "BatchGetBuildBatchesInput$ids": "<p>An array that contains the batch build identifiers to retrieve.</p>",
+        "BatchGetBuildBatchesOutput$buildBatchesNotFound": "<p>An array that contains the identifiers of any batch builds that are not found.</p>",
+        "ListBuildBatchesForProjectOutput$ids": "<p>An array of strings that contains the batch build identifiers.</p>",
+        "ListBuildBatchesOutput$ids": "<p>An array of strings that contains the batch build identifiers.</p>"
+      }
+    },
+    "BuildBatchPhase": {
+      "base": "<p>Contains information about a stage for a batch build.</p>",
+      "refs": {
+        "BuildBatchPhases$member": null
+      }
+    },
+    "BuildBatchPhaseType": {
+      "base": null,
+      "refs": {
+        "BuildBatchPhase$phaseType": "<p>The name of the batch build phase. Valid values include:</p> <dl> <dt>COMBINE_ARTIFACTS</dt> <dd> <p>Build output artifacts are being combined and uploaded to the output location.</p> </dd> <dt>DOWNLOAD_BATCHSPEC</dt> <dd> <p>The batch build specification is being downloaded.</p> </dd> <dt>FAILED</dt> <dd> <p>One or more of the builds failed.</p> </dd> <dt>IN_PROGRESS</dt> <dd> <p>The batch build is in progress.</p> </dd> <dt>STOPPED</dt> <dd> <p>The batch build was stopped.</p> </dd> <dt>SUBMITTED</dt> <dd> <p>The btach build has been submitted.</p> </dd> <dt>SUCCEEDED</dt> <dd> <p>The batch build succeeded.</p> </dd> </dl>"
+      }
+    },
+    "BuildBatchPhases": {
+      "base": null,
+      "refs": {
+        "BuildBatch$phases": "<p>An array of <code>BuildBatchPhase</code> objects the specify the phases of the batch build.</p>"
+      }
+    },
+    "BuildBatches": {
+      "base": null,
+      "refs": {
+        "BatchGetBuildBatchesOutput$buildBatches": "<p>An array of <code>BuildBatch</code> objects that represent the retrieved batch builds.</p>"
+      }
+    },
+    "BuildGroup": {
+      "base": "<p>Contains information about a batch build build group. Build groups are used to combine builds that can run in parallel, while still being able to set dependencies on other build groups.</p>",
+      "refs": {
+        "BuildGroups$member": null
+      }
+    },
+    "BuildGroups": {
+      "base": null,
+      "refs": {
+        "BuildBatch$buildGroups": "<p>An array of <code>BuildGroup</code> objects that define the build groups for the batch build.</p>"
+      }
+    },
+    "BuildIds": {
+      "base": null,
+      "refs": {
+        "BatchDeleteBuildsInput$ids": "<p>The IDs of the builds to delete.</p>",
+        "BatchDeleteBuildsOutput$buildsDeleted": "<p>The IDs of the builds that were successfully deleted.</p>",
+        "BatchGetBuildsInput$ids": "<p>The IDs of the builds.</p>",
+        "BatchGetBuildsOutput$buildsNotFound": "<p>The IDs of builds for which information could not be found.</p>",
+        "DeleteBuildBatchOutput$buildsDeleted": "<p>An array of strings that contain the identifiers of the builds that were deleted.</p>",
+        "ListBuildsForProjectOutput$ids": "<p>A list of build IDs for the specified build project, with each build ID representing a single build.</p>",
+        "ListBuildsOutput$ids": "<p>A list of build IDs, with each build ID representing a single build.</p>"
+      }
+    },
+    "BuildNotDeleted": {
+      "base": "<p>Information about a build that could not be successfully deleted.</p>",
+      "refs": {
+        "BuildsNotDeleted$member": null
+      }
+    },
+    "BuildPhase": {
+      "base": "<p>Information about a stage for a build.</p>",
+      "refs": {
+        "BuildPhases$member": null
+      }
+    },
+    "BuildPhaseType": {
+      "base": null,
+      "refs": {
+        "BuildPhase$phaseType": "<p>The name of the build phase. Valid values include:</p> <ul> <li> <p> <code>BUILD</code>: Core build activities typically occur in this build phase.</p> </li> <li> <p> <code>COMPLETED</code>: The build has been completed.</p> </li> <li> <p> <code>DOWNLOAD_SOURCE</code>: Source code is being downloaded in this build phase.</p> </li> <li> <p> <code>FINALIZING</code>: The build process is completing in this build phase.</p> </li> <li> <p> <code>INSTALL</code>: Installation activities typically occur in this build phase.</p> </li> <li> <p> <code>POST_BUILD</code>: Post-build activities typically occur in this build phase.</p> </li> <li> <p> <code>PRE_BUILD</code>: Pre-build activities typically occur in this build phase.</p> </li> <li> <p> <code>PROVISIONING</code>: The build environment is being set up.</p> </li> <li> <p> <code>QUEUED</code>: The build has been submitted and is queued behind other submitted builds.</p> </li> <li> <p> <code>SUBMITTED</code>: The build has been submitted.</p> </li> <li> <p> <code>UPLOAD_ARTIFACTS</code>: Build output artifacts are being uploaded to the output location.</p> </li> </ul>"
+      }
+    },
+    "BuildPhases": {
+      "base": null,
+      "refs": {
+        "Build$phases": "<p>Information about all previous build phases that are complete and information about any current build phase that is not yet complete.</p>"
+      }
+    },
+    "BuildReportArns": {
+      "base": null,
+      "refs": {
+        "Build$reportArns": "<p> An array of the ARNs associated with this build's reports. </p>"
+      }
+    },
+    "BuildStatusConfig": {
+      "base": "<p>Contains information that defines how the AWS CodeBuild build project reports the build status to the source provider. </p>",
+      "refs": {
+        "ProjectSource$buildStatusConfig": "<p>Contains information that defines how the build project reports the build status to the source provider. This option is only used when the source provider is <code>GITHUB</code>, <code>GITHUB_ENTERPRISE</code>, or <code>BITBUCKET</code>.</p>",
+        "StartBuildInput$buildStatusConfigOverride": "<p>Contains information that defines how the build project reports the build status to the source provider. This option is only used when the source provider is <code>GITHUB</code>, <code>GITHUB_ENTERPRISE</code>, or <code>BITBUCKET</code>.</p>"
+      }
+    },
+    "BuildSummaries": {
+      "base": null,
+      "refs": {
+        "BuildGroup$priorBuildSummaryList": "<p>An array of <code>BuildSummary</code> objects that contain summaries of previous build groups.</p>"
+      }
+    },
+    "BuildSummary": {
+      "base": "<p>Contains summary information about a batch build group.</p>",
+      "refs": {
+        "BuildGroup$currentBuildSummary": "<p>A <code>BuildSummary</code> object that contains a summary of the current build group.</p>",
+        "BuildSummaries$member": null
+      }
+    },
+    "Builds": {
+      "base": null,
+      "refs": {
+        "BatchGetBuildsOutput$builds": "<p>Information about the requested builds.</p>"
+      }
+    },
+    "BuildsNotDeleted": {
+      "base": null,
+      "refs": {
+        "BatchDeleteBuildsOutput$buildsNotDeleted": "<p>Information about any builds that could not be successfully deleted.</p>",
+        "DeleteBuildBatchOutput$buildsNotDeleted": "<p>An array of <code>BuildNotDeleted</code> objects that specify the builds that could not be deleted.</p>"
+      }
+    },
+    "CacheMode": {
+      "base": null,
+      "refs": {
+        "ProjectCacheModes$member": null
+      }
+    },
+    "CacheType": {
+      "base": null,
+      "refs": {
+        "ProjectCache$type": "<p>The type of cache used by the build project. Valid values include:</p> <ul> <li> <p> <code>NO_CACHE</code>: The build project does not use any cache.</p> </li> <li> <p> <code>S3</code>: The build project reads and writes from and to S3.</p> </li> <li> <p> <code>LOCAL</code>: The build project stores a cache locally on a build host that is only available to that build host.</p> </li> </ul>"
+      }
+    },
+    "CloudWatchLogsConfig": {
+      "base": "<p> Information about Amazon CloudWatch Logs for a build project. </p>",
+      "refs": {
+        "LogsConfig$cloudWatchLogs": "<p> Information about Amazon CloudWatch Logs for a build project. Amazon CloudWatch Logs are enabled by default. </p>",
+        "LogsLocation$cloudWatchLogs": "<p> Information about Amazon CloudWatch Logs for a build project. </p>"
+      }
+    },
+    "CodeCoverage": {
+      "base": "<p>Contains code coverage report information.</p> <p>Line coverage measures how many statements your tests cover. A statement is a single instruction, not including comments, conditionals, etc.</p> <p>Branch coverage determines if your tests cover every possible branch of a control structure, such as an <code>if</code> or <code>case</code> statement.</p>",
+      "refs": {
+        "CodeCoverages$member": null
+      }
+    },
+    "CodeCoverageReportSummary": {
+      "base": "<p>Contains a summary of a code coverage report.</p> <p>Line coverage measures how many statements your tests cover. A statement is a single instruction, not including comments, conditionals, etc.</p> <p>Branch coverage determines if your tests cover every possible branch of a control structure, such as an <code>if</code> or <code>case</code> statement.</p>",
+      "refs": {
+        "Report$codeCoverageSummary": "<p>A <code>CodeCoverageReportSummary</code> object that contains a code coverage summary for this report.</p>"
+      }
+    },
+    "CodeCoverages": {
+      "base": null,
+      "refs": {
+        "DescribeCodeCoveragesOutput$codeCoverages": "<p>An array of <code>CodeCoverage</code> objects that contain the results.</p>"
+      }
+    },
+    "ComputeType": {
+      "base": null,
+      "refs": {
+        "ProjectEnvironment$computeType": "<p>Information about the compute resources the build project uses. Available values include:</p> <ul> <li> <p> <code>BUILD_GENERAL1_SMALL</code>: Use up to 3 GB memory and 2 vCPUs for builds.</p> </li> <li> <p> <code>BUILD_GENERAL1_MEDIUM</code>: Use up to 7 GB memory and 4 vCPUs for builds.</p> </li> <li> <p> <code>BUILD_GENERAL1_LARGE</code>: Use up to 16 GB memory and 8 vCPUs for builds, depending on your environment type.</p> </li> <li> <p> <code>BUILD_GENERAL1_2XLARGE</code>: Use up to 145 GB memory, 72 vCPUs, and 824 GB of SSD storage for builds. This compute type supports Docker images up to 100 GB uncompressed.</p> </li> </ul> <p> If you use <code>BUILD_GENERAL1_LARGE</code>: </p> <ul> <li> <p> For environment type <code>LINUX_CONTAINER</code>, you can use up to 15 GB memory and 8 vCPUs for builds. </p> </li> <li> <p> For environment type <code>LINUX_GPU_CONTAINER</code>, you can use up to 255 GB memory, 32 vCPUs, and 4 NVIDIA Tesla V100 GPUs for builds.</p> </li> <li> <p> For environment type <code>ARM_CONTAINER</code>, you can use up to 16 GB memory and 8 vCPUs on ARM-based processors for builds.</p> </li> </ul> <p> For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html\">Build Environment Compute Types</a> in the <i>AWS CodeBuild User Guide.</i> </p>",
+        "StartBuildBatchInput$computeTypeOverride": "<p>The name of a compute type for this batch build that overrides the one specified in the batch build project.</p>",
+        "StartBuildInput$computeTypeOverride": "<p>The name of a compute type for this build that overrides the one specified in the build project.</p>"
+      }
+    },
+    "ComputeTypesAllowed": {
+      "base": null,
+      "refs": {
+        "BatchRestrictions$computeTypesAllowed": "<p>An array of strings that specify the compute types that are allowed for the batch build. See <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html\">Build environment compute types</a> in the <i>AWS CodeBuild User Guide</i> for these values. </p>"
+      }
+    },
+    "CreateProjectInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProjectOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateReportGroupInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateReportGroupOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWebhookInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateWebhookOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CredentialProviderType": {
+      "base": null,
+      "refs": {
+        "RegistryCredential$credentialProvider": "<p> The service that created the credentials to access a private Docker registry. The valid value, SECRETS_MANAGER, is for AWS Secrets Manager. </p>"
+      }
+    },
+    "DebugSession": {
+      "base": "<p>Contains information about the debug session for a build. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/session-manager.html\">Viewing a running build in Session Manager</a>.</p>",
+      "refs": {
+        "Build$debugSession": "<p>Contains information about the debug session for this build.</p>"
+      }
+    },
+    "DeleteBuildBatchInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteBuildBatchOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProjectOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReportGroupInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReportGroupOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReportInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReportOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResourcePolicyInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResourcePolicyOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSourceCredentialsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSourceCredentialsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWebhookInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteWebhookOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCodeCoveragesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCodeCoveragesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTestCasesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTestCasesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnvironmentImage": {
+      "base": "<p>Information about a Docker image that is managed by AWS CodeBuild.</p>",
+      "refs": {
+        "EnvironmentImages$member": null
+      }
+    },
+    "EnvironmentImages": {
+      "base": null,
+      "refs": {
+        "EnvironmentLanguage$images": "<p>The list of Docker images that are related by the specified programming language.</p>"
+      }
+    },
+    "EnvironmentLanguage": {
+      "base": "<p>A set of Docker images that are related by programming language and are managed by AWS CodeBuild.</p>",
+      "refs": {
+        "EnvironmentLanguages$member": null
+      }
+    },
+    "EnvironmentLanguages": {
+      "base": null,
+      "refs": {
+        "EnvironmentPlatform$languages": "<p>The list of programming languages that are available for the specified platform.</p>"
+      }
+    },
+    "EnvironmentPlatform": {
+      "base": "<p>A set of Docker images that are related by platform and are managed by AWS CodeBuild.</p>",
+      "refs": {
+        "EnvironmentPlatforms$member": null
+      }
+    },
+    "EnvironmentPlatforms": {
+      "base": null,
+      "refs": {
+        "ListCuratedEnvironmentImagesOutput$platforms": "<p>Information about supported platforms for Docker images that are managed by AWS CodeBuild.</p>"
+      }
+    },
+    "EnvironmentType": {
+      "base": null,
+      "refs": {
+        "ProjectEnvironment$type": "<p>The type of build environment to use for related builds.</p> <ul> <li> <p>The environment type <code>ARM_CONTAINER</code> is available only in regions US East (N. Virginia), US East (Ohio), US West (Oregon), EU (Ireland), Asia Pacific (Mumbai), Asia Pacific (Tokyo), Asia Pacific (Sydney), and EU (Frankfurt).</p> </li> <li> <p>The environment type <code>LINUX_CONTAINER</code> with compute type <code>build.general1.2xlarge</code> is available only in regions US East (N. Virginia), US East (Ohio), US West (Oregon), Canada (Central), EU (Ireland), EU (London), EU (Frankfurt), Asia Pacific (Tokyo), Asia Pacific (Seoul), Asia Pacific (Singapore), Asia Pacific (Sydney), China (Beijing), and China (Ningxia).</p> </li> <li> <p>The environment type <code>LINUX_GPU_CONTAINER</code> is available only in regions US East (N. Virginia), US East (Ohio), US West (Oregon), Canada (Central), EU (Ireland), EU (London), EU (Frankfurt), Asia Pacific (Tokyo), Asia Pacific (Seoul), Asia Pacific (Singapore), Asia Pacific (Sydney) , China (Beijing), and China (Ningxia).</p> </li> </ul>",
+        "StartBuildBatchInput$environmentTypeOverride": "<p>A container type for this batch build that overrides the one specified in the batch build project.</p>",
+        "StartBuildInput$environmentTypeOverride": "<p>A container type for this build that overrides the one specified in the build project.</p>"
+      }
+    },
+    "EnvironmentVariable": {
+      "base": "<p>Information about an environment variable for a build project or a build.</p>",
+      "refs": {
+        "EnvironmentVariables$member": null
+      }
+    },
+    "EnvironmentVariableType": {
+      "base": null,
+      "refs": {
+        "EnvironmentVariable$type": "<p>The type of environment variable. Valid values include:</p> <ul> <li> <p> <code>PARAMETER_STORE</code>: An environment variable stored in Amazon EC2 Systems Manager Parameter Store. To learn how to specify a parameter store environment variable, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#build-spec.env.parameter-store\">env/parameter-store</a> in the <i>AWS CodeBuild User Guide</i>.</p> </li> <li> <p> <code>PLAINTEXT</code>: An environment variable in plain text format. This is the default value.</p> </li> <li> <p> <code>SECRETS_MANAGER</code>: An environment variable stored in AWS Secrets Manager. To learn how to specify a secrets manager environment variable, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#build-spec.env.secrets-manager\">env/secrets-manager</a> in the <i>AWS CodeBuild User Guide</i>.</p> </li> </ul>"
+      }
+    },
+    "EnvironmentVariables": {
+      "base": null,
+      "refs": {
+        "ProjectEnvironment$environmentVariables": "<p>A set of environment variables to make available to builds for this build project.</p>",
+        "StartBuildBatchInput$environmentVariablesOverride": "<p>An array of <code>EnvironmentVariable</code> objects that override, or add to, the environment variables defined in the batch build project.</p>",
+        "StartBuildInput$environmentVariablesOverride": "<p>A set of environment variables that overrides, for this build only, the latest ones already defined in the build project.</p>"
+      }
+    },
+    "ExportedEnvironmentVariable": {
+      "base": "<p> Information about an exported environment variable. </p>",
+      "refs": {
+        "ExportedEnvironmentVariables$member": null
+      }
+    },
+    "ExportedEnvironmentVariables": {
+      "base": null,
+      "refs": {
+        "Build$exportedEnvironmentVariables": "<p> A list of exported environment variables for this build. </p>"
+      }
+    },
+    "FileSystemType": {
+      "base": null,
+      "refs": {
+        "ProjectFileSystemLocation$type": "<p> The type of the file system. The one supported type is <code>EFS</code>. </p>"
+      }
+    },
+    "FilterGroup": {
+      "base": null,
+      "refs": {
+        "FilterGroups$member": null
+      }
+    },
+    "FilterGroups": {
+      "base": null,
+      "refs": {
+        "CreateWebhookInput$filterGroups": "<p>An array of arrays of <code>WebhookFilter</code> objects used to determine which webhooks are triggered. At least one <code>WebhookFilter</code> in the array must specify <code>EVENT</code> as its <code>type</code>. </p> <p>For a build to be triggered, at least one filter group in the <code>filterGroups</code> array must pass. For a filter group to pass, each of its filters must pass. </p>",
+        "UpdateWebhookInput$filterGroups": "<p> An array of arrays of <code>WebhookFilter</code> objects used to determine if a webhook event can trigger a build. A filter group must contain at least one <code>EVENT</code> <code>WebhookFilter</code>. </p>",
+        "Webhook$filterGroups": "<p>An array of arrays of <code>WebhookFilter</code> objects used to determine which webhooks are triggered. At least one <code>WebhookFilter</code> in the array must specify <code>EVENT</code> as its <code>type</code>. </p> <p>For a build to be triggered, at least one filter group in the <code>filterGroups</code> array must pass. For a filter group to pass, each of its filters must pass. </p>"
+      }
+    },
+    "GetResourcePolicyInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetResourcePolicyOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GitCloneDepth": {
+      "base": null,
+      "refs": {
+        "ProjectSource$gitCloneDepth": "<p>Information about the Git clone depth for the build project.</p>",
+        "StartBuildBatchInput$gitCloneDepthOverride": "<p>The user-defined depth of history, with a minimum value of 0, that overrides, for this batch build only, any previous depth of history defined in the batch build project.</p>",
+        "StartBuildInput$gitCloneDepthOverride": "<p>The user-defined depth of history, with a minimum value of 0, that overrides, for this build only, any previous depth of history defined in the build project.</p>"
+      }
+    },
+    "GitSubmodulesConfig": {
+      "base": "<p> Information about the Git submodules configuration for an AWS CodeBuild build project. </p>",
+      "refs": {
+        "ProjectSource$gitSubmodulesConfig": "<p> Information about the Git submodules configuration for the build project. </p>",
+        "StartBuildBatchInput$gitSubmodulesConfigOverride": "<p>A <code>GitSubmodulesConfig</code> object that overrides the Git submodules configuration for this batch build.</p>",
+        "StartBuildInput$gitSubmodulesConfigOverride": "<p> Information about the Git submodules configuration for this build of an AWS CodeBuild build project. </p>"
+      }
+    },
+    "Identifiers": {
+      "base": null,
+      "refs": {
+        "BuildGroup$dependsOn": "<p>An array of strings that contain the identifiers of the build groups that this build group depends on.</p>"
+      }
+    },
+    "ImagePullCredentialsType": {
+      "base": null,
+      "refs": {
+        "ProjectEnvironment$imagePullCredentialsType": "<p> The type of credentials AWS CodeBuild uses to pull images in your build. There are two valid values: </p> <ul> <li> <p> <code>CODEBUILD</code> specifies that AWS CodeBuild uses its own credentials. This requires that you modify your ECR repository policy to trust AWS CodeBuild's service principal. </p> </li> <li> <p> <code>SERVICE_ROLE</code> specifies that AWS CodeBuild uses your build project's service role. </p> </li> </ul> <p> When you use a cross-account or private registry image, you must use SERVICE_ROLE credentials. When you use an AWS CodeBuild curated image, you must use CODEBUILD credentials. </p>",
+        "StartBuildBatchInput$imagePullCredentialsTypeOverride": "<p>The type of credentials AWS CodeBuild uses to pull images in your batch build. There are two valid values: </p> <dl> <dt>CODEBUILD</dt> <dd> <p>Specifies that AWS CodeBuild uses its own credentials. This requires that you modify your ECR repository policy to trust AWS CodeBuild's service principal.</p> </dd> <dt>SERVICE_ROLE</dt> <dd> <p>Specifies that AWS CodeBuild uses your build project's service role. </p> </dd> </dl> <p>When using a cross-account or private registry image, you must use <code>SERVICE_ROLE</code> credentials. When using an AWS CodeBuild curated image, you must use <code>CODEBUILD</code> credentials. </p>",
+        "StartBuildInput$imagePullCredentialsTypeOverride": "<p>The type of credentials AWS CodeBuild uses to pull images in your build. There are two valid values: </p> <dl> <dt>CODEBUILD</dt> <dd> <p>Specifies that AWS CodeBuild uses its own credentials. This requires that you modify your ECR repository policy to trust AWS CodeBuild's service principal.</p> </dd> <dt>SERVICE_ROLE</dt> <dd> <p>Specifies that AWS CodeBuild uses your build project's service role. </p> </dd> </dl> <p>When using a cross-account or private registry image, you must use <code>SERVICE_ROLE</code> credentials. When using an AWS CodeBuild curated image, you must use <code>CODEBUILD</code> credentials. </p>"
+      }
+    },
+    "ImageVersions": {
+      "base": null,
+      "refs": {
+        "EnvironmentImage$versions": "<p>A list of environment image versions.</p>"
+      }
+    },
+    "ImportSourceCredentialsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportSourceCredentialsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvalidInputException": {
+      "base": "<p>The input value that was provided is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidateProjectCacheInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvalidateProjectCacheOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "KeyInput": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>The tag's key.</p>"
+      }
+    },
+    "LanguageType": {
+      "base": null,
+      "refs": {
+        "EnvironmentLanguage$language": "<p>The programming language for the Docker images.</p>"
+      }
+    },
+    "ListBuildBatchesForProjectInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildBatchesForProjectOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildBatchesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildBatchesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildsForProjectInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildsForProjectOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListBuildsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCuratedEnvironmentImagesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCuratedEnvironmentImagesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProjectsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportGroupsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportGroupsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportsForReportGroupInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportsForReportGroupOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListReportsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSharedProjectsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSharedProjectsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSharedReportGroupsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSharedReportGroupsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSourceCredentialsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListSourceCredentialsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogsConfig": {
+      "base": "<p> Information about logs for a build project. These can be logs in Amazon CloudWatch Logs, built in a specified S3 bucket, or both. </p>",
+      "refs": {
+        "BuildBatch$logConfig": null,
+        "CreateProjectInput$logsConfig": "<p>Information about logs for the build project. These can be logs in Amazon CloudWatch Logs, logs uploaded to a specified S3 bucket, or both. </p>",
+        "Project$logsConfig": "<p>Information about logs for the build project. A project can create logs in Amazon CloudWatch Logs, an S3 bucket, or both. </p>",
+        "StartBuildBatchInput$logsConfigOverride": "<p>A <code>LogsConfig</code> object that override the log settings defined in the batch build project.</p>",
+        "StartBuildInput$logsConfigOverride": "<p> Log settings for this build that override the log settings defined in the build project. </p>",
+        "UpdateProjectInput$logsConfig": "<p> Information about logs for the build project. A project can create logs in Amazon CloudWatch Logs, logs in an S3 bucket, or both. </p>"
+      }
+    },
+    "LogsConfigStatusType": {
+      "base": null,
+      "refs": {
+        "CloudWatchLogsConfig$status": "<p>The current status of the logs in Amazon CloudWatch Logs for a build project. Valid values are:</p> <ul> <li> <p> <code>ENABLED</code>: Amazon CloudWatch Logs are enabled for this build project.</p> </li> <li> <p> <code>DISABLED</code>: Amazon CloudWatch Logs are not enabled for this build project.</p> </li> </ul>",
+        "S3LogsConfig$status": "<p>The current status of the S3 build logs. Valid values are:</p> <ul> <li> <p> <code>ENABLED</code>: S3 build logs are enabled for this build project.</p> </li> <li> <p> <code>DISABLED</code>: S3 build logs are not enabled for this build project.</p> </li> </ul>"
+      }
+    },
+    "LogsLocation": {
+      "base": "<p>Information about build logs in Amazon CloudWatch Logs.</p>",
+      "refs": {
+        "Build$logs": "<p>Information about the build's logs in Amazon CloudWatch Logs.</p>"
+      }
+    },
+    "NetworkInterface": {
+      "base": "<p>Describes a network interface.</p>",
+      "refs": {
+        "Build$networkInterface": "<p>Describes a network interface.</p>"
+      }
+    },
+    "NonEmptyString": {
+      "base": null,
+      "refs": {
+        "Build$id": "<p>The unique ID for the build.</p>",
+        "Build$arn": "<p>The Amazon Resource Name (ARN) of the build.</p>",
+        "Build$sourceVersion": "<p>Any version identifier for the version of the source code to be built. If <code>sourceVersion</code> is specified at the project level, then this <code>sourceVersion</code> (at the build level) takes precedence. </p> <p> For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "Build$resolvedSourceVersion": "<p> An identifier for the version of this build's source code. </p> <ul> <li> <p> For AWS CodeCommit, GitHub, GitHub Enterprise, and BitBucket, the commit ID. </p> </li> <li> <p> For AWS CodePipeline, the source revision provided by AWS CodePipeline. </p> </li> <li> <p> For Amazon Simple Storage Service (Amazon S3), this does not apply. </p> </li> </ul>",
+        "Build$projectName": "<p>The name of the AWS CodeBuild project.</p>",
+        "Build$serviceRole": "<p>The name of a service role used for this build.</p>",
+        "Build$encryptionKey": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) to be used for encrypting the build output artifacts.</p> <note> <p> You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "BuildBatch$id": "<p>The identifier of the batch build.</p>",
+        "BuildBatch$arn": "<p>The ARN of the batch build.</p>",
+        "BuildBatch$sourceVersion": "<p>The identifier of the version of the source code to be built.</p>",
+        "BuildBatch$resolvedSourceVersion": "<p>The identifier of the resolved version of this batch build's source code.</p> <ul> <li> <p>For AWS CodeCommit, GitHub, GitHub Enterprise, and BitBucket, the commit ID.</p> </li> <li> <p>For AWS CodePipeline, the source revision provided by AWS CodePipeline.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3), this does not apply.</p> </li> </ul>",
+        "BuildBatch$projectName": "<p>The name of the batch build project.</p>",
+        "BuildBatch$serviceRole": "<p>The name of a service role used for builds in the batch.</p>",
+        "BuildBatch$encryptionKey": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) to be used for encrypting the batch build output artifacts.</p> <note> <p>You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "BuildBatchIds$member": null,
+        "BuildIds$member": null,
+        "BuildNotDeleted$id": "<p>The ID of the build that could not be successfully deleted.</p>",
+        "CodeCoverage$id": "<p>The identifier of the code coverage report.</p>",
+        "CodeCoverage$reportARN": "<p>The ARN of the report.</p>",
+        "CodeCoverage$filePath": "<p>The path of the test report file.</p>",
+        "ComputeTypesAllowed$member": null,
+        "CreateProjectInput$serviceRole": "<p>The ARN of the AWS Identity and Access Management (IAM) role that enables AWS CodeBuild to interact with dependent AWS services on behalf of the AWS account.</p>",
+        "CreateProjectInput$encryptionKey": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) to be used for encrypting the build output artifacts.</p> <note> <p>You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "DebugSession$sessionTarget": "<p>Contains the identifier of the Session Manager session used for the build. To work with the paused build, you open this session to examine, control, and resume the build.</p>",
+        "DeleteBuildBatchInput$id": "<p>The identifier of the batch build to delete.</p>",
+        "DeleteProjectInput$name": "<p>The name of the build project.</p>",
+        "DeleteReportGroupInput$arn": "<p>The ARN of the report group to delete. </p>",
+        "DeleteReportInput$arn": "<p> The ARN of the report to delete. </p>",
+        "DeleteResourcePolicyInput$resourceArn": "<p> The ARN of the resource that is associated with the resource policy. </p>",
+        "DeleteSourceCredentialsInput$arn": "<p> The Amazon Resource Name (ARN) of the token.</p>",
+        "DeleteSourceCredentialsOutput$arn": "<p> The Amazon Resource Name (ARN) of the token. </p>",
+        "DescribeCodeCoveragesInput$reportArn": "<p> The ARN of the report for which test cases are returned. </p>",
+        "EnvironmentVariable$name": "<p>The name or key of the environment variable.</p>",
+        "ExportedEnvironmentVariable$name": "<p> The name of this exported environment variable. </p>",
+        "GetResourcePolicyInput$resourceArn": "<p> The ARN of the resource that is associated with the resource policy. </p>",
+        "GetResourcePolicyOutput$policy": "<p> The resource policy for the resource identified by the input ARN parameter. </p>",
+        "Identifiers$member": null,
+        "ImportSourceCredentialsInput$username": "<p> The Bitbucket username when the <code>authType</code> is BASIC_AUTH. This parameter is not valid for other types of source providers or connections. </p>",
+        "ImportSourceCredentialsOutput$arn": "<p> The Amazon Resource Name (ARN) of the token. </p>",
+        "InvalidateProjectCacheInput$projectName": "<p>The name of the AWS CodeBuild build project that the cache is reset for.</p>",
+        "ListBuildBatchesForProjectInput$projectName": "<p>The name of the project.</p>",
+        "ListBuildsForProjectInput$projectName": "<p>The name of the AWS CodeBuild project.</p>",
+        "ListProjectsInput$nextToken": "<p>During a previous call, if there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned.</p>",
+        "ListSharedProjectsInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "NetworkInterface$subnetId": "<p>The ID of the subnet.</p>",
+        "NetworkInterface$networkInterfaceId": "<p>The ID of the network interface.</p>",
+        "Project$serviceRole": "<p>The ARN of the AWS Identity and Access Management (IAM) role that enables AWS CodeBuild to interact with dependent AWS services on behalf of the AWS account.</p>",
+        "Project$encryptionKey": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) to be used for encrypting the build output artifacts.</p> <note> <p>You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "ProjectArns$member": null,
+        "ProjectBuildBatchConfig$serviceRole": "<p>Specifies the service role ARN for the batch build project.</p>",
+        "ProjectEnvironment$image": "<p>The image tag or image digest that identifies the Docker image to use for this build project. Use the following formats:</p> <ul> <li> <p>For an image tag: <code>&lt;registry&gt;/&lt;repository&gt;:&lt;tag&gt;</code>. For example, in the Docker repository that CodeBuild uses to manage its Docker images, this would be <code>aws/codebuild/standard:4.0</code>. To specify the latest version of this image, this would be <code>aws/codebuild/standard:latest</code>.</p> </li> <li> <p>For an image digest: <code>&lt;registry&gt;/&lt;repository&gt;@&lt;digest&gt;</code>. For example, to specify an image with the digest \"sha256:cbbf2f9a99b47fc460d422812b6a5adff7dfee951d8fa2e4a98caa0382cfbdbf,\" use <code>&lt;registry&gt;/&lt;repository&gt;@sha256:cbbf2f9a99b47fc460d422812b6a5adff7dfee951d8fa2e4a98caa0382cfbdbf</code>.</p> </li> </ul>",
+        "ProjectNames$member": null,
+        "PutResourcePolicyInput$policy": "<p> A JSON-formatted resource policy. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/project-sharing.html#project-sharing-share\">Sharing a Project</a> and <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/report-groups-sharing.html#report-groups-sharing-share\">Sharing a Report Group</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "PutResourcePolicyInput$resourceArn": "<p> The ARN of the <code>Project</code> or <code>ReportGroup</code> resource you want to associate with a resource policy. </p>",
+        "PutResourcePolicyOutput$resourceArn": "<p> The ARN of the <code>Project</code> or <code>ReportGroup</code> resource that is associated with a resource policy. </p>",
+        "RegistryCredential$credential": "<p> The Amazon Resource Name (ARN) or name of credentials created using AWS Secrets Manager. </p> <note> <p> The <code>credential</code> can use the name of the credentials only if they exist in your current AWS Region. </p> </note>",
+        "Report$arn": "<p> The ARN of the report run. </p>",
+        "Report$reportGroupArn": "<p> The ARN of the report group associated with this report. </p>",
+        "ReportArns$member": null,
+        "ReportGroup$arn": "<p> The ARN of a <code>ReportGroup</code>. </p>",
+        "ReportGroupArns$member": null,
+        "RetryBuildBatchInput$id": "<p>Specifies the identifier of the batch build to restart.</p>",
+        "RetryBuildInput$id": "<p>Specifies the identifier of the build to restart.</p>",
+        "S3ReportExportConfig$bucket": "<p> The name of the S3 bucket where the raw data of a report are exported. </p>",
+        "S3ReportExportConfig$encryptionKey": "<p> The encryption key for the report's encrypted raw data. </p>",
+        "SecurityGroupIds$member": null,
+        "SourceCredentialsInfo$arn": "<p> The Amazon Resource Name (ARN) of the token. </p>",
+        "StartBuildBatchInput$projectName": "<p>The name of the project.</p>",
+        "StartBuildBatchInput$imageOverride": "<p>The name of an image for this batch build that overrides the one specified in the batch build project.</p>",
+        "StartBuildBatchInput$serviceRoleOverride": "<p>The name of a service role for this batch build that overrides the one specified in the batch build project.</p>",
+        "StartBuildBatchInput$encryptionKeyOverride": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) that overrides the one specified in the batch build project. The CMK key encrypts the build output artifacts.</p> <note> <p>You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "StartBuildInput$projectName": "<p>The name of the AWS CodeBuild build project to start running a build.</p>",
+        "StartBuildInput$imageOverride": "<p>The name of an image for this build that overrides the one specified in the build project.</p>",
+        "StartBuildInput$serviceRoleOverride": "<p>The name of a service role for this build that overrides the one specified in the build project.</p>",
+        "StartBuildInput$encryptionKeyOverride": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) that overrides the one specified in the build project. The CMK key encrypts the build output artifacts.</p> <note> <p> You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "StopBuildBatchInput$id": "<p>The identifier of the batch build to stop.</p>",
+        "StopBuildInput$id": "<p>The ID of the build.</p>",
+        "Subnets$member": null,
+        "TestCase$reportArn": "<p> The ARN of the report to which the test case belongs. </p>",
+        "UpdateProjectInput$name": "<p>The name of the build project.</p> <note> <p>You cannot change a build project's name.</p> </note>",
+        "UpdateProjectInput$serviceRole": "<p>The replacement ARN of the AWS Identity and Access Management (IAM) role that enables AWS CodeBuild to interact with dependent AWS services on behalf of the AWS account.</p>",
+        "UpdateProjectInput$encryptionKey": "<p>The AWS Key Management Service (AWS KMS) customer master key (CMK) to be used for encrypting the build output artifacts.</p> <note> <p> You can use a cross-account KMS key to encrypt the build output artifacts if your service role has permission to that key. </p> </note> <p>You can specify either the Amazon Resource Name (ARN) of the CMK or, if available, the CMK's alias (using the format <code>alias/&lt;alias-name&gt;</code>).</p>",
+        "UpdateReportGroupInput$arn": "<p> The ARN of the report group to update. </p>",
+        "VpcConfig$vpcId": "<p>The ID of the Amazon VPC.</p>",
+        "Webhook$url": "<p>The URL to the webhook.</p>",
+        "Webhook$payloadUrl": "<p>The AWS CodeBuild endpoint where webhook events are sent.</p>",
+        "Webhook$secret": "<p>The secret token of the associated repository. </p> <note> <p>A Bitbucket webhook does not support <code>secret</code>. </p> </note>"
+      }
+    },
+    "NonNegativeInt": {
+      "base": null,
+      "refs": {
+        "CodeCoverage$linesCovered": "<p>The number of lines that are covered by your tests.</p>",
+        "CodeCoverage$linesMissed": "<p>The number of lines that are not covered by your tests.</p>",
+        "CodeCoverage$branchesCovered": "<p>The number of conditional branches that are covered by your tests.</p>",
+        "CodeCoverage$branchesMissed": "<p>The number of conditional branches that are not covered by your tests.</p>",
+        "CodeCoverageReportSummary$linesCovered": "<p>The number of lines that are covered by your tests.</p>",
+        "CodeCoverageReportSummary$linesMissed": "<p>The number of lines that are not covered by your tests.</p>",
+        "CodeCoverageReportSummary$branchesCovered": "<p>The number of conditional branches that are covered by your tests.</p>",
+        "CodeCoverageReportSummary$branchesMissed": "<p>The number of conditional branches that are not covered by your tests.</p>"
+      }
+    },
+    "OAuthProviderException": {
+      "base": "<p>There was a problem with the underlying OAuth provider.</p>",
+      "refs": {
+      }
+    },
+    "PageSize": {
+      "base": null,
+      "refs": {
+        "DescribeCodeCoveragesInput$maxResults": "<p>The maximum number of results to return.</p>",
+        "DescribeTestCasesInput$maxResults": "<p> The maximum number of paginated test cases returned per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>TestCase</code> objects. The default value is 100. </p>",
+        "ListBuildBatchesForProjectInput$maxResults": "<p>The maximum number of results to return.</p>",
+        "ListBuildBatchesInput$maxResults": "<p>The maximum number of results to return.</p>",
+        "ListReportGroupsInput$maxResults": "<p> The maximum number of paginated report groups returned per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>ReportGroup</code> objects. The default value is 100. </p>",
+        "ListReportsForReportGroupInput$maxResults": "<p> The maximum number of paginated reports in this report group returned per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>Report</code> objects. The default value is 100. </p>",
+        "ListReportsInput$maxResults": "<p> The maximum number of paginated reports returned per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>Report</code> objects. The default value is 100. </p>",
+        "ListSharedProjectsInput$maxResults": "<p> The maximum number of paginated shared build projects returned per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>Project</code> objects. The default value is 100. </p>",
+        "ListSharedReportGroupsInput$maxResults": "<p> The maximum number of paginated shared report groups per response. Use <code>nextToken</code> to iterate pages in the list of returned <code>ReportGroup</code> objects. The default value is 100. </p>"
+      }
+    },
+    "Percentage": {
+      "base": null,
+      "refs": {
+        "CodeCoverage$lineCoveragePercentage": "<p>The percentage of lines that are covered by your tests.</p>",
+        "CodeCoverage$branchCoveragePercentage": "<p>The percentage of branches that are covered by your tests.</p>",
+        "CodeCoverageReportSummary$lineCoveragePercentage": "<p>The percentage of lines that are covered by your tests.</p>",
+        "CodeCoverageReportSummary$branchCoveragePercentage": "<p>The percentage of branches that are covered by your tests.</p>",
+        "DescribeCodeCoveragesInput$minLineCoveragePercentage": "<p>The minimum line coverage percentage to report.</p>",
+        "DescribeCodeCoveragesInput$maxLineCoveragePercentage": "<p>The maximum line coverage percentage to report.</p>"
+      }
+    },
+    "PhaseContext": {
+      "base": "<p>Additional information about a build phase that has an error. You can use this information for troubleshooting.</p>",
+      "refs": {
+        "PhaseContexts$member": null
+      }
+    },
+    "PhaseContexts": {
+      "base": null,
+      "refs": {
+        "BuildBatchPhase$contexts": "<p>Additional information about the batch build phase. Especially to help troubleshoot a failed btach build.</p>",
+        "BuildPhase$contexts": "<p>Additional information about a build phase, especially to help troubleshoot a failed build.</p>"
+      }
+    },
+    "PlatformType": {
+      "base": null,
+      "refs": {
+        "EnvironmentPlatform$platform": "<p>The platform's name.</p>"
+      }
+    },
+    "Project": {
+      "base": "<p>Information about a build project.</p>",
+      "refs": {
+        "CreateProjectOutput$project": "<p>Information about the build project that was created.</p>",
+        "Projects$member": null,
+        "UpdateProjectOutput$project": "<p>Information about the build project that was changed.</p>"
+      }
+    },
+    "ProjectArns": {
+      "base": null,
+      "refs": {
+        "ListSharedProjectsOutput$projects": "<p> The list of ARNs for the build projects shared with the current AWS account or user. </p>"
+      }
+    },
+    "ProjectArtifacts": {
+      "base": "<p>Information about the build output artifacts for the build project.</p>",
+      "refs": {
+        "CreateProjectInput$artifacts": "<p>Information about the build output artifacts for the build project.</p>",
+        "Project$artifacts": "<p>Information about the build output artifacts for the build project.</p>",
+        "ProjectArtifactsList$member": null,
+        "StartBuildBatchInput$artifactsOverride": "<p>An array of <code>ProjectArtifacts</code> objects that contains information about the build output artifact overrides for the build project.</p>",
+        "StartBuildInput$artifactsOverride": "<p>Build output artifact settings that override, for this build only, the latest ones already defined in the build project.</p>",
+        "UpdateProjectInput$artifacts": "<p>Information to be changed about the build output artifacts for the build project.</p>"
+      }
+    },
+    "ProjectArtifactsList": {
+      "base": null,
+      "refs": {
+        "CreateProjectInput$secondaryArtifacts": "<p>An array of <code>ProjectArtifacts</code> objects. </p>",
+        "Project$secondaryArtifacts": "<p>An array of <code>ProjectArtifacts</code> objects. </p>",
+        "StartBuildBatchInput$secondaryArtifactsOverride": "<p>An array of <code>ProjectArtifacts</code> objects that override the secondary artifacts defined in the batch build project.</p>",
+        "StartBuildInput$secondaryArtifactsOverride": "<p> An array of <code>ProjectArtifacts</code> objects. </p>",
+        "UpdateProjectInput$secondaryArtifacts": "<p> An array of <code>ProjectSource</code> objects. </p>"
+      }
+    },
+    "ProjectBadge": {
+      "base": "<p>Information about the build badge for the build project.</p>",
+      "refs": {
+        "Project$badge": "<p>Information about the build badge for the build project.</p>"
+      }
+    },
+    "ProjectBuildBatchConfig": {
+      "base": "<p>Contains configuration information about a batch build project.</p>",
+      "refs": {
+        "BuildBatch$buildBatchConfig": null,
+        "CreateProjectInput$buildBatchConfig": "<p>A <a>ProjectBuildBatchConfig</a> object that defines the batch build options for the project.</p>",
+        "Project$buildBatchConfig": "<p>A <a>ProjectBuildBatchConfig</a> object that defines the batch build options for the project.</p>",
+        "StartBuildBatchInput$buildBatchConfigOverride": "<p>A <code>BuildBatchConfigOverride</code> object that contains batch build configuration overrides.</p>",
+        "UpdateProjectInput$buildBatchConfig": null
+      }
+    },
+    "ProjectCache": {
+      "base": "<p>Information about the cache for the build project.</p>",
+      "refs": {
+        "Build$cache": "<p>Information about the cache for the build.</p>",
+        "BuildBatch$cache": null,
+        "CreateProjectInput$cache": "<p>Stores recently used information so that it can be quickly accessed at a later time.</p>",
+        "Project$cache": "<p>Information about the cache for the build project.</p>",
+        "StartBuildBatchInput$cacheOverride": "<p>A <code>ProjectCache</code> object that specifies cache overrides.</p>",
+        "StartBuildInput$cacheOverride": "<p>A ProjectCache object specified for this build that overrides the one defined in the build project.</p>",
+        "UpdateProjectInput$cache": "<p>Stores recently used information so that it can be quickly accessed at a later time.</p>"
+      }
+    },
+    "ProjectCacheModes": {
+      "base": null,
+      "refs": {
+        "ProjectCache$modes": "<p> If you use a <code>LOCAL</code> cache, the local cache mode. You can use one or more local cache modes at the same time. </p> <ul> <li> <p> <code>LOCAL_SOURCE_CACHE</code> mode caches Git metadata for primary and secondary sources. After the cache is created, subsequent builds pull only the change between commits. This mode is a good choice for projects with a clean working directory and a source that is a large Git repository. If you choose this option and your project does not use a Git repository (GitHub, GitHub Enterprise, or Bitbucket), the option is ignored. </p> </li> <li> <p> <code>LOCAL_DOCKER_LAYER_CACHE</code> mode caches existing Docker layers. This mode is a good choice for projects that build or pull large Docker images. It can prevent the performance issues caused by pulling large Docker images down from the network. </p> <note> <ul> <li> <p> You can use a Docker layer cache in the Linux environment only. </p> </li> <li> <p> The <code>privileged</code> flag must be set so that your project has the required Docker permissions. </p> </li> <li> <p> You should consider the security implications before you use a Docker layer cache. </p> </li> </ul> </note> </li> </ul> <ul> <li> <p> <code>LOCAL_CUSTOM_CACHE</code> mode caches directories you specify in the buildspec file. This mode is a good choice if your build scenario is not suited to one of the other three local cache modes. If you use a custom cache: </p> <ul> <li> <p> Only directories can be specified for caching. You cannot specify individual files. </p> </li> <li> <p> Symlinks are used to reference cached directories. </p> </li> <li> <p> Cached directories are linked to your build before it downloads its project sources. Cached items are overridden if a source item has the same name. Directories are specified using cache paths in the buildspec file. </p> </li> </ul> </li> </ul>"
+      }
+    },
+    "ProjectDescription": {
+      "base": null,
+      "refs": {
+        "CreateProjectInput$description": "<p>A description that makes the build project easy to identify.</p>",
+        "Project$description": "<p>A description that makes the build project easy to identify.</p>",
+        "UpdateProjectInput$description": "<p>A new or replacement description of the build project.</p>"
+      }
+    },
+    "ProjectEnvironment": {
+      "base": "<p>Information about the build environment of the build project.</p>",
+      "refs": {
+        "Build$environment": "<p>Information about the build environment for this build.</p>",
+        "BuildBatch$environment": null,
+        "CreateProjectInput$environment": "<p>Information about the build environment for the build project.</p>",
+        "Project$environment": "<p>Information about the build environment for this build project.</p>",
+        "UpdateProjectInput$environment": "<p>Information to be changed about the build environment for the build project.</p>"
+      }
+    },
+    "ProjectFileSystemLocation": {
+      "base": "<p> Information about a file system created by Amazon Elastic File System (EFS). For more information, see <a href=\"https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html\">What Is Amazon Elastic File System?</a> </p>",
+      "refs": {
+        "ProjectFileSystemLocations$member": null
+      }
+    },
+    "ProjectFileSystemLocations": {
+      "base": null,
+      "refs": {
+        "Build$fileSystemLocations": "<p> An array of <code>ProjectFileSystemLocation</code> objects for a CodeBuild build project. A <code>ProjectFileSystemLocation</code> object specifies the <code>identifier</code>, <code>location</code>, <code>mountOptions</code>, <code>mountPoint</code>, and <code>type</code> of a file system created using Amazon Elastic File System. </p>",
+        "BuildBatch$fileSystemLocations": "<p>An array of <code>ProjectFileSystemLocation</code> objects for the batch build project. A <code>ProjectFileSystemLocation</code> object specifies the <code>identifier</code>, <code>location</code>, <code>mountOptions</code>, <code>mountPoint</code>, and <code>type</code> of a file system created using Amazon Elastic File System. </p>",
+        "CreateProjectInput$fileSystemLocations": "<p> An array of <code>ProjectFileSystemLocation</code> objects for a CodeBuild build project. A <code>ProjectFileSystemLocation</code> object specifies the <code>identifier</code>, <code>location</code>, <code>mountOptions</code>, <code>mountPoint</code>, and <code>type</code> of a file system created using Amazon Elastic File System. </p>",
+        "Project$fileSystemLocations": "<p> An array of <code>ProjectFileSystemLocation</code> objects for a CodeBuild build project. A <code>ProjectFileSystemLocation</code> object specifies the <code>identifier</code>, <code>location</code>, <code>mountOptions</code>, <code>mountPoint</code>, and <code>type</code> of a file system created using Amazon Elastic File System. </p>",
+        "UpdateProjectInput$fileSystemLocations": "<p> An array of <code>ProjectFileSystemLocation</code> objects for a CodeBuild build project. A <code>ProjectFileSystemLocation</code> object specifies the <code>identifier</code>, <code>location</code>, <code>mountOptions</code>, <code>mountPoint</code>, and <code>type</code> of a file system created using Amazon Elastic File System. </p>"
+      }
+    },
+    "ProjectName": {
+      "base": null,
+      "refs": {
+        "CreateProjectInput$name": "<p>The name of the build project.</p>",
+        "CreateWebhookInput$projectName": "<p>The name of the AWS CodeBuild project.</p>",
+        "DeleteWebhookInput$projectName": "<p>The name of the AWS CodeBuild project.</p>",
+        "Project$name": "<p>The name of the build project.</p>",
+        "UpdateWebhookInput$projectName": "<p>The name of the AWS CodeBuild project.</p>"
+      }
+    },
+    "ProjectNames": {
+      "base": null,
+      "refs": {
+        "BatchGetProjectsInput$names": "<p>The names or ARNs of the build projects. To get information about a project shared with your AWS account, its ARN must be specified. You cannot specify a shared project using its name.</p>",
+        "BatchGetProjectsOutput$projectsNotFound": "<p>The names of build projects for which information could not be found.</p>",
+        "ListProjectsOutput$projects": "<p>The list of build project names, with each build project name representing a single build project.</p>"
+      }
+    },
+    "ProjectSecondarySourceVersions": {
+      "base": null,
+      "refs": {
+        "Build$secondarySourceVersions": "<p> An array of <code>ProjectSourceVersion</code> objects. Each <code>ProjectSourceVersion</code> must be one of: </p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example, <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul>",
+        "BuildBatch$secondarySourceVersions": "<p>An array of <code>ProjectSourceVersion</code> objects. Each <code>ProjectSourceVersion</code> must be one of: </p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example, <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul>",
+        "CreateProjectInput$secondarySourceVersions": "<p>An array of <code>ProjectSourceVersion</code> objects. If <code>secondarySourceVersions</code> is specified at the build level, then they take precedence over these <code>secondarySourceVersions</code> (at the project level). </p>",
+        "Project$secondarySourceVersions": "<p>An array of <code>ProjectSourceVersion</code> objects. If <code>secondarySourceVersions</code> is specified at the build level, then they take over these <code>secondarySourceVersions</code> (at the project level). </p>",
+        "StartBuildBatchInput$secondarySourcesVersionOverride": "<p>An array of <code>ProjectSourceVersion</code> objects that override the secondary source versions in the batch build project.</p>",
+        "StartBuildInput$secondarySourcesVersionOverride": "<p> An array of <code>ProjectSourceVersion</code> objects that specify one or more versions of the project's secondary sources to be used for this build only. </p>",
+        "UpdateProjectInput$secondarySourceVersions": "<p> An array of <code>ProjectSourceVersion</code> objects. If <code>secondarySourceVersions</code> is specified at the build level, then they take over these <code>secondarySourceVersions</code> (at the project level). </p>"
+      }
+    },
+    "ProjectSortByType": {
+      "base": null,
+      "refs": {
+        "ListProjectsInput$sortBy": "<p>The criterion to be used to list build project names. Valid values include:</p> <ul> <li> <p> <code>CREATED_TIME</code>: List based on when each build project was created.</p> </li> <li> <p> <code>LAST_MODIFIED_TIME</code>: List based on when information about each build project was last changed.</p> </li> <li> <p> <code>NAME</code>: List based on each build project's name.</p> </li> </ul> <p>Use <code>sortOrder</code> to specify in what order to list the build project names based on the preceding criteria.</p>"
+      }
+    },
+    "ProjectSource": {
+      "base": "<p>Information about the build input source code for the build project.</p>",
+      "refs": {
+        "Build$source": "<p>Information about the source code to be built.</p>",
+        "BuildBatch$source": null,
+        "CreateProjectInput$source": "<p>Information about the build input source code for the build project.</p>",
+        "Project$source": "<p>Information about the build input source code for this build project.</p>",
+        "ProjectSources$member": null,
+        "UpdateProjectInput$source": "<p>Information to be changed about the build input source code for the build project.</p>"
+      }
+    },
+    "ProjectSourceVersion": {
+      "base": "<p> A source identifier and its corresponding version. </p>",
+      "refs": {
+        "ProjectSecondarySourceVersions$member": null
+      }
+    },
+    "ProjectSources": {
+      "base": null,
+      "refs": {
+        "Build$secondarySources": "<p> An array of <code>ProjectSource</code> objects. </p>",
+        "BuildBatch$secondarySources": "<p>An array of <code>ProjectSource</code> objects that define the sources for the batch build.</p>",
+        "CreateProjectInput$secondarySources": "<p>An array of <code>ProjectSource</code> objects. </p>",
+        "Project$secondarySources": "<p>An array of <code>ProjectSource</code> objects. </p>",
+        "StartBuildBatchInput$secondarySourcesOverride": "<p>An array of <code>ProjectSource</code> objects that override the secondary sources defined in the batch build project.</p>",
+        "StartBuildInput$secondarySourcesOverride": "<p> An array of <code>ProjectSource</code> objects. </p>",
+        "UpdateProjectInput$secondarySources": "<p> An array of <code>ProjectSource</code> objects. </p>"
+      }
+    },
+    "Projects": {
+      "base": null,
+      "refs": {
+        "BatchGetProjectsOutput$projects": "<p>Information about the requested build projects.</p>"
+      }
+    },
+    "PutResourcePolicyInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutResourcePolicyOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegistryCredential": {
+      "base": "<p> Information about credentials that provide access to a private Docker registry. When this is set: </p> <ul> <li> <p> <code>imagePullCredentialsType</code> must be set to <code>SERVICE_ROLE</code>. </p> </li> <li> <p> images cannot be curated or an Amazon ECR image.</p> </li> </ul> <p> For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-private-registry.html\">Private Registry with AWS Secrets Manager Sample for AWS CodeBuild</a>. </p>",
+      "refs": {
+        "ProjectEnvironment$registryCredential": "<p> The credentials for access to a private registry.</p>",
+        "StartBuildBatchInput$registryCredentialOverride": "<p>A <code>RegistryCredential</code> object that overrides credentials for access to a private registry.</p>",
+        "StartBuildInput$registryCredentialOverride": "<p> The credentials for access to a private registry. </p>"
+      }
+    },
+    "Report": {
+      "base": "<p>Information about the results from running a series of test cases during the run of a build project. The test cases are specified in the buildspec for the build project using one or more paths to the test case files. You can specify any type of tests you want, such as unit tests, integration tests, and functional tests. </p>",
+      "refs": {
+        "Reports$member": null
+      }
+    },
+    "ReportArns": {
+      "base": null,
+      "refs": {
+        "BatchGetReportsInput$reportArns": "<p> An array of ARNs that identify the <code>Report</code> objects to return. </p>",
+        "BatchGetReportsOutput$reportsNotFound": "<p> An array of ARNs passed to <code>BatchGetReportGroups</code> that are not associated with a <code>Report</code>. </p>",
+        "ListReportsForReportGroupOutput$reports": "<p> The list of report ARNs. </p>",
+        "ListReportsOutput$reports": "<p> The list of returned ARNs for the reports in the current AWS account. </p>"
+      }
+    },
+    "ReportCodeCoverageSortByType": {
+      "base": null,
+      "refs": {
+        "DescribeCodeCoveragesInput$sortBy": "<p>Specifies how the results are sorted. Possible values are:</p> <dl> <dt>FILE_PATH</dt> <dd> <p>The results are sorted by file path.</p> </dd> <dt>LINE_COVERAGE_PERCENTAGE</dt> <dd> <p>The results are sorted by the percentage of lines that are covered.</p> </dd> </dl>"
+      }
+    },
+    "ReportExportConfig": {
+      "base": "<p> Information about the location where the run of a report is exported. </p>",
+      "refs": {
+        "CreateReportGroupInput$exportConfig": "<p> A <code>ReportExportConfig</code> object that contains information about where the report group test results are exported. </p>",
+        "Report$exportConfig": "<p> Information about where the raw data used to generate this report was exported. </p>",
+        "ReportGroup$exportConfig": "<p> Information about the destination where the raw data of this <code>ReportGroup</code> is exported. </p>",
+        "UpdateReportGroupInput$exportConfig": "<p> Used to specify an updated export type. Valid values are: </p> <ul> <li> <p> <code>S3</code>: The report results are exported to an S3 bucket. </p> </li> <li> <p> <code>NO_EXPORT</code>: The report results are not exported. </p> </li> </ul>"
+      }
+    },
+    "ReportExportConfigType": {
+      "base": null,
+      "refs": {
+        "ReportExportConfig$exportConfigType": "<p> The export configuration type. Valid values are: </p> <ul> <li> <p> <code>S3</code>: The report results are exported to an S3 bucket. </p> </li> <li> <p> <code>NO_EXPORT</code>: The report results are not exported. </p> </li> </ul>"
+      }
+    },
+    "ReportFilter": {
+      "base": "<p> A filter used to return reports with the status specified by the input <code>status</code> parameter. </p>",
+      "refs": {
+        "ListReportsForReportGroupInput$filter": "<p> A <code>ReportFilter</code> object used to filter the returned reports. </p>",
+        "ListReportsInput$filter": "<p> A <code>ReportFilter</code> object used to filter the returned reports. </p>"
+      }
+    },
+    "ReportGroup": {
+      "base": "<p> A series of reports. Each report contains information about the results from running a series of test cases. You specify the test cases for a report group in the buildspec for a build project using one or more paths to the test case files. </p>",
+      "refs": {
+        "CreateReportGroupOutput$reportGroup": "<p> Information about the report group that was created. </p>",
+        "ReportGroups$member": null,
+        "UpdateReportGroupOutput$reportGroup": "<p> Information about the updated report group. </p>"
+      }
+    },
+    "ReportGroupArns": {
+      "base": null,
+      "refs": {
+        "BatchGetReportGroupsInput$reportGroupArns": "<p> An array of report group ARNs that identify the report groups to return. </p>",
+        "BatchGetReportGroupsOutput$reportGroupsNotFound": "<p> An array of ARNs passed to <code>BatchGetReportGroups</code> that are not associated with a <code>ReportGroup</code>. </p>",
+        "ListReportGroupsOutput$reportGroups": "<p> The list of ARNs for the report groups in the current AWS account. </p>",
+        "ListSharedReportGroupsOutput$reportGroups": "<p> The list of ARNs for the report groups shared with the current AWS account or user. </p>"
+      }
+    },
+    "ReportGroupName": {
+      "base": null,
+      "refs": {
+        "CreateReportGroupInput$name": "<p> The name of the report group. </p>",
+        "ReportGroup$name": "<p> The name of a <code>ReportGroup</code>. </p>"
+      }
+    },
+    "ReportGroupSortByType": {
+      "base": null,
+      "refs": {
+        "ListReportGroupsInput$sortBy": "<p> The criterion to be used to list build report groups. Valid values include: </p> <ul> <li> <p> <code>CREATED_TIME</code>: List based on when each report group was created.</p> </li> <li> <p> <code>LAST_MODIFIED_TIME</code>: List based on when each report group was last changed.</p> </li> <li> <p> <code>NAME</code>: List based on each report group's name.</p> </li> </ul>"
+      }
+    },
+    "ReportGroups": {
+      "base": null,
+      "refs": {
+        "BatchGetReportGroupsOutput$reportGroups": "<p> The array of report groups returned by <code>BatchGetReportGroups</code>. </p>"
+      }
+    },
+    "ReportPackagingType": {
+      "base": null,
+      "refs": {
+        "S3ReportExportConfig$packaging": "<p> The type of build output artifact to create. Valid values include: </p> <ul> <li> <p> <code>NONE</code>: AWS CodeBuild creates the raw data in the output bucket. This is the default if packaging is not specified. </p> </li> <li> <p> <code>ZIP</code>: AWS CodeBuild creates a ZIP file with the raw data in the output bucket. </p> </li> </ul>"
+      }
+    },
+    "ReportStatusCounts": {
+      "base": null,
+      "refs": {
+        "TestReportSummary$statusCounts": "<p> A map that contains the number of each type of status returned by the test results in this <code>TestReportSummary</code>. </p>"
+      }
+    },
+    "ReportStatusType": {
+      "base": null,
+      "refs": {
+        "Report$status": "<p> The status of this report. </p>",
+        "ReportFilter$status": "<p> The status used to filter reports. You can filter using one status only. </p>"
+      }
+    },
+    "ReportType": {
+      "base": null,
+      "refs": {
+        "CreateReportGroupInput$type": "<p> The type of report group. </p>",
+        "Report$type": "<p>The type of the report that was run.</p> <dl> <dt>CODE_COVERAGE</dt> <dd> <p>A code coverage report.</p> </dd> <dt>TEST</dt> <dd> <p>A test report.</p> </dd> </dl>",
+        "ReportGroup$type": "<p> The type of the <code>ReportGroup</code>. The one valid value is <code>TEST</code>. </p>"
+      }
+    },
+    "Reports": {
+      "base": null,
+      "refs": {
+        "BatchGetReportsOutput$reports": "<p> The array of <code>Report</code> objects returned by <code>BatchGetReports</code>. </p>"
+      }
+    },
+    "ResolvedArtifact": {
+      "base": "<p>Represents a resolved build artifact. A resolve artifact is an artifact that is built and deployed to the destination, such as Amazon Simple Storage Service (Amazon S3).</p>",
+      "refs": {
+        "BuildSummary$primaryArtifact": "<p>A <code>ResolvedArtifact</code> object that represents the primary build artifacts for the build group.</p>",
+        "ResolvedSecondaryArtifacts$member": null
+      }
+    },
+    "ResolvedSecondaryArtifacts": {
+      "base": null,
+      "refs": {
+        "BuildSummary$secondaryArtifacts": "<p>An array of <code>ResolvedArtifact</code> objects that represents the secondary build artifacts for the build group.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified AWS resource cannot be created, because an AWS resource with the same settings already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified AWS resource cannot be found.</p>",
+      "refs": {
+      }
+    },
+    "RetryBuildBatchInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RetryBuildBatchOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RetryBuildBatchType": {
+      "base": null,
+      "refs": {
+        "RetryBuildBatchInput$retryType": "<p>Specifies the type of retry to perform.</p>"
+      }
+    },
+    "RetryBuildInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RetryBuildOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "S3LogsConfig": {
+      "base": "<p> Information about S3 logs for a build project. </p>",
+      "refs": {
+        "LogsConfig$s3Logs": "<p> Information about logs built to an S3 bucket for a build project. S3 logs are not enabled by default. </p>",
+        "LogsLocation$s3Logs": "<p> Information about S3 logs for a build project. </p>"
+      }
+    },
+    "S3ReportExportConfig": {
+      "base": "<p> Information about the S3 bucket where the raw data of a report are exported. </p>",
+      "refs": {
+        "ReportExportConfig$s3Destination": "<p> A <code>S3ReportExportConfig</code> object that contains information about the S3 bucket where the run of a report is exported. </p>"
+      }
+    },
+    "SecurityGroupIds": {
+      "base": null,
+      "refs": {
+        "VpcConfig$securityGroupIds": "<p>A list of one or more security groups IDs in your Amazon VPC.</p>"
+      }
+    },
+    "SensitiveNonEmptyString": {
+      "base": null,
+      "refs": {
+        "ImportSourceCredentialsInput$token": "<p> For GitHub or GitHub Enterprise, this is the personal access token. For Bitbucket, this is the app password. </p>"
+      }
+    },
+    "ServerType": {
+      "base": null,
+      "refs": {
+        "ImportSourceCredentialsInput$serverType": "<p> The source provider used for this project. </p>",
+        "SourceCredentialsInfo$serverType": "<p> The type of source provider. The valid options are GITHUB, GITHUB_ENTERPRISE, or BITBUCKET. </p>"
+      }
+    },
+    "SharedResourceSortByType": {
+      "base": null,
+      "refs": {
+        "ListSharedProjectsInput$sortBy": "<p> The criterion to be used to list build projects shared with the current AWS account or user. Valid values include: </p> <ul> <li> <p> <code>ARN</code>: List based on the ARN. </p> </li> <li> <p> <code>MODIFIED_TIME</code>: List based on when information about the shared project was last changed. </p> </li> </ul>",
+        "ListSharedReportGroupsInput$sortBy": "<p> The criterion to be used to list report groups shared with the current AWS account or user. Valid values include: </p> <ul> <li> <p> <code>ARN</code>: List based on the ARN. </p> </li> <li> <p> <code>MODIFIED_TIME</code>: List based on when information about the shared report group was last changed. </p> </li> </ul>"
+      }
+    },
+    "SortOrderType": {
+      "base": null,
+      "refs": {
+        "DescribeCodeCoveragesInput$sortOrder": "<p>Specifies if the results are sorted in ascending or descending order.</p>",
+        "ListBuildBatchesForProjectInput$sortOrder": "<p>Specifies the sort order of the returned items. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List the batch build identifiers in ascending order by identifier.</p> </li> <li> <p> <code>DESCENDING</code>: List the batch build identifiers in descending order by identifier.</p> </li> </ul>",
+        "ListBuildBatchesInput$sortOrder": "<p>Specifies the sort order of the returned items. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List the batch build identifiers in ascending order by identifier.</p> </li> <li> <p> <code>DESCENDING</code>: List the batch build identifiers in descending order by identifier.</p> </li> </ul>",
+        "ListBuildsForProjectInput$sortOrder": "<p>The order to list build IDs. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List the build IDs in ascending order by build ID.</p> </li> <li> <p> <code>DESCENDING</code>: List the build IDs in descending order by build ID.</p> </li> </ul>",
+        "ListBuildsInput$sortOrder": "<p>The order to list build IDs. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List the build IDs in ascending order by build ID.</p> </li> <li> <p> <code>DESCENDING</code>: List the build IDs in descending order by build ID.</p> </li> </ul>",
+        "ListProjectsInput$sortOrder": "<p>The order in which to list build projects. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List in ascending order.</p> </li> <li> <p> <code>DESCENDING</code>: List in descending order.</p> </li> </ul> <p>Use <code>sortBy</code> to specify the criterion to be used to list build project names.</p>",
+        "ListReportGroupsInput$sortOrder": "<p> Used to specify the order to sort the list of returned report groups. Valid values are <code>ASCENDING</code> and <code>DESCENDING</code>. </p>",
+        "ListReportsForReportGroupInput$sortOrder": "<p> Use to specify whether the results are returned in ascending or descending order. </p>",
+        "ListReportsInput$sortOrder": "<p> Specifies the sort order for the list of returned reports. Valid values are: </p> <ul> <li> <p> <code>ASCENDING</code>: return reports in chronological order based on their creation date. </p> </li> <li> <p> <code>DESCENDING</code>: return reports in the reverse chronological order based on their creation date. </p> </li> </ul>",
+        "ListSharedProjectsInput$sortOrder": "<p>The order in which to list shared build projects. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List in ascending order.</p> </li> <li> <p> <code>DESCENDING</code>: List in descending order.</p> </li> </ul>",
+        "ListSharedReportGroupsInput$sortOrder": "<p>The order in which to list shared report groups. Valid values include:</p> <ul> <li> <p> <code>ASCENDING</code>: List in ascending order.</p> </li> <li> <p> <code>DESCENDING</code>: List in descending order.</p> </li> </ul>"
+      }
+    },
+    "SourceAuth": {
+      "base": "<p>Information about the authorization settings for AWS CodeBuild to access the source code to be built.</p> <p>This information is for the AWS CodeBuild console's use only. Your code should not get or set this information directly.</p>",
+      "refs": {
+        "ProjectSource$auth": "<p>Information about the authorization settings for AWS CodeBuild to access the source code to be built.</p> <p>This information is for the AWS CodeBuild console's use only. Your code should not get or set this information directly.</p>",
+        "StartBuildBatchInput$sourceAuthOverride": "<p>A <code>SourceAuth</code> object that overrides the one defined in the batch build project. This override applies only if the build project's source is BitBucket or GitHub.</p>",
+        "StartBuildInput$sourceAuthOverride": "<p>An authorization type for this build that overrides the one defined in the build project. This override applies only if the build project's source is BitBucket or GitHub.</p>"
+      }
+    },
+    "SourceAuthType": {
+      "base": null,
+      "refs": {
+        "SourceAuth$type": "<note> <p> This data type is deprecated and is no longer accurate or used. </p> </note> <p>The authorization type to use. The only valid value is <code>OAUTH</code>, which represents the OAuth authorization type.</p>"
+      }
+    },
+    "SourceCredentialsInfo": {
+      "base": "<p> Information about the credentials for a GitHub, GitHub Enterprise, or Bitbucket repository. </p>",
+      "refs": {
+        "SourceCredentialsInfos$member": null
+      }
+    },
+    "SourceCredentialsInfos": {
+      "base": null,
+      "refs": {
+        "ListSourceCredentialsOutput$sourceCredentialsInfos": "<p> A list of <code>SourceCredentialsInfo</code> objects. Each <code>SourceCredentialsInfo</code> object includes the authentication type, token ARN, and type of source provider for one set of credentials. </p>"
+      }
+    },
+    "SourceType": {
+      "base": null,
+      "refs": {
+        "ProjectSource$type": "<p>The type of repository that contains the source code to be built. Valid values include:</p> <ul> <li> <p> <code>BITBUCKET</code>: The source code is in a Bitbucket repository.</p> </li> <li> <p> <code>CODECOMMIT</code>: The source code is in an AWS CodeCommit repository.</p> </li> <li> <p> <code>CODEPIPELINE</code>: The source code settings are specified in the source action of a pipeline in AWS CodePipeline.</p> </li> <li> <p> <code>GITHUB</code>: The source code is in a GitHub or GitHub Enterprise Cloud repository.</p> </li> <li> <p> <code>GITHUB_ENTERPRISE</code>: The source code is in a GitHub Enterprise Server repository.</p> </li> <li> <p> <code>NO_SOURCE</code>: The project does not have input source code.</p> </li> <li> <p> <code>S3</code>: The source code is in an Amazon Simple Storage Service (Amazon S3) input bucket.</p> </li> </ul>",
+        "StartBuildBatchInput$sourceTypeOverride": "<p>The source input type that overrides the source input defined in the batch build project.</p>",
+        "StartBuildInput$sourceTypeOverride": "<p>A source input type, for this build, that overrides the source input defined in the build project.</p>"
+      }
+    },
+    "StartBuildBatchInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartBuildBatchOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartBuildInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartBuildOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StatusType": {
+      "base": null,
+      "refs": {
+        "Build$buildStatus": "<p>The current status of the build. Valid values include:</p> <ul> <li> <p> <code>FAILED</code>: The build failed.</p> </li> <li> <p> <code>FAULT</code>: The build faulted.</p> </li> <li> <p> <code>IN_PROGRESS</code>: The build is still in progress.</p> </li> <li> <p> <code>STOPPED</code>: The build stopped.</p> </li> <li> <p> <code>SUCCEEDED</code>: The build succeeded.</p> </li> <li> <p> <code>TIMED_OUT</code>: The build timed out.</p> </li> </ul>",
+        "BuildBatch$buildBatchStatus": "<p>The status of the batch build.</p>",
+        "BuildBatchFilter$status": "<p>The status of the batch builds to retrieve. Only batch builds that have this status will be retrieved.</p>",
+        "BuildBatchPhase$phaseStatus": "<p>The current status of the batch build phase. Valid values include:</p> <dl> <dt>FAILED</dt> <dd> <p>The build phase failed.</p> </dd> <dt>FAULT</dt> <dd> <p>The build phase faulted.</p> </dd> <dt>IN_PROGRESS</dt> <dd> <p>The build phase is still in progress.</p> </dd> <dt>QUEUED</dt> <dd> <p>The build has been submitted and is queued behind other submitted builds.</p> </dd> <dt>STOPPED</dt> <dd> <p>The build phase stopped.</p> </dd> <dt>SUCCEEDED</dt> <dd> <p>The build phase succeeded.</p> </dd> <dt>TIMED_OUT</dt> <dd> <p>The build phase timed out.</p> </dd> </dl>",
+        "BuildPhase$phaseStatus": "<p>The current status of the build phase. Valid values include:</p> <dl> <dt>FAILED</dt> <dd> <p>The build phase failed.</p> </dd> <dt>FAULT</dt> <dd> <p>The build phase faulted.</p> </dd> <dt>IN_PROGRESS</dt> <dd> <p>The build phase is still in progress.</p> </dd> <dt>QUEUED</dt> <dd> <p>The build has been submitted and is queued behind other submitted builds.</p> </dd> <dt>STOPPED</dt> <dd> <p>The build phase stopped.</p> </dd> <dt>SUCCEEDED</dt> <dd> <p>The build phase succeeded.</p> </dd> <dt>TIMED_OUT</dt> <dd> <p>The build phase timed out.</p> </dd> </dl>",
+        "BuildSummary$buildStatus": "<p>The status of the build group.</p> <dl> <dt>FAILED</dt> <dd> <p>The build group failed.</p> </dd> <dt>FAULT</dt> <dd> <p>The build group faulted.</p> </dd> <dt>IN_PROGRESS</dt> <dd> <p>The build group is still in progress.</p> </dd> <dt>STOPPED</dt> <dd> <p>The build group stopped.</p> </dd> <dt>SUCCEEDED</dt> <dd> <p>The build group succeeded.</p> </dd> <dt>TIMED_OUT</dt> <dd> <p>The build group timed out.</p> </dd> </dl>"
+      }
+    },
+    "StopBuildBatchInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopBuildBatchOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopBuildInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopBuildOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Build$currentPhase": "<p>The current build phase.</p>",
+        "Build$initiator": "<p>The entity that started the build. Valid values include:</p> <ul> <li> <p>If AWS CodePipeline started the build, the pipeline's name (for example, <code>codepipeline/my-demo-pipeline</code>).</p> </li> <li> <p>If an AWS Identity and Access Management (IAM) user started the build, the user's name (for example, <code>MyUserName</code>).</p> </li> <li> <p>If the Jenkins plugin for AWS CodeBuild started the build, the string <code>CodeBuild-Jenkins-Plugin</code>.</p> </li> </ul>",
+        "Build$buildBatchArn": "<p>The ARN of the batch build that this build is a member of, if applicable.</p>",
+        "BuildArtifacts$location": "<p>Information about the location of the build artifacts.</p>",
+        "BuildArtifacts$sha256sum": "<p>The SHA-256 hash of the build artifact.</p> <p>You can use this hash along with a checksum tool to confirm file integrity and authenticity.</p> <note> <p>This value is available only if the build project's <code>packaging</code> value is set to <code>ZIP</code>.</p> </note>",
+        "BuildArtifacts$md5sum": "<p>The MD5 hash of the build artifact.</p> <p>You can use this hash along with a checksum tool to confirm file integrity and authenticity.</p> <note> <p>This value is available only if the build project's <code>packaging</code> value is set to <code>ZIP</code>.</p> </note>",
+        "BuildArtifacts$artifactIdentifier": "<p> An identifier for this artifact definition. </p>",
+        "BuildBatch$currentPhase": "<p>The current phase of the batch build.</p>",
+        "BuildBatch$initiator": "<p>The entity that started the batch build. Valid values include:</p> <ul> <li> <p>If AWS CodePipeline started the build, the pipeline's name (for example, <code>codepipeline/my-demo-pipeline</code>).</p> </li> <li> <p>If an AWS Identity and Access Management (IAM) user started the build, the user's name.</p> </li> <li> <p>If the Jenkins plugin for AWS CodeBuild started the build, the string <code>CodeBuild-Jenkins-Plugin</code>.</p> </li> </ul>",
+        "BuildGroup$identifier": "<p>Contains the identifier of the build group.</p>",
+        "BuildNotDeleted$statusCode": "<p>Additional information about the build that could not be successfully deleted.</p>",
+        "BuildReportArns$member": null,
+        "BuildStatusConfig$context": "<p>Specifies the context of the build status CodeBuild sends to the source provider. The usage of this parameter depends on the source provider.</p> <dl> <dt>Bitbucket</dt> <dd> <p>This parameter is used for the <code>name</code> parameter in the Bitbucket commit status. For more information, see <a href=\"https://developer.atlassian.com/bitbucket/api/2/reference/resource/repositories/%7Bworkspace%7D/%7Brepo_slug%7D/commit/%7Bnode%7D/statuses/build\">build</a> in the Bitbucket API documentation.</p> </dd> <dt>GitHub/GitHub Enterprise Server</dt> <dd> <p>This parameter is used for the <code>context</code> parameter in the GitHub commit status. For more information, see <a href=\"https://developer.github.com/v3/repos/statuses/#create-a-commit-status\">Create a commit status</a> in the GitHub developer guide.</p> </dd> </dl>",
+        "BuildStatusConfig$targetUrl": "<p>Specifies the target url of the build status CodeBuild sends to the source provider. The usage of this parameter depends on the source provider.</p> <dl> <dt>Bitbucket</dt> <dd> <p>This parameter is used for the <code>url</code> parameter in the Bitbucket commit status. For more information, see <a href=\"https://developer.atlassian.com/bitbucket/api/2/reference/resource/repositories/%7Bworkspace%7D/%7Brepo_slug%7D/commit/%7Bnode%7D/statuses/build\">build</a> in the Bitbucket API documentation.</p> </dd> <dt>GitHub/GitHub Enterprise Server</dt> <dd> <p>This parameter is used for the <code>target_url</code> parameter in the GitHub commit status. For more information, see <a href=\"https://developer.github.com/v3/repos/statuses/#create-a-commit-status\">Create a commit status</a> in the GitHub developer guide.</p> </dd> </dl>",
+        "BuildSummary$arn": "<p>The batch build ARN.</p>",
+        "CloudWatchLogsConfig$groupName": "<p> The group name of the logs in Amazon CloudWatch Logs. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html\">Working with Log Groups and Log Streams</a>. </p>",
+        "CloudWatchLogsConfig$streamName": "<p> The prefix of the stream name of the Amazon CloudWatch Logs. For more information, see <a href=\"https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html\">Working with Log Groups and Log Streams</a>. </p>",
+        "CreateProjectInput$sourceVersion": "<p>A version of the build input to be built for this project. If not specified, the latest version is used. If specified, it must be one of: </p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul> <p>If <code>sourceVersion</code> is specified at the build level, then that version takes precedence over this <code>sourceVersion</code> (at the project level). </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "CreateWebhookInput$branchFilter": "<p>A regular expression used to determine which repository branches are built when a webhook is triggered. If the name of a branch matches the regular expression, then it is built. If <code>branchFilter</code> is empty, then all branches are built.</p> <note> <p>It is recommended that you use <code>filterGroups</code> instead of <code>branchFilter</code>. </p> </note>",
+        "DeleteBuildBatchOutput$statusCode": "<p>The status code.</p>",
+        "DescribeCodeCoveragesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous call to <code>DescribeCodeCoverages</code>. This specifies the next item to return. To return the beginning of the list, exclude this parameter.</p>",
+        "DescribeCodeCoveragesOutput$nextToken": "<p>If there are more items to return, this contains a token that is passed to a subsequent call to <code>DescribeCodeCoverages</code> to retrieve the next set of items.</p>",
+        "DescribeTestCasesInput$reportArn": "<p> The ARN of the report for which test cases are returned. </p>",
+        "DescribeTestCasesInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "DescribeTestCasesOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "EnvironmentImage$name": "<p>The name of the Docker image.</p>",
+        "EnvironmentImage$description": "<p>The description of the Docker image.</p>",
+        "EnvironmentVariable$value": "<p>The value of the environment variable.</p> <important> <p>We strongly discourage the use of <code>PLAINTEXT</code> environment variables to store sensitive values, especially AWS secret key IDs and secret access keys. <code>PLAINTEXT</code> environment variables can be displayed in plain text using the AWS CodeBuild console and the AWS Command Line Interface (AWS CLI). For sensitive values, we recommend you use an environment variable of type <code>PARAMETER_STORE</code> or <code>SECRETS_MANAGER</code>. </p> </important>",
+        "ExportedEnvironmentVariable$value": "<p> The value assigned to this exported environment variable. </p> <note> <p> During a build, the value of a variable is available starting with the <code>install</code> phase. It can be updated between the start of the <code>install</code> phase and the end of the <code>post_build</code> phase. After the <code>post_build</code> phase ends, the value of exported variables cannot change.</p> </note>",
+        "ImageVersions$member": null,
+        "ListBuildBatchesForProjectInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous call to <code>ListBuildBatchesForProject</code>. This specifies the next item to return. To return the beginning of the list, exclude this parameter.</p>",
+        "ListBuildBatchesForProjectOutput$nextToken": "<p>If there are more items to return, this contains a token that is passed to a subsequent call to <code>ListBuildBatchesForProject</code> to retrieve the next set of items.</p>",
+        "ListBuildBatchesInput$nextToken": "<p>The <code>nextToken</code> value returned from a previous call to <code>ListBuildBatches</code>. This specifies the next item to return. To return the beginning of the list, exclude this parameter.</p>",
+        "ListBuildBatchesOutput$nextToken": "<p>If there are more items to return, this contains a token that is passed to a subsequent call to <code>ListBuildBatches</code> to retrieve the next set of items.</p>",
+        "ListBuildsForProjectInput$nextToken": "<p>During a previous call, if there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned.</p>",
+        "ListBuildsForProjectOutput$nextToken": "<p>If there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call.</p>",
+        "ListBuildsInput$nextToken": "<p>During a previous call, if there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned.</p>",
+        "ListBuildsOutput$nextToken": "<p>If there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call.</p>",
+        "ListProjectsOutput$nextToken": "<p>If there are more than 100 items in the list, only the first 100 items are returned, along with a unique string called a <i>nextToken</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call.</p>",
+        "ListReportGroupsInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListReportGroupsOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListReportsForReportGroupInput$reportGroupArn": "<p> The ARN of the report group for which you want to return report ARNs. </p>",
+        "ListReportsForReportGroupInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListReportsForReportGroupOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListReportsInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListReportsOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListSharedProjectsOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListSharedReportGroupsInput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "ListSharedReportGroupsOutput$nextToken": "<p> During a previous call, the maximum number of items that can be returned is the value specified in <code>maxResults</code>. If there more items in the list, then a unique string called a <i>nextToken</i> is returned. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned. </p>",
+        "LogsLocation$groupName": "<p>The name of the Amazon CloudWatch Logs group for the build logs.</p>",
+        "LogsLocation$streamName": "<p>The name of the Amazon CloudWatch Logs stream for the build logs.</p>",
+        "LogsLocation$deepLink": "<p>The URL to an individual build log in Amazon CloudWatch Logs.</p>",
+        "LogsLocation$s3DeepLink": "<p> The URL to a build log in an S3 bucket. </p>",
+        "LogsLocation$cloudWatchLogsArn": "<p> The ARN of Amazon CloudWatch Logs for a build project. Its format is <code>arn:${Partition}:logs:${Region}:${Account}:log-group:${LogGroupName}:log-stream:${LogStreamName}</code>. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazoncloudwatchlogs.html#amazoncloudwatchlogs-resources-for-iam-policies\">Resources Defined by Amazon CloudWatch Logs</a>. </p>",
+        "LogsLocation$s3LogsArn": "<p> The ARN of S3 logs for a build project. Its format is <code>arn:${Partition}:s3:::${BucketName}/${ObjectName}</code>. For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/list_amazons3.html#amazons3-resources-for-iam-policies\">Resources Defined by Amazon S3</a>. </p>",
+        "PhaseContext$statusCode": "<p>The status code for the context of the build phase.</p>",
+        "PhaseContext$message": "<p>An explanation of the build phase's context. This might include a command ID and an exit code.</p>",
+        "Project$arn": "<p>The Amazon Resource Name (ARN) of the build project.</p>",
+        "Project$sourceVersion": "<p>A version of the build input to be built for this project. If not specified, the latest version is used. If specified, it must be one of:</p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul> <p>If <code>sourceVersion</code> is specified at the build level, then that version takes precedence over this <code>sourceVersion</code> (at the project level). </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "ProjectArtifacts$location": "<p>Information about the build output artifact location:</p> <ul> <li> <p>If <code>type</code> is set to <code>CODEPIPELINE</code>, AWS CodePipeline ignores this value if specified. This is because AWS CodePipeline manages its build output locations instead of AWS CodeBuild.</p> </li> <li> <p>If <code>type</code> is set to <code>NO_ARTIFACTS</code>, this value is ignored if specified, because no build output is produced.</p> </li> <li> <p>If <code>type</code> is set to <code>S3</code>, this is the name of the output bucket.</p> </li> </ul>",
+        "ProjectArtifacts$path": "<p>Along with <code>namespaceType</code> and <code>name</code>, the pattern that AWS CodeBuild uses to name and store the output artifact:</p> <ul> <li> <p>If <code>type</code> is set to <code>CODEPIPELINE</code>, AWS CodePipeline ignores this value if specified. This is because AWS CodePipeline manages its build output names instead of AWS CodeBuild.</p> </li> <li> <p>If <code>type</code> is set to <code>NO_ARTIFACTS</code>, this value is ignored if specified, because no build output is produced.</p> </li> <li> <p>If <code>type</code> is set to <code>S3</code>, this is the path to the output artifact. If <code>path</code> is not specified, <code>path</code> is not used.</p> </li> </ul> <p>For example, if <code>path</code> is set to <code>MyArtifacts</code>, <code>namespaceType</code> is set to <code>NONE</code>, and <code>name</code> is set to <code>MyArtifact.zip</code>, the output artifact is stored in the output bucket at <code>MyArtifacts/MyArtifact.zip</code>.</p>",
+        "ProjectArtifacts$name": "<p>Along with <code>path</code> and <code>namespaceType</code>, the pattern that AWS CodeBuild uses to name and store the output artifact:</p> <ul> <li> <p>If <code>type</code> is set to <code>CODEPIPELINE</code>, AWS CodePipeline ignores this value if specified. This is because AWS CodePipeline manages its build output names instead of AWS CodeBuild.</p> </li> <li> <p>If <code>type</code> is set to <code>NO_ARTIFACTS</code>, this value is ignored if specified, because no build output is produced.</p> </li> <li> <p>If <code>type</code> is set to <code>S3</code>, this is the name of the output artifact object. If you set the name to be a forward slash (\"/\"), the artifact is stored in the root of the output bucket.</p> </li> </ul> <p>For example:</p> <ul> <li> <p> If <code>path</code> is set to <code>MyArtifacts</code>, <code>namespaceType</code> is set to <code>BUILD_ID</code>, and <code>name</code> is set to <code>MyArtifact.zip</code>, then the output artifact is stored in <code>MyArtifacts/&lt;build-ID&gt;/MyArtifact.zip</code>. </p> </li> <li> <p> If <code>path</code> is empty, <code>namespaceType</code> is set to <code>NONE</code>, and <code>name</code> is set to \"<code>/</code>\", the output artifact is stored in the root of the output bucket. </p> </li> <li> <p> If <code>path</code> is set to <code>MyArtifacts</code>, <code>namespaceType</code> is set to <code>BUILD_ID</code>, and <code>name</code> is set to \"<code>/</code>\", the output artifact is stored in <code>MyArtifacts/&lt;build-ID&gt;</code>. </p> </li> </ul>",
+        "ProjectArtifacts$artifactIdentifier": "<p> An identifier for this artifact definition. </p>",
+        "ProjectBadge$badgeRequestUrl": "<p>The publicly-accessible URL through which you can access the build badge for your project. </p> <p>The publicly accessible URL through which you can access the build badge for your project. </p>",
+        "ProjectCache$location": "<p>Information about the cache location: </p> <ul> <li> <p> <code>NO_CACHE</code> or <code>LOCAL</code>: This value is ignored.</p> </li> <li> <p> <code>S3</code>: This is the S3 bucket name/prefix.</p> </li> </ul>",
+        "ProjectEnvironment$certificate": "<p>The certificate to use with this build project.</p>",
+        "ProjectFileSystemLocation$location": "<p> A string that specifies the location of the file system created by Amazon EFS. Its format is <code>efs-dns-name:/directory-path</code>. You can find the DNS name of file system when you view it in the AWS EFS console. The directory path is a path to a directory in the file system that CodeBuild mounts. For example, if the DNS name of a file system is <code>fs-abcd1234.efs.us-west-2.amazonaws.com</code>, and its mount directory is <code>my-efs-mount-directory</code>, then the <code>location</code> is <code>fs-abcd1234.efs.us-west-2.amazonaws.com:/my-efs-mount-directory</code>. </p> <p> The directory path in the format <code>efs-dns-name:/directory-path</code> is optional. If you do not specify a directory path, the location is only the DNS name and CodeBuild mounts the entire file system. </p>",
+        "ProjectFileSystemLocation$mountPoint": "<p> The location in the container where you mount the file system. </p>",
+        "ProjectFileSystemLocation$identifier": "<p> The name used to access a file system created by Amazon EFS. CodeBuild creates an environment variable by appending the <code>identifier</code> in all capital letters to <code>CODEBUILD_</code>. For example, if you specify <code>my-efs</code> for <code>identifier</code>, a new environment variable is create named <code>CODEBUILD_MY-EFS</code>. </p> <p> The <code>identifier</code> is used to mount your file system. </p>",
+        "ProjectFileSystemLocation$mountOptions": "<p> The mount options for a file system created by AWS EFS. The default mount options used by CodeBuild are <code>nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2</code>. For more information, see <a href=\"https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-nfs-mount-settings.html\">Recommended NFS Mount Options</a>. </p>",
+        "ProjectSource$location": "<p>Information about the location of the source code to be built. Valid values include:</p> <ul> <li> <p>For source code settings that are specified in the source action of a pipeline in AWS CodePipeline, <code>location</code> should not be specified. If it is specified, AWS CodePipeline ignores it. This is because AWS CodePipeline uses the settings in a pipeline's source action instead of this value.</p> </li> <li> <p>For source code in an AWS CodeCommit repository, the HTTPS clone URL to the repository that contains the source code and the buildspec file (for example, <code>https://git-codecommit.&lt;region-ID&gt;.amazonaws.com/v1/repos/&lt;repo-name&gt;</code>).</p> </li> <li> <p>For source code in an Amazon Simple Storage Service (Amazon S3) input bucket, one of the following. </p> <ul> <li> <p>The path to the ZIP file that contains the source code (for example, <code>&lt;bucket-name&gt;/&lt;path&gt;/&lt;object-name&gt;.zip</code>). </p> </li> <li> <p>The path to the folder that contains the source code (for example, <code>&lt;bucket-name&gt;/&lt;path-to-source-code&gt;/&lt;folder&gt;/</code>). </p> </li> </ul> </li> <li> <p>For source code in a GitHub repository, the HTTPS clone URL to the repository that contains the source and the buildspec file. You must connect your AWS account to your GitHub account. Use the AWS CodeBuild console to start creating a build project. When you use the console to connect (or reconnect) with GitHub, on the GitHub <b>Authorize application</b> page, for <b>Organization access</b>, choose <b>Request access</b> next to each repository you want to allow AWS CodeBuild to have access to, and then choose <b>Authorize application</b>. (After you have connected to your GitHub account, you do not need to finish creating the build project. You can leave the AWS CodeBuild console.) To instruct AWS CodeBuild to use this connection, in the <code>source</code> object, set the <code>auth</code> object's <code>type</code> value to <code>OAUTH</code>.</p> </li> <li> <p>For source code in a Bitbucket repository, the HTTPS clone URL to the repository that contains the source and the buildspec file. You must connect your AWS account to your Bitbucket account. Use the AWS CodeBuild console to start creating a build project. When you use the console to connect (or reconnect) with Bitbucket, on the Bitbucket <b>Confirm access to your account</b> page, choose <b>Grant access</b>. (After you have connected to your Bitbucket account, you do not need to finish creating the build project. You can leave the AWS CodeBuild console.) To instruct AWS CodeBuild to use this connection, in the <code>source</code> object, set the <code>auth</code> object's <code>type</code> value to <code>OAUTH</code>.</p> </li> </ul>",
+        "ProjectSource$buildspec": "<p>The buildspec file declaration to use for the builds in this build project.</p> <p> If this value is set, it can be either an inline buildspec definition, the path to an alternate buildspec file relative to the value of the built-in <code>CODEBUILD_SRC_DIR</code> environment variable, or the path to an S3 bucket. The bucket must be in the same AWS Region as the build project. Specify the buildspec file using its ARN (for example, <code>arn:aws:s3:::my-codebuild-sample2/buildspec.yml</code>). If this value is not provided or is set to an empty string, the source code must contain a buildspec file in its root directory. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#build-spec-ref-name-storage\">Buildspec File Name and Storage Location</a>. </p>",
+        "ProjectSource$sourceIdentifier": "<p> An identifier for this project source. </p>",
+        "ProjectSourceVersion$sourceIdentifier": "<p>An identifier for a source in the build project.</p>",
+        "ProjectSourceVersion$sourceVersion": "<p>The source version for the corresponding source identifier. If specified, must be one of:</p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example, <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul> <p> For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "Report$name": "<p> The name of the report that was run. </p>",
+        "Report$executionId": "<p> The ARN of the build run that generated this report. </p>",
+        "ReportStatusCounts$key": null,
+        "ResolvedArtifact$location": "<p>The location of the artifact.</p>",
+        "ResolvedArtifact$identifier": "<p>The identifier of the artifact.</p>",
+        "RetryBuildBatchInput$idempotencyToken": "<p>A unique, case sensitive identifier you provide to ensure the idempotency of the <code>RetryBuildBatch</code> request. The token is included in the <code>RetryBuildBatch</code> request and is valid for five minutes. If you repeat the <code>RetryBuildBatch</code> request with the same token, but change a parameter, AWS CodeBuild returns a parameter mismatch error.</p>",
+        "RetryBuildInput$idempotencyToken": "<p>A unique, case sensitive identifier you provide to ensure the idempotency of the <code>RetryBuild</code> request. The token is included in the <code>RetryBuild</code> request and is valid for five minutes. If you repeat the <code>RetryBuild</code> request with the same token, but change a parameter, AWS CodeBuild returns a parameter mismatch error.</p>",
+        "S3LogsConfig$location": "<p> The ARN of an S3 bucket and the path prefix for S3 logs. If your Amazon S3 bucket name is <code>my-bucket</code>, and your path prefix is <code>build-log</code>, then acceptable formats are <code>my-bucket/build-log</code> or <code>arn:aws:s3:::my-bucket/build-log</code>. </p>",
+        "S3ReportExportConfig$path": "<p> The path to the exported report's raw data results. </p>",
+        "SourceAuth$resource": "<p>The resource value that applies to the specified authorization type.</p>",
+        "StartBuildBatchInput$sourceVersion": "<p>The version of the batch build input to be built, for this build only. If not specified, the latest version is used. If specified, the contents depends on the source provider:</p> <dl> <dt>AWS CodeCommit</dt> <dd> <p>The commit ID, branch, or Git tag to use.</p> </dd> <dt>GitHub</dt> <dd> <p>The commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </dd> <dt>Bitbucket</dt> <dd> <p>The commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </dd> <dt>Amazon Simple Storage Service (Amazon S3)</dt> <dd> <p>The version ID of the object that represents the build input ZIP file to use.</p> </dd> </dl> <p>If <code>sourceVersion</code> is specified at the project level, then this <code>sourceVersion</code> (at the build level) takes precedence. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "StartBuildBatchInput$sourceLocationOverride": "<p>A location that overrides, for this batch build, the source location defined in the batch build project.</p>",
+        "StartBuildBatchInput$buildspecOverride": "<p>A buildspec file declaration that overrides, for this build only, the latest one already defined in the build project.</p> <p>If this value is set, it can be either an inline buildspec definition, the path to an alternate buildspec file relative to the value of the built-in <code>CODEBUILD_SRC_DIR</code> environment variable, or the path to an S3 bucket. The bucket must be in the same AWS Region as the build project. Specify the buildspec file using its ARN (for example, <code>arn:aws:s3:::my-codebuild-sample2/buildspec.yml</code>). If this value is not provided or is set to an empty string, the source code must contain a buildspec file in its root directory. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#build-spec-ref-name-storage\">Buildspec File Name and Storage Location</a>. </p>",
+        "StartBuildBatchInput$certificateOverride": "<p>The name of a certificate for this batch build that overrides the one specified in the batch build project.</p>",
+        "StartBuildBatchInput$idempotencyToken": "<p>A unique, case sensitive identifier you provide to ensure the idempotency of the <code>StartBuildBatch</code> request. The token is included in the <code>StartBuildBatch</code> request and is valid for five minutes. If you repeat the <code>StartBuildBatch</code> request with the same token, but change a parameter, AWS CodeBuild returns a parameter mismatch error.</p>",
+        "StartBuildInput$sourceVersion": "<p>The version of the build input to be built, for this build only. If not specified, the latest version is used. If specified, the contents depends on the source provider:</p> <dl> <dt>AWS CodeCommit</dt> <dd> <p>The commit ID, branch, or Git tag to use.</p> </dd> <dt>GitHub</dt> <dd> <p>The commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </dd> <dt>Bitbucket</dt> <dd> <p>The commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </dd> <dt>Amazon Simple Storage Service (Amazon S3)</dt> <dd> <p>The version ID of the object that represents the build input ZIP file to use.</p> </dd> </dl> <p>If <code>sourceVersion</code> is specified at the project level, then this <code>sourceVersion</code> (at the build level) takes precedence. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "StartBuildInput$sourceLocationOverride": "<p>A location that overrides, for this build, the source location for the one defined in the build project.</p>",
+        "StartBuildInput$buildspecOverride": "<p>A buildspec file declaration that overrides, for this build only, the latest one already defined in the build project.</p> <p> If this value is set, it can be either an inline buildspec definition, the path to an alternate buildspec file relative to the value of the built-in <code>CODEBUILD_SRC_DIR</code> environment variable, or the path to an S3 bucket. The bucket must be in the same AWS Region as the build project. Specify the buildspec file using its ARN (for example, <code>arn:aws:s3:::my-codebuild-sample2/buildspec.yml</code>). If this value is not provided or is set to an empty string, the source code must contain a buildspec file in its root directory. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#build-spec-ref-name-storage\">Buildspec File Name and Storage Location</a>. </p>",
+        "StartBuildInput$certificateOverride": "<p>The name of a certificate for this build that overrides the one specified in the build project.</p>",
+        "StartBuildInput$idempotencyToken": "<p>A unique, case sensitive identifier you provide to ensure the idempotency of the StartBuild request. The token is included in the StartBuild request and is valid for 5 minutes. If you repeat the StartBuild request with the same token, but change a parameter, AWS CodeBuild returns a parameter mismatch error. </p>",
+        "TestCase$testRawDataPath": "<p> The path to the raw data file that contains the test result. </p>",
+        "TestCase$prefix": "<p> A string that is applied to a series of related test cases. CodeBuild generates the prefix. The prefix depends on the framework used to generate the tests. </p>",
+        "TestCase$name": "<p> The name of the test case. </p>",
+        "TestCase$status": "<p> The status returned by the test case after it was run. Valid statuses are <code>SUCCEEDED</code>, <code>FAILED</code>, <code>ERROR</code>, <code>SKIPPED</code>, and <code>UNKNOWN</code>. </p>",
+        "TestCase$message": "<p> A message associated with a test case. For example, an error message or stack trace. </p>",
+        "TestCaseFilter$status": "<p>The status used to filter test cases. A <code>TestCaseFilter</code> can have one status. Valid values are:</p> <ul> <li> <p> <code>SUCCEEDED</code> </p> </li> <li> <p> <code>FAILED</code> </p> </li> <li> <p> <code>ERROR</code> </p> </li> <li> <p> <code>SKIPPED</code> </p> </li> <li> <p> <code>UNKNOWN</code> </p> </li> </ul>",
+        "TestCaseFilter$keyword": "<p>A keyword that is used to filter on the <code>name</code> or the <code>prefix</code> of the test cases. Only test cases where the keyword is a substring of the <code>name</code> or the <code>prefix</code> will be returned.</p>",
+        "UpdateProjectInput$sourceVersion": "<p> A version of the build input to be built for this project. If not specified, the latest version is used. If specified, it must be one of: </p> <ul> <li> <p>For AWS CodeCommit: the commit ID, branch, or Git tag to use.</p> </li> <li> <p>For GitHub: the commit ID, pull request ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a pull request ID is specified, it must use the format <code>pr/pull-request-ID</code> (for example <code>pr/25</code>). If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Bitbucket: the commit ID, branch name, or tag name that corresponds to the version of the source code you want to build. If a branch name is specified, the branch's HEAD commit ID is used. If not specified, the default branch's HEAD commit ID is used.</p> </li> <li> <p>For Amazon Simple Storage Service (Amazon S3): the version ID of the object that represents the build input ZIP file to use.</p> </li> </ul> <p> If <code>sourceVersion</code> is specified at the build level, then that version takes precedence over this <code>sourceVersion</code> (at the project level). </p> <p> For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html\">Source Version Sample with CodeBuild</a> in the <i>AWS CodeBuild User Guide</i>. </p>",
+        "UpdateWebhookInput$branchFilter": "<p>A regular expression used to determine which repository branches are built when a webhook is triggered. If the name of a branch matches the regular expression, then it is built. If <code>branchFilter</code> is empty, then all branches are built.</p> <note> <p> It is recommended that you use <code>filterGroups</code> instead of <code>branchFilter</code>. </p> </note>",
+        "Webhook$branchFilter": "<p>A regular expression used to determine which repository branches are built when a webhook is triggered. If the name of a branch matches the regular expression, then it is built. If <code>branchFilter</code> is empty, then all branches are built.</p> <note> <p>It is recommended that you use <code>filterGroups</code> instead of <code>branchFilter</code>. </p> </note>",
+        "WebhookFilter$pattern": "<p> For a <code>WebHookFilter</code> that uses <code>EVENT</code> type, a comma-separated string that specifies one or more events. For example, the webhook filter <code>PUSH, PULL_REQUEST_CREATED, PULL_REQUEST_UPDATED</code> allows all push, pull request created, and pull request updated events to trigger a build. </p> <p> For a <code>WebHookFilter</code> that uses any of the other filter types, a regular expression pattern. For example, a <code>WebHookFilter</code> that uses <code>HEAD_REF</code> for its <code>type</code> and the pattern <code>^refs/heads/</code> triggers a build when the head reference is a branch with a reference name <code>refs/heads/branch-name</code>. </p>"
+      }
+    },
+    "Subnets": {
+      "base": null,
+      "refs": {
+        "VpcConfig$subnets": "<p>A list of one or more subnet IDs in your Amazon VPC.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A tag, consisting of a key and a value.</p> <p>This tag is available for use by AWS services that support tags in AWS CodeBuild.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateProjectInput$tags": "<p>A list of tag key and value pairs associated with this build project.</p> <p>These tags are available for use by AWS services that support AWS CodeBuild build project tags.</p>",
+        "CreateReportGroupInput$tags": "<p> A list of tag key and value pairs associated with this report group. </p> <p>These tags are available for use by AWS services that support AWS CodeBuild report group tags.</p>",
+        "Project$tags": "<p>A list of tag key and value pairs associated with this build project.</p> <p>These tags are available for use by AWS services that support AWS CodeBuild build project tags.</p>",
+        "ReportGroup$tags": "<p> A list of tag key and value pairs associated with this report group. </p> <p>These tags are available for use by AWS services that support AWS CodeBuild report group tags.</p>",
+        "UpdateProjectInput$tags": "<p>An updated list of tag key and value pairs associated with this build project.</p> <p>These tags are available for use by AWS services that support AWS CodeBuild build project tags.</p>",
+        "UpdateReportGroupInput$tags": "<p> An updated list of tag key and value pairs associated with this report group. </p> <p>These tags are available for use by AWS services that support AWS CodeBuild report group tags.</p>"
+      }
+    },
+    "TestCase": {
+      "base": "<p> Information about a test case created using a framework such as NUnit or Cucumber. A test case might be a unit test or a configuration test. </p>",
+      "refs": {
+        "TestCases$member": null
+      }
+    },
+    "TestCaseFilter": {
+      "base": "<p>A filter used to return specific types of test cases. In order to pass the filter, the report must meet all of the filter properties.</p>",
+      "refs": {
+        "DescribeTestCasesInput$filter": "<p> A <code>TestCaseFilter</code> object used to filter the returned reports. </p>"
+      }
+    },
+    "TestCases": {
+      "base": null,
+      "refs": {
+        "DescribeTestCasesOutput$testCases": "<p> The returned list of test cases. </p>"
+      }
+    },
+    "TestReportSummary": {
+      "base": "<p> Information about a test report. </p>",
+      "refs": {
+        "Report$testSummary": "<p> A <code>TestReportSummary</code> object that contains information about this test report. </p>"
+      }
+    },
+    "TimeOut": {
+      "base": null,
+      "refs": {
+        "CreateProjectInput$timeoutInMinutes": "<p>How long, in minutes, from 5 to 480 (8 hours), for AWS CodeBuild to wait before it times out any build that has not been marked as completed. The default is 60 minutes.</p>",
+        "CreateProjectInput$queuedTimeoutInMinutes": "<p>The number of minutes a build is allowed to be queued before it times out. </p>",
+        "Project$timeoutInMinutes": "<p>How long, in minutes, from 5 to 480 (8 hours), for AWS CodeBuild to wait before timing out any related build that did not get marked as completed. The default is 60 minutes.</p>",
+        "Project$queuedTimeoutInMinutes": "<p>The number of minutes a build is allowed to be queued before it times out. </p>",
+        "StartBuildBatchInput$buildTimeoutInMinutesOverride": "<p>Overrides the build timeout specified in the batch build project.</p>",
+        "StartBuildBatchInput$queuedTimeoutInMinutesOverride": "<p>The number of minutes a batch build is allowed to be queued before it times out.</p>",
+        "StartBuildInput$timeoutInMinutesOverride": "<p>The number of build timeout minutes, from 5 to 480 (8 hours), that overrides, for this build only, the latest setting already defined in the build project.</p>",
+        "StartBuildInput$queuedTimeoutInMinutesOverride": "<p> The number of minutes a build is allowed to be queued before it times out. </p>",
+        "UpdateProjectInput$timeoutInMinutes": "<p>The replacement value in minutes, from 5 to 480 (8 hours), for AWS CodeBuild to wait before timing out any related build that did not get marked as completed.</p>",
+        "UpdateProjectInput$queuedTimeoutInMinutes": "<p> The number of minutes a build is allowed to be queued before it times out. </p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Build$startTime": "<p>When the build process started, expressed in Unix time format.</p>",
+        "Build$endTime": "<p>When the build process ended, expressed in Unix time format.</p>",
+        "BuildBatch$startTime": "<p>The date and time that the batch build started.</p>",
+        "BuildBatch$endTime": "<p>The date and time that the batch build ended.</p>",
+        "BuildBatchPhase$startTime": "<p>When the batch build phase started, expressed in Unix time format.</p>",
+        "BuildBatchPhase$endTime": "<p>When the batch build phase ended, expressed in Unix time format.</p>",
+        "BuildPhase$startTime": "<p>When the build phase started, expressed in Unix time format.</p>",
+        "BuildPhase$endTime": "<p>When the build phase ended, expressed in Unix time format.</p>",
+        "BuildSummary$requestedOn": "<p>When the build was started, expressed in Unix time format.</p>",
+        "CodeCoverage$expired": "<p>The date and time that the tests were run.</p>",
+        "Project$created": "<p>When the build project was created, expressed in Unix time format.</p>",
+        "Project$lastModified": "<p>When the build project's settings were last modified, expressed in Unix time format.</p>",
+        "Report$created": "<p> The date and time this report run occurred. </p>",
+        "Report$expired": "<p> The date and time a report expires. A report expires 30 days after it is created. An expired report is not available to view in CodeBuild. </p>",
+        "ReportGroup$created": "<p> The date and time this <code>ReportGroup</code> was created. </p>",
+        "ReportGroup$lastModified": "<p> The date and time this <code>ReportGroup</code> was last modified. </p>",
+        "TestCase$expired": "<p> The date and time a test case expires. A test case expires 30 days after it is created. An expired test case is not available to view in CodeBuild. </p>",
+        "Webhook$lastModifiedSecret": "<p>A timestamp that indicates the last time a repository's secret token was modified. </p>"
+      }
+    },
+    "UpdateProjectInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateProjectOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateReportGroupInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateReportGroupOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWebhookInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateWebhookOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValueInput": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>The tag's value.</p>"
+      }
+    },
+    "VpcConfig": {
+      "base": "<p>Information about the VPC configuration that AWS CodeBuild accesses.</p>",
+      "refs": {
+        "Build$vpcConfig": "<p>If your AWS CodeBuild project accesses resources in an Amazon VPC, you provide this parameter that identifies the VPC ID and the list of security group IDs and subnet IDs. The security groups and subnets must belong to the same VPC. You must provide at least one security group and one subnet ID.</p>",
+        "BuildBatch$vpcConfig": null,
+        "CreateProjectInput$vpcConfig": "<p>VpcConfig enables AWS CodeBuild to access resources in an Amazon VPC.</p>",
+        "Project$vpcConfig": "<p>Information about the VPC configuration that AWS CodeBuild accesses.</p>",
+        "UpdateProjectInput$vpcConfig": "<p>VpcConfig enables AWS CodeBuild to access resources in an Amazon VPC.</p>"
+      }
+    },
+    "Webhook": {
+      "base": "<p>Information about a webhook that connects repository events to a build project in AWS CodeBuild.</p>",
+      "refs": {
+        "CreateWebhookOutput$webhook": "<p>Information about a webhook that connects repository events to a build project in AWS CodeBuild.</p>",
+        "Project$webhook": "<p>Information about a webhook that connects repository events to a build project in AWS CodeBuild.</p>",
+        "UpdateWebhookOutput$webhook": "<p> Information about a repository's webhook that is associated with a project in AWS CodeBuild. </p>"
+      }
+    },
+    "WebhookBuildType": {
+      "base": null,
+      "refs": {
+        "CreateWebhookInput$buildType": "<p>Specifies the type of build this webhook will trigger.</p>",
+        "UpdateWebhookInput$buildType": "<p>Specifies the type of build this webhook will trigger.</p>",
+        "Webhook$buildType": "<p>Specifies the type of build this webhook will trigger.</p>"
+      }
+    },
+    "WebhookFilter": {
+      "base": "<p> A filter used to determine which webhooks trigger a build. </p>",
+      "refs": {
+        "FilterGroup$member": null
+      }
+    },
+    "WebhookFilterType": {
+      "base": null,
+      "refs": {
+        "WebhookFilter$type": "<p> The type of webhook filter. There are six webhook filter types: <code>EVENT</code>, <code>ACTOR_ACCOUNT_ID</code>, <code>HEAD_REF</code>, <code>BASE_REF</code>, <code>FILE_PATH</code>, and <code>COMMIT_MESSAGE</code>. </p> <dl> <dt> EVENT </dt> <dd> <p> A webhook event triggers a build when the provided <code>pattern</code> matches one of five event types: <code>PUSH</code>, <code>PULL_REQUEST_CREATED</code>, <code>PULL_REQUEST_UPDATED</code>, <code>PULL_REQUEST_REOPENED</code>, and <code>PULL_REQUEST_MERGED</code>. The <code>EVENT</code> patterns are specified as a comma-separated string. For example, <code>PUSH, PULL_REQUEST_CREATED, PULL_REQUEST_UPDATED</code> filters all push, pull request created, and pull request updated events. </p> <note> <p> The <code>PULL_REQUEST_REOPENED</code> works with GitHub and GitHub Enterprise only. </p> </note> </dd> <dt> ACTOR_ACCOUNT_ID </dt> <dd> <p> A webhook event triggers a build when a GitHub, GitHub Enterprise, or Bitbucket account ID matches the regular expression <code>pattern</code>. </p> </dd> <dt> HEAD_REF </dt> <dd> <p> A webhook event triggers a build when the head reference matches the regular expression <code>pattern</code>. For example, <code>refs/heads/branch-name</code> and <code>refs/tags/tag-name</code>. </p> <p> Works with GitHub and GitHub Enterprise push, GitHub and GitHub Enterprise pull request, Bitbucket push, and Bitbucket pull request events. </p> </dd> <dt> BASE_REF </dt> <dd> <p> A webhook event triggers a build when the base reference matches the regular expression <code>pattern</code>. For example, <code>refs/heads/branch-name</code>. </p> <note> <p> Works with pull request events only. </p> </note> </dd> <dt> FILE_PATH </dt> <dd> <p> A webhook triggers a build when the path of a changed file matches the regular expression <code>pattern</code>. </p> <note> <p> Works with GitHub and Bitbucket events push and pull requests events. Also works with GitHub Enterprise push events, but does not work with GitHub Enterprise pull request events. </p> </note> </dd> <dt>COMMIT_MESSAGE</dt> <dd> <p>A webhook triggers a build when the head commit message matches the regular expression <code>pattern</code>.</p> <note> <p> Works with GitHub and Bitbucket events push and pull requests events. Also works with GitHub Enterprise push events, but does not work with GitHub Enterprise pull request events. </p> </note> </dd> </dl>"
+      }
+    },
+    "WrapperBoolean": {
+      "base": null,
+      "refs": {
+        "BuildArtifacts$overrideArtifactName": "<p> If this flag is set, a name specified in the buildspec file overrides the artifact name. The name specified in a buildspec file is calculated at build time and uses the Shell Command Language. For example, you can append a date and time to your artifact name so that it is always unique. </p>",
+        "BuildArtifacts$encryptionDisabled": "<p> Information that tells you if encryption for build artifacts is disabled. </p>",
+        "CreateProjectInput$badgeEnabled": "<p>Set this to true to generate a publicly accessible URL for your project's build badge.</p>",
+        "DebugSession$sessionEnabled": "<p>Specifies if session debugging is enabled for this build.</p>",
+        "GitSubmodulesConfig$fetchSubmodules": "<p> Set to true to fetch Git submodules for your AWS CodeBuild build project. </p>",
+        "ImportSourceCredentialsInput$shouldOverwrite": "<p> Set to <code>false</code> to prevent overwriting the repository source credentials. Set to <code>true</code> to overwrite the repository source credentials. The default value is <code>true</code>. </p>",
+        "ProjectArtifacts$overrideArtifactName": "<p> If this flag is set, a name specified in the buildspec file overrides the artifact name. The name specified in a buildspec file is calculated at build time and uses the Shell Command Language. For example, you can append a date and time to your artifact name so that it is always unique. </p>",
+        "ProjectArtifacts$encryptionDisabled": "<p> Set to true if you do not want your output artifacts encrypted. This option is valid only if your artifacts type is Amazon Simple Storage Service (Amazon S3). If this is set with another artifacts type, an invalidInputException is thrown. </p>",
+        "ProjectBuildBatchConfig$combineArtifacts": "<p>Specifies if the build artifacts for the batch build should be combined into a single artifact location.</p>",
+        "ProjectEnvironment$privilegedMode": "<p>Enables running the Docker daemon inside a Docker container. Set to true only if the build project is used to build Docker images. Otherwise, a build that attempts to interact with the Docker daemon fails. The default setting is <code>false</code>.</p> <p>You can initialize the Docker daemon during the install phase of your build by adding one of the following sets of commands to the install phase of your buildspec file:</p> <p>If the operating system's base image is Ubuntu Linux:</p> <p> <code>- nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay&amp;</code> </p> <p> <code>- timeout 15 sh -c \"until docker info; do echo .; sleep 1; done\"</code> </p> <p>If the operating system's base image is Alpine Linux and the previous command does not work, add the <code>-t</code> argument to <code>timeout</code>:</p> <p> <code>- nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay&amp;</code> </p> <p> <code>- timeout -t 15 sh -c \"until docker info; do echo .; sleep 1; done\"</code> </p>",
+        "ProjectSource$reportBuildStatus": "<p> Set to true to report the status of a build's start and finish to your source provider. This option is valid only when your source provider is GitHub, GitHub Enterprise, or Bitbucket. If this is set and you use a different source provider, an invalidInputException is thrown. </p> <note> <p> The status of a build triggered by a webhook is always reported to your source provider. </p> </note>",
+        "ProjectSource$insecureSsl": "<p>Enable this flag to ignore SSL warnings while connecting to the project source code.</p>",
+        "Report$truncated": "<p> A boolean that specifies if this report run is truncated. The list of test cases is truncated after the maximum number of test cases is reached. </p>",
+        "S3LogsConfig$encryptionDisabled": "<p> Set to true if you do not want your S3 build log output encrypted. By default S3 build logs are encrypted. </p>",
+        "S3ReportExportConfig$encryptionDisabled": "<p> A boolean value that specifies if the results of a report are encrypted. </p>",
+        "StartBuildBatchInput$insecureSslOverride": "<p>Enable this flag to override the insecure SSL setting that is specified in the batch build project. The insecure SSL setting determines whether to ignore SSL warnings while connecting to the project source code. This override applies only if the build's source is GitHub Enterprise.</p>",
+        "StartBuildBatchInput$reportBuildBatchStatusOverride": "<p>Set to <code>true</code> to report to your source provider the status of a batch build's start and completion. If you use this option with a source provider other than GitHub, GitHub Enterprise, or Bitbucket, an <code>invalidInputException</code> is thrown. </p> <note> <p>The status of a build triggered by a webhook is always reported to your source provider. </p> </note>",
+        "StartBuildBatchInput$privilegedModeOverride": "<p>Enable this flag to override privileged mode in the batch build project.</p>",
+        "StartBuildInput$insecureSslOverride": "<p>Enable this flag to override the insecure SSL setting that is specified in the build project. The insecure SSL setting determines whether to ignore SSL warnings while connecting to the project source code. This override applies only if the build's source is GitHub Enterprise.</p>",
+        "StartBuildInput$reportBuildStatusOverride": "<p> Set to true to report to your source provider the status of a build's start and completion. If you use this option with a source provider other than GitHub, GitHub Enterprise, or Bitbucket, an invalidInputException is thrown. </p> <note> <p> The status of a build triggered by a webhook is always reported to your source provider. </p> </note>",
+        "StartBuildInput$privilegedModeOverride": "<p>Enable this flag to override privileged mode in the build project.</p>",
+        "StartBuildInput$debugSessionEnabled": "<p>Specifies if session debugging is enabled for this build. For more information, see <a href=\"https://docs.aws.amazon.com/codebuild/latest/userguide/session-manager.html\">Viewing a running build in Session Manager</a>.</p>",
+        "UpdateProjectInput$badgeEnabled": "<p>Set this to true to generate a publicly accessible URL for your project's build badge.</p>",
+        "WebhookFilter$excludeMatchedPattern": "<p> Used to indicate that the <code>pattern</code> determines which webhook events do not trigger a build. If true, then a webhook event that does not match the <code>pattern</code> triggers a build. If false, then a webhook event that matches the <code>pattern</code> triggers a build. </p>"
+      }
+    },
+    "WrapperInt": {
+      "base": null,
+      "refs": {
+        "BatchRestrictions$maximumBuildsAllowed": "<p>Specifies the maximum number of builds allowed.</p>",
+        "Build$timeoutInMinutes": "<p>How long, in minutes, for AWS CodeBuild to wait before timing out this build if it does not get marked as completed.</p>",
+        "Build$queuedTimeoutInMinutes": "<p> The number of minutes a build is allowed to be queued before it times out. </p>",
+        "BuildBatch$buildTimeoutInMinutes": "<p>Specifies the maximum amount of time, in minutes, that the build in a batch must be completed in.</p>",
+        "BuildBatch$queuedTimeoutInMinutes": "<p>Specifies the amount of time, in minutes, that the batch build is allowed to be queued before it times out.</p>",
+        "ProjectBuildBatchConfig$timeoutInMins": "<p>Specifies the maximum amount of time, in minutes, that the batch build must be completed in.</p>",
+        "ReportStatusCounts$value": null,
+        "TestReportSummary$total": "<p> The number of test cases in this <code>TestReportSummary</code>. The total includes truncated test cases. </p>"
+      }
+    },
+    "WrapperLong": {
+      "base": null,
+      "refs": {
+        "Build$buildNumber": "<p>The number of the build. For each project, the <code>buildNumber</code> of its first build is <code>1</code>. The <code>buildNumber</code> of each subsequent build is incremented by <code>1</code>. If a build is deleted, the <code>buildNumber</code> of other builds does not change.</p>",
+        "BuildBatch$buildBatchNumber": "<p>The number of the batch build. For each project, the <code>buildBatchNumber</code> of its first batch build is <code>1</code>. The <code>buildBatchNumber</code> of each subsequent batch build is incremented by <code>1</code>. If a batch build is deleted, the <code>buildBatchNumber</code> of other batch builds does not change.</p>",
+        "BuildBatchPhase$durationInSeconds": "<p>How long, in seconds, between the starting and ending times of the batch build's phase.</p>",
+        "BuildPhase$durationInSeconds": "<p>How long, in seconds, between the starting and ending times of the build's phase.</p>",
+        "TestCase$durationInNanoSeconds": "<p> The number of nanoseconds it took to run this test case. </p>",
+        "TestReportSummary$durationInNanoSeconds": "<p> The number of nanoseconds it took to run all of the test cases in this report. </p>"
+      }
+    }
+  }
+}

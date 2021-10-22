@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package testpb;
+
+message FooRequest {
+  bool fail = 1;
+  int64 sleep_nanos = 2;
+}
+
+message FooResponse {
+}
+
+service Foo {
+  rpc Single(FooRequest) returns (FooResponse);
+  rpc Multiple(stream FooRequest) returns (stream FooResponse);
+}

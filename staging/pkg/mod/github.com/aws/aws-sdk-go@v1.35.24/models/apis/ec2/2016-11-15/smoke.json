@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeRegions",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeInstances",
+            "input": {
+                "InstanceIds": [
+                    "i-12345678"
+                ]
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

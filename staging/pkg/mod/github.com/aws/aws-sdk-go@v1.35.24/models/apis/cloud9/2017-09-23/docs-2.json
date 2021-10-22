@@ -1,0 +1,417 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Cloud9</fullname> <p>AWS Cloud9 is a collection of tools that you can use to code, build, run, test, debug, and release software in the cloud.</p> <p>For more information about AWS Cloud9, see the <a href=\"https://docs.aws.amazon.com/cloud9/latest/user-guide\">AWS Cloud9 User Guide</a>.</p> <p>AWS Cloud9 supports these operations:</p> <ul> <li> <p> <code>CreateEnvironmentEC2</code>: Creates an AWS Cloud9 development environment, launches an Amazon EC2 instance, and then connects from the instance to the environment.</p> </li> <li> <p> <code>CreateEnvironmentMembership</code>: Adds an environment member to an environment.</p> </li> <li> <p> <code>DeleteEnvironment</code>: Deletes an environment. If an Amazon EC2 instance is connected to the environment, also terminates the instance.</p> </li> <li> <p> <code>DeleteEnvironmentMembership</code>: Deletes an environment member from an environment.</p> </li> <li> <p> <code>DescribeEnvironmentMemberships</code>: Gets information about environment members for an environment.</p> </li> <li> <p> <code>DescribeEnvironments</code>: Gets information about environments.</p> </li> <li> <p> <code>DescribeEnvironmentStatus</code>: Gets status information for an environment.</p> </li> <li> <p> <code>ListEnvironments</code>: Gets a list of environment identifiers.</p> </li> <li> <p> <code>ListTagsForResource</code>: Gets the tags for an environment.</p> </li> <li> <p> <code>TagResource</code>: Adds tags to an environment.</p> </li> <li> <p> <code>UntagResource</code>: Removes tags from an environment.</p> </li> <li> <p> <code>UpdateEnvironment</code>: Changes the settings of an existing environment.</p> </li> <li> <p> <code>UpdateEnvironmentMembership</code>: Changes the settings of an existing environment member for an environment.</p> </li> </ul>",
+  "operations": {
+    "CreateEnvironmentEC2": "<p>Creates an AWS Cloud9 development environment, launches an Amazon Elastic Compute Cloud (Amazon EC2) instance, and then connects from the instance to the environment.</p>",
+    "CreateEnvironmentMembership": "<p>Adds an environment member to an AWS Cloud9 development environment.</p>",
+    "DeleteEnvironment": "<p>Deletes an AWS Cloud9 development environment. If an Amazon EC2 instance is connected to the environment, also terminates the instance.</p>",
+    "DeleteEnvironmentMembership": "<p>Deletes an environment member from an AWS Cloud9 development environment.</p>",
+    "DescribeEnvironmentMemberships": "<p>Gets information about environment members for an AWS Cloud9 development environment.</p>",
+    "DescribeEnvironmentStatus": "<p>Gets status information for an AWS Cloud9 development environment.</p>",
+    "DescribeEnvironments": "<p>Gets information about AWS Cloud9 development environments.</p>",
+    "ListEnvironments": "<p>Gets a list of AWS Cloud9 development environment identifiers.</p>",
+    "ListTagsForResource": "<p>Gets a list of the tags associated with an AWS Cloud9 development environment.</p>",
+    "TagResource": "<p>Adds tags to an AWS Cloud9 development environment.</p> <important> <p>Tags that you add to an AWS Cloud9 environment by using this method will NOT be automatically propagated to underlying resources.</p> </important>",
+    "UntagResource": "<p>Removes tags from an AWS Cloud9 development environment.</p>",
+    "UpdateEnvironment": "<p>Changes the settings of an existing AWS Cloud9 development environment.</p>",
+    "UpdateEnvironmentMembership": "<p>Changes the settings of an existing environment member for an AWS Cloud9 development environment.</p>"
+  },
+  "shapes": {
+    "AutomaticStopTimeMinutes": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$automaticStopTimeMinutes": "<p>The number of minutes until the running instance is shut down after the environment has last been used.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>The target request is invalid.</p>",
+      "refs": {
+      }
+    },
+    "BoundedEnvironmentIdList": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentsRequest$environmentIds": "<p>The IDs of individual environments to get information about.</p>"
+      }
+    },
+    "ClientRequestToken": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$clientRequestToken": "<p>A unique, case-sensitive string that helps AWS Cloud9 to ensure this operation completes no more than one time.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/AWSEC2/latest/APIReference/Run_Instance_Idempotency.html\">Client Tokens</a> in the <i>Amazon EC2 API Reference</i>.</p>"
+      }
+    },
+    "ConcurrentAccessException": {
+      "base": "<p>A concurrent access issue occurred.</p>",
+      "refs": {
+      }
+    },
+    "ConflictException": {
+      "base": "<p>A conflict occurred.</p>",
+      "refs": {
+      }
+    },
+    "ConnectionType": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$connectionType": "<p>The connection type used for connecting to an Amazon EC2 environment.</p>",
+        "Environment$connectionType": "<p>The connection type used for connecting to an Amazon EC2 environment.</p>"
+      }
+    },
+    "CreateEnvironmentEC2Request": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEnvironmentEC2Result": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEnvironmentMembershipRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEnvironmentMembershipResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEnvironmentMembershipRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEnvironmentMembershipResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEnvironmentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentMembershipsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentMembershipsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEnvironmentsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Environment": {
+      "base": "<p>Information about an AWS Cloud9 development environment.</p>",
+      "refs": {
+        "EnvironmentList$member": null
+      }
+    },
+    "EnvironmentArn": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the AWS Cloud9 development environment to get the tags for.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the AWS Cloud9 development environment to add tags to.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the AWS Cloud9 development environment to remove tags from.</p>"
+      }
+    },
+    "EnvironmentDescription": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$description": "<p>The description of the environment to create.</p>",
+        "Environment$description": "<p>The description for the environment.</p>",
+        "UpdateEnvironmentRequest$description": "<p>Any new or replacement description for the environment.</p>"
+      }
+    },
+    "EnvironmentId": {
+      "base": null,
+      "refs": {
+        "BoundedEnvironmentIdList$member": null,
+        "CreateEnvironmentEC2Result$environmentId": "<p>The ID of the environment that was created.</p>",
+        "CreateEnvironmentMembershipRequest$environmentId": "<p>The ID of the environment that contains the environment member you want to add.</p>",
+        "DeleteEnvironmentMembershipRequest$environmentId": "<p>The ID of the environment to delete the environment member from.</p>",
+        "DeleteEnvironmentRequest$environmentId": "<p>The ID of the environment to delete.</p>",
+        "DescribeEnvironmentMembershipsRequest$environmentId": "<p>The ID of the environment to get environment member information about.</p>",
+        "DescribeEnvironmentStatusRequest$environmentId": "<p>The ID of the environment to get status information about.</p>",
+        "Environment$id": "<p>The ID of the environment.</p>",
+        "EnvironmentIdList$member": null,
+        "EnvironmentMember$environmentId": "<p>The ID of the environment for the environment member.</p>",
+        "UpdateEnvironmentMembershipRequest$environmentId": "<p>The ID of the environment for the environment member whose settings you want to change.</p>",
+        "UpdateEnvironmentRequest$environmentId": "<p>The ID of the environment to change settings.</p>"
+      }
+    },
+    "EnvironmentIdList": {
+      "base": null,
+      "refs": {
+        "ListEnvironmentsResult$environmentIds": "<p>The list of environment identifiers.</p>"
+      }
+    },
+    "EnvironmentLifecycle": {
+      "base": "<p>Information about the current creation or deletion lifecycle state of an AWS Cloud9 development environment.</p>",
+      "refs": {
+        "Environment$lifecycle": "<p>The state of the environment in its creation or deletion lifecycle.</p>"
+      }
+    },
+    "EnvironmentLifecycleStatus": {
+      "base": null,
+      "refs": {
+        "EnvironmentLifecycle$status": "<p>The current creation or deletion lifecycle state of the environment.</p> <ul> <li> <p> <code>CREATING</code>: The environment is in the process of being created.</p> </li> <li> <p> <code>CREATED</code>: The environment was successfully created.</p> </li> <li> <p> <code>CREATE_FAILED</code>: The environment failed to be created.</p> </li> <li> <p> <code>DELETING</code>: The environment is in the process of being deleted.</p> </li> <li> <p> <code>DELETE_FAILED</code>: The environment failed to delete.</p> </li> </ul>"
+      }
+    },
+    "EnvironmentList": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentsResult$environments": "<p>Information about the environments that are returned.</p>"
+      }
+    },
+    "EnvironmentMember": {
+      "base": "<p>Information about an environment member for an AWS Cloud9 development environment.</p>",
+      "refs": {
+        "CreateEnvironmentMembershipResult$membership": "<p>Information about the environment member that was added.</p>",
+        "EnvironmentMembersList$member": null,
+        "UpdateEnvironmentMembershipResult$membership": "<p>Information about the environment member whose settings were changed.</p>"
+      }
+    },
+    "EnvironmentMembersList": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentMembershipsResult$memberships": "<p>Information about the environment members for the environment.</p>"
+      }
+    },
+    "EnvironmentName": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$name": "<p>The name of the environment to create.</p> <p>This name is visible to other AWS IAM users in the same AWS account.</p>",
+        "Environment$name": "<p>The name of the environment.</p>",
+        "UpdateEnvironmentRequest$name": "<p>A replacement name for the environment.</p>"
+      }
+    },
+    "EnvironmentStatus": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentStatusResult$status": "<p>The status of the environment. Available values include:</p> <ul> <li> <p> <code>connecting</code>: The environment is connecting.</p> </li> <li> <p> <code>creating</code>: The environment is being created.</p> </li> <li> <p> <code>deleting</code>: The environment is being deleted.</p> </li> <li> <p> <code>error</code>: The environment is in an error state.</p> </li> <li> <p> <code>ready</code>: The environment is ready.</p> </li> <li> <p> <code>stopped</code>: The environment is stopped.</p> </li> <li> <p> <code>stopping</code>: The environment is stopping.</p> </li> </ul>"
+      }
+    },
+    "EnvironmentType": {
+      "base": null,
+      "refs": {
+        "Environment$type": "<p>The type of environment. Valid values include the following:</p> <ul> <li> <p> <code>ec2</code>: An Amazon Elastic Compute Cloud (Amazon EC2) instance connects to the environment.</p> </li> <li> <p> <code>ssh</code>: Your own server connects to the environment.</p> </li> </ul>"
+      }
+    },
+    "ForbiddenException": {
+      "base": "<p>An access permissions issue occurred.</p>",
+      "refs": {
+      }
+    },
+    "InstanceType": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$instanceType": "<p>The type of instance to connect to the environment (for example, <code>t2.micro</code>).</p>"
+      }
+    },
+    "InternalServerErrorException": {
+      "base": "<p>An internal server error occurred.</p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>A service limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListEnvironmentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListEnvironmentsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentMembershipsRequest$maxResults": "<p>The maximum number of environment members to get information about.</p>",
+        "ListEnvironmentsRequest$maxResults": "<p>The maximum number of environments to get identifiers for.</p>"
+      }
+    },
+    "MemberPermissions": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentMembershipRequest$permissions": "<p>The type of environment member permissions you want to associate with this environment member. Available values include:</p> <ul> <li> <p> <code>read-only</code>: Has read-only access to the environment.</p> </li> <li> <p> <code>read-write</code>: Has read-write access to the environment.</p> </li> </ul>",
+        "UpdateEnvironmentMembershipRequest$permissions": "<p>The replacement type of environment member permissions you want to associate with this environment member. Available values include:</p> <ul> <li> <p> <code>read-only</code>: Has read-only access to the environment.</p> </li> <li> <p> <code>read-write</code>: Has read-write access to the environment.</p> </li> </ul>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The target resource cannot be found.</p>",
+      "refs": {
+      }
+    },
+    "Permissions": {
+      "base": null,
+      "refs": {
+        "EnvironmentMember$permissions": "<p>The type of environment member permissions associated with this environment member. Available values include:</p> <ul> <li> <p> <code>owner</code>: Owns the environment.</p> </li> <li> <p> <code>read-only</code>: Has read-only access to the environment.</p> </li> <li> <p> <code>read-write</code>: Has read-write access to the environment.</p> </li> </ul>",
+        "PermissionsList$member": null
+      }
+    },
+    "PermissionsList": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentMembershipsRequest$permissions": "<p>The type of environment member permissions to get information about. Available values include:</p> <ul> <li> <p> <code>owner</code>: Owns the environment.</p> </li> <li> <p> <code>read-only</code>: Has read-only access to the environment.</p> </li> <li> <p> <code>read-write</code>: Has read-write access to the environment.</p> </li> </ul> <p>If no value is specified, information about all environment members are returned.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "DescribeEnvironmentMembershipsRequest$nextToken": "<p>During a previous call, if there are more than 25 items in the list, only the first 25 items are returned, along with a unique string called a <i>next token</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned.</p>",
+        "DescribeEnvironmentMembershipsResult$nextToken": "<p>If there are more than 25 items in the list, only the first 25 items are returned, along with a unique string called a <i>next token</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call.</p>",
+        "DescribeEnvironmentStatusResult$message": "<p>Any informational message about the status of the environment.</p>",
+        "Environment$arn": "<p>The Amazon Resource Name (ARN) of the environment.</p>",
+        "Environment$ownerArn": "<p>The Amazon Resource Name (ARN) of the environment owner.</p>",
+        "EnvironmentLifecycle$reason": "<p>Any informational message about the lifecycle state of the environment.</p>",
+        "EnvironmentLifecycle$failureResource": "<p>If the environment failed to delete, the Amazon Resource Name (ARN) of the related AWS resource.</p>",
+        "EnvironmentMember$userId": "<p>The user ID in AWS Identity and Access Management (AWS IAM) of the environment member.</p>",
+        "ListEnvironmentsRequest$nextToken": "<p>During a previous call, if there are more than 25 items in the list, only the first 25 items are returned, along with a unique string called a <i>next token</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call. To get all of the items in the list, keep calling this operation with each subsequent next token that is returned, until no more next tokens are returned.</p>",
+        "ListEnvironmentsResult$nextToken": "<p>If there are more than 25 items in the list, only the first 25 items are returned, along with a unique string called a <i>next token</i>. To get the next batch of items in the list, call this operation again, adding the next token to the call.</p>"
+      }
+    },
+    "SubnetId": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$subnetId": "<p>The ID of the subnet in Amazon VPC that AWS Cloud9 will use to communicate with the Amazon EC2 instance.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>Metadata that is associated with AWS resources. In particular, a name-value pair that can be associated with an AWS Cloud9 development environment. There are two types of tags: <i>user tags</i> and <i>system tags</i>. A user tag is created by the user. A system tag is automatically created by AWS services. A system tag is prefixed with \"aws:\" and cannot be modified by the user.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The <b>name</b> part of a tag.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tag names of the tags to remove from the given AWS Cloud9 development environment.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$tags": "<p>An array of key-value pairs that will be associated with the new AWS Cloud9 development environment.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>The list of tags associated with the AWS Cloud9 development environment.</p>",
+        "TagResourceRequest$Tags": "<p>The list of tags to add to the given AWS Cloud9 development environment.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The <b>value</b> part of a tag.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "EnvironmentMember$lastAccess": "<p>The time, expressed in epoch time format, when the environment member last opened the environment.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p>Too many service requests were made over the given time period.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEnvironmentMembershipRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEnvironmentMembershipResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEnvironmentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateEnvironmentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UserArn": {
+      "base": null,
+      "refs": {
+        "CreateEnvironmentEC2Request$ownerArn": "<p>The Amazon Resource Name (ARN) of the environment owner. This ARN can be the ARN of any AWS IAM principal. If this value is not specified, the ARN defaults to this environment's creator.</p>",
+        "CreateEnvironmentMembershipRequest$userArn": "<p>The Amazon Resource Name (ARN) of the environment member you want to add.</p>",
+        "DeleteEnvironmentMembershipRequest$userArn": "<p>The Amazon Resource Name (ARN) of the environment member to delete from the environment.</p>",
+        "DescribeEnvironmentMembershipsRequest$userArn": "<p>The Amazon Resource Name (ARN) of an individual environment member to get information about. If no value is specified, information about all environment members are returned.</p>",
+        "EnvironmentMember$userArn": "<p>The Amazon Resource Name (ARN) of the environment member.</p>",
+        "UpdateEnvironmentMembershipRequest$userArn": "<p>The Amazon Resource Name (ARN) of the environment member whose settings you want to change.</p>"
+      }
+    }
+  }
+}

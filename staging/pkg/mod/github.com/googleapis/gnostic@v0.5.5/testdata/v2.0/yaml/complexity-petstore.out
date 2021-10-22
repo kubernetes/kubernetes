@@ -1,0 +1,14 @@
+
+
+../../examples/v2.0/yaml/complexity.json -------------------- 
+{
+  "path_count": 2,
+  "get_count": 2,
+  "post_count": 1,
+  "schema_count": 8,
+  "schema_property_count": 5
+}
+
+
+../../examples/v2.0/yaml/complexity.pb -------------------- 
+08

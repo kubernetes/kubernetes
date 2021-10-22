@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeClusterVersions",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DescribeClusters",
+            "input": {
+                "ClusterIdentifier": "fake-cluster"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

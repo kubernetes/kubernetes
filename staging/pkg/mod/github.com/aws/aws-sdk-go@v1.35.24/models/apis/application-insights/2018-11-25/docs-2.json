@@ -1,0 +1,1000 @@
+{
+  "version": "2.0",
+  "service": "<fullname>Amazon CloudWatch Application Insights for .NET and SQL Server</fullname> <p> Amazon CloudWatch Application Insights for .NET and SQL Server is a service that helps you detect common problems with your .NET and SQL Server-based applications. It enables you to pinpoint the source of issues in your applications (built with technologies such as Microsoft IIS, .NET, and Microsoft SQL Server), by providing key insights into detected problems.</p> <p>After you onboard your application, CloudWatch Application Insights for .NET and SQL Server identifies, recommends, and sets up metrics and logs. It continuously analyzes and correlates your metrics and logs for unusual behavior to surface actionable problems with your application. For example, if your application is slow and unresponsive and leading to HTTP 500 errors in your Application Load Balancer (ALB), Application Insights informs you that a memory pressure problem with your SQL Server database is occurring. It bases this analysis on impactful metrics and log errors. </p>",
+  "operations": {
+    "CreateApplication": "<p>Adds an application that is created from a resource group.</p>",
+    "CreateComponent": "<p>Creates a custom component by grouping similar standalone instances to monitor.</p>",
+    "CreateLogPattern": "<p>Adds an log pattern to a <code>LogPatternSet</code>.</p>",
+    "DeleteApplication": "<p>Removes the specified application from monitoring. Does not delete the application.</p>",
+    "DeleteComponent": "<p>Ungroups a custom component. When you ungroup custom components, all applicable monitors that are set up for the component are removed and the instances revert to their standalone status.</p>",
+    "DeleteLogPattern": "<p>Removes the specified log pattern from a <code>LogPatternSet</code>.</p>",
+    "DescribeApplication": "<p>Describes the application.</p>",
+    "DescribeComponent": "<p>Describes a component and lists the resources that are grouped together in a component.</p>",
+    "DescribeComponentConfiguration": "<p>Describes the monitoring configuration of the component.</p>",
+    "DescribeComponentConfigurationRecommendation": "<p>Describes the recommended monitoring configuration of the component.</p>",
+    "DescribeLogPattern": "<p>Describe a specific log pattern from a <code>LogPatternSet</code>.</p>",
+    "DescribeObservation": "<p>Describes an anomaly or error with the application.</p>",
+    "DescribeProblem": "<p>Describes an application problem.</p>",
+    "DescribeProblemObservations": "<p>Describes the anomalies or errors associated with the problem.</p>",
+    "ListApplications": "<p>Lists the IDs of the applications that you are monitoring. </p>",
+    "ListComponents": "<p>Lists the auto-grouped, standalone, and custom components of the application.</p>",
+    "ListConfigurationHistory": "<p> Lists the INFO, WARN, and ERROR events for periodic configuration updates performed by Application Insights. Examples of events represented are: </p> <ul> <li> <p>INFO: creating a new alarm or updating an alarm threshold.</p> </li> <li> <p>WARN: alarm not created due to insufficient data points used to predict thresholds.</p> </li> <li> <p>ERROR: alarm not created due to permission errors or exceeding quotas. </p> </li> </ul>",
+    "ListLogPatternSets": "<p>Lists the log pattern sets in the specific application.</p>",
+    "ListLogPatterns": "<p>Lists the log patterns in the specific log <code>LogPatternSet</code>.</p>",
+    "ListProblems": "<p>Lists the problems with your application.</p>",
+    "ListTagsForResource": "<p>Retrieve a list of the tags (keys and values) that are associated with a specified application. A <i>tag</i> is a label that you optionally define and associate with an application. Each tag consists of a required <i>tag key</i> and an optional associated <i>tag value</i>. A tag key is a general label that acts as a category for more specific tag values. A tag value acts as a descriptor within a tag key.</p>",
+    "TagResource": "<p>Add one or more tags (keys and values) to a specified application. A <i>tag</i> is a label that you optionally define and associate with an application. Tags can help you categorize and manage application in different ways, such as by purpose, owner, environment, or other criteria. </p> <p>Each tag consists of a required <i>tag key</i> and an associated <i>tag value</i>, both of which you define. A tag key is a general label that acts as a category for more specific tag values. A tag value acts as a descriptor within a tag key.</p>",
+    "UntagResource": "<p>Remove one or more tags (keys and values) from a specified application.</p>",
+    "UpdateApplication": "<p>Updates the application.</p>",
+    "UpdateComponent": "<p>Updates the custom component name and/or the list of resources that make up the component.</p>",
+    "UpdateComponentConfiguration": "<p>Updates the monitoring configurations for the component. The configuration input parameter is an escaped JSON of the configuration and should match the schema of what is returned by <code>DescribeComponentConfigurationRecommendation</code>. </p>",
+    "UpdateLogPattern": "<p>Adds a log pattern to a <code>LogPatternSet</code>.</p>"
+  },
+  "shapes": {
+    "AffectedResource": {
+      "base": null,
+      "refs": {
+        "Problem$AffectedResource": "<p>The resource affected by the problem.</p>"
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the application that you want to retrieve tag information for.</p>",
+        "TagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the application that you want to add one or more tags to.</p>",
+        "TooManyTagsException$ResourceName": "<p>The name of the resource with too many tags.</p>",
+        "UntagResourceRequest$ResourceARN": "<p>The Amazon Resource Name (ARN) of the application that you want to remove one or more tags from.</p>"
+      }
+    },
+    "ApplicationComponent": {
+      "base": "<p>Describes a standalone resource or similarly grouped resources that the application is made up of.</p>",
+      "refs": {
+        "ApplicationComponentList$member": null,
+        "DescribeComponentResponse$ApplicationComponent": null
+      }
+    },
+    "ApplicationComponentList": {
+      "base": null,
+      "refs": {
+        "ListComponentsResponse$ApplicationComponentList": "<p>The list of application components.</p>"
+      }
+    },
+    "ApplicationInfo": {
+      "base": "<p>Describes the status of the application.</p>",
+      "refs": {
+        "ApplicationInfoList$member": null,
+        "CreateApplicationResponse$ApplicationInfo": "<p>Information about the application.</p>",
+        "DescribeApplicationResponse$ApplicationInfo": "<p>Information about the application.</p>",
+        "UpdateApplicationResponse$ApplicationInfo": "<p>Information about the application. </p>"
+      }
+    },
+    "ApplicationInfoList": {
+      "base": null,
+      "refs": {
+        "ListApplicationsResponse$ApplicationInfoList": "<p>The list of applications.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>The request is not understood by the server.</p>",
+      "refs": {
+      }
+    },
+    "CWEMonitorEnabled": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$CWEMonitorEnabled": "<p> Indicates whether Application Insights can listen to CloudWatch events for the application resources, such as <code>instance terminated</code>, <code>failed deployment</code>, and others. </p>",
+        "CreateApplicationRequest$CWEMonitorEnabled": "<p> Indicates whether Application Insights can listen to CloudWatch events for the application resources, such as <code>instance terminated</code>, <code>failed deployment</code>, and others. </p>",
+        "UpdateApplicationRequest$CWEMonitorEnabled": "<p> Indicates whether Application Insights can listen to CloudWatch events for the application resources, such as <code>instance terminated</code>, <code>failed deployment</code>, and others. </p>"
+      }
+    },
+    "CloudWatchEventDetailType": {
+      "base": null,
+      "refs": {
+        "Observation$CloudWatchEventDetailType": "<p> The detail type of the CloudWatch Event-based observation, for example, <code>EC2 Instance State-change Notification</code>. </p>"
+      }
+    },
+    "CloudWatchEventId": {
+      "base": null,
+      "refs": {
+        "Observation$CloudWatchEventId": "<p> The ID of the CloudWatch Event-based observation related to the detected problem. </p>"
+      }
+    },
+    "CloudWatchEventSource": {
+      "base": null,
+      "refs": {
+        "Observation$CloudWatchEventSource": "<p> The source of the CloudWatch Event. </p>"
+      }
+    },
+    "CodeDeployApplication": {
+      "base": null,
+      "refs": {
+        "Observation$CodeDeployApplication": "<p> The CodeDeploy application to which the deployment belongs. </p>"
+      }
+    },
+    "CodeDeployDeploymentGroup": {
+      "base": null,
+      "refs": {
+        "Observation$CodeDeployDeploymentGroup": "<p> The deployment group to which the CodeDeploy deployment belongs. </p>"
+      }
+    },
+    "CodeDeployDeploymentId": {
+      "base": null,
+      "refs": {
+        "Observation$CodeDeployDeploymentId": "<p> The deployment ID of the CodeDeploy-based observation related to the detected problem. </p>"
+      }
+    },
+    "CodeDeployInstanceGroupId": {
+      "base": null,
+      "refs": {
+        "Observation$CodeDeployInstanceGroupId": "<p> The instance group to which the CodeDeploy instance belongs. </p>"
+      }
+    },
+    "CodeDeployState": {
+      "base": null,
+      "refs": {
+        "Observation$CodeDeployState": "<p> The status of the CodeDeploy deployment, for example <code>SUCCESS</code> or <code> FAILURE</code>. </p>"
+      }
+    },
+    "ComponentConfiguration": {
+      "base": null,
+      "refs": {
+        "DescribeComponentConfigurationRecommendationResponse$ComponentConfiguration": "<p>The recommended configuration settings of the component. The value is the escaped JSON of the configuration.</p>",
+        "DescribeComponentConfigurationResponse$ComponentConfiguration": "<p>The configuration settings of the component. The value is the escaped JSON of the configuration.</p>",
+        "UpdateComponentConfigurationRequest$ComponentConfiguration": "<p>The configuration settings of the component. The value is the escaped JSON of the configuration. For more information about the JSON format, see <a href=\"https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/working-with-json.html\">Working with JSON</a>. You can send a request to <code>DescribeComponentConfigurationRecommendation</code> to see the recommended configuration for a component. For the complete format of the component configuration file, see <a href=\"https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/component-config.html\">Component Configuration</a>.</p>"
+      }
+    },
+    "ComponentName": {
+      "base": null,
+      "refs": {
+        "ApplicationComponent$ComponentName": "<p>The name of the component.</p>",
+        "CreateComponentRequest$ComponentName": "<p>The name of the component.</p>",
+        "DeleteComponentRequest$ComponentName": "<p>The name of the component.</p>",
+        "DescribeComponentConfigurationRecommendationRequest$ComponentName": "<p>The name of the component.</p>",
+        "DescribeComponentConfigurationRequest$ComponentName": "<p>The name of the component.</p>",
+        "DescribeComponentRequest$ComponentName": "<p>The name of the component.</p>",
+        "UpdateComponentConfigurationRequest$ComponentName": "<p>The name of the component.</p>",
+        "UpdateComponentRequest$ComponentName": "<p>The name of the component.</p>"
+      }
+    },
+    "ConfigurationEvent": {
+      "base": "<p> The event information. </p>",
+      "refs": {
+        "ConfigurationEventList$member": null
+      }
+    },
+    "ConfigurationEventDetail": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$EventDetail": "<p> The details of the event in plain text. </p>"
+      }
+    },
+    "ConfigurationEventList": {
+      "base": null,
+      "refs": {
+        "ListConfigurationHistoryResponse$EventList": "<p> The list of configuration events and their corresponding details. </p>"
+      }
+    },
+    "ConfigurationEventMonitoredResourceARN": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$MonitoredResourceARN": "<p> The resource monitored by Application Insights. </p>"
+      }
+    },
+    "ConfigurationEventResourceName": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$EventResourceName": "<p> The name of the resource Application Insights attempted to configure. </p>"
+      }
+    },
+    "ConfigurationEventResourceType": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$EventResourceType": "<p> The resource type that Application Insights attempted to configure, for example, CLOUDWATCH_ALARM. </p>"
+      }
+    },
+    "ConfigurationEventStatus": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$EventStatus": "<p> The status of the configuration update event. Possible values include INFO, WARN, and ERROR. </p>",
+        "ListConfigurationHistoryRequest$EventStatus": "<p>The status of the configuration update event. Possible values include INFO, WARN, and ERROR.</p>"
+      }
+    },
+    "ConfigurationEventTime": {
+      "base": null,
+      "refs": {
+        "ConfigurationEvent$EventTime": "<p> The timestamp of the event. </p>"
+      }
+    },
+    "CreateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateComponentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateComponentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLogPatternRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLogPatternResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteComponentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteComponentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLogPatternRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLogPatternResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentConfigurationRecommendationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentConfigurationRecommendationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeComponentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLogPatternRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLogPatternResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeObservationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeObservationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProblemObservationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProblemObservationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProblemRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProblemResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Ec2State": {
+      "base": null,
+      "refs": {
+        "Observation$Ec2State": "<p> The state of the instance, such as <code>STOPPING</code> or <code>TERMINATING</code>. </p>"
+      }
+    },
+    "EndTime": {
+      "base": null,
+      "refs": {
+        "ListConfigurationHistoryRequest$EndTime": "<p>The end time of the event.</p>",
+        "ListProblemsRequest$EndTime": "<p>The time when the problem ended, in epoch seconds. If not specified, problems within the past seven days are returned.</p>",
+        "Observation$EndTime": "<p>The time when the observation ended, in epoch seconds.</p>",
+        "Problem$EndTime": "<p>The time when the problem ended, in epoch seconds.</p>"
+      }
+    },
+    "ErrorMsg": {
+      "base": null,
+      "refs": {
+        "BadRequestException$Message": null,
+        "InternalServerException$Message": null,
+        "ResourceInUseException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "TagsAlreadyExistException$Message": null,
+        "TooManyTagsException$Message": null
+      }
+    },
+    "Feedback": {
+      "base": null,
+      "refs": {
+        "Problem$Feedback": "<p>Feedback provided by the user about the problem.</p>"
+      }
+    },
+    "FeedbackKey": {
+      "base": null,
+      "refs": {
+        "Feedback$key": null
+      }
+    },
+    "FeedbackValue": {
+      "base": null,
+      "refs": {
+        "Feedback$value": null
+      }
+    },
+    "HealthEventArn": {
+      "base": null,
+      "refs": {
+        "Observation$HealthEventArn": "<p> The Amazon Resource Name (ARN) of the AWS Health Event-based observation.</p>"
+      }
+    },
+    "HealthEventDescription": {
+      "base": null,
+      "refs": {
+        "Observation$HealthEventDescription": "<p> The description of the AWS Health event provided by the service, such as Amazon EC2. </p>"
+      }
+    },
+    "HealthEventTypeCategory": {
+      "base": null,
+      "refs": {
+        "Observation$HealthEventTypeCategory": "<p> The category of the AWS Health event, such as <code>issue</code>. </p>"
+      }
+    },
+    "HealthEventTypeCode": {
+      "base": null,
+      "refs": {
+        "Observation$HealthEventTypeCode": "<p> The type of the AWS Health event, for example, <code>AWS_EC2_POWER_CONNECTIVITY_ISSUE</code>. </p>"
+      }
+    },
+    "HealthService": {
+      "base": null,
+      "refs": {
+        "Observation$HealthService": "<p> The service to which the AWS Health Event belongs, such as EC2. </p>"
+      }
+    },
+    "Insights": {
+      "base": null,
+      "refs": {
+        "Problem$Insights": "<p>A detailed analysis of the problem using machine learning.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>The server encountered an internal error and is unable to complete the request.</p>",
+      "refs": {
+      }
+    },
+    "LifeCycle": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$LifeCycle": "<p>The lifecycle of the application. </p>"
+      }
+    },
+    "LineTime": {
+      "base": null,
+      "refs": {
+        "Observation$LineTime": "<p>The timestamp in the CloudWatch Logs that specifies when the matched line occurred.</p>"
+      }
+    },
+    "ListApplicationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListApplicationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListComponentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListComponentsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListConfigurationHistoryRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListConfigurationHistoryResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogPatternSetsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogPatternSetsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogPatternsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLogPatternsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProblemsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProblemsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogFilter": {
+      "base": null,
+      "refs": {
+        "Observation$LogFilter": "<p>The log filter of the observation.</p>"
+      }
+    },
+    "LogGroup": {
+      "base": null,
+      "refs": {
+        "Observation$LogGroup": "<p>The log group name.</p>"
+      }
+    },
+    "LogPattern": {
+      "base": "<p>An object that defines the log patterns that belongs to a <code>LogPatternSet</code>.</p>",
+      "refs": {
+        "CreateLogPatternResponse$LogPattern": "<p>The successfully created log pattern.</p>",
+        "DescribeLogPatternResponse$LogPattern": "<p>The successfully created log pattern.</p>",
+        "LogPatternList$member": null,
+        "UpdateLogPatternResponse$LogPattern": "<p>The successfully created log pattern.</p>"
+      }
+    },
+    "LogPatternList": {
+      "base": null,
+      "refs": {
+        "ListLogPatternsResponse$LogPatterns": "<p>The list of log patterns.</p>"
+      }
+    },
+    "LogPatternName": {
+      "base": null,
+      "refs": {
+        "CreateLogPatternRequest$PatternName": "<p>The name of the log pattern.</p>",
+        "DeleteLogPatternRequest$PatternName": "<p>The name of the log pattern.</p>",
+        "DescribeLogPatternRequest$PatternName": "<p>The name of the log pattern.</p>",
+        "LogPattern$PatternName": "<p>The name of the log pattern. A log pattern name can contains at many as 50 characters, and it cannot be empty. The characters can be Unicode letters, digits or one of the following symbols: period, dash, underscore.</p>",
+        "UpdateLogPatternRequest$PatternName": "<p>The name of the log pattern.</p>"
+      }
+    },
+    "LogPatternRank": {
+      "base": null,
+      "refs": {
+        "CreateLogPatternRequest$Rank": "<p>Rank of the log pattern.</p>",
+        "LogPattern$Rank": "<p>Rank of the log pattern.</p>",
+        "UpdateLogPatternRequest$Rank": "<p>Rank of the log pattern.</p>"
+      }
+    },
+    "LogPatternRegex": {
+      "base": null,
+      "refs": {
+        "CreateLogPatternRequest$Pattern": "<p>The log pattern.</p>",
+        "LogPattern$Pattern": "<p>A regular expression that defines the log pattern. A log pattern can contains at many as 50 characters, and it cannot be empty.</p>",
+        "UpdateLogPatternRequest$Pattern": "<p>The log pattern.</p>"
+      }
+    },
+    "LogPatternSetList": {
+      "base": null,
+      "refs": {
+        "ListLogPatternSetsResponse$LogPatternSets": "<p>The list of log pattern sets.</p>"
+      }
+    },
+    "LogPatternSetName": {
+      "base": null,
+      "refs": {
+        "CreateLogPatternRequest$PatternSetName": "<p>The name of the log pattern set.</p>",
+        "DeleteLogPatternRequest$PatternSetName": "<p>The name of the log pattern set.</p>",
+        "DescribeLogPatternRequest$PatternSetName": "<p>The name of the log pattern set.</p>",
+        "ListLogPatternsRequest$PatternSetName": "<p>The name of the log pattern set.</p>",
+        "LogPattern$PatternSetName": "<p>The name of the log pattern. A log pattern name can contains at many as 30 characters, and it cannot be empty. The characters can be Unicode letters, digits or one of the following symbols: period, dash, underscore.</p>",
+        "LogPatternSetList$member": null,
+        "UpdateLogPatternRequest$PatternSetName": "<p>The name of the log pattern set.</p>"
+      }
+    },
+    "LogText": {
+      "base": null,
+      "refs": {
+        "Observation$LogText": "<p>The log text of the observation.</p>"
+      }
+    },
+    "MaxEntities": {
+      "base": null,
+      "refs": {
+        "ListApplicationsRequest$MaxResults": "<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>",
+        "ListComponentsRequest$MaxResults": "<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>",
+        "ListConfigurationHistoryRequest$MaxResults": "<p> The maximum number of results returned by <code>ListConfigurationHistory</code> in paginated output. When this parameter is used, <code>ListConfigurationHistory</code> returns only <code>MaxResults</code> in a single page along with a <code>NextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListConfigurationHistory</code> request with the returned <code>NextToken</code> value. If this parameter is not used, then <code>ListConfigurationHistory</code> returns all results. </p>",
+        "ListLogPatternSetsRequest$MaxResults": "<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>",
+        "ListLogPatternsRequest$MaxResults": "<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>",
+        "ListProblemsRequest$MaxResults": "<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+      }
+    },
+    "MetricName": {
+      "base": null,
+      "refs": {
+        "Observation$MetricName": "<p>The name of the observation metric.</p>"
+      }
+    },
+    "MetricNamespace": {
+      "base": null,
+      "refs": {
+        "Observation$MetricNamespace": "<p>The namespace of the observation metric.</p>"
+      }
+    },
+    "Monitor": {
+      "base": null,
+      "refs": {
+        "ApplicationComponent$Monitor": "<p>Indicates whether the application component is monitored. </p>",
+        "DescribeComponentConfigurationResponse$Monitor": "<p>Indicates whether the application component is monitored.</p>",
+        "UpdateComponentConfigurationRequest$Monitor": "<p>Indicates whether the application component is monitored.</p>"
+      }
+    },
+    "NewComponentName": {
+      "base": null,
+      "refs": {
+        "UpdateComponentRequest$NewComponentName": "<p>The new name of the component.</p>"
+      }
+    },
+    "Observation": {
+      "base": "<p>Describes an anomaly or error with the application.</p>",
+      "refs": {
+        "DescribeObservationResponse$Observation": "<p>Information about the observation.</p>",
+        "ObservationList$member": null
+      }
+    },
+    "ObservationId": {
+      "base": null,
+      "refs": {
+        "DescribeObservationRequest$ObservationId": "<p>The ID of the observation.</p>",
+        "Observation$Id": "<p>The ID of the observation type.</p>"
+      }
+    },
+    "ObservationList": {
+      "base": null,
+      "refs": {
+        "RelatedObservations$ObservationList": "<p>The list of observations related to the problem.</p>"
+      }
+    },
+    "OpsCenterEnabled": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$OpsCenterEnabled": "<p> Indicates whether Application Insights will create opsItems for any problem detected by Application Insights for an application. </p>",
+        "CreateApplicationRequest$OpsCenterEnabled": "<p> When set to <code>true</code>, creates opsItems for any problems detected on an application. </p>",
+        "UpdateApplicationRequest$OpsCenterEnabled": "<p> When set to <code>true</code>, creates opsItems for any problems detected on an application. </p>"
+      }
+    },
+    "OpsItemSNSTopicArn": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$OpsItemSNSTopicArn": "<p> The SNS topic provided to Application Insights that is associated to the created opsItems to receive SNS notifications for opsItem updates. </p>",
+        "CreateApplicationRequest$OpsItemSNSTopicArn": "<p> The SNS topic provided to Application Insights that is associated to the created opsItem. Allows you to receive notifications for updates to the opsItem. </p>",
+        "UpdateApplicationRequest$OpsItemSNSTopicArn": "<p> The SNS topic provided to Application Insights that is associated to the created opsItem. Allows you to receive notifications for updates to the opsItem.</p>"
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListApplicationsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListApplicationsResponse$NextToken": "<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>",
+        "ListComponentsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListComponentsResponse$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListConfigurationHistoryRequest$NextToken": "<p>The <code>NextToken</code> value returned from a previous paginated <code>ListConfigurationHistory</code> request where <code>MaxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>NextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListConfigurationHistoryResponse$NextToken": "<p>The <code>NextToken</code> value to include in a future <code>ListConfigurationHistory</code> request. When the results of a <code>ListConfigurationHistory</code> request exceed <code>MaxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListLogPatternSetsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListLogPatternSetsResponse$NextToken": "<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>",
+        "ListLogPatternsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListLogPatternsResponse$NextToken": "<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>",
+        "ListProblemsRequest$NextToken": "<p>The token to request the next page of results.</p>",
+        "ListProblemsResponse$NextToken": "<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+      }
+    },
+    "Problem": {
+      "base": "<p>Describes a problem that is detected by correlating observations.</p>",
+      "refs": {
+        "DescribeProblemResponse$Problem": "<p>Information about the problem. </p>",
+        "ProblemList$member": null
+      }
+    },
+    "ProblemId": {
+      "base": null,
+      "refs": {
+        "DescribeProblemObservationsRequest$ProblemId": "<p>The ID of the problem.</p>",
+        "DescribeProblemRequest$ProblemId": "<p>The ID of the problem.</p>",
+        "Problem$Id": "<p>The ID of the problem.</p>"
+      }
+    },
+    "ProblemList": {
+      "base": null,
+      "refs": {
+        "ListProblemsResponse$ProblemList": "<p>The list of problems. </p>"
+      }
+    },
+    "RelatedObservations": {
+      "base": "<p>Describes observations related to the problem.</p>",
+      "refs": {
+        "DescribeProblemObservationsResponse$RelatedObservations": "<p>Observations related to the problem.</p>"
+      }
+    },
+    "Remarks": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$Remarks": "<p>The issues on the user side that block Application Insights from successfully monitoring an application. Example remarks include:</p> <ul> <li> <p>“Configuring application, detected 1 Errors, 3 Warnings”</p> </li> <li> <p>“Configuring application, detected 1 Unconfigured Components”</p> </li> </ul>"
+      }
+    },
+    "RemoveSNSTopic": {
+      "base": null,
+      "refs": {
+        "UpdateApplicationRequest$RemoveSNSTopic": "<p> Disassociates the SNS topic from the opsItem created for detected problems.</p>"
+      }
+    },
+    "ResourceARN": {
+      "base": null,
+      "refs": {
+        "ResourceList$member": null
+      }
+    },
+    "ResourceGroupName": {
+      "base": null,
+      "refs": {
+        "ApplicationInfo$ResourceGroupName": "<p>The name of the resource group used for the application.</p>",
+        "CreateApplicationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "CreateComponentRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "CreateLogPatternRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "CreateLogPatternResponse$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DeleteApplicationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DeleteComponentRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DeleteLogPatternRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeApplicationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeComponentConfigurationRecommendationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeComponentConfigurationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeComponentRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeLogPatternRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "DescribeLogPatternResponse$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListComponentsRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListConfigurationHistoryRequest$ResourceGroupName": "<p>Resource group to which the application belongs. </p>",
+        "ListLogPatternSetsRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListLogPatternSetsResponse$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListLogPatternsRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListLogPatternsResponse$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "ListProblemsRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "Problem$ResourceGroupName": "<p>The name of the resource group affected by the problem.</p>",
+        "UpdateApplicationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "UpdateComponentConfigurationRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "UpdateComponentRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "UpdateLogPatternRequest$ResourceGroupName": "<p>The name of the resource group.</p>",
+        "UpdateLogPatternResponse$ResourceGroupName": "<p>The name of the resource group.</p>"
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The resource is already created or in use.</p>",
+      "refs": {
+      }
+    },
+    "ResourceList": {
+      "base": null,
+      "refs": {
+        "CreateComponentRequest$ResourceList": "<p>The list of resource ARNs that belong to the component.</p>",
+        "DescribeComponentResponse$ResourceList": "<p>The list of resource ARNs that belong to the component.</p>",
+        "UpdateComponentRequest$ResourceList": "<p>The list of resource ARNs that belong to the component.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The resource does not exist in the customer account.</p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "ApplicationComponent$ResourceType": "<p>The resource type. Supported resource types include EC2 instances, Auto Scaling group, Classic ELB, Application ELB, and SQS Queue.</p>"
+      }
+    },
+    "SeverityLevel": {
+      "base": null,
+      "refs": {
+        "Problem$SeverityLevel": "<p>A measure of the level of impact of the problem.</p>"
+      }
+    },
+    "SourceARN": {
+      "base": null,
+      "refs": {
+        "Observation$SourceARN": "<p>The source resource ARN of the observation.</p>"
+      }
+    },
+    "SourceType": {
+      "base": null,
+      "refs": {
+        "Observation$SourceType": "<p>The source type of the observation.</p>"
+      }
+    },
+    "StartTime": {
+      "base": null,
+      "refs": {
+        "ListConfigurationHistoryRequest$StartTime": "<p>The start time of the event. </p>",
+        "ListProblemsRequest$StartTime": "<p>The time when the problem was detected, in epoch seconds. If you don't specify a time frame for the request, problems within the past seven days are returned.</p>",
+        "Observation$StartTime": "<p>The time when the observation was first detected, in epoch seconds.</p>",
+        "Problem$StartTime": "<p>The time when the problem started, in epoch seconds.</p>"
+      }
+    },
+    "Status": {
+      "base": null,
+      "refs": {
+        "Problem$Status": "<p>The status of the problem.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>An object that defines the tags associated with an application. A <i>tag</i> is a label that you optionally define and associate with an application. Tags can help you categorize and manage resources in different ways, such as by purpose, owner, environment, or other criteria.</p> <p>Each tag consists of a required <i>tag key</i> and an associated <i>tag value</i>, both of which you define. A tag key is a general label that acts as a category for a more specific tag value. A tag value acts as a descriptor within a tag key. A tag key can contain as many as 128 characters. A tag value can contain as many as 256 characters. The characters can be Unicode letters, digits, white space, or one of the following symbols: _ . : / = + -. The following additional restrictions apply to tags:</p> <ul> <li> <p>Tag keys and values are case sensitive.</p> </li> <li> <p>For each associated resource, each tag key must be unique and it can have only one value.</p> </li> <li> <p>The <code>aws:</code> prefix is reserved for use by AWS; you can’t use it in any tag keys or values that you define. In addition, you can't edit or remove tag keys or values that use this prefix. </p> </li> </ul>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>One part of a key-value pair that defines a tag. The maximum length of a tag key is 128 characters. The minimum length is 1 character.</p>",
+        "TagKeyList$member": null
+      }
+    },
+    "TagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$TagKeys": "<p>The tags (tag keys) that you want to remove from the resource. When you specify a tag key, the action removes both that key and its associated tag value.</p> <p>To remove more than one tag from the application, append the <code>TagKeys</code> parameter and argument for each additional tag to remove, separated by an ampersand. </p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "CreateApplicationRequest$Tags": "<p>List of tags to add to the application. tag key (<code>Key</code>) and an associated tag value (<code>Value</code>). The maximum length of a tag key is 128 characters. The maximum length of a tag value is 256 characters.</p>",
+        "ListTagsForResourceResponse$Tags": "<p>An array that lists all the tags that are associated with the application. Each tag consists of a required tag key (<code>Key</code>) and an associated tag value (<code>Value</code>).</p>",
+        "TagResourceRequest$Tags": "<p>A list of tags that to add to the application. A tag consists of a required tag key (<code>Key</code>) and an associated tag value (<code>Value</code>). The maximum length of a tag key is 128 characters. The maximum length of a tag value is 256 characters.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The optional part of a key-value pair that defines a tag. The maximum length of a tag value is 256 characters. The minimum length is 0 characters. If you don't want an application to have a specific tag value, don't specify a value for this parameter.</p>"
+      }
+    },
+    "TagsAlreadyExistException": {
+      "base": "<p>Tags are already registered for the specified application ARN.</p>",
+      "refs": {
+      }
+    },
+    "Tier": {
+      "base": null,
+      "refs": {
+        "ApplicationComponent$Tier": "<p>The stack tier of the application component.</p>",
+        "DescribeComponentConfigurationRecommendationRequest$Tier": "<p>The tier of the application component. Supported tiers include <code>DOT_NET_CORE</code>, <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code>.</p>",
+        "DescribeComponentConfigurationResponse$Tier": "<p>The tier of the application component. Supported tiers include <code>DOT_NET_CORE</code>, <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code> </p>",
+        "UpdateComponentConfigurationRequest$Tier": "<p>The tier of the application component. Supported tiers include <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>DOT_NET_CORE</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code>.</p>"
+      }
+    },
+    "Title": {
+      "base": null,
+      "refs": {
+        "Problem$Title": "<p>The name of the problem.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>The number of the provided tags is beyond the limit, or the number of total tags you are trying to attach to the specified resource exceeds the limit.</p>",
+      "refs": {
+      }
+    },
+    "Unit": {
+      "base": null,
+      "refs": {
+        "Observation$Unit": "<p>The unit of the source observation metric.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateApplicationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateApplicationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateComponentConfigurationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateComponentConfigurationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateComponentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateComponentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateLogPatternRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateLogPatternResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The parameter is not valid.</p>",
+      "refs": {
+      }
+    },
+    "Value": {
+      "base": null,
+      "refs": {
+        "Observation$Value": "<p>The value of the source observation metric.</p>"
+      }
+    },
+    "XRayErrorPercent": {
+      "base": null,
+      "refs": {
+        "Observation$XRayErrorPercent": "<p> The X-Ray request error percentage for this node. </p>"
+      }
+    },
+    "XRayFaultPercent": {
+      "base": null,
+      "refs": {
+        "Observation$XRayFaultPercent": "<p> The X-Ray request fault percentage for this node. </p>"
+      }
+    },
+    "XRayNodeName": {
+      "base": null,
+      "refs": {
+        "Observation$XRayNodeName": "<p> The name of the X-Ray node. </p>"
+      }
+    },
+    "XRayNodeType": {
+      "base": null,
+      "refs": {
+        "Observation$XRayNodeType": "<p> The type of the X-Ray node. </p>"
+      }
+    },
+    "XRayRequestAverageLatency": {
+      "base": null,
+      "refs": {
+        "Observation$XRayRequestAverageLatency": "<p> The X-Ray node request average latency for this node. </p>"
+      }
+    },
+    "XRayRequestCount": {
+      "base": null,
+      "refs": {
+        "Observation$XRayRequestCount": "<p> The X-Ray request count for this node. </p>"
+      }
+    },
+    "XRayThrottlePercent": {
+      "base": null,
+      "refs": {
+        "Observation$XRayThrottlePercent": "<p> The X-Ray request throttle percentage for this node. </p>"
+      }
+    }
+  }
+}

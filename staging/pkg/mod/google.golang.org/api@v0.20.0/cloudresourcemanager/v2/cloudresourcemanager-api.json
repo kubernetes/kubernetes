@@ -1,0 +1,912 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/cloud-platform.read-only": {
+          "description": "View your data across Google Cloud Platform services"
+        }
+      }
+    }
+  },
+  "basePath": "",
+  "baseUrl": "https://cloudresourcemanager.googleapis.com/",
+  "batchPath": "batch",
+  "canonicalName": "Cloud Resource Manager",
+  "description": "Creates, reads, and updates metadata for Google Cloud Platform resource containers.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://cloud.google.com/resource-manager",
+  "fullyEncodeReservedExpansion": true,
+  "icons": {
+    "x16": "http://www.google.com/images/icons/product/search-16.gif",
+    "x32": "http://www.google.com/images/icons/product/search-32.gif"
+  },
+  "id": "cloudresourcemanager:v2",
+  "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://cloudresourcemanager.mtls.googleapis.com/",
+  "name": "cloudresourcemanager",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "location": "query",
+      "type": "string"
+    },
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "uploadType": {
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    },
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "folders": {
+      "methods": {
+        "create": {
+          "description": "Creates a Folder in the resource hierarchy.\nReturns an Operation which can be used to track the progress of the\nfolder creation workflow.\nUpon success the Operation.response field will be populated with the\ncreated Folder.\n\nIn order to succeed, the addition of this new Folder must not violate\nthe Folder naming, height or fanout constraints.\n\n+ The Folder's display_name must be distinct from all other Folder's that\nshare its parent.\n+ The addition of the Folder must not cause the active Folder hierarchy\nto exceed a height of 4. Note, the full active + deleted Folder hierarchy\nis allowed to reach a height of 8; this provides additional headroom when\nmoving folders that contain deleted folders.\n+ The addition of the Folder must not cause the total number of Folders\nunder its parent to exceed 100.\n\nIf the operation fails due to a folder constraint violation, some errors\nmay be returned by the CreateFolder request, with status code\nFAILED_PRECONDITION and an error description. Other folder constraint\nviolations will be communicated in the Operation, with the specific\nPreconditionFailure returned via the details list in the Operation.error\nfield.\n\nThe caller must have `resourcemanager.folders.create` permission on the\nidentified parent.",
+          "flatPath": "v2/folders",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.create",
+          "parameterOrder": [],
+          "parameters": {
+            "parent": {
+              "description": "Required. The resource name of the new Folder's parent.\nMust be of the form `folders/{folder_id}` or `organizations/{org_id}`.",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "v2/folders",
+          "request": {
+            "$ref": "Folder"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "delete": {
+          "description": "Requests deletion of a Folder. The Folder is moved into the\nDELETE_REQUESTED state\nimmediately, and is deleted approximately 30 days later. This method may\nonly be called on an empty Folder in the\nACTIVE state, where a Folder is empty if\nit doesn't contain any Folders or Projects in the\nACTIVE state.\nThe caller must have `resourcemanager.folders.delete` permission on the\nidentified folder.",
+          "flatPath": "v2/folders/{foldersId}",
+          "httpMethod": "DELETE",
+          "id": "cloudresourcemanager.folders.delete",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Required. the resource name of the Folder to be deleted.\nMust be of the form `folders/{folder_id}`.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}",
+          "response": {
+            "$ref": "Folder"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "get": {
+          "description": "Retrieves a Folder identified by the supplied resource name.\nValid Folder resource names have the format `folders/{folder_id}`\n(for example, `folders/1234`).\nThe caller must have `resourcemanager.folders.get` permission on the\nidentified folder.",
+          "flatPath": "v2/folders/{foldersId}",
+          "httpMethod": "GET",
+          "id": "cloudresourcemanager.folders.get",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Required. The resource name of the Folder to retrieve.\nMust be of the form `folders/{folder_id}`.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}",
+          "response": {
+            "$ref": "Folder"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        },
+        "getIamPolicy": {
+          "description": "Gets the access control policy for a Folder. The returned policy may be\nempty if no such policy or resource exists. The `resource` field should\nbe the Folder's resource name, e.g. \"folders/1234\".\nThe caller must have `resourcemanager.folders.getIamPolicy` permission\non the identified folder.",
+          "flatPath": "v2/folders/{foldersId}:getIamPolicy",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.getIamPolicy",
+          "parameterOrder": [
+            "resource"
+          ],
+          "parameters": {
+            "resource": {
+              "description": "REQUIRED: The resource for which the policy is being requested.\nSee the operation documentation for the appropriate value for this field.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+resource}:getIamPolicy",
+          "request": {
+            "$ref": "GetIamPolicyRequest"
+          },
+          "response": {
+            "$ref": "Policy"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        },
+        "list": {
+          "description": "Lists the Folders that are direct descendants of supplied parent resource.\nList provides a strongly consistent view of the Folders underneath\nthe specified parent resource.\nList returns Folders sorted based upon the (ascending) lexical ordering\nof their display_name.\nThe caller must have `resourcemanager.folders.list` permission on the\nidentified parent.",
+          "flatPath": "v2/folders",
+          "httpMethod": "GET",
+          "id": "cloudresourcemanager.folders.list",
+          "parameterOrder": [],
+          "parameters": {
+            "pageSize": {
+              "description": "Optional. The maximum number of Folders to return in the response.",
+              "format": "int32",
+              "location": "query",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "Optional. A pagination token returned from a previous call to `ListFolders`\nthat indicates where this listing should continue from.",
+              "location": "query",
+              "type": "string"
+            },
+            "parent": {
+              "description": "Required. The resource name of the Organization or Folder whose Folders are\nbeing listed.\nMust be of the form `folders/{folder_id}` or `organizations/{org_id}`.\nAccess to this method is controlled by checking the\n`resourcemanager.folders.list` permission on the `parent`.",
+              "location": "query",
+              "type": "string"
+            },
+            "showDeleted": {
+              "description": "Optional. Controls whether Folders in the\nDELETE_REQUESTED\nstate should be returned. Defaults to false.",
+              "location": "query",
+              "type": "boolean"
+            }
+          },
+          "path": "v2/folders",
+          "response": {
+            "$ref": "ListFoldersResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        },
+        "move": {
+          "description": "Moves a Folder under a new resource parent.\nReturns an Operation which can be used to track the progress of the\nfolder move workflow.\nUpon success the Operation.response field will be populated with the\nmoved Folder.\nUpon failure, a FolderOperationError categorizing the failure cause will\nbe returned - if the failure occurs synchronously then the\nFolderOperationError will be returned via the Status.details field\nand if it occurs asynchronously then the FolderOperation will be returned\nvia the Operation.error field.\nIn addition, the Operation.metadata field will be populated with a\nFolderOperation message as an aid to stateless clients.\nFolder moves will be rejected if they violate either the naming, height\nor fanout constraints described in the\nCreateFolder documentation.\nThe caller must have `resourcemanager.folders.move` permission on the\nfolder's current and proposed new parent.",
+          "flatPath": "v2/folders/{foldersId}:move",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.move",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Required. The resource name of the Folder to move.\nMust be of the form folders/{folder_id}",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}:move",
+          "request": {
+            "$ref": "MoveFolderRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "patch": {
+          "description": "Updates a Folder, changing its display_name.\nChanges to the folder display_name will be rejected if they violate either\nthe display_name formatting rules or naming constraints described in\nthe CreateFolder documentation.\n\nThe Folder's display name must start and end with a letter or digit,\nmay contain letters, digits, spaces, hyphens and underscores and can be\nno longer than 30 characters. This is captured by the regular expression:\n[\\p{L}\\p{N}]([\\p{L}\\p{N}_- ]{0,28}[\\p{L}\\p{N}])?.\nThe caller must have `resourcemanager.folders.update` permission on the\nidentified folder.\n\nIf the update fails due to the unique name constraint then a\nPreconditionFailure explaining this violation will be returned\nin the Status.details field.",
+          "flatPath": "v2/folders/{foldersId}",
+          "httpMethod": "PATCH",
+          "id": "cloudresourcemanager.folders.patch",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Output only. The resource name of the Folder.\nIts format is `folders/{folder_id}`, for example: \"folders/1234\".",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            },
+            "updateMask": {
+              "description": "Required. Fields to be updated.\nOnly the `display_name` can be updated.",
+              "format": "google-fieldmask",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}",
+          "request": {
+            "$ref": "Folder"
+          },
+          "response": {
+            "$ref": "Folder"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "search": {
+          "description": "Search for folders that match specific filter criteria.\nSearch provides an eventually consistent view of the folders a user has\naccess to which meet the specified filter criteria.\n\nThis will only return folders on which the caller has the\npermission `resourcemanager.folders.get`.",
+          "flatPath": "v2/folders:search",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.search",
+          "parameterOrder": [],
+          "parameters": {},
+          "path": "v2/folders:search",
+          "request": {
+            "$ref": "SearchFoldersRequest"
+          },
+          "response": {
+            "$ref": "SearchFoldersResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        },
+        "setIamPolicy": {
+          "description": "Sets the access control policy on a Folder, replacing any existing policy.\nThe `resource` field should be the Folder's resource name, e.g.\n\"folders/1234\".\nThe caller must have `resourcemanager.folders.setIamPolicy` permission\non the identified folder.",
+          "flatPath": "v2/folders/{foldersId}:setIamPolicy",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.setIamPolicy",
+          "parameterOrder": [
+            "resource"
+          ],
+          "parameters": {
+            "resource": {
+              "description": "REQUIRED: The resource for which the policy is being specified.\nSee the operation documentation for the appropriate value for this field.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+resource}:setIamPolicy",
+          "request": {
+            "$ref": "SetIamPolicyRequest"
+          },
+          "response": {
+            "$ref": "Policy"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "testIamPermissions": {
+          "description": "Returns permissions that a caller has on the specified Folder.\nThe `resource` field should be the Folder's resource name,\ne.g. \"folders/1234\".\n\nThere are no permissions required for making this API call.",
+          "flatPath": "v2/folders/{foldersId}:testIamPermissions",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.testIamPermissions",
+          "parameterOrder": [
+            "resource"
+          ],
+          "parameters": {
+            "resource": {
+              "description": "REQUIRED: The resource for which the policy detail is being requested.\nSee the operation documentation for the appropriate value for this field.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+resource}:testIamPermissions",
+          "request": {
+            "$ref": "TestIamPermissionsRequest"
+          },
+          "response": {
+            "$ref": "TestIamPermissionsResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        },
+        "undelete": {
+          "description": "Cancels the deletion request for a Folder. This method may only be\ncalled on a Folder in the\nDELETE_REQUESTED state.\nIn order to succeed, the Folder's parent must be in the\nACTIVE state.\nIn addition, reintroducing the folder into the tree must not violate\nfolder naming, height and fanout constraints described in the\nCreateFolder documentation.\nThe caller must have `resourcemanager.folders.undelete` permission on the\nidentified folder.",
+          "flatPath": "v2/folders/{foldersId}:undelete",
+          "httpMethod": "POST",
+          "id": "cloudresourcemanager.folders.undelete",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Required. The resource name of the Folder to undelete.\nMust be of the form `folders/{folder_id}`.",
+              "location": "path",
+              "pattern": "^folders/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v2/{+name}:undelete",
+          "request": {
+            "$ref": "UndeleteFolderRequest"
+          },
+          "response": {
+            "$ref": "Folder"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        }
+      }
+    },
+    "operations": {
+      "methods": {
+        "get": {
+          "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
+          "flatPath": "v1/operations/{operationsId}",
+          "httpMethod": "GET",
+          "id": "cloudresourcemanager.operations.get",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "The name of the operation resource.",
+              "location": "path",
+              "pattern": "^operations/.*$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v1/{+name}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/cloud-platform.read-only"
+          ]
+        }
+      }
+    }
+  },
+  "revision": "20200212",
+  "rootUrl": "https://cloudresourcemanager.googleapis.com/",
+  "schemas": {
+    "AuditConfig": {
+      "description": "Specifies the audit configuration for a service.\nThe configuration determines which permission types are logged, and what\nidentities, if any, are exempted from logging.\nAn AuditConfig must have one or more AuditLogConfigs.\n\nIf there are AuditConfigs for both `allServices` and a specific service,\nthe union of the two AuditConfigs is used for that service: the log_types\nspecified in each AuditConfig are enabled, and the exempted_members in each\nAuditLogConfig are exempted.\n\nExample Policy with multiple AuditConfigs:\n\n    {\n      \"audit_configs\": [\n        {\n          \"service\": \"allServices\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n              \"exempted_members\": [\n                \"user:jose@example.com\"\n              ]\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n            },\n            {\n              \"log_type\": \"ADMIN_READ\",\n            }\n          ]\n        },\n        {\n          \"service\": \"sampleservice.googleapis.com\"\n          \"audit_log_configs\": [\n            {\n              \"log_type\": \"DATA_READ\",\n            },\n            {\n              \"log_type\": \"DATA_WRITE\",\n              \"exempted_members\": [\n                \"user:aliya@example.com\"\n              ]\n            }\n          ]\n        }\n      ]\n    }\n\nFor sampleservice, this policy enables DATA_READ, DATA_WRITE and ADMIN_READ\nlogging. It also exempts jose@example.com from DATA_READ logging, and\naliya@example.com from DATA_WRITE logging.",
+      "id": "AuditConfig",
+      "properties": {
+        "auditLogConfigs": {
+          "description": "The configuration for logging of each type of permission.",
+          "items": {
+            "$ref": "AuditLogConfig"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "Specifies a service that will be enabled for audit logging.\nFor example, `storage.googleapis.com`, `cloudsql.googleapis.com`.\n`allServices` is a special value that covers all services.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuditLogConfig": {
+      "description": "Provides the configuration for logging a type of permissions.\nExample:\n\n    {\n      \"audit_log_configs\": [\n        {\n          \"log_type\": \"DATA_READ\",\n          \"exempted_members\": [\n            \"user:jose@example.com\"\n          ]\n        },\n        {\n          \"log_type\": \"DATA_WRITE\",\n        }\n      ]\n    }\n\nThis enables 'DATA_READ' and 'DATA_WRITE' logging, while exempting\njose@example.com from DATA_READ logging.",
+      "id": "AuditLogConfig",
+      "properties": {
+        "exemptedMembers": {
+          "description": "Specifies the identities that do not cause logging for this type of\npermission.\nFollows the same format of Binding.members.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logType": {
+          "description": "The log type that this config enables.",
+          "enum": [
+            "LOG_TYPE_UNSPECIFIED",
+            "ADMIN_READ",
+            "DATA_WRITE",
+            "DATA_READ"
+          ],
+          "enumDescriptions": [
+            "Default case. Should never be this.",
+            "Admin reads. Example: CloudIAM getIamPolicy",
+            "Data writes. Example: CloudSQL Users create",
+            "Data reads. Example: CloudSQL Users list"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "description": "Associates `members` with a `role`.",
+      "id": "Binding",
+      "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "The condition that is associated with this binding.\nNOTE: An unsatisfied condition will not allow user access via current\nbinding. Different bindings, including their conditions, are examined\nindependently."
+        },
+        "members": {
+          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@example.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n* `deleted:user:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a user that has been recently deleted. For\n   example, `alice@example.com?uid=123456789012345678901`. If the user is\n   recovered, this value reverts to `user:{emailid}` and the recovered user\n   retains the role in the binding.\n\n* `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address (plus\n   unique identifier) representing a service account that has been recently\n   deleted. For example,\n   `my-other-app@appspot.gserviceaccount.com?uid=123456789012345678901`.\n   If the service account is undeleted, this value reverts to\n   `serviceAccount:{emailid}` and the undeleted service account retains the\n   role in the binding.\n\n* `deleted:group:{emailid}?uid={uniqueid}`: An email address (plus unique\n   identifier) representing a Google group that has been recently\n   deleted. For example, `admins@example.com?uid=123456789012345678901`. If\n   the group is recovered, this value reverts to `group:{emailid}` and the\n   recovered group retains the role in the binding.\n\n\n* `domain:{domain}`: The G Suite domain (primary) that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "role": {
+          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information.",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Folder": {
+      "description": "A Folder in an Organization's resource hierarchy, used to\norganize that Organization's resources.",
+      "id": "Folder",
+      "properties": {
+        "createTime": {
+          "description": "Output only. Timestamp when the Folder was created. Assigned by the server.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "The folder’s display name.\nA folder’s display name must be unique amongst its siblings, e.g.\nno two folders with the same parent can share the same display name.\nThe display name must start and end with a letter or digit, may contain\nletters, digits, spaces, hyphens and underscores and can be no longer\nthan 30 characters. This is captured by the regular expression:\n[\\p{L}\\p{N}]([\\p{L}\\p{N}_- ]{0,28}[\\p{L}\\p{N}])?.",
+          "type": "string"
+        },
+        "lifecycleState": {
+          "description": "Output only. The lifecycle state of the folder.\nUpdates to the lifecycle_state must be performed via\nDeleteFolder and\nUndeleteFolder.",
+          "enum": [
+            "LIFECYCLE_STATE_UNSPECIFIED",
+            "ACTIVE",
+            "DELETE_REQUESTED"
+          ],
+          "enumDescriptions": [
+            "Unspecified state.",
+            "The normal and active state.",
+            "The folder has been marked for deletion by the user."
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "Output only. The resource name of the Folder.\nIts format is `folders/{folder_id}`, for example: \"folders/1234\".",
+          "type": "string"
+        },
+        "parent": {
+          "description": "Required. The Folder’s parent's resource name.\nUpdates to the folder's parent must be performed via\nMoveFolder.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "FolderOperation": {
+      "description": "Metadata describing a long running folder operation",
+      "id": "FolderOperation",
+      "properties": {
+        "destinationParent": {
+          "description": "The resource name of the folder or organization we are either creating\nthe folder under or moving the folder to.",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "The display name of the folder.",
+          "type": "string"
+        },
+        "operationType": {
+          "description": "The type of this operation.",
+          "enum": [
+            "OPERATION_TYPE_UNSPECIFIED",
+            "CREATE",
+            "MOVE"
+          ],
+          "enumDescriptions": [
+            "Operation type not specified.",
+            "A create folder operation.",
+            "A move folder operation."
+          ],
+          "type": "string"
+        },
+        "sourceParent": {
+          "description": "The resource name of the folder's parent.\nOnly applicable when the operation_type is MOVE.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "FolderOperationError": {
+      "description": "A classification of the Folder Operation error.",
+      "id": "FolderOperationError",
+      "properties": {
+        "errorMessageId": {
+          "description": "The type of operation error experienced.",
+          "enum": [
+            "ERROR_TYPE_UNSPECIFIED",
+            "ACTIVE_FOLDER_HEIGHT_VIOLATION",
+            "MAX_CHILD_FOLDERS_VIOLATION",
+            "FOLDER_NAME_UNIQUENESS_VIOLATION",
+            "RESOURCE_DELETED_VIOLATION",
+            "PARENT_DELETED_VIOLATION",
+            "CYCLE_INTRODUCED_VIOLATION",
+            "FOLDER_BEING_MOVED_VIOLATION",
+            "FOLDER_TO_DELETE_NON_EMPTY_VIOLATION",
+            "DELETED_FOLDER_HEIGHT_VIOLATION"
+          ],
+          "enumDescriptions": [
+            "The error type was unrecognized or unspecified.",
+            "The attempted action would violate the max folder depth constraint.",
+            "The attempted action would violate the max child folders constraint.",
+            "The attempted action would violate the locally-unique folder\ndisplay_name constraint.",
+            "The resource being moved has been deleted.",
+            "The resource a folder was being added to has been deleted.",
+            "The attempted action would introduce cycle in resource path.",
+            "The attempted action would move a folder that is already being moved.",
+            "The folder the caller is trying to delete contains active resources.",
+            "The attempted action would violate the max deleted folder depth\nconstraint."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GetIamPolicyRequest": {
+      "description": "Request message for `GetIamPolicy` method.",
+      "id": "GetIamPolicyRequest",
+      "properties": {
+        "options": {
+          "$ref": "GetPolicyOptions",
+          "description": "OPTIONAL: A `GetPolicyOptions` object for specifying options to\n`GetIamPolicy`. This field is only used by Cloud IAM."
+        }
+      },
+      "type": "object"
+    },
+    "GetPolicyOptions": {
+      "description": "Encapsulates settings provided to GetIamPolicy.",
+      "id": "GetPolicyOptions",
+      "properties": {
+        "requestedPolicyVersion": {
+          "description": "Optional. The policy format version to be returned.\n\nValid values are 0, 1, and 3. Requests specifying an invalid value will be\nrejected.\n\nRequests for policies with any conditional bindings must specify version 3.\nPolicies without any conditional bindings may specify any valid value or\nleave the field unset.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ListFoldersResponse": {
+      "description": "The ListFolders response message.",
+      "id": "ListFoldersResponse",
+      "properties": {
+        "folders": {
+          "description": "A possibly paginated list of Folders that are direct descendants of\nthe specified parent resource.",
+          "items": {
+            "$ref": "Folder"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "A pagination token returned from a previous call to `ListFolders`\nthat indicates from where listing should continue.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MoveFolderRequest": {
+      "description": "The MoveFolder request message.",
+      "id": "MoveFolderRequest",
+      "properties": {
+        "destinationParent": {
+          "description": "Required. The resource name of the Folder or Organization to reparent\nthe folder under.\nMust be of the form `folders/{folder_id}` or `organizations/{org_id}`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Operation": {
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call.",
+      "id": "Operation",
+      "properties": {
+        "done": {
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable.",
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`.",
+          "type": "string"
+        },
+        "response": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The normal response of the operation in case of success.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Policy": {
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Google Cloud resources.\n\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members` to a single `role`. Members can be user accounts, service accounts,\nGoogle groups, and domains (such as G Suite). A `role` is a named list of\npermissions; each `role` can be an IAM predefined role or a user-created\ncustom role.\n\nOptionally, a `binding` can specify a `condition`, which is a logical\nexpression that allows access to a resource only if the expression evaluates\nto `true`. A condition can add constraints based on attributes of the\nrequest, the resource, or both.\n\n**JSON example:**\n\n    {\n      \"bindings\": [\n        {\n          \"role\": \"roles/resourcemanager.organizationAdmin\",\n          \"members\": [\n            \"user:mike@example.com\",\n            \"group:admins@example.com\",\n            \"domain:google.com\",\n            \"serviceAccount:my-project-id@appspot.gserviceaccount.com\"\n          ]\n        },\n        {\n          \"role\": \"roles/resourcemanager.organizationViewer\",\n          \"members\": [\"user:eve@example.com\"],\n          \"condition\": {\n            \"title\": \"expirable access\",\n            \"description\": \"Does not grant access after Sep 2020\",\n            \"expression\": \"request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\",\n          }\n        }\n      ],\n      \"etag\": \"BwWWja0YfJA=\",\n      \"version\": 3\n    }\n\n**YAML example:**\n\n    bindings:\n    - members:\n      - user:mike@example.com\n      - group:admins@example.com\n      - domain:google.com\n      - serviceAccount:my-project-id@appspot.gserviceaccount.com\n      role: roles/resourcemanager.organizationAdmin\n    - members:\n      - user:eve@example.com\n      role: roles/resourcemanager.organizationViewer\n      condition:\n        title: expirable access\n        description: Does not grant access after Sep 2020\n        expression: request.time \u003c timestamp('2020-10-01T00:00:00.000Z')\n    - etag: BwWWja0YfJA=\n    - version: 3\n\nFor a description of IAM and its features, see the\n[IAM documentation](https://cloud.google.com/iam/docs/).",
+      "id": "Policy",
+      "properties": {
+        "auditConfigs": {
+          "description": "Specifies cloud audit logging configuration for this policy.",
+          "items": {
+            "$ref": "AuditConfig"
+          },
+          "type": "array"
+        },
+        "bindings": {
+          "description": "Associates a list of `members` to a `role`. Optionally, may specify a\n`condition` that determines how and when the `bindings` are applied. Each\nof the `bindings` must contain at least one member.",
+          "items": {
+            "$ref": "Binding"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy.\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.",
+          "format": "byte",
+          "type": "string"
+        },
+        "version": {
+          "description": "Specifies the format of the policy.\n\nValid values are `0`, `1`, and `3`. Requests that specify an invalid value\nare rejected.\n\nAny operation that affects conditional role bindings must specify version\n`3`. This requirement applies to the following operations:\n\n* Getting a policy that includes a conditional role binding\n* Adding a conditional role binding to a policy\n* Changing a conditional role binding in a policy\n* Removing any role binding, with or without a condition, from a policy\n  that includes conditions\n\n**Important:** If you use IAM Conditions, you must include the `etag` field\nwhenever you call `setIamPolicy`. If you omit this field, then IAM allows\nyou to overwrite a version `3` policy with a version `1` policy, and all of\nthe conditions in the version `3` policy are lost.\n\nIf a policy does not include any conditions, operations on that policy may\nspecify any valid version or leave the field unset.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ProjectCreationStatus": {
+      "description": "A status object which is used as the `metadata` field for the Operation\nreturned by CreateProject. It provides insight for when significant phases of\nProject creation have completed.",
+      "id": "ProjectCreationStatus",
+      "properties": {
+        "createTime": {
+          "description": "Creation time of the project creation workflow.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "gettable": {
+          "description": "True if the project can be retrieved using GetProject. No other operations\non the project are guaranteed to work until the project creation is\ncomplete.",
+          "type": "boolean"
+        },
+        "ready": {
+          "description": "True if the project creation process is complete.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "SearchFoldersRequest": {
+      "description": "The request message for searching folders.",
+      "id": "SearchFoldersRequest",
+      "properties": {
+        "pageSize": {
+          "description": "Optional. The maximum number of folders to return in the response.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "pageToken": {
+          "description": "Optional. A pagination token returned from a previous call to `SearchFolders`\nthat indicates from where search should continue.",
+          "type": "string"
+        },
+        "query": {
+          "description": "Search criteria used to select the Folders to return.\nIf no search criteria is specified then all accessible folders will be\nreturned.\n\nQuery expressions can be used to restrict results based upon displayName,\nlifecycleState and parent, where the operators `=`, `NOT`, `AND` and `OR`\ncan be used along with the suffix wildcard symbol `*`.\n\nThe displayName field in a query expression should use escaped quotes\nfor values that include whitespace to prevent unexpected behavior.\n\nSome example queries are:\n\n* Query `displayName=Test*` returns Folder resources whose display name\nstarts with \"Test\".\n* Query `lifecycleState=ACTIVE` returns Folder resources with\n`lifecycleState` set to `ACTIVE`.\n* Query `parent=folders/123` returns Folder resources that have\n`folders/123` as a parent resource.\n* Query `parent=folders/123 AND lifecycleState=ACTIVE` returns active\nFolder resources that have `folders/123` as a parent resource.\n* Query `displayName=\\\\\"Test String\\\\\"` returns Folder resources with\ndisplay names that include both \"Test\" and \"String\".",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SearchFoldersResponse": {
+      "description": "The response message for searching folders.",
+      "id": "SearchFoldersResponse",
+      "properties": {
+        "folders": {
+          "description": "A possibly paginated folder search results.\nthe specified parent resource.",
+          "items": {
+            "$ref": "Folder"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "A pagination token returned from a previous call to `SearchFolders`\nthat indicates from where searching should continue.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SetIamPolicyRequest": {
+      "description": "Request message for `SetIamPolicy` method.",
+      "id": "SetIamPolicyRequest",
+      "properties": {
+        "policy": {
+          "$ref": "Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Cloud Platform services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "description": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:\npaths: \"bindings, etag\"\nThis field is only used by Cloud IAM.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Status": {
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors).",
+      "id": "Status",
+      "properties": {
+        "code": {
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use.",
+          "items": {
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\ngoogle.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsRequest": {
+      "description": "Request message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsRequest",
+      "properties": {
+        "permissions": {
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TestIamPermissionsResponse": {
+      "description": "Response message for `TestIamPermissions` method.",
+      "id": "TestIamPermissionsResponse",
+      "properties": {
+        "permissions": {
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "UndeleteFolderRequest": {
+      "description": "The UndeleteFolder request message.",
+      "id": "UndeleteFolderRequest",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "servicePath": "",
+  "title": "Cloud Resource Manager API",
+  "version": "v2"
+}

@@ -1,0 +1,137 @@
+parameters:
+  - name: Repository
+    type: string
+    default: $(Build.Repository.Name)
+  - name: Prefix
+    type: string
+  - name: CIConventionOptions
+    type: string
+    default: ''
+  - name: UPConventionOptions
+    type: string
+    default: ''
+  - name: TestsConventionOptions
+    type: string
+    default: ''
+
+steps:
+  - template: install-pipeline-generation.yml
+  - template: /eng/common/pipelines/templates/steps/set-default-branch.yml
+  # This covers our public repos.
+  - ${{ if not(endsWith(parameters.Repository, '-pr'))}}:
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project public
+        --prefix ${{parameters.Prefix}}
+        --devopspath "\${{parameters.Prefix}}"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention ci
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        ${{parameters.CIConventionOptions}}
+      displayName: Create CI pipelines for public repository
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project internal
+        --prefix ${{parameters.Prefix}}
+        --devopspath "\${{parameters.Prefix}}"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention up
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        ${{parameters.UPConventionOptions}}
+      displayName: Create UP pipelines for public repository
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project internal
+        --prefix ${{parameters.Prefix}}
+        --devopspath "\${{parameters.Prefix}}"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention tests
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        ${{parameters.TestsConventionOptions}}
+      displayName: Create Live Test pipelines for public repository
+      condition: ne('${{parameters.TestsConventionOptions}}','')
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)
+
+  # This covers our -pr repositories.
+  - ${{ if endsWith(parameters.Repository, '-pr')}}:
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project internal
+        --prefix ${{parameters.Prefix}}-pr
+        --devopspath "\${{parameters.Prefix}}\pr"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention ci
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        --no-schedule
+        ${{parameters.CIConventionOptions}}
+      displayName: Create CI pipelines for private repository
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project internal
+        --prefix ${{parameters.Prefix}}-pr
+        --devopspath "\${{parameters.Prefix}}\pr"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention up
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        --no-schedule
+        ${{parameters.UPConventionOptions}}
+      displayName: Create UP pipelines for private repository
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)
+    - script: >
+        $(Pipeline.Workspace)/pipeline-generator/pipeline-generator
+        --organization https://dev.azure.com/azure-sdk
+        --project internal
+        --prefix ${{parameters.Prefix}}-pr
+        --devopspath "\${{parameters.Prefix}}\pr"
+        --path $(System.DefaultWorkingDirectory)/sdk
+        --endpoint Azure
+        --repository ${{parameters.Repository}}
+        --convention tests
+        --agentpool Hosted
+        --branch refs/heads/$(DefaultBranch)
+        --patvar PATVAR
+        --debug
+        --no-schedule
+        ${{parameters.TestsConventionOptions}}
+      displayName: Create Live Test pipelines for private repository
+      condition: ne('${{parameters.TestsConventionOptions}}','')
+      env:
+        PATVAR: $(azuresdk-azure-sdk-devops-pipeline-generation-pat)

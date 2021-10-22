@@ -1,0 +1,5 @@
+go-vhd (0.1-0rbel1) trusty; urgency=medium
+
+  * Initial release.
+
+ -- Sergio Rubio <rubiojr@frameos.org>  Tue, 17 Mar 2015 20:04:53 +0100

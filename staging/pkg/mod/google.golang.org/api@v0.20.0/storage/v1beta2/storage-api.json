@@ -1,0 +1,2345 @@
+{
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/devstorage.full_control": {
+          "description": "Manage your data and permissions in Google Cloud Storage"
+        },
+        "https://www.googleapis.com/auth/devstorage.read_only": {
+          "description": "View your data in Google Cloud Storage"
+        },
+        "https://www.googleapis.com/auth/devstorage.read_write": {
+          "description": "Manage your data in Google Cloud Storage"
+        }
+      }
+    }
+  },
+  "basePath": "/storage/v1beta2/",
+  "baseUrl": "https://storage.googleapis.com/storage/v1beta2/",
+  "batchPath": "batch/storage/v1beta2",
+  "description": "Lets you store and retrieve potentially-large, immutable data objects.",
+  "discoveryVersion": "v1",
+  "documentationLink": "https://developers.google.com/storage/docs/json_api/",
+  "etag": "\"u9GIe6H63LSGq-9_t39K2Zx_EAc/1hoB3WsJXoIw5J_z-8UMtcT5m_A\"",
+  "icons": {
+    "x16": "https://www.google.com/images/icons/product/cloud_storage-16.png",
+    "x32": "https://www.google.com/images/icons/product/cloud_storage-32.png"
+  },
+  "id": "storage:v1beta2",
+  "kind": "discovery#restDescription",
+  "labels": [
+    "labs"
+  ],
+  "name": "storage",
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "parameters": {
+    "alt": {
+      "default": "json",
+      "description": "Data format for the response.",
+      "enum": [
+        "json"
+      ],
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json"
+      ],
+      "location": "query",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "location": "query",
+      "type": "string"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "location": "query",
+      "type": "string"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "description": "Returns response with indentations and line breaks.",
+      "location": "query",
+      "type": "boolean"
+    },
+    "quotaUser": {
+      "description": "An opaque string that represents a user for quota purposes. Must not exceed 40 characters.",
+      "location": "query",
+      "type": "string"
+    },
+    "userIp": {
+      "description": "Deprecated. Please use quotaUser instead.",
+      "location": "query",
+      "type": "string"
+    }
+  },
+  "protocol": "rest",
+  "resources": {
+    "bucketAccessControls": {
+      "methods": {
+        "delete": {
+          "description": "Permanently deletes the ACL entry for the specified entity on the specified bucket.",
+          "httpMethod": "DELETE",
+          "id": "storage.bucketAccessControls.delete",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl/{entity}",
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "get": {
+          "description": "Returns the ACL entry for the specified entity on the specified bucket.",
+          "httpMethod": "GET",
+          "id": "storage.bucketAccessControls.get",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl/{entity}",
+          "response": {
+            "$ref": "BucketAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "insert": {
+          "description": "Creates a new ACL entry on the specified bucket.",
+          "httpMethod": "POST",
+          "id": "storage.bucketAccessControls.insert",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl",
+          "request": {
+            "$ref": "BucketAccessControl"
+          },
+          "response": {
+            "$ref": "BucketAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "list": {
+          "description": "Retrieves ACL entries on the specified bucket.",
+          "httpMethod": "GET",
+          "id": "storage.bucketAccessControls.list",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl",
+          "response": {
+            "$ref": "BucketAccessControls"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "patch": {
+          "description": "Updates an ACL entry on the specified bucket. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "storage.bucketAccessControls.patch",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl/{entity}",
+          "request": {
+            "$ref": "BucketAccessControl"
+          },
+          "response": {
+            "$ref": "BucketAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "update": {
+          "description": "Updates an ACL entry on the specified bucket.",
+          "httpMethod": "PUT",
+          "id": "storage.bucketAccessControls.update",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/acl/{entity}",
+          "request": {
+            "$ref": "BucketAccessControl"
+          },
+          "response": {
+            "$ref": "BucketAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        }
+      }
+    },
+    "buckets": {
+      "methods": {
+        "delete": {
+          "description": "Permanently deletes an empty bucket.",
+          "httpMethod": "DELETE",
+          "id": "storage.buckets.delete",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}",
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "get": {
+          "description": "Returns metadata for the specified bucket.",
+          "httpMethod": "GET",
+          "id": "storage.buckets.get",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit acl and defaultObjectAcl properties."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}",
+          "response": {
+            "$ref": "Bucket"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "insert": {
+          "description": "Creates a new bucket.",
+          "httpMethod": "POST",
+          "id": "storage.buckets.insert",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "project": {
+              "description": "A valid API project identifier.",
+              "location": "query",
+              "required": true,
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl, unless the bucket resource specifies acl or defaultObjectAcl properties, when it defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit acl and defaultObjectAcl properties."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b",
+          "request": {
+            "$ref": "Bucket"
+          },
+          "response": {
+            "$ref": "Bucket"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "list": {
+          "description": "Retrieves a list of buckets for a given project.",
+          "httpMethod": "GET",
+          "id": "storage.buckets.list",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "maxResults": {
+              "description": "Maximum number of buckets to return.",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "A previously-returned page token representing part of the larger set of results to view.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "A valid API project identifier.",
+              "location": "query",
+              "required": true,
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit acl and defaultObjectAcl properties."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b",
+          "response": {
+            "$ref": "Buckets"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "patch": {
+          "description": "Updates a bucket. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "storage.buckets.patch",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit acl and defaultObjectAcl properties."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}",
+          "request": {
+            "$ref": "Bucket"
+          },
+          "response": {
+            "$ref": "Bucket"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "update": {
+          "description": "Updates a bucket.",
+          "httpMethod": "PUT",
+          "id": "storage.buckets.update",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the return of the bucket metadata conditional on whether the bucket's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit acl and defaultObjectAcl properties."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}",
+          "request": {
+            "$ref": "Bucket"
+          },
+          "response": {
+            "$ref": "Bucket"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        }
+      }
+    },
+    "channels": {
+      "methods": {
+        "stop": {
+          "description": "Stop watching resources through this channel",
+          "httpMethod": "POST",
+          "id": "storage.channels.stop",
+          "path": "channels/stop",
+          "request": {
+            "$ref": "Channel",
+            "parameterName": "resource"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        }
+      }
+    },
+    "defaultObjectAccessControls": {
+      "methods": {
+        "delete": {
+          "description": "Permanently deletes the default object ACL entry for the specified entity on the specified bucket.",
+          "httpMethod": "DELETE",
+          "id": "storage.defaultObjectAccessControls.delete",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl/{entity}",
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "get": {
+          "description": "Returns the default object ACL entry for the specified entity on the specified bucket.",
+          "httpMethod": "GET",
+          "id": "storage.defaultObjectAccessControls.get",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl/{entity}",
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "insert": {
+          "description": "Creates a new default object ACL entry on the specified bucket.",
+          "httpMethod": "POST",
+          "id": "storage.defaultObjectAccessControls.insert",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "list": {
+          "description": "Retrieves default object ACL entries on the specified bucket.",
+          "httpMethod": "GET",
+          "id": "storage.defaultObjectAccessControls.list",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "If present, only return default ACL listing if the bucket's current metageneration matches this value.",
+              "format": "int64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "If present, only return default ACL listing if the bucket's current metageneration does not match the given value.",
+              "format": "int64",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl",
+          "response": {
+            "$ref": "ObjectAccessControls"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "patch": {
+          "description": "Updates a default object ACL entry on the specified bucket. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "storage.defaultObjectAccessControls.patch",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl/{entity}",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "update": {
+          "description": "Updates a default object ACL entry on the specified bucket.",
+          "httpMethod": "PUT",
+          "id": "storage.defaultObjectAccessControls.update",
+          "parameterOrder": [
+            "bucket",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/defaultObjectAcl/{entity}",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        }
+      }
+    },
+    "objectAccessControls": {
+      "methods": {
+        "delete": {
+          "description": "Permanently deletes the ACL entry for the specified entity on the specified object.",
+          "httpMethod": "DELETE",
+          "id": "storage.objectAccessControls.delete",
+          "parameterOrder": [
+            "bucket",
+            "object",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl/{entity}",
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "get": {
+          "description": "Returns the ACL entry for the specified entity on the specified object.",
+          "httpMethod": "GET",
+          "id": "storage.objectAccessControls.get",
+          "parameterOrder": [
+            "bucket",
+            "object",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl/{entity}",
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "insert": {
+          "description": "Creates a new ACL entry on the specified object.",
+          "httpMethod": "POST",
+          "id": "storage.objectAccessControls.insert",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "list": {
+          "description": "Retrieves ACL entries on the specified object.",
+          "httpMethod": "GET",
+          "id": "storage.objectAccessControls.list",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl",
+          "response": {
+            "$ref": "ObjectAccessControls"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "patch": {
+          "description": "Updates an ACL entry on the specified object. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "storage.objectAccessControls.patch",
+          "parameterOrder": [
+            "bucket",
+            "object",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl/{entity}",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        },
+        "update": {
+          "description": "Updates an ACL entry on the specified object.",
+          "httpMethod": "PUT",
+          "id": "storage.objectAccessControls.update",
+          "parameterOrder": [
+            "bucket",
+            "object",
+            "entity"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of a bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "entity": {
+              "description": "The entity holding the permission. Can be user-userId, user-emailAddress, group-groupId, group-emailAddress, allUsers, or allAuthenticatedUsers.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}/acl/{entity}",
+          "request": {
+            "$ref": "ObjectAccessControl"
+          },
+          "response": {
+            "$ref": "ObjectAccessControl"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control"
+          ]
+        }
+      }
+    },
+    "objects": {
+      "methods": {
+        "compose": {
+          "description": "Concatenates a list of existing objects into a new object in the same bucket.",
+          "httpMethod": "POST",
+          "id": "storage.objects.compose",
+          "parameterOrder": [
+            "destinationBucket",
+            "destinationObject"
+          ],
+          "parameters": {
+            "destinationBucket": {
+              "description": "Name of the bucket containing the source objects. The destination object is stored in this bucket.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "destinationObject": {
+              "description": "Name of the new object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{destinationBucket}/o/{destinationObject}/compose",
+          "request": {
+            "$ref": "ComposeRequest"
+          },
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsMediaDownload": true
+        },
+        "copy": {
+          "description": "Copies an object to a destination in the same location. Optionally overrides metadata.",
+          "httpMethod": "POST",
+          "id": "storage.objects.copy",
+          "parameterOrder": [
+            "sourceBucket",
+            "sourceObject",
+            "destinationBucket",
+            "destinationObject"
+          ],
+          "parameters": {
+            "destinationBucket": {
+              "description": "Name of the bucket in which to store the new object. Overrides the provided object metadata's bucket value, if any.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "destinationObject": {
+              "description": "Name of the new object. Required when the object metadata is not otherwise provided. Overrides the object metadata's name value, if any.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the destination object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the destination object's current generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the destination object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the destination object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifSourceGenerationMatch": {
+              "description": "Makes the operation conditional on whether the source object's generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifSourceGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the source object's generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifSourceMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the source object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifSourceMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the source object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl, unless the object resource specifies the acl property, when it defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "sourceBucket": {
+              "description": "Name of the bucket in which to find the source object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "sourceGeneration": {
+              "description": "If present, selects a specific revision of the source object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "sourceObject": {
+              "description": "Name of the source object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{sourceBucket}/o/{sourceObject}/copyTo/b/{destinationBucket}/o/{destinationObject}",
+          "request": {
+            "$ref": "Object"
+          },
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsMediaDownload": true
+        },
+        "delete": {
+          "description": "Deletes data blobs and associated metadata. Deletions are permanent if versioning is not enabled for the bucket, or if the generation parameter is used.",
+          "httpMethod": "DELETE",
+          "id": "storage.objects.delete",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which the object resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, permanently deletes a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}",
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "get": {
+          "description": "Retrieves objects or their associated metadata.",
+          "httpMethod": "GET",
+          "id": "storage.objects.get",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which the object resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}",
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsMediaDownload": true
+        },
+        "insert": {
+          "description": "Stores new data blobs and associated metadata.",
+          "httpMethod": "POST",
+          "id": "storage.objects.insert",
+          "mediaUpload": {
+            "accept": [
+              "*/*"
+            ],
+            "protocols": {
+              "resumable": {
+                "multipart": true,
+                "path": "/resumable/upload/storage/v1beta2/b/{bucket}/o"
+              },
+              "simple": {
+                "multipart": true,
+                "path": "/upload/storage/v1beta2/b/{bucket}/o"
+              }
+            }
+          },
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which to store the new object. Overrides the provided object metadata's bucket value, if any.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of the object. Required when the object metadata is not otherwise provided. Overrides the object metadata's name value, if any.",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl, unless the object resource specifies the acl property, when it defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o",
+          "request": {
+            "$ref": "Object"
+          },
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsMediaDownload": true,
+          "supportsMediaUpload": true
+        },
+        "list": {
+          "description": "Retrieves a list of objects matching the criteria.",
+          "httpMethod": "GET",
+          "id": "storage.objects.list",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which to look for objects.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "delimiter": {
+              "description": "Returns results in a directory-like mode. items will contain only objects whose names, aside from the prefix, do not contain delimiter. Objects whose names, aside from the prefix, contain delimiter will have their name, truncated after the delimiter, returned in prefixes. Duplicate prefixes are omitted.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "description": "Maximum number of items plus prefixes to return. As duplicate prefixes are omitted, fewer total results may be returned than requested.",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "A previously-returned page token representing part of the larger set of results to view.",
+              "location": "query",
+              "type": "string"
+            },
+            "prefix": {
+              "description": "Filter results to objects whose names begin with this prefix.",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "versions": {
+              "description": "If true, lists all versions of a file as distinct results.",
+              "location": "query",
+              "type": "boolean"
+            }
+          },
+          "path": "b/{bucket}/o",
+          "response": {
+            "$ref": "Objects"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsSubscription": true
+        },
+        "patch": {
+          "description": "Updates a data blob's associated metadata. This method supports patch semantics.",
+          "httpMethod": "PATCH",
+          "id": "storage.objects.patch",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which the object resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}",
+          "request": {
+            "$ref": "Object"
+          },
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ]
+        },
+        "update": {
+          "description": "Updates a data blob's associated metadata.",
+          "httpMethod": "PUT",
+          "id": "storage.objects.update",
+          "parameterOrder": [
+            "bucket",
+            "object"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which the object resides.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "generation": {
+              "description": "If present, selects a specific revision of this object (as opposed to the latest version, the default).",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifGenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current generation does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration matches the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "ifMetagenerationNotMatch": {
+              "description": "Makes the operation conditional on whether the object's current metageneration does not match the given value.",
+              "format": "uint64",
+              "location": "query",
+              "type": "string"
+            },
+            "object": {
+              "description": "Name of the object.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to full.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "b/{bucket}/o/{object}",
+          "request": {
+            "$ref": "Object"
+          },
+          "response": {
+            "$ref": "Object"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsMediaDownload": true
+        },
+        "watchAll": {
+          "description": "Watch for changes on all objects in a bucket.",
+          "httpMethod": "POST",
+          "id": "storage.objects.watchAll",
+          "parameterOrder": [
+            "bucket"
+          ],
+          "parameters": {
+            "bucket": {
+              "description": "Name of the bucket in which to look for objects.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "delimiter": {
+              "description": "Returns results in a directory-like mode. items will contain only objects whose names, aside from the prefix, do not contain delimiter. Objects whose names, aside from the prefix, contain delimiter will have their name, truncated after the delimiter, returned in prefixes. Duplicate prefixes are omitted.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "description": "Maximum number of items plus prefixes to return. As duplicate prefixes are omitted, fewer total results may be returned than requested.",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "A previously-returned page token representing part of the larger set of results to view.",
+              "location": "query",
+              "type": "string"
+            },
+            "prefix": {
+              "description": "Filter results to objects whose names begin with this prefix.",
+              "location": "query",
+              "type": "string"
+            },
+            "projection": {
+              "description": "Set of properties to return. Defaults to noAcl.",
+              "enum": [
+                "full",
+                "noAcl"
+              ],
+              "enumDescriptions": [
+                "Include all properties.",
+                "Omit the acl property."
+              ],
+              "location": "query",
+              "type": "string"
+            },
+            "versions": {
+              "description": "If true, lists all versions of a file as distinct results.",
+              "location": "query",
+              "type": "boolean"
+            }
+          },
+          "path": "b/{bucket}/o/watch",
+          "request": {
+            "$ref": "Channel",
+            "parameterName": "resource"
+          },
+          "response": {
+            "$ref": "Channel"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "supportsSubscription": true
+        }
+      }
+    }
+  },
+  "revision": "20191127",
+  "rootUrl": "https://storage.googleapis.com/",
+  "schemas": {
+    "Bucket": {
+      "description": "A bucket.",
+      "id": "Bucket",
+      "properties": {
+        "acl": {
+          "annotations": {
+            "required": [
+              "storage.buckets.update"
+            ]
+          },
+          "description": "Access controls on the bucket.",
+          "items": {
+            "$ref": "BucketAccessControl"
+          },
+          "type": "array"
+        },
+        "cors": {
+          "description": "The bucket's Cross-Origin Resource Sharing (CORS) configuration.",
+          "items": {
+            "properties": {
+              "maxAgeSeconds": {
+                "description": "The value, in seconds, to return in the  Access-Control-Max-Age header used in preflight responses.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "method": {
+                "description": "The list of HTTP methods on which to include CORS response headers: GET, OPTIONS, POST, etc. Note, \"*\" is permitted in the list of methods, and means \"any method\".",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "origin": {
+                "description": "The list of Origins eligible to receive CORS response headers. Note: \"*\" is permitted in the list of origins, and means \"any Origin\".",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "responseHeader": {
+                "description": "The list of HTTP headers other than the simple response headers to give permission for the user-agent to share across domains.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "defaultObjectAcl": {
+          "description": "Default access controls to apply to new objects when no ACL is provided.",
+          "items": {
+            "$ref": "ObjectAccessControl"
+          },
+          "type": "array"
+        },
+        "etag": {
+          "description": "HTTP 1.1 Entity tag for the bucket.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The ID of the bucket.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "storage#bucket",
+          "description": "The kind of item this is. For buckets, this is always storage#bucket.",
+          "type": "string"
+        },
+        "lifecycle": {
+          "description": "The bucket's lifecycle configuration. See object lifecycle management for more information.",
+          "properties": {
+            "rule": {
+              "description": "A lifecycle management rule, which is made of an action to take and the condition(s) under which the action will be taken.",
+              "items": {
+                "properties": {
+                  "action": {
+                    "description": "The action to take.",
+                    "properties": {
+                      "type": {
+                        "description": "Type of the action. Currently only Delete is supported.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "condition": {
+                    "description": "The condition(s) under which the action will be taken.",
+                    "properties": {
+                      "age": {
+                        "description": "Age of an object (in days). This condition is satisfied when an object reaches the specified age.",
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "createdBefore": {
+                        "description": "A date in RFC 3339 format with only the date part, e.g. \"2013-01-15\". This condition is satisfied when an object is created before midnight of the specified date in UTC.",
+                        "format": "date",
+                        "type": "string"
+                      },
+                      "isLive": {
+                        "description": "Relevant only for versioned objects. If the value is true, this condition matches live objects; if the value is false, it matches archived objects.",
+                        "type": "boolean"
+                      },
+                      "numNewerVersions": {
+                        "description": "Relevant only for versioned objects. If the value is N, this condition is satisfied when there are at least N versions (including the live version) newer than this version of the object.",
+                        "format": "int32",
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "location": {
+          "description": "The location of the bucket. Object data for objects in the bucket resides in physical storage within this region. Typical values are US and EU. Defaults to US. See the developer's guide for the authoritative list.",
+          "type": "string"
+        },
+        "logging": {
+          "description": "The bucket's logging configuration, which defines the destination bucket and optional name prefix for the current bucket's logs.",
+          "properties": {
+            "logBucket": {
+              "description": "The destination bucket where the current bucket's logs should be placed.",
+              "type": "string"
+            },
+            "logObjectPrefix": {
+              "description": "A prefix for log object names.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "metageneration": {
+          "description": "The metadata generation of this bucket.",
+          "format": "int64",
+          "type": "string"
+        },
+        "name": {
+          "annotations": {
+            "required": [
+              "storage.buckets.insert"
+            ]
+          },
+          "description": "The name of the bucket.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "The owner of the bucket. This is always the project team's owner group.",
+          "properties": {
+            "entity": {
+              "description": "The entity, in the form group-groupId.",
+              "type": "string"
+            },
+            "entityId": {
+              "description": "The ID for the entity.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "selfLink": {
+          "description": "The URI of this bucket.",
+          "type": "string"
+        },
+        "storageClass": {
+          "description": "The bucket's storage class. This defines how objects in the bucket are stored and determines the SLA and the cost of storage. Typical values are STANDARD and DURABLE_REDUCED_AVAILABILITY. Defaults to STANDARD. See the developer's guide for the authoritative list.",
+          "type": "string"
+        },
+        "timeCreated": {
+          "description": "Creation time of the bucket in RFC 3339 format.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "versioning": {
+          "description": "The bucket's versioning configuration.",
+          "properties": {
+            "enabled": {
+              "description": "While set to true, versioning is fully enabled for this bucket.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "website": {
+          "description": "The bucket's website configuration.",
+          "properties": {
+            "mainPageSuffix": {
+              "description": "Behaves as the bucket's directory index where missing objects are treated as potential directories.",
+              "type": "string"
+            },
+            "notFoundPage": {
+              "description": "The custom object to return when a requested resource is not found.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "BucketAccessControl": {
+      "description": "An access-control entry.",
+      "id": "BucketAccessControl",
+      "properties": {
+        "bucket": {
+          "description": "The name of the bucket.",
+          "type": "string"
+        },
+        "domain": {
+          "description": "The domain associated with the entity, if any.",
+          "type": "string"
+        },
+        "email": {
+          "description": "The email address associated with the entity, if any.",
+          "type": "string"
+        },
+        "entity": {
+          "annotations": {
+            "required": [
+              "storage.bucketAccessControls.insert"
+            ]
+          },
+          "description": "The entity holding the permission, in one of the following forms: \n- user-userId \n- user-email \n- group-groupId \n- group-email \n- domain-domain \n- allUsers \n- allAuthenticatedUsers Examples: \n- The user liz@example.com would be user-liz@example.com. \n- The group example@googlegroups.com would be group-example@googlegroups.com. \n- To refer to all members of the Google Apps for Business domain example.com, the entity would be domain-example.com.",
+          "type": "string"
+        },
+        "entityId": {
+          "description": "The ID for the entity, if any.",
+          "type": "string"
+        },
+        "etag": {
+          "description": "HTTP 1.1 Entity tag for the access-control entry.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The ID of the access-control entry.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "storage#bucketAccessControl",
+          "description": "The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl.",
+          "type": "string"
+        },
+        "role": {
+          "annotations": {
+            "required": [
+              "storage.bucketAccessControls.insert"
+            ]
+          },
+          "description": "The access permission for the entity. Can be READER, WRITER, or OWNER.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "The link to this access-control entry.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BucketAccessControls": {
+      "description": "An access-control list.",
+      "id": "BucketAccessControls",
+      "properties": {
+        "items": {
+          "description": "The list of items.",
+          "items": {
+            "$ref": "BucketAccessControl"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "storage#bucketAccessControls",
+          "description": "The kind of item this is. For lists of bucket access control entries, this is always storage#bucketAccessControls.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Buckets": {
+      "description": "A list of buckets.",
+      "id": "Buckets",
+      "properties": {
+        "items": {
+          "description": "The list of items.",
+          "items": {
+            "$ref": "Bucket"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "storage#buckets",
+          "description": "The kind of item this is. For lists of buckets, this is always storage#buckets.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "The continuation token, used to page through large result sets. Provide this value in a subsequent request to return the next page of results.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Channel": {
+      "description": "An notification channel used to watch for resource changes.",
+      "id": "Channel",
+      "properties": {
+        "address": {
+          "description": "The address where notifications are delivered for this channel.",
+          "type": "string"
+        },
+        "expiration": {
+          "description": "Date and time of notification channel expiration, expressed as a Unix timestamp, in milliseconds. Optional.",
+          "format": "int64",
+          "type": "string"
+        },
+        "id": {
+          "description": "A UUID or similar unique string that identifies this channel.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "api#channel",
+          "description": "Identifies this as a notification channel used to watch for changes to a resource, which is \"api#channel\".",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "description": "Declares a new parameter by name.",
+            "type": "string"
+          },
+          "description": "Additional parameters controlling delivery channel behavior. Optional.",
+          "type": "object"
+        },
+        "payload": {
+          "description": "A Boolean value to indicate whether payload is wanted. Optional.",
+          "type": "boolean"
+        },
+        "resourceId": {
+          "description": "An opaque ID that identifies the resource being watched on this channel. Stable across different API versions.",
+          "type": "string"
+        },
+        "resourceUri": {
+          "description": "A version-specific identifier for the watched resource.",
+          "type": "string"
+        },
+        "token": {
+          "description": "An arbitrary string delivered to the target address with each notification delivered over this channel. Optional.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The type of delivery mechanism used for this channel.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ComposeRequest": {
+      "description": "A Compose request.",
+      "id": "ComposeRequest",
+      "properties": {
+        "destination": {
+          "$ref": "Object",
+          "description": "Properties of the resulting object"
+        },
+        "kind": {
+          "default": "storage#composeRequest",
+          "description": "The kind of item this is.",
+          "type": "string"
+        },
+        "sourceObjects": {
+          "annotations": {
+            "required": [
+              "storage.objects.compose"
+            ]
+          },
+          "description": "The list of source objects that will be concatenated into a single object.",
+          "items": {
+            "properties": {
+              "generation": {
+                "description": "The generation of this object to use as the source.",
+                "format": "int64",
+                "type": "string"
+              },
+              "name": {
+                "annotations": {
+                  "required": [
+                    "storage.objects.compose"
+                  ]
+                },
+                "description": "The source object's name. All source objects must reside in the same bucket.",
+                "type": "string"
+              },
+              "objectPreconditions": {
+                "description": "Conditions that must be met for this operation to execute.",
+                "properties": {
+                  "ifGenerationMatch": {
+                    "description": "Only perform the composition if the generation of the source object that would be used matches this value. If this value and a generation are both specified, they must be the same value or the call will fail.",
+                    "format": "int64",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Object": {
+      "description": "An object.",
+      "id": "Object",
+      "properties": {
+        "acl": {
+          "annotations": {
+            "required": [
+              "storage.objects.update"
+            ]
+          },
+          "description": "Access controls on the object.",
+          "items": {
+            "$ref": "ObjectAccessControl"
+          },
+          "type": "array"
+        },
+        "bucket": {
+          "description": "The bucket containing this object.",
+          "type": "string"
+        },
+        "cacheControl": {
+          "description": "Cache-Control directive for the object data.",
+          "type": "string"
+        },
+        "componentCount": {
+          "description": "Number of underlying components that make up this object. Components are accumulated by compose operations and are limited to a count of 32.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "contentDisposition": {
+          "description": "Content-Disposition of the object data.",
+          "type": "string"
+        },
+        "contentEncoding": {
+          "description": "Content-Encoding of the object data.",
+          "type": "string"
+        },
+        "contentLanguage": {
+          "description": "Content-Language of the object data.",
+          "type": "string"
+        },
+        "contentType": {
+          "annotations": {
+            "required": [
+              "storage.objects.update"
+            ]
+          },
+          "description": "Content-Type of the object data.",
+          "type": "string"
+        },
+        "crc32c": {
+          "description": "CRC32c checksum, as described in RFC 4960, Appendix B; encoded using base64.",
+          "type": "string"
+        },
+        "etag": {
+          "description": "HTTP 1.1 Entity tag for the object.",
+          "type": "string"
+        },
+        "generation": {
+          "description": "The content generation of this object. Used for object versioning.",
+          "format": "int64",
+          "type": "string"
+        },
+        "id": {
+          "description": "The ID of the object.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "storage#object",
+          "description": "The kind of item this is. For objects, this is always storage#object.",
+          "type": "string"
+        },
+        "md5Hash": {
+          "description": "MD5 hash of the data; encoded using base64.",
+          "type": "string"
+        },
+        "mediaLink": {
+          "description": "Media download link.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "description": "An individual metadata entry.",
+            "type": "string"
+          },
+          "description": "User-provided metadata, in key/value pairs.",
+          "type": "object"
+        },
+        "metageneration": {
+          "description": "The generation of the metadata for this object at this generation. Used for metadata versioning. Has no meaning outside of the context of this generation.",
+          "format": "int64",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of this object. Required if not specified by URL parameter.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "The owner of the object. This will always be the uploader of the object.",
+          "properties": {
+            "entity": {
+              "description": "The entity, in the form user-userId.",
+              "type": "string"
+            },
+            "entityId": {
+              "description": "The ID for the entity.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "selfLink": {
+          "description": "The link to this object.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Content-Length of the data in bytes.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "storageClass": {
+          "description": "Storage class of the object.",
+          "type": "string"
+        },
+        "timeDeleted": {
+          "description": "Deletion time of the object in RFC 3339 format. Will be returned if and only if this version of the object has been deleted.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "updated": {
+          "description": "Modification time of the object metadata in RFC 3339 format.",
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ObjectAccessControl": {
+      "description": "An access-control entry.",
+      "id": "ObjectAccessControl",
+      "properties": {
+        "bucket": {
+          "description": "The name of the bucket.",
+          "type": "string"
+        },
+        "domain": {
+          "description": "The domain associated with the entity, if any.",
+          "type": "string"
+        },
+        "email": {
+          "description": "The email address associated with the entity, if any.",
+          "type": "string"
+        },
+        "entity": {
+          "description": "The entity holding the permission, in one of the following forms: \n- user-userId \n- user-email \n- group-groupId \n- group-email \n- domain-domain \n- allUsers \n- allAuthenticatedUsers Examples: \n- The user liz@example.com would be user-liz@example.com. \n- The group example@googlegroups.com would be group-example@googlegroups.com. \n- To refer to all members of the Google Apps for Business domain example.com, the entity would be domain-example.com.",
+          "type": "string"
+        },
+        "entityId": {
+          "description": "The ID for the entity, if any.",
+          "type": "string"
+        },
+        "etag": {
+          "description": "HTTP 1.1 Entity tag for the access-control entry.",
+          "type": "string"
+        },
+        "generation": {
+          "description": "The content generation of the object.",
+          "format": "int64",
+          "type": "string"
+        },
+        "id": {
+          "description": "The ID of the access-control entry.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "storage#objectAccessControl",
+          "description": "The kind of item this is. For object access control entries, this is always storage#objectAccessControl.",
+          "type": "string"
+        },
+        "object": {
+          "description": "The name of the object.",
+          "type": "string"
+        },
+        "role": {
+          "description": "The access permission for the entity. Can be READER or OWNER.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "The link to this access-control entry.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ObjectAccessControls": {
+      "description": "An access-control list.",
+      "id": "ObjectAccessControls",
+      "properties": {
+        "items": {
+          "description": "The list of items.",
+          "items": {
+            "type": "any"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "storage#objectAccessControls",
+          "description": "The kind of item this is. For lists of object access control entries, this is always storage#objectAccessControls.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Objects": {
+      "description": "A list of objects.",
+      "id": "Objects",
+      "properties": {
+        "items": {
+          "description": "The list of items.",
+          "items": {
+            "$ref": "Object"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "storage#objects",
+          "description": "The kind of item this is. For lists of objects, this is always storage#objects.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "The continuation token, used to page through large result sets. Provide this value in a subsequent request to return the next page of results.",
+          "type": "string"
+        },
+        "prefixes": {
+          "description": "The list of prefixes of objects matching-but-not-listed up to and including the requested delimiter.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "servicePath": "storage/v1beta2/",
+  "title": "Cloud Storage JSON API",
+  "version": "v1beta2"
+}

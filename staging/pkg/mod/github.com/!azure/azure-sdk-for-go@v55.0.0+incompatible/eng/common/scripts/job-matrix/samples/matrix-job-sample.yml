@@ -1,0 +1,42 @@
+parameters:
+- name: CloudConfig
+  type: object
+- name: Matrix
+  type: string
+- name: DependsOn
+  type: string
+  default: ''
+- name: UsePlatformContainer
+  type: boolean
+  default: false
+
+jobs:
+  - job:
+    dependsOn: ${{ parameters.DependsOn }}
+    condition: ne(${{ parameters.Matrix }}, '{}')
+    strategy:
+      matrix: $[ ${{ parameters.Matrix }} ]
+
+    pool:
+      name: $(Pool)
+      vmImage: $(OSVmImage)
+
+    ${{ if eq(parameters.UsePlatformContainer, 'true') }}:
+      container: $[ variables['Container'] ]
+
+    steps:
+      - pwsh: |
+          Write-Output "MATRIX JOB PARAMETERS"
+          Write-Output $(Agent.JobName)
+          Write-Output "-----------------"
+          Write-Output $(OSVmImage)
+          Write-Output $(TestTargetFramework)
+          try {
+            Write-Output $(additionalTestArguments)
+          } catch {}
+        displayName: Print matrix job variables
+
+      - pwsh: |
+          Write-Output "Success"
+        displayName: linux OS condition example
+        condition: and(succeededOrFailed(), contains(variables['OSVmImage'], 'Ubuntu'))

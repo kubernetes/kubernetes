@@ -1,0 +1,391 @@
+{
+  "version": "2.0",
+  "service": "<p>The Amazon Braket API Reference provides information about the operations and structures supported in Amazon Braket.</p>",
+  "operations": {
+    "CancelQuantumTask": "<p>Cancels the specified task.</p>",
+    "CreateQuantumTask": "<p>Creates a quantum task.</p>",
+    "GetDevice": "<p>Retrieves the devices available in Amazon Braket.</p>",
+    "GetQuantumTask": "<p>Retrieves the specified quantum task.</p>",
+    "ListTagsForResource": "<p>Shows the tags associated with this resource.</p>",
+    "SearchDevices": "<p>Searches for devices using the specified filters.</p>",
+    "SearchQuantumTasks": "<p>Searches for tasks that match the specified filter values.</p>",
+    "TagResource": "<p>Add a tag to the specified resource.</p>",
+    "UntagResource": "<p>Remove tags from a resource.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "CancelQuantumTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelQuantumTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancellationStatus": {
+      "base": null,
+      "refs": {
+        "CancelQuantumTaskResponse$cancellationStatus": "<p>The status of the cancellation request.</p>"
+      }
+    },
+    "ConflictException": {
+      "base": "<p>An error occurred due to a conflict.</p>",
+      "refs": {
+      }
+    },
+    "CreateQuantumTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateQuantumTaskRequestDeviceParametersString": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$deviceParameters": "<p>The parameters for the device to run the task on.</p>"
+      }
+    },
+    "CreateQuantumTaskRequestOutputS3BucketString": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$outputS3Bucket": "<p>The S3 bucket to store task result files in.</p>"
+      }
+    },
+    "CreateQuantumTaskRequestOutputS3KeyPrefixString": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$outputS3KeyPrefix": "<p>The key prefix for the location in the S3 bucket to store task results in.</p>"
+      }
+    },
+    "CreateQuantumTaskRequestShotsLong": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$shots": "<p>The number of shots to use for the task.</p>"
+      }
+    },
+    "CreateQuantumTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeviceArn": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$deviceArn": "<p>The ARN of the device to run the task on.</p>",
+        "DeviceSummary$deviceArn": "<p>The ARN of the device.</p>",
+        "GetDeviceRequest$deviceArn": "<p>The ARN of the device to retrieve.</p>",
+        "GetDeviceResponse$deviceArn": "<p>The ARN of the device.</p>",
+        "GetQuantumTaskResponse$deviceArn": "<p>The ARN of the device the task was run on.</p>",
+        "QuantumTaskSummary$deviceArn": "<p>The ARN of the device the task ran on.</p>"
+      }
+    },
+    "DeviceOfflineException": {
+      "base": "<p>The specified device is currently offline.</p>",
+      "refs": {
+      }
+    },
+    "DeviceStatus": {
+      "base": null,
+      "refs": {
+        "DeviceSummary$deviceStatus": "<p>The status of the device.</p>",
+        "GetDeviceResponse$deviceStatus": "<p>The status of the device.</p>"
+      }
+    },
+    "DeviceSummary": {
+      "base": "<p>Includes information about the device.</p>",
+      "refs": {
+        "DeviceSummaryList$member": null
+      }
+    },
+    "DeviceSummaryList": {
+      "base": null,
+      "refs": {
+        "SearchDevicesResponse$devices": "<p>An array of <code>DeviceSummary</code> objects for devices that match the specified filter values.</p>"
+      }
+    },
+    "DeviceType": {
+      "base": null,
+      "refs": {
+        "DeviceSummary$deviceType": "<p>The type of the device.</p>",
+        "GetDeviceResponse$deviceType": "<p>The type of the device.</p>"
+      }
+    },
+    "GetDeviceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDeviceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetQuantumTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetQuantumTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalServiceException": {
+      "base": "<p>The request processing has failed because of an unknown error, exception, or failure.</p>",
+      "refs": {
+      }
+    },
+    "JsonValue": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$action": "<p>The action associated with the task.</p>",
+        "GetDeviceResponse$deviceCapabilities": "<p>Details about the capabilities of the device.</p>",
+        "GetQuantumTaskResponse$deviceParameters": "<p>The parameters for the device on which the task ran.</p>"
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "GetQuantumTaskResponse$shots": "<p>The number of shots used in the task.</p>",
+        "QuantumTaskSummary$shots": "<p>The shots used for the task.</p>"
+      }
+    },
+    "QuantumTaskArn": {
+      "base": null,
+      "refs": {
+        "CancelQuantumTaskRequest$quantumTaskArn": "<p>The ARN of the task to cancel.</p>",
+        "CancelQuantumTaskResponse$quantumTaskArn": "<p>The ARN of the task.</p>",
+        "CreateQuantumTaskResponse$quantumTaskArn": "<p>The ARN of the task created by the request.</p>",
+        "GetQuantumTaskRequest$quantumTaskArn": "<p>the ARN of the task to retrieve.</p>",
+        "GetQuantumTaskResponse$quantumTaskArn": "<p>The ARN of the task.</p>",
+        "QuantumTaskSummary$quantumTaskArn": "<p>The ARN of the task.</p>"
+      }
+    },
+    "QuantumTaskStatus": {
+      "base": null,
+      "refs": {
+        "GetQuantumTaskResponse$status": "<p>The status of the task.</p>",
+        "QuantumTaskSummary$status": "<p>The status of the task.</p>"
+      }
+    },
+    "QuantumTaskSummary": {
+      "base": "<p>Includes information about a quantum task.</p>",
+      "refs": {
+        "QuantumTaskSummaryList$member": null
+      }
+    },
+    "QuantumTaskSummaryList": {
+      "base": null,
+      "refs": {
+        "SearchQuantumTasksResponse$quantumTasks": "<p>An array of <code>QuantumTaskSummary</code> objects for tasks that match the specified filters.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource was not found.</p>",
+      "refs": {
+      }
+    },
+    "SearchDevicesFilter": {
+      "base": "<p>The filter to use for searching devices.</p>",
+      "refs": {
+        "SearchDevicesRequestFiltersList$member": null
+      }
+    },
+    "SearchDevicesFilterNameString": {
+      "base": null,
+      "refs": {
+        "SearchDevicesFilter$name": "<p>The name to use to filter results.</p>"
+      }
+    },
+    "SearchDevicesFilterValuesList": {
+      "base": null,
+      "refs": {
+        "SearchDevicesFilter$values": "<p>The values to use to filter results.</p>"
+      }
+    },
+    "SearchDevicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchDevicesRequestFiltersList": {
+      "base": null,
+      "refs": {
+        "SearchDevicesRequest$filters": "<p>The filter values to use to search for a device.</p>"
+      }
+    },
+    "SearchDevicesRequestMaxResultsInteger": {
+      "base": null,
+      "refs": {
+        "SearchDevicesRequest$maxResults": "<p>The maximum number of results to return in the response.</p>"
+      }
+    },
+    "SearchDevicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchQuantumTasksFilter": {
+      "base": "<p>A filter to use to search for tasks.</p>",
+      "refs": {
+        "SearchQuantumTasksRequestFiltersList$member": null
+      }
+    },
+    "SearchQuantumTasksFilterOperator": {
+      "base": null,
+      "refs": {
+        "SearchQuantumTasksFilter$operator": "<p>An operator to use in the filter.</p>"
+      }
+    },
+    "SearchQuantumTasksFilterValuesList": {
+      "base": null,
+      "refs": {
+        "SearchQuantumTasksFilter$values": "<p>The values to use for the filter.</p>"
+      }
+    },
+    "SearchQuantumTasksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SearchQuantumTasksRequestFiltersList": {
+      "base": null,
+      "refs": {
+        "SearchQuantumTasksRequest$filters": "<p>Array of <code>SearchQuantumTasksFilter</code> objects.</p>"
+      }
+    },
+    "SearchQuantumTasksRequestMaxResultsInteger": {
+      "base": null,
+      "refs": {
+        "SearchQuantumTasksRequest$maxResults": "<p>Maximum number of results to return in the response.</p>"
+      }
+    },
+    "SearchQuantumTasksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ServiceQuotaExceededException": {
+      "base": "<p>The request failed because a service quota is exceeded.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "ConflictException$message": null,
+        "DeviceOfflineException$message": null,
+        "DeviceSummary$deviceName": "<p>The name of the device.</p>",
+        "DeviceSummary$providerName": "<p>The provider of the device.</p>",
+        "GetDeviceResponse$deviceName": "<p>The name of the device.</p>",
+        "GetDeviceResponse$providerName": "<p>The name of the partner company for the device.</p>",
+        "GetQuantumTaskResponse$failureReason": "<p>The reason that a task failed.</p>",
+        "GetQuantumTaskResponse$outputS3Bucket": "<p>The S3 bucket where task results are stored.</p>",
+        "GetQuantumTaskResponse$outputS3Directory": "<p>The folder in the S3 bucket where task results are stored.</p>",
+        "InternalServiceException$message": null,
+        "ListTagsForResourceRequest$resourceArn": "<p>Specify the <code>resourceArn</code> for the resource whose tags to display.</p>",
+        "QuantumTaskSummary$outputS3Bucket": "<p>The S3 bucket where the task result file is stored..</p>",
+        "QuantumTaskSummary$outputS3Directory": "<p>The folder in the S3 bucket where the task result file is stored.</p>",
+        "ResourceNotFoundException$message": null,
+        "SearchDevicesRequest$nextToken": "<p>A token used for pagination of results returned in the response. Use the token returned from the previous request continue results where the previous request ended.</p>",
+        "SearchDevicesResponse$nextToken": "<p>A token used for pagination of results, or null if there are no additional results. Use the token value in a subsequent request to continue results where the previous request ended.</p>",
+        "SearchQuantumTasksRequest$nextToken": "<p>A token used for pagination of results returned in the response. Use the token returned from the previous request continue results where the previous request ended.</p>",
+        "SearchQuantumTasksResponse$nextToken": "<p>A token used for pagination of results, or null if there are no additional results. Use the token value in a subsequent request to continue results where the previous request ended.</p>",
+        "ServiceQuotaExceededException$message": null,
+        "TagKeys$member": null,
+        "TagResourceRequest$resourceArn": "<p>Specify the <code>resourceArn</code> of the resource to which a tag will be added.</p>",
+        "TagsMap$key": null,
+        "TagsMap$value": null,
+        "ThrottlingException$message": null,
+        "UntagResourceRequest$resourceArn": "<p>Specify the <code>resourceArn</code> for the resource from which to remove the tags.</p>",
+        "ValidationException$message": null
+      }
+    },
+    "String256": {
+      "base": null,
+      "refs": {
+        "SearchDevicesFilterValuesList$member": null,
+        "SearchQuantumTasksFilterValuesList$member": null
+      }
+    },
+    "String64": {
+      "base": null,
+      "refs": {
+        "CancelQuantumTaskRequest$clientToken": "<p>The client token associated with the request.</p>",
+        "CreateQuantumTaskRequest$clientToken": "<p>The client token associated with the request.</p>",
+        "SearchQuantumTasksFilter$name": "<p>The name of the device used for the task.</p>"
+      }
+    },
+    "SyntheticTimestamp_date_time": {
+      "base": null,
+      "refs": {
+        "GetQuantumTaskResponse$createdAt": "<p>The time at which the task was created.</p>",
+        "GetQuantumTaskResponse$endedAt": "<p>The time at which the task ended.</p>",
+        "QuantumTaskSummary$createdAt": "<p>The time at which the task was created.</p>",
+        "QuantumTaskSummary$endedAt": "<p>The time at which the task finished.</p>"
+      }
+    },
+    "TagKeys": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>pecify the keys for the tags to remove from the resource.</p>"
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagsMap": {
+      "base": null,
+      "refs": {
+        "CreateQuantumTaskRequest$tags": "<p>Tags to be added to the quantum task you're creating.</p>",
+        "GetQuantumTaskResponse$tags": "<p>The tags that belong to this task.</p>",
+        "ListTagsForResourceResponse$tags": "<p>Displays the key, value pairs of tags associated with this resource.</p>",
+        "QuantumTaskSummary$tags": "<p>Displays the key, value pairs of tags associated with this quantum task.</p>",
+        "TagResourceRequest$tags": "<p>Specify the tags to add to the resource.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The throttling rate limit is met.</p>",
+      "refs": {
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The input fails to satisfy the constraints specified by an AWS service.</p>",
+      "refs": {
+      }
+    }
+  }
+}

@@ -1,0 +1,1599 @@
+{
+  "version": "2.0",
+  "service": "<p>This is the Amazon Fraud Detector API Reference. This guide is for developers who need detailed information about Amazon Fraud Detector API actions, data types, and errors. For more information about Amazon Fraud Detector features, see the <a href=\"https://docs.aws.amazon.com/frauddetector/latest/ug/\">Amazon Fraud Detector User Guide</a>.</p>",
+  "operations": {
+    "BatchCreateVariable": "<p>Creates a batch of variables.</p>",
+    "BatchGetVariable": "<p>Gets a batch of variables.</p>",
+    "CreateDetectorVersion": "<p>Creates a detector version. The detector version starts in a <code>DRAFT</code> status.</p>",
+    "CreateModel": "<p>Creates a model using the specified model type.</p>",
+    "CreateModelVersion": "<p>Creates a version of the model using the specified model type and model id. </p>",
+    "CreateRule": "<p>Creates a rule for use with the specified detector. </p>",
+    "CreateVariable": "<p>Creates a variable.</p>",
+    "DeleteDetector": "<p>Deletes the detector. Before deleting a detector, you must first delete all detector versions and rule versions associated with the detector.</p> <p>When you delete a detector, Amazon Fraud Detector permanently deletes the detector and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteDetectorVersion": "<p>Deletes the detector version. You cannot delete detector versions that are in <code>ACTIVE</code> status.</p> <p>When you delete a detector version, Amazon Fraud Detector permanently deletes the detector and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteEntityType": "<p>Deletes an entity type.</p> <p>You cannot delete an entity type that is included in an event type.</p> <p>When you delete an entity type, Amazon Fraud Detector permanently deletes that entity type from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteEvent": "<p>Deletes the specified event.</p> <p>When you delete an event, Amazon Fraud Detector permanently deletes that event from the evaluation history, and the event data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteEventType": "<p>Deletes an event type.</p> <p>You cannot delete an event type that is used in a detector or a model.</p> <p>When you delete an entity type, Amazon Fraud Detector permanently deletes that entity type from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteExternalModel": "<p>Removes a SageMaker model from Amazon Fraud Detector.</p> <p>You can remove an Amazon SageMaker model if it is not associated with a detector version. Removing a SageMaker model disconnects it from Amazon Fraud Detector, but the model remains available in SageMaker.</p>",
+    "DeleteLabel": "<p>Deletes a label.</p> <p>You cannot delete labels that are included in an event type in Amazon Fraud Detector.</p> <p>You cannot delete a label assigned to an event ID. You must first delete the relevant event ID.</p> <p>When you delete a label, Amazon Fraud Detector permanently deletes that label from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteModel": "<p>Deletes a model.</p> <p>You can delete models and model versions in Amazon Fraud Detector, provided that they are not associated with a detector version.</p> <p> When you delete a model, Amazon Fraud Detector permanently deletes that model from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteModelVersion": "<p>Deletes a model version.</p> <p>You can delete models and model versions in Amazon Fraud Detector, provided that they are not associated with a detector version.</p> <p> When you delete a model version, Amazon Fraud Detector permanently deletes that model version from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteOutcome": "<p>Deletes an outcome.</p> <p>You cannot delete an outcome that is used in a rule version.</p> <p>When you delete an outcome, Amazon Fraud Detector permanently deletes that outcome from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteRule": "<p>Deletes the rule. You cannot delete a rule if it is used by an <code>ACTIVE</code> or <code>INACTIVE</code> detector version.</p> <p>When you delete a rule, Amazon Fraud Detector permanently deletes that rule from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DeleteVariable": "<p>Deletes a variable.</p> <p>You can't delete variables that are included in an event type in Amazon Fraud Detector.</p> <p>Amazon Fraud Detector automatically deletes model output variables and SageMaker model output variables when you delete the model. You can't delete these variables manually.</p> <p>When you delete a variable, Amazon Fraud Detector permanently deletes that variable from the evaluation history, and the data is no longer stored in Amazon Fraud Detector.</p>",
+    "DescribeDetector": "<p>Gets all versions for a specified detector.</p>",
+    "DescribeModelVersions": "<p>Gets all of the model versions for the specified model type or for the specified model type and model ID. You can also get details for a single, specified model version. </p>",
+    "GetDetectorVersion": "<p>Gets a particular detector version. </p>",
+    "GetDetectors": "<p>Gets all detectors or a single detector if a <code>detectorId</code> is specified. This is a paginated API. If you provide a null <code>maxResults</code>, this action retrieves a maximum of 10 records per page. If you provide a <code>maxResults</code>, the value must be between 5 and 10. To get the next page results, provide the pagination token from the <code>GetDetectorsResponse</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetEntityTypes": "<p>Gets all entity types or a specific entity type if a name is specified. This is a paginated API. If you provide a null <code>maxResults</code>, this action retrieves a maximum of 10 records per page. If you provide a <code>maxResults</code>, the value must be between 5 and 10. To get the next page results, provide the pagination token from the <code>GetEntityTypesResponse</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetEventPrediction": "<p>Evaluates an event against a detector version. If a version ID is not provided, the detector’s (<code>ACTIVE</code>) version is used.</p>",
+    "GetEventTypes": "<p>Gets all event types or a specific event type if name is provided. This is a paginated API. If you provide a null <code>maxResults</code>, this action retrieves a maximum of 10 records per page. If you provide a <code>maxResults</code>, the value must be between 5 and 10. To get the next page results, provide the pagination token from the <code>GetEventTypesResponse</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetExternalModels": "<p>Gets the details for one or more Amazon SageMaker models that have been imported into the service. This is a paginated API. If you provide a null <code>maxResults</code>, this actions retrieves a maximum of 10 records per page. If you provide a <code>maxResults</code>, the value must be between 5 and 10. To get the next page results, provide the pagination token from the <code>GetExternalModelsResult</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetKMSEncryptionKey": "<p>Gets the encryption key if a Key Management Service (KMS) customer master key (CMK) has been specified to be used to encrypt content in Amazon Fraud Detector.</p>",
+    "GetLabels": "<p>Gets all labels or a specific label if name is provided. This is a paginated API. If you provide a null <code>maxResults</code>, this action retrieves a maximum of 50 records per page. If you provide a <code>maxResults</code>, the value must be between 10 and 50. To get the next page results, provide the pagination token from the <code>GetGetLabelsResponse</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetModelVersion": "<p>Gets the details of the specified model version.</p>",
+    "GetModels": "<p>Gets one or more models. Gets all models for the AWS account if no model type and no model id provided. Gets all models for the AWS account and model type, if the model type is specified but model id is not provided. Gets a specific model if (model type, model id) tuple is specified. </p> <p>This is a paginated API. If you provide a null <code>maxResults</code>, this action retrieves a maximum of 10 records per page. If you provide a <code>maxResults</code>, the value must be between 1 and 10. To get the next page results, provide the pagination token from the response as part of your request. A null pagination token fetches the records from the beginning.</p>",
+    "GetOutcomes": "<p>Gets one or more outcomes. This is a paginated API. If you provide a null <code>maxResults</code>, this actions retrieves a maximum of 100 records per page. If you provide a <code>maxResults</code>, the value must be between 50 and 100. To get the next page results, provide the pagination token from the <code>GetOutcomesResult</code> as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "GetRules": "<p>Get all rules for a detector (paginated) if <code>ruleId</code> and <code>ruleVersion</code> are not specified. Gets all rules for the detector and the <code>ruleId</code> if present (paginated). Gets a specific rule if both the <code>ruleId</code> and the <code>ruleVersion</code> are specified.</p> <p>This is a paginated API. Providing null maxResults results in retrieving maximum of 100 records per page. If you provide maxResults the value must be between 50 and 100. To get the next page result, a provide a pagination token from GetRulesResult as part of your request. Null pagination token fetches the records from the beginning.</p>",
+    "GetVariables": "<p>Gets all of the variables or the specific variable. This is a paginated API. Providing null <code>maxSizePerPage</code> results in retrieving maximum of 100 records per page. If you provide <code>maxSizePerPage</code> the value must be between 50 and 100. To get the next page result, a provide a pagination token from <code>GetVariablesResult</code> as part of your request. Null pagination token fetches the records from the beginning. </p>",
+    "ListTagsForResource": "<p>Lists all tags associated with the resource. This is a paginated API. To get the next page results, provide the pagination token from the response as part of your request. A null pagination token fetches the records from the beginning. </p>",
+    "PutDetector": "<p>Creates or updates a detector. </p>",
+    "PutEntityType": "<p>Creates or updates an entity type. An entity represents who is performing the event. As part of a fraud prediction, you pass the entity ID to indicate the specific entity who performed the event. An entity type classifies the entity. Example classifications include customer, merchant, or account.</p>",
+    "PutEventType": "<p>Creates or updates an event type. An event is a business activity that is evaluated for fraud risk. With Amazon Fraud Detector, you generate fraud predictions for events. An event type defines the structure for an event sent to Amazon Fraud Detector. This includes the variables sent as part of the event, the entity performing the event (such as a customer), and the labels that classify the event. Example event types include online payment transactions, account registrations, and authentications.</p>",
+    "PutExternalModel": "<p>Creates or updates an Amazon SageMaker model endpoint. You can also use this action to update the configuration of the model endpoint, including the IAM role and/or the mapped variables. </p>",
+    "PutKMSEncryptionKey": "<p>Specifies the Key Management Service (KMS) customer master key (CMK) to be used to encrypt content in Amazon Fraud Detector.</p>",
+    "PutLabel": "<p>Creates or updates label. A label classifies an event as fraudulent or legitimate. Labels are associated with event types and used to train supervised machine learning models in Amazon Fraud Detector. </p>",
+    "PutOutcome": "<p>Creates or updates an outcome. </p>",
+    "TagResource": "<p>Assigns tags to a resource.</p>",
+    "UntagResource": "<p>Removes tags from a resource.</p>",
+    "UpdateDetectorVersion": "<p> Updates a detector version. The detector version attributes that you can update include models, external model endpoints, rules, rule execution mode, and description. You can only update a <code>DRAFT</code> detector version.</p>",
+    "UpdateDetectorVersionMetadata": "<p>Updates the detector version's description. You can update the metadata for any detector version (<code>DRAFT, ACTIVE,</code> or <code>INACTIVE</code>). </p>",
+    "UpdateDetectorVersionStatus": "<p>Updates the detector version’s status. You can perform the following promotions or demotions using <code>UpdateDetectorVersionStatus</code>: <code>DRAFT</code> to <code>ACTIVE</code>, <code>ACTIVE</code> to <code>INACTIVE</code>, and <code>INACTIVE</code> to <code>ACTIVE</code>.</p>",
+    "UpdateModel": "<p>Updates a model. You can update the description attribute using this action.</p>",
+    "UpdateModelVersion": "<p>Updates a model version. Updating a model version retrains an existing model version using updated training data and produces a new minor version of the model. You can update the training data set location and data access role attributes using this action. This action creates and trains a new minor version of the model, for example version 1.01, 1.02, 1.03.</p>",
+    "UpdateModelVersionStatus": "<p>Updates the status of a model version.</p> <p>You can perform the following status updates:</p> <ol> <li> <p>Change the <code>TRAINING_COMPLETE</code> status to <code>ACTIVE</code>.</p> </li> <li> <p>Change <code>ACTIVE</code>to <code>INACTIVE</code>.</p> </li> </ol>",
+    "UpdateRuleMetadata": "<p>Updates a rule's metadata. The description attribute can be updated.</p>",
+    "UpdateRuleVersion": "<p>Updates a rule version resulting in a new rule version. Updates a rule version resulting in a new rule version (version 1, 2, 3 ...). </p>",
+    "UpdateVariable": "<p>Updates a variable.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>An exception indicating Amazon Fraud Detector does not have the needed permissions. This can occur if you submit a request, such as <code>PutExternalModel</code>, that specifies a role that is not in your account.</p>",
+      "refs": {
+      }
+    },
+    "BatchCreateVariableError": {
+      "base": "<p>Provides the error of the batch create variable API.</p>",
+      "refs": {
+        "BatchCreateVariableErrorList$member": null
+      }
+    },
+    "BatchCreateVariableErrorList": {
+      "base": null,
+      "refs": {
+        "BatchCreateVariableResult$errors": "<p>Provides the errors for the <code>BatchCreateVariable</code> request.</p>"
+      }
+    },
+    "BatchCreateVariableRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchCreateVariableResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetVariableError": {
+      "base": "<p>Provides the error of the batch get variable API.</p>",
+      "refs": {
+        "BatchGetVariableErrorList$member": null
+      }
+    },
+    "BatchGetVariableErrorList": {
+      "base": null,
+      "refs": {
+        "BatchGetVariableResult$errors": "<p>The errors from the request.</p>"
+      }
+    },
+    "BatchGetVariableRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetVariableResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConflictException": {
+      "base": "<p>An exception indicating there was a conflict during a delete operation. The following delete operations can cause a conflict exception:</p> <ul> <li> <p>DeleteDetector: A conflict exception will occur if the detector has associated <code>Rules</code> or <code>DetectorVersions</code>. You can only delete a detector if it has no <code>Rules</code> or <code>DetectorVersions</code>.</p> </li> <li> <p>DeleteDetectorVersion: A conflict exception will occur if the <code>DetectorVersion</code> status is <code>ACTIVE</code>.</p> </li> <li> <p>DeleteRule: A conflict exception will occur if the <code>RuleVersion</code> is in use by an associated <code>ACTIVE</code> or <code>INACTIVE DetectorVersion</code>.</p> </li> </ul>",
+      "refs": {
+      }
+    },
+    "CreateDetectorVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDetectorVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateModelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateModelVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateModelVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateVariableRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateVariableResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CsvIndexToVariableMap": {
+      "base": null,
+      "refs": {
+        "ModelOutputConfiguration$csvIndexToVariableMap": "<p>A map of CSV index values in the SageMaker response to the Amazon Fraud Detector variables. </p>"
+      }
+    },
+    "DataSource": {
+      "base": null,
+      "refs": {
+        "CreateVariableRequest$dataSource": "<p>The source of the data.</p>",
+        "Variable$dataSource": "<p>The data source of the variable.</p>"
+      }
+    },
+    "DataType": {
+      "base": null,
+      "refs": {
+        "CreateVariableRequest$dataType": "<p>The data type.</p>",
+        "Variable$dataType": "<p>The data type of the variable. For more information see <a href=\"https://docs.aws.amazon.com/frauddetector/latest/ug/create-a-variable.html#variable-types\">Variable types</a>.</p>"
+      }
+    },
+    "DataValidationMetrics": {
+      "base": "<p>The model training validation messages.</p>",
+      "refs": {
+        "TrainingResult$dataValidationMetrics": "<p>The validation metrics.</p>"
+      }
+    },
+    "DeleteDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDetectorResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDetectorVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDetectorVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEntityTypeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEntityTypeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventTypeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventTypeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteExternalModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteExternalModelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLabelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLabelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteModelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteModelVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteModelVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOutcomeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOutcomeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRuleRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRuleResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVariableRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteVariableResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDetectorResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeModelVersionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeModelVersionsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Detector": {
+      "base": "<p>The detector.</p>",
+      "refs": {
+        "DetectorList$member": null
+      }
+    },
+    "DetectorList": {
+      "base": null,
+      "refs": {
+        "GetDetectorsResult$detectors": "<p>The detectors.</p>"
+      }
+    },
+    "DetectorVersionMaxResults": {
+      "base": null,
+      "refs": {
+        "DescribeDetectorRequest$maxResults": "<p>The maximum number of results to return for the request.</p>"
+      }
+    },
+    "DetectorVersionStatus": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionResult$status": "<p>The status of the detector version.</p>",
+        "DetectorVersionSummary$status": "<p>The detector version status. </p>",
+        "GetDetectorVersionResult$status": "<p>The status of the detector version.</p>",
+        "UpdateDetectorVersionStatusRequest$status": "<p>The new status.</p>"
+      }
+    },
+    "DetectorVersionSummary": {
+      "base": "<p>The summary of the detector version.</p>",
+      "refs": {
+        "DetectorVersionSummaryList$member": null
+      }
+    },
+    "DetectorVersionSummaryList": {
+      "base": null,
+      "refs": {
+        "DescribeDetectorResult$detectorVersionSummaries": "<p>The status and description for each detector version.</p>"
+      }
+    },
+    "DetectorsMaxResults": {
+      "base": null,
+      "refs": {
+        "GetDetectorsRequest$maxResults": "<p>The maximum number of objects to return for the request.</p>"
+      }
+    },
+    "Entity": {
+      "base": "<p>The entity details. </p>",
+      "refs": {
+        "listOfEntities$member": null
+      }
+    },
+    "EntityType": {
+      "base": "<p>The entity type details.</p>",
+      "refs": {
+        "entityTypeList$member": null
+      }
+    },
+    "EventType": {
+      "base": "<p>The event type details.</p>",
+      "refs": {
+        "eventTypeList$member": null
+      }
+    },
+    "EventVariableMap": {
+      "base": null,
+      "refs": {
+        "GetEventPredictionRequest$eventVariables": "<p>Names of the event type's variables you defined in Amazon Fraud Detector to represent data elements and their corresponding values for the event you are sending for evaluation.</p>"
+      }
+    },
+    "ExternalEventsDetail": {
+      "base": "<p>Details for the external events data used for model version training.</p>",
+      "refs": {
+        "CreateModelVersionRequest$externalEventsDetail": "<p>Details for the external events data used for model version training. Required if <code>trainingDataSource</code> is <code>EXTERNAL_EVENTS</code>.</p>",
+        "GetModelVersionResult$externalEventsDetail": "<p>The event details.</p>",
+        "ModelVersionDetail$externalEventsDetail": "<p>The event details.</p>",
+        "UpdateModelVersionRequest$externalEventsDetail": "<p>The event details.</p>"
+      }
+    },
+    "ExternalModel": {
+      "base": "<p>The Amazon SageMaker model.</p>",
+      "refs": {
+        "ExternalModelList$member": null
+      }
+    },
+    "ExternalModelEndpointDataBlobMap": {
+      "base": null,
+      "refs": {
+        "GetEventPredictionRequest$externalModelEndpointDataBlobs": "<p>The Amazon SageMaker model endpoint input data blobs.</p>"
+      }
+    },
+    "ExternalModelList": {
+      "base": null,
+      "refs": {
+        "GetExternalModelsResult$externalModels": "<p>Gets the Amazon SageMaker models.</p>"
+      }
+    },
+    "ExternalModelsMaxResults": {
+      "base": null,
+      "refs": {
+        "GetExternalModelsRequest$maxResults": "<p>The maximum number of objects to return for the request.</p>"
+      }
+    },
+    "FieldValidationMessage": {
+      "base": "<p>The message details.</p>",
+      "refs": {
+        "fieldValidationMessageList$member": null
+      }
+    },
+    "FileValidationMessage": {
+      "base": "<p>The message details.</p>",
+      "refs": {
+        "fileValidationMessageList$member": null
+      }
+    },
+    "GetDetectorVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDetectorVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDetectorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDetectorsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEntityTypesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEntityTypesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEventPredictionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEventPredictionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEventTypesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetEventTypesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetExternalModelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetExternalModelsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetKMSEncryptionKeyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLabelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLabelsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetModelVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetModelVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetModelsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetModelsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOutcomesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetOutcomesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRulesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetRulesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetVariablesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetVariablesResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>An exception indicating an internal server error.</p>",
+      "refs": {
+      }
+    },
+    "JsonKeyToVariableMap": {
+      "base": null,
+      "refs": {
+        "ModelOutputConfiguration$jsonKeyToVariableMap": "<p>A map of JSON keys in response from SageMaker to the Amazon Fraud Detector variables. </p>"
+      }
+    },
+    "KMSKey": {
+      "base": "<p>The KMS key details.</p>",
+      "refs": {
+        "GetKMSEncryptionKeyResult$kmsKey": "<p>The KMS encryption key.</p>"
+      }
+    },
+    "KmsEncryptionKeyArn": {
+      "base": null,
+      "refs": {
+        "KMSKey$kmsEncryptionKeyArn": "<p>The encryption key ARN.</p>",
+        "PutKMSEncryptionKeyRequest$kmsEncryptionKeyArn": "<p>The KMS encryption key ARN.</p>"
+      }
+    },
+    "Label": {
+      "base": "<p>The label details.</p>",
+      "refs": {
+        "labelList$member": null
+      }
+    },
+    "LabelSchema": {
+      "base": "<p>The label schema.</p>",
+      "refs": {
+        "TrainingDataSchema$labelSchema": null
+      }
+    },
+    "Language": {
+      "base": null,
+      "refs": {
+        "CreateRuleRequest$language": "<p>The language of the rule.</p>",
+        "RuleDetail$language": "<p>The rule language.</p>",
+        "UpdateRuleVersionRequest$language": "<p>The language.</p>"
+      }
+    },
+    "ListOfModelScores": {
+      "base": null,
+      "refs": {
+        "GetEventPredictionResult$modelScores": "<p>The model scores. Amazon Fraud Detector generates model scores between 0 and 1000, where 0 is low fraud risk and 1000 is high fraud risk. Model scores are directly related to the false positive rate (FPR). For example, a score of 600 corresponds to an estimated 10% false positive rate whereas a score of 900 corresponds to an estimated 2% false positive rate.</p>"
+      }
+    },
+    "ListOfModelVersions": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$modelVersions": "<p>The model versions to include in the detector version.</p>",
+        "GetDetectorVersionResult$modelVersions": "<p>The model versions included in the detector version. </p>",
+        "UpdateDetectorVersionRequest$modelVersions": "<p>The model versions to include in the detector version.</p>"
+      }
+    },
+    "ListOfRuleResults": {
+      "base": null,
+      "refs": {
+        "GetEventPredictionResult$ruleResults": "<p>The results.</p>"
+      }
+    },
+    "ListOfStrings": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$externalModelEndpoints": "<p>The Amazon Sagemaker model endpoints to include in the detector version.</p>",
+        "EventType$eventVariables": "<p>The event type event variables.</p>",
+        "EventType$labels": "<p>The event type labels.</p>",
+        "GetDetectorVersionResult$externalModelEndpoints": "<p>The Amazon SageMaker model endpoints included in the detector version.</p>",
+        "PutEventTypeRequest$labels": "<p>The event type labels.</p>",
+        "RuleResult$outcomes": "<p>The outcomes of the matched rule, based on the rule execution mode.</p>",
+        "TrainingDataSchema$modelVariables": "<p>The training data schema variables.</p>",
+        "UpdateDetectorVersionRequest$externalModelEndpoints": "<p>The Amazon SageMaker model endpoints to include in the detector version.</p>",
+        "labelMapper$value": null
+      }
+    },
+    "ListTagsForResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MetricDataPoint": {
+      "base": "<p>Model performance metrics data points.</p>",
+      "refs": {
+        "metricDataPointsList$member": null
+      }
+    },
+    "Model": {
+      "base": "<p>The model.</p>",
+      "refs": {
+        "modelList$member": null
+      }
+    },
+    "ModelEndpointDataBlob": {
+      "base": "<p>A pre-formed Amazon SageMaker model input you can include if your detector version includes an imported Amazon SageMaker model endpoint with pass-through input configuration.</p>",
+      "refs": {
+        "ExternalModelEndpointDataBlobMap$value": null
+      }
+    },
+    "ModelEndpointStatus": {
+      "base": null,
+      "refs": {
+        "ExternalModel$modelEndpointStatus": "<p>The Amazon Fraud Detector status for the external model endpoint</p>",
+        "PutExternalModelRequest$modelEndpointStatus": "<p>The model endpoint’s status in Amazon Fraud Detector.</p>"
+      }
+    },
+    "ModelInputConfiguration": {
+      "base": "<p>The Amazon SageMaker model input configuration.</p>",
+      "refs": {
+        "ExternalModel$inputConfiguration": "<p>The input configuration.</p>",
+        "PutExternalModelRequest$inputConfiguration": "<p>The model endpoint input configuration.</p>"
+      }
+    },
+    "ModelInputDataFormat": {
+      "base": null,
+      "refs": {
+        "ModelInputConfiguration$format": "<p> The format of the model input configuration. The format differs depending on if it is passed through to SageMaker or constructed by Amazon Fraud Detector.</p>"
+      }
+    },
+    "ModelOutputConfiguration": {
+      "base": "<p>Provides the Amazon Sagemaker model output configuration.</p>",
+      "refs": {
+        "ExternalModel$outputConfiguration": "<p>The output configuration.</p>",
+        "PutExternalModelRequest$outputConfiguration": "<p>The model endpoint output configuration.</p>"
+      }
+    },
+    "ModelOutputDataFormat": {
+      "base": null,
+      "refs": {
+        "ModelOutputConfiguration$format": "<p>The format of the model output configuration.</p>"
+      }
+    },
+    "ModelPredictionMap": {
+      "base": null,
+      "refs": {
+        "ModelScores$scores": "<p>The model's fraud prediction scores.</p>"
+      }
+    },
+    "ModelScores": {
+      "base": "<p>The fraud prediction scores.</p>",
+      "refs": {
+        "ListOfModelScores$member": null
+      }
+    },
+    "ModelSource": {
+      "base": null,
+      "refs": {
+        "ExternalModel$modelSource": "<p>The source of the model.</p>",
+        "PutExternalModelRequest$modelSource": "<p>The source of the model.</p>"
+      }
+    },
+    "ModelTypeEnum": {
+      "base": null,
+      "refs": {
+        "CreateModelRequest$modelType": "<p>The model type. </p>",
+        "CreateModelVersionRequest$modelType": "<p>The model type.</p>",
+        "CreateModelVersionResult$modelType": "<p>The model type.</p>",
+        "DeleteModelRequest$modelType": "<p>The model type of the model to delete.</p>",
+        "DeleteModelVersionRequest$modelType": "<p>The model type of the model version to delete.</p>",
+        "DescribeModelVersionsRequest$modelType": "<p>The model type.</p>",
+        "GetModelVersionRequest$modelType": "<p>The model type.</p>",
+        "GetModelVersionResult$modelType": "<p>The model type.</p>",
+        "GetModelsRequest$modelType": "<p>The model type.</p>",
+        "Model$modelType": "<p>The model type.</p>",
+        "ModelVersion$modelType": "<p>The model type.</p>",
+        "ModelVersionDetail$modelType": "<p>The model type.</p>",
+        "UpdateModelRequest$modelType": "<p>The model type.</p>",
+        "UpdateModelVersionRequest$modelType": "<p>The model type.</p>",
+        "UpdateModelVersionResult$modelType": "<p>The model type.</p>",
+        "UpdateModelVersionStatusRequest$modelType": "<p>The model type.</p>"
+      }
+    },
+    "ModelVersion": {
+      "base": "<p>The model version.</p>",
+      "refs": {
+        "ListOfModelVersions$member": null,
+        "ModelScores$modelVersion": "<p>The model version.</p>"
+      }
+    },
+    "ModelVersionDetail": {
+      "base": "<p>The details of the model version.</p>",
+      "refs": {
+        "modelVersionDetailList$member": null
+      }
+    },
+    "ModelVersionStatus": {
+      "base": null,
+      "refs": {
+        "UpdateModelVersionStatusRequest$status": "<p>The model version status.</p>"
+      }
+    },
+    "NameList": {
+      "base": null,
+      "refs": {
+        "BatchGetVariableRequest$names": "<p>The list of variable names to get.</p>"
+      }
+    },
+    "NonEmptyListOfStrings": {
+      "base": null,
+      "refs": {
+        "CreateRuleRequest$outcomes": "<p>The outcome or outcomes returned when the rule expression matches.</p>",
+        "EventType$entityTypes": "<p>The event type entity types.</p>",
+        "PutEventTypeRequest$eventVariables": "<p>The event type variables.</p>",
+        "PutEventTypeRequest$entityTypes": "<p>The entity type for the event type. Example entity types: customer, merchant, account.</p>",
+        "RuleDetail$outcomes": "<p>The rule outcomes.</p>",
+        "UpdateRuleVersionRequest$outcomes": "<p>The outcomes.</p>"
+      }
+    },
+    "Outcome": {
+      "base": "<p>The outcome.</p>",
+      "refs": {
+        "OutcomeList$member": null
+      }
+    },
+    "OutcomeList": {
+      "base": null,
+      "refs": {
+        "GetOutcomesResult$outcomes": "<p>The outcomes. </p>"
+      }
+    },
+    "OutcomesMaxResults": {
+      "base": null,
+      "refs": {
+        "GetOutcomesRequest$maxResults": "<p>The maximum number of objects to return for the request. </p>"
+      }
+    },
+    "PutDetectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutDetectorResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutEntityTypeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutEntityTypeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutEventTypeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutEventTypeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutExternalModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutExternalModelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutKMSEncryptionKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutKMSEncryptionKeyResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLabelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLabelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutOutcomeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutOutcomeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>An exception indicating the specified resource was not found.</p>",
+      "refs": {
+      }
+    },
+    "Rule": {
+      "base": "<p>A rule.</p>",
+      "refs": {
+        "CreateRuleResult$rule": "<p>The created rule.</p>",
+        "DeleteRuleRequest$rule": null,
+        "RuleList$member": null,
+        "UpdateRuleMetadataRequest$rule": "<p>The rule to update.</p>",
+        "UpdateRuleVersionRequest$rule": "<p>The rule to update.</p>",
+        "UpdateRuleVersionResult$rule": "<p>The new rule version that was created.</p>"
+      }
+    },
+    "RuleDetail": {
+      "base": "<p>The details of the rule.</p>",
+      "refs": {
+        "RuleDetailList$member": null
+      }
+    },
+    "RuleDetailList": {
+      "base": null,
+      "refs": {
+        "GetRulesResult$ruleDetails": "<p>The details of the requested rule.</p>"
+      }
+    },
+    "RuleExecutionMode": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$ruleExecutionMode": "<p>The rule execution mode for the rules included in the detector version.</p> <p>You can define and edit the rule mode at the detector version level, when it is in draft status.</p> <p>If you specify <code>FIRST_MATCHED</code>, Amazon Fraud Detector evaluates rules sequentially, first to last, stopping at the first matched rule. Amazon Fraud dectector then provides the outcomes for that single rule.</p> <p>If you specifiy <code>ALL_MATCHED</code>, Amazon Fraud Detector evaluates all rules and returns the outcomes for all matched rules. </p> <p>The default behavior is <code>FIRST_MATCHED</code>.</p>",
+        "GetDetectorVersionResult$ruleExecutionMode": "<p>The execution mode of the rule in the dectector</p> <p> <code>FIRST_MATCHED</code> indicates that Amazon Fraud Detector evaluates rules sequentially, first to last, stopping at the first matched rule. Amazon Fraud dectector then provides the outcomes for that single rule.</p> <p> <code>ALL_MATCHED</code> indicates that Amazon Fraud Detector evaluates all rules and returns the outcomes for all matched rules. You can define and edit the rule mode at the detector version level, when it is in draft status.</p>",
+        "UpdateDetectorVersionRequest$ruleExecutionMode": "<p>The rule execution mode to add to the detector.</p> <p>If you specify <code>FIRST_MATCHED</code>, Amazon Fraud Detector evaluates rules sequentially, first to last, stopping at the first matched rule. Amazon Fraud dectector then provides the outcomes for that single rule.</p> <p>If you specifiy <code>ALL_MATCHED</code>, Amazon Fraud Detector evaluates all rules and returns the outcomes for all matched rules. You can define and edit the rule mode at the detector version level, when it is in draft status.</p> <p>The default behavior is <code>FIRST_MATCHED</code>.</p>"
+      }
+    },
+    "RuleList": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$rules": "<p>The rules to include in the detector version.</p>",
+        "GetDetectorVersionResult$rules": "<p>The rules included in the detector version.</p>",
+        "UpdateDetectorVersionRequest$rules": "<p>The rules to include in the detector version.</p>"
+      }
+    },
+    "RuleResult": {
+      "base": "<p>The rule results.</p>",
+      "refs": {
+        "ListOfRuleResults$member": null
+      }
+    },
+    "RulesMaxResults": {
+      "base": null,
+      "refs": {
+        "GetRulesRequest$maxResults": "<p>The maximum number of rules to return for the request.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A key and value pair. </p>",
+      "refs": {
+        "tagList$member": null
+      }
+    },
+    "TagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagsMaxResults": {
+      "base": null,
+      "refs": {
+        "ListTagsForResourceRequest$maxResults": "<p>The maximum number of objects to return for the request. </p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>An exception indicating a throttling error.</p>",
+      "refs": {
+      }
+    },
+    "TrainingDataSchema": {
+      "base": "<p>The training data schema.</p>",
+      "refs": {
+        "CreateModelVersionRequest$trainingDataSchema": "<p>The training data schema.</p>",
+        "GetModelVersionResult$trainingDataSchema": "<p>The training data schema.</p>",
+        "ModelVersionDetail$trainingDataSchema": "<p>The training data schema.</p>"
+      }
+    },
+    "TrainingDataSourceEnum": {
+      "base": null,
+      "refs": {
+        "CreateModelVersionRequest$trainingDataSource": "<p>The training data source location in Amazon S3. </p>",
+        "GetModelVersionResult$trainingDataSource": "<p>The training data source.</p>",
+        "ModelVersionDetail$trainingDataSource": "<p>The model version training data source.</p>"
+      }
+    },
+    "TrainingMetrics": {
+      "base": "<p>The training metric details.</p>",
+      "refs": {
+        "TrainingResult$trainingMetrics": "<p>The training metric details.</p>"
+      }
+    },
+    "TrainingResult": {
+      "base": "<p>The training result details.</p>",
+      "refs": {
+        "ModelVersionDetail$trainingResult": "<p>The training results.</p>"
+      }
+    },
+    "UntagResourceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UntagResourceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionMetadataResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDetectorVersionStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelVersionStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateModelVersionStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRuleMetadataRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRuleMetadataResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRuleVersionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateRuleVersionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVariableRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateVariableResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UseEventVariables": {
+      "base": null,
+      "refs": {
+        "ModelInputConfiguration$useEventVariables": "<p>The event variables.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>An exception indicating a specified value is not allowed.</p>",
+      "refs": {
+      }
+    },
+    "Variable": {
+      "base": "<p>The variable.</p>",
+      "refs": {
+        "VariableList$member": null
+      }
+    },
+    "VariableEntry": {
+      "base": "<p>A variable in the list of variables for the batch create variable request.</p>",
+      "refs": {
+        "VariableEntryList$member": null
+      }
+    },
+    "VariableEntryList": {
+      "base": null,
+      "refs": {
+        "BatchCreateVariableRequest$variableEntries": "<p>The list of variables for the batch create variable request.</p>"
+      }
+    },
+    "VariableList": {
+      "base": null,
+      "refs": {
+        "BatchGetVariableResult$variables": "<p>The returned variables.</p>",
+        "GetVariablesResult$variables": "<p>The names of the variables returned. </p>"
+      }
+    },
+    "VariablesMaxResults": {
+      "base": null,
+      "refs": {
+        "GetVariablesRequest$maxResults": "<p>The max size per page determined for the get variable request. </p>"
+      }
+    },
+    "blob": {
+      "base": null,
+      "refs": {
+        "ModelEndpointDataBlob$byteBuffer": "<p>The byte buffer of the Amazon SageMaker model endpoint input data blob.</p>"
+      }
+    },
+    "contentType": {
+      "base": null,
+      "refs": {
+        "ModelEndpointDataBlob$contentType": "<p>The content type of the Amazon SageMaker model endpoint input data blob. </p>"
+      }
+    },
+    "description": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$description": "<p>The description of the detector version.</p>",
+        "CreateModelRequest$description": "<p>The model description. </p>",
+        "CreateRuleRequest$description": "<p>The rule description.</p>",
+        "Detector$description": "<p>The detector description.</p>",
+        "DetectorVersionSummary$description": "<p>The detector version description. </p>",
+        "EntityType$description": "<p>The entity type description.</p>",
+        "EventType$description": "<p>The event type description.</p>",
+        "GetDetectorVersionResult$description": "<p>The detector version description.</p>",
+        "Label$description": "<p>The label description.</p>",
+        "Model$description": "<p>The model description.</p>",
+        "Outcome$description": "<p>The outcome description.</p>",
+        "PutDetectorRequest$description": "<p>The description of the detector.</p>",
+        "PutEntityTypeRequest$description": "<p>The description.</p>",
+        "PutEventTypeRequest$description": "<p>The description of the event type.</p>",
+        "PutLabelRequest$description": "<p>The label description.</p>",
+        "PutOutcomeRequest$description": "<p>The outcome description.</p>",
+        "RuleDetail$description": "<p>The rule description.</p>",
+        "UpdateDetectorVersionMetadataRequest$description": "<p>The description.</p>",
+        "UpdateDetectorVersionRequest$description": "<p>The detector version description. </p>",
+        "UpdateModelRequest$description": "<p>The new model description.</p>",
+        "UpdateRuleMetadataRequest$description": "<p>The rule description.</p>",
+        "UpdateRuleVersionRequest$description": "<p>The description.</p>"
+      }
+    },
+    "entityTypeList": {
+      "base": null,
+      "refs": {
+        "GetEntityTypesResult$entityTypes": "<p>An array of entity types.</p>"
+      }
+    },
+    "entityTypesMaxResults": {
+      "base": null,
+      "refs": {
+        "GetEntityTypesRequest$maxResults": "<p>The maximum number of objects to return for the request.</p>"
+      }
+    },
+    "eventTypeList": {
+      "base": null,
+      "refs": {
+        "GetEventTypesResult$eventTypes": "<p>An array of event types.</p>"
+      }
+    },
+    "eventTypesMaxResults": {
+      "base": null,
+      "refs": {
+        "GetEventTypesRequest$maxResults": "<p>The maximum number of objects to return for the request.</p>"
+      }
+    },
+    "fieldValidationMessageList": {
+      "base": null,
+      "refs": {
+        "DataValidationMetrics$fieldLevelMessages": "<p>The field-specific model training validation messages.</p>"
+      }
+    },
+    "fileValidationMessageList": {
+      "base": null,
+      "refs": {
+        "DataValidationMetrics$fileLevelMessages": "<p>The file-specific model training validation messages.</p>"
+      }
+    },
+    "float": {
+      "base": null,
+      "refs": {
+        "MetricDataPoint$fpr": "<p>The false positive rate. This is the percentage of total legitimate events that are incorrectly predicted as fraud.</p>",
+        "MetricDataPoint$precision": "<p>The percentage of fraud events correctly predicted as fraudulent as compared to all events predicted as fraudulent.</p>",
+        "MetricDataPoint$tpr": "<p>The true positive rate. This is the percentage of total fraud the model detects. Also known as capture rate.</p>",
+        "MetricDataPoint$threshold": "<p>The model threshold that specifies an acceptable fraud capture rate. For example, a threshold of 500 means any model score 500 or above is labeled as fraud.</p>",
+        "ModelPredictionMap$value": null,
+        "TrainingMetrics$auc": "<p>The area under the curve. This summarizes true positive rate (TPR) and false positive rate (FPR) across all possible model score thresholds. A model with no predictive power has an AUC of 0.5, whereas a perfect model has a score of 1.0.</p>"
+      }
+    },
+    "floatVersionString": {
+      "base": null,
+      "refs": {
+        "DeleteModelVersionRequest$modelVersionNumber": "<p>The model version number of the model version to delete.</p>",
+        "DescribeModelVersionsRequest$modelVersionNumber": "<p>The model version number.</p>",
+        "GetModelVersionRequest$modelVersionNumber": "<p>The model version number.</p>",
+        "GetModelVersionResult$modelVersionNumber": "<p>The model version number.</p>",
+        "ModelVersionDetail$modelVersionNumber": "<p>The model version number.</p>",
+        "UpdateModelVersionResult$modelVersionNumber": "<p>The model version number of the model version updated.</p>",
+        "UpdateModelVersionStatusRequest$modelVersionNumber": "<p>The model version number.</p>"
+      }
+    },
+    "fraudDetectorArn": {
+      "base": null,
+      "refs": {
+        "DescribeDetectorResult$arn": "<p>The detector ARN.</p>",
+        "Detector$arn": "<p>The detector ARN.</p>",
+        "EntityType$arn": "<p>The entity type ARN.</p>",
+        "EventType$arn": "<p>The entity type ARN.</p>",
+        "ExternalModel$arn": "<p>The model ARN.</p>",
+        "GetDetectorVersionResult$arn": "<p>The detector version ARN.</p>",
+        "GetModelVersionResult$arn": "<p>The model version ARN.</p>",
+        "Label$arn": "<p>The label ARN.</p>",
+        "ListTagsForResourceRequest$resourceARN": "<p>The ARN that specifies the resource whose tags you want to list.</p>",
+        "Model$arn": "<p>The ARN of the model.</p>",
+        "ModelVersion$arn": "<p>The model version ARN.</p>",
+        "ModelVersionDetail$arn": "<p>The model version ARN.</p>",
+        "Outcome$arn": "<p>The outcome ARN.</p>",
+        "RuleDetail$arn": "<p>The rule ARN.</p>",
+        "TagResourceRequest$resourceARN": "<p>The resource ARN.</p>",
+        "UntagResourceRequest$resourceARN": "<p>The ARN of the resource from which to remove the tag.</p>",
+        "Variable$arn": "<p>The ARN of the variable.</p>"
+      }
+    },
+    "iamRoleArn": {
+      "base": null,
+      "refs": {
+        "ExternalEventsDetail$dataAccessRoleArn": "<p>The ARN of the role that provides Amazon Fraud Detector access to the data location.</p>"
+      }
+    },
+    "identifier": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionRequest$detectorId": "<p>The ID of the detector under which you want to create a new version.</p>",
+        "CreateDetectorVersionResult$detectorId": "<p>The ID for the created version's parent detector.</p>",
+        "CreateRuleRequest$ruleId": "<p>The rule ID.</p>",
+        "CreateRuleRequest$detectorId": "<p>The detector ID for the rule's parent detector.</p>",
+        "DeleteDetectorRequest$detectorId": "<p>The ID of the detector to delete.</p>",
+        "DeleteDetectorVersionRequest$detectorId": "<p>The ID of the parent detector for the detector version to delete.</p>",
+        "DeleteEntityTypeRequest$name": "<p>The name of the entity type to delete.</p>",
+        "DeleteEventRequest$eventId": "<p>The ID of the event to delete.</p>",
+        "DeleteEventRequest$eventTypeName": "<p>The name of the event type.</p>",
+        "DeleteEventTypeRequest$name": "<p>The name of the event type to delete.</p>",
+        "DeleteLabelRequest$name": "<p>The name of the label to delete.</p>",
+        "DeleteOutcomeRequest$name": "<p>The name of the outcome to delete.</p>",
+        "DescribeDetectorRequest$detectorId": "<p>The detector ID.</p>",
+        "DescribeDetectorResult$detectorId": "<p>The detector ID.</p>",
+        "Detector$detectorId": "<p>The detector ID.</p>",
+        "Detector$eventTypeName": "<p>The name of the event type.</p>",
+        "Entity$entityId": "<p>The entity ID. If you do not know the <code>entityId</code>, you can pass <code>unknown</code>, which is areserved string literal.</p>",
+        "GetDetectorVersionRequest$detectorId": "<p>The detector ID.</p>",
+        "GetDetectorVersionResult$detectorId": "<p>The detector ID.</p>",
+        "GetDetectorsRequest$detectorId": "<p>The detector ID.</p>",
+        "GetEntityTypesRequest$name": "<p>The name.</p>",
+        "GetEventTypesRequest$name": "<p>The name.</p>",
+        "GetLabelsRequest$name": "<p>The name of the label or labels to get.</p>",
+        "GetOutcomesRequest$name": "<p>The name of the outcome or outcomes to get.</p>",
+        "GetRulesRequest$ruleId": "<p>The rule ID.</p>",
+        "GetRulesRequest$detectorId": "<p>The detector ID.</p>",
+        "ModelInputConfiguration$eventTypeName": "<p>The event type name.</p>",
+        "Outcome$name": "<p>The outcome name.</p>",
+        "PutDetectorRequest$detectorId": "<p>The detector ID. </p>",
+        "PutDetectorRequest$eventTypeName": "<p>The name of the event type.</p>",
+        "PutEntityTypeRequest$name": "<p>The name of the entity type.</p>",
+        "PutEventTypeRequest$name": "<p>The name.</p>",
+        "PutLabelRequest$name": "<p>The label name.</p>",
+        "PutOutcomeRequest$name": "<p>The name of the outcome.</p>",
+        "Rule$detectorId": "<p>The detector for which the rule is associated.</p>",
+        "Rule$ruleId": "<p>The rule ID.</p>",
+        "RuleDetail$ruleId": "<p>The rule ID.</p>",
+        "RuleDetail$detectorId": "<p>The detector for which the rule is associated.</p>",
+        "UpdateDetectorVersionMetadataRequest$detectorId": "<p>The detector ID.</p>",
+        "UpdateDetectorVersionRequest$detectorId": "<p>The parent detector ID for the detector version you want to update.</p>",
+        "UpdateDetectorVersionStatusRequest$detectorId": "<p>The detector ID. </p>"
+      }
+    },
+    "integer": {
+      "base": null,
+      "refs": {
+        "BatchCreateVariableError$code": "<p>The error code. </p>",
+        "BatchGetVariableError$code": "<p>The error code. </p>"
+      }
+    },
+    "labelList": {
+      "base": null,
+      "refs": {
+        "GetLabelsResult$labels": "<p>An array of labels.</p>"
+      }
+    },
+    "labelMapper": {
+      "base": null,
+      "refs": {
+        "LabelSchema$labelMapper": "<p>The label mapper maps the Amazon Fraud Detector supported model classification labels (<code>FRAUD</code>, <code>LEGIT</code>) to the appropriate event type labels. For example, if \"<code>FRAUD</code>\" and \"<code>LEGIT</code>\" are Amazon Fraud Detector supported labels, this mapper could be: <code>{\"FRAUD\" =&gt; [\"0\"]</code>, <code>\"LEGIT\" =&gt; [\"1\"]}</code> or <code>{\"FRAUD\" =&gt; [\"false\"]</code>, <code>\"LEGIT\" =&gt; [\"true\"]}</code> or <code>{\"FRAUD\" =&gt; [\"fraud\", \"abuse\"]</code>, <code>\"LEGIT\" =&gt; [\"legit\", \"safe\"]}</code>. The value part of the mapper is a list, because you may have multiple label variants from your event type for a single Amazon Fraud Detector label. </p>"
+      }
+    },
+    "labelsMaxResults": {
+      "base": null,
+      "refs": {
+        "GetLabelsRequest$maxResults": "<p>The maximum number of objects to return for the request.</p>"
+      }
+    },
+    "listOfEntities": {
+      "base": null,
+      "refs": {
+        "GetEventPredictionRequest$entities": "<p>The entity type (associated with the detector's event type) and specific entity ID representing who performed the event. If an entity id is not available, use \"UNKNOWN.\"</p>"
+      }
+    },
+    "metricDataPointsList": {
+      "base": null,
+      "refs": {
+        "TrainingMetrics$metricDataPoints": "<p>The data points details.</p>"
+      }
+    },
+    "modelIdentifier": {
+      "base": null,
+      "refs": {
+        "CreateModelRequest$modelId": "<p>The model ID.</p>",
+        "CreateModelVersionRequest$modelId": "<p>The model ID. </p>",
+        "CreateModelVersionResult$modelId": "<p>The model ID.</p>",
+        "DeleteModelRequest$modelId": "<p>The model ID of the model to delete.</p>",
+        "DeleteModelVersionRequest$modelId": "<p>The model ID of the model version to delete.</p>",
+        "DescribeModelVersionsRequest$modelId": "<p>The model ID.</p>",
+        "GetModelVersionRequest$modelId": "<p>The model ID.</p>",
+        "GetModelVersionResult$modelId": "<p>The model ID.</p>",
+        "GetModelsRequest$modelId": "<p>The model ID.</p>",
+        "Model$modelId": "<p>The model ID.</p>",
+        "ModelVersion$modelId": "<p>The model ID.</p>",
+        "ModelVersionDetail$modelId": "<p>The model ID.</p>",
+        "UpdateModelRequest$modelId": "<p>The model ID.</p>",
+        "UpdateModelVersionRequest$modelId": "<p>The model ID.</p>",
+        "UpdateModelVersionResult$modelId": "<p>The model ID.</p>",
+        "UpdateModelVersionStatusRequest$modelId": "<p>The model ID of the model version to update.</p>"
+      }
+    },
+    "modelList": {
+      "base": null,
+      "refs": {
+        "GetModelsResult$models": "<p>The array of models.</p>"
+      }
+    },
+    "modelVersionDetailList": {
+      "base": null,
+      "refs": {
+        "DescribeModelVersionsResult$modelVersionDetails": "<p>The model version details.</p>"
+      }
+    },
+    "modelsMaxPageSize": {
+      "base": null,
+      "refs": {
+        "DescribeModelVersionsRequest$maxResults": "<p>The maximum number of results to return.</p>",
+        "GetModelsRequest$maxResults": "<p>The maximum number of objects to return for the request. </p>"
+      }
+    },
+    "nonEmptyString": {
+      "base": null,
+      "refs": {
+        "CreateDetectorVersionResult$detectorVersionId": "<p>The ID for the created detector. </p>",
+        "CreateModelVersionResult$modelVersionNumber": "<p>The model version number of the model version created.</p>",
+        "DetectorVersionSummary$detectorVersionId": "<p>The detector version ID. </p>",
+        "ModelVersion$modelVersionNumber": "<p>The model version number.</p>"
+      }
+    },
+    "ruleExpression": {
+      "base": null,
+      "refs": {
+        "CreateRuleRequest$expression": "<p>The rule expression.</p>",
+        "RuleDetail$expression": "<p>The rule expression.</p>",
+        "UpdateRuleVersionRequest$expression": "<p>The rule expression.</p>"
+      }
+    },
+    "s3BucketLocation": {
+      "base": null,
+      "refs": {
+        "ExternalEventsDetail$dataLocation": "<p>The Amazon S3 bucket location for the data.</p>"
+      }
+    },
+    "sageMakerEndpointIdentifier": {
+      "base": null,
+      "refs": {
+        "DeleteExternalModelRequest$modelEndpoint": "<p>The endpoint of the Amazon Sagemaker model to delete.</p>",
+        "PutExternalModelRequest$modelEndpoint": "<p>The model endpoints name.</p>"
+      }
+    },
+    "string": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$message": null,
+        "BatchCreateVariableError$name": "<p>The name.</p>",
+        "BatchCreateVariableError$message": "<p>The error message.</p>",
+        "BatchGetVariableError$name": "<p>The error name. </p>",
+        "BatchGetVariableError$message": "<p>The error message.</p>",
+        "ConflictException$message": null,
+        "CreateModelRequest$eventTypeName": "<p>The name of the event type.</p>",
+        "CreateModelVersionResult$status": "<p>The model version status. </p>",
+        "CreateVariableRequest$name": "<p>The name of the variable.</p>",
+        "CreateVariableRequest$defaultValue": "<p>The default value for the variable when no value is received.</p>",
+        "CreateVariableRequest$description": "<p>The description.</p>",
+        "CreateVariableRequest$variableType": "<p>The variable type. For more information see <a href=\"https://docs.aws.amazon.com/frauddetector/latest/ug/create-a-variable.html#variable-types\">Variable types</a>. </p> <p>Valid Values: <code>AUTH_CODE | AVS | BILLING_ADDRESS_L1 | BILLING_ADDRESS_L2 | BILLING_CITY | BILLING_COUNTRY | BILLING_NAME | BILLING_PHONE | BILLING_STATE | BILLING_ZIP | CARD_BIN | CATEGORICAL | CURRENCY_CODE | EMAIL_ADDRESS | FINGERPRINT | FRAUD_LABEL | FREE_FORM_TEXT | IP_ADDRESS | NUMERIC | ORDER_ID | PAYMENT_TYPE | PHONE_NUMBER | PRICE | PRODUCT_CATEGORY | SHIPPING_ADDRESS_L1 | SHIPPING_ADDRESS_L2 | SHIPPING_CITY | SHIPPING_COUNTRY | SHIPPING_NAME | SHIPPING_PHONE | SHIPPING_STATE | SHIPPING_ZIP | USERAGENT</code> </p>",
+        "CsvIndexToVariableMap$key": null,
+        "CsvIndexToVariableMap$value": null,
+        "DeleteVariableRequest$name": "<p>The name of the variable to delete.</p>",
+        "DescribeDetectorRequest$nextToken": "<p>The next token from the previous response.</p>",
+        "DescribeDetectorResult$nextToken": "<p>The next token to be used for subsequent requests.</p>",
+        "DescribeModelVersionsRequest$nextToken": "<p>The next token from the previous results.</p>",
+        "DescribeModelVersionsResult$nextToken": "<p>The next token.</p>",
+        "Entity$entityType": "<p>The entity type.</p>",
+        "EntityType$name": "<p>The entity type name.</p>",
+        "EventType$name": "<p>The event type name.</p>",
+        "ExternalModel$modelEndpoint": "<p>The Amazon SageMaker model endpoints.</p>",
+        "ExternalModel$invokeModelEndpointRoleArn": "<p>The role used to invoke the model. </p>",
+        "ExternalModelEndpointDataBlobMap$key": null,
+        "FieldValidationMessage$fieldName": "<p>The field name.</p>",
+        "FieldValidationMessage$identifier": "<p>The message ID.</p>",
+        "FieldValidationMessage$title": "<p>The message title.</p>",
+        "FieldValidationMessage$content": "<p>The message content.</p>",
+        "FieldValidationMessage$type": "<p>The message type.</p>",
+        "FileValidationMessage$title": "<p>The message title.</p>",
+        "FileValidationMessage$content": "<p>The message content.</p>",
+        "FileValidationMessage$type": "<p>The message type.</p>",
+        "GetDetectorsRequest$nextToken": "<p>The next token for the subsequent request.</p>",
+        "GetDetectorsResult$nextToken": "<p>The next page token.</p>",
+        "GetEntityTypesRequest$nextToken": "<p>The next token for the subsequent request.</p>",
+        "GetEntityTypesResult$nextToken": "<p>The next page token.</p>",
+        "GetEventPredictionRequest$detectorId": "<p>The detector ID.</p>",
+        "GetEventPredictionRequest$eventId": "<p>The unique ID used to identify the event.</p>",
+        "GetEventPredictionRequest$eventTypeName": "<p>The event type associated with the detector specified for the prediction.</p>",
+        "GetEventPredictionRequest$eventTimestamp": "<p>Timestamp that defines when the event under evaluation occurred.</p>",
+        "GetEventTypesRequest$nextToken": "<p>The next token for the subsequent request.</p>",
+        "GetEventTypesResult$nextToken": "<p>The next page token.</p>",
+        "GetExternalModelsRequest$modelEndpoint": "<p>The Amazon SageMaker model endpoint.</p>",
+        "GetExternalModelsRequest$nextToken": "<p>The next page token for the request.</p>",
+        "GetExternalModelsResult$nextToken": "<p>The next page token to be used in subsequent requests.</p>",
+        "GetLabelsRequest$nextToken": "<p>The next token for the subsequent request.</p>",
+        "GetLabelsResult$nextToken": "<p>The next page token.</p>",
+        "GetModelVersionResult$status": "<p>The model version status.</p> <p>Possible values are:</p> <ul> <li> <p> <code>TRAINING_IN_PROGRESS</code> </p> </li> <li> <p> <code>TRAINING_COMPLETE</code> </p> </li> <li> <p> <code>ACTIVATE_REQUESTED</code> </p> </li> <li> <p> <code>ACTIVATE_IN_PROGRESS</code> </p> </li> <li> <p> <code>ACTIVE</code> </p> </li> <li> <p> <code>INACTIVATE_REQUESTED</code> </p> </li> <li> <p> <code>INACTIVATE_IN_PROGRESS</code> </p> </li> <li> <p> <code>INACTIVE</code> </p> </li> <li> <p> <code>ERROR</code> </p> </li> </ul>",
+        "GetModelsRequest$nextToken": "<p>The next token for the subsequent request.</p>",
+        "GetModelsResult$nextToken": "<p>The next page token to be used in subsequent requests.</p>",
+        "GetOutcomesRequest$nextToken": "<p>The next page token for the request. </p>",
+        "GetOutcomesResult$nextToken": "<p>The next page token for subsequent requests.</p>",
+        "GetRulesRequest$nextToken": "<p>The next page token.</p>",
+        "GetRulesResult$nextToken": "<p>The next page token to be used in subsequent requests.</p>",
+        "GetVariablesRequest$name": "<p>The name of the variable. </p>",
+        "GetVariablesRequest$nextToken": "<p>The next page token of the get variable request. </p>",
+        "GetVariablesResult$nextToken": "<p>The next page token to be used in subsequent requests. </p>",
+        "InternalServerException$message": null,
+        "JsonKeyToVariableMap$key": null,
+        "JsonKeyToVariableMap$value": null,
+        "Label$name": "<p>The label name.</p>",
+        "ListOfStrings$member": null,
+        "ListTagsForResourceRequest$nextToken": "<p>The next token from the previous results.</p>",
+        "ListTagsForResourceResult$nextToken": "<p>The next token for subsequent requests. </p>",
+        "Model$eventTypeName": "<p>The name of the event type.</p>",
+        "ModelInputConfiguration$jsonInputTemplate": "<p> Template for constructing the JSON input-data sent to SageMaker. At event-evaluation, the placeholders for variable names in the template will be replaced with the variable values before being sent to SageMaker. </p>",
+        "ModelInputConfiguration$csvInputTemplate": "<p> Template for constructing the CSV input-data sent to SageMaker. At event-evaluation, the placeholders for variable-names in the template will be replaced with the variable values before being sent to SageMaker. </p>",
+        "ModelPredictionMap$key": null,
+        "ModelVersionDetail$status": "<p>The status of the model version.</p>",
+        "NameList$member": null,
+        "NonEmptyListOfStrings$member": null,
+        "PutExternalModelRequest$invokeModelEndpointRoleArn": "<p>The IAM role used to invoke the model endpoint.</p>",
+        "ResourceNotFoundException$message": null,
+        "RuleResult$ruleId": "<p>The rule ID that was matched, based on the rule execution mode.</p>",
+        "ThrottlingException$message": null,
+        "UpdateModelVersionResult$status": "<p>The status of the updated model version.</p>",
+        "UpdateVariableRequest$name": "<p>The name of the variable.</p>",
+        "UpdateVariableRequest$defaultValue": "<p>The new default value of the variable.</p>",
+        "UpdateVariableRequest$description": "<p>The new description.</p>",
+        "UpdateVariableRequest$variableType": "<p>The variable type. For more information see <a href=\"https://docs.aws.amazon.com/frauddetector/latest/ug/create-a-variable.html#variable-types\">Variable types</a>.</p>",
+        "ValidationException$message": null,
+        "Variable$name": "<p>The name of the variable.</p>",
+        "Variable$defaultValue": "<p>The default value of the variable.</p>",
+        "Variable$description": "<p>The description of the variable. </p>",
+        "Variable$variableType": "<p>The variable type of the variable.</p> <p>Valid Values: <code>AUTH_CODE | AVS | BILLING_ADDRESS_L1 | BILLING_ADDRESS_L2 | BILLING_CITY | BILLING_COUNTRY | BILLING_NAME | BILLING_PHONE | BILLING_STATE | BILLING_ZIP | CARD_BIN | CATEGORICAL | CURRENCY_CODE | EMAIL_ADDRESS | FINGERPRINT | FRAUD_LABEL | FREE_FORM_TEXT | IP_ADDRESS | NUMERIC | ORDER_ID | PAYMENT_TYPE | PHONE_NUMBER | PRICE | PRODUCT_CATEGORY | SHIPPING_ADDRESS_L1 | SHIPPING_ADDRESS_L2 | SHIPPING_CITY | SHIPPING_COUNTRY | SHIPPING_NAME | SHIPPING_PHONE | SHIPPING_STATE | SHIPPING_ZIP | USERAGENT </code> </p>",
+        "VariableEntry$name": "<p>The name of the variable.</p>",
+        "VariableEntry$dataType": "<p>The data type of the variable.</p>",
+        "VariableEntry$dataSource": "<p>The data source of the variable.</p>",
+        "VariableEntry$defaultValue": "<p>The default value of the variable.</p>",
+        "VariableEntry$description": "<p>The description of the variable.</p>",
+        "VariableEntry$variableType": "<p>The type of the variable. For more information see <a href=\"https://docs.aws.amazon.com/frauddetector/latest/ug/create-a-variable.html#variable-types\">Variable types</a>.</p> <p>Valid Values: <code>AUTH_CODE | AVS | BILLING_ADDRESS_L1 | BILLING_ADDRESS_L2 | BILLING_CITY | BILLING_COUNTRY | BILLING_NAME | BILLING_PHONE | BILLING_STATE | BILLING_ZIP | CARD_BIN | CATEGORICAL | CURRENCY_CODE | EMAIL_ADDRESS | FINGERPRINT | FRAUD_LABEL | FREE_FORM_TEXT | IP_ADDRESS | NUMERIC | ORDER_ID | PAYMENT_TYPE | PHONE_NUMBER | PRICE | PRODUCT_CATEGORY | SHIPPING_ADDRESS_L1 | SHIPPING_ADDRESS_L2 | SHIPPING_CITY | SHIPPING_COUNTRY | SHIPPING_NAME | SHIPPING_PHONE | SHIPPING_STATE | SHIPPING_ZIP | USERAGENT </code> </p>",
+        "labelMapper$key": null
+      }
+    },
+    "tagKey": {
+      "base": null,
+      "refs": {
+        "Tag$key": "<p>A tag key.</p>",
+        "tagKeyList$member": null
+      }
+    },
+    "tagKeyList": {
+      "base": null,
+      "refs": {
+        "UntagResourceRequest$tagKeys": "<p>The resource ARN.</p>"
+      }
+    },
+    "tagList": {
+      "base": null,
+      "refs": {
+        "BatchCreateVariableRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "CreateDetectorVersionRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "CreateModelRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "CreateModelVersionRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "CreateRuleRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "CreateVariableRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "ListTagsForResourceResult$tags": "<p>A collection of key and value pairs.</p>",
+        "PutDetectorRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "PutEntityTypeRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "PutEventTypeRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "PutExternalModelRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "PutLabelRequest$tags": "<p/>",
+        "PutOutcomeRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "TagResourceRequest$tags": "<p>The tags to assign to the resource.</p>",
+        "UpdateModelVersionRequest$tags": "<p>A collection of key and value pairs.</p>",
+        "UpdateRuleVersionRequest$tags": "<p>The tags to assign to the rule version.</p>"
+      }
+    },
+    "tagValue": {
+      "base": null,
+      "refs": {
+        "Tag$value": "<p>A value assigned to a tag key.</p>"
+      }
+    },
+    "time": {
+      "base": null,
+      "refs": {
+        "Detector$lastUpdatedTime": "<p>Timestamp of when the detector was last updated.</p>",
+        "Detector$createdTime": "<p>Timestamp of when the detector was created.</p>",
+        "DetectorVersionSummary$lastUpdatedTime": "<p>Timestamp of when the detector version was last updated.</p>",
+        "EntityType$lastUpdatedTime": "<p>Timestamp of when the entity type was last updated.</p>",
+        "EntityType$createdTime": "<p>Timestamp of when the entity type was created.</p>",
+        "EventType$lastUpdatedTime": "<p>Timestamp of when the event type was last updated.</p>",
+        "EventType$createdTime": "<p>Timestamp of when the event type was created.</p>",
+        "ExternalModel$lastUpdatedTime": "<p>Timestamp of when the model was last updated.</p>",
+        "ExternalModel$createdTime": "<p>Timestamp of when the model was last created.</p>",
+        "GetDetectorVersionResult$lastUpdatedTime": "<p>The timestamp when the detector version was last updated. </p>",
+        "GetDetectorVersionResult$createdTime": "<p>The timestamp when the detector version was created. </p>",
+        "Label$lastUpdatedTime": "<p>Timestamp of when the label was last updated.</p>",
+        "Label$createdTime": "<p>Timestamp of when the event type was created.</p>",
+        "Model$createdTime": "<p>Timestamp of when the model was created.</p>",
+        "Model$lastUpdatedTime": "<p>Timestamp of last time the model was updated.</p>",
+        "ModelVersionDetail$lastUpdatedTime": "<p>The timestamp when the model was last updated.</p>",
+        "ModelVersionDetail$createdTime": "<p>The timestamp when the model was created.</p>",
+        "Outcome$lastUpdatedTime": "<p>The timestamp when the outcome was last updated.</p>",
+        "Outcome$createdTime": "<p>The timestamp when the outcome was created.</p>",
+        "RuleDetail$lastUpdatedTime": "<p>Timestamp of the last time the rule was updated.</p>",
+        "RuleDetail$createdTime": "<p>The timestamp of when the rule was created.</p>",
+        "Variable$lastUpdatedTime": "<p>The time when variable was last updated.</p>",
+        "Variable$createdTime": "<p>The time when the variable was created.</p>"
+      }
+    },
+    "variableName": {
+      "base": null,
+      "refs": {
+        "EventVariableMap$key": null
+      }
+    },
+    "variableValue": {
+      "base": null,
+      "refs": {
+        "EventVariableMap$value": null
+      }
+    },
+    "wholeNumberVersionString": {
+      "base": null,
+      "refs": {
+        "DeleteDetectorVersionRequest$detectorVersionId": "<p>The ID of the detector version to delete.</p>",
+        "GetDetectorVersionRequest$detectorVersionId": "<p>The detector version ID.</p>",
+        "GetDetectorVersionResult$detectorVersionId": "<p>The detector version ID.</p>",
+        "GetEventPredictionRequest$detectorVersionId": "<p>The detector version ID.</p>",
+        "GetRulesRequest$ruleVersion": "<p>The rule version.</p>",
+        "Rule$ruleVersion": "<p>The rule version.</p>",
+        "RuleDetail$ruleVersion": "<p>The rule version.</p>",
+        "UpdateDetectorVersionMetadataRequest$detectorVersionId": "<p>The detector version ID. </p>",
+        "UpdateDetectorVersionRequest$detectorVersionId": "<p>The detector version ID. </p>",
+        "UpdateDetectorVersionStatusRequest$detectorVersionId": "<p>The detector version ID. </p>",
+        "UpdateModelVersionRequest$majorVersionNumber": "<p>The major version number.</p>"
+      }
+    }
+  }
+}

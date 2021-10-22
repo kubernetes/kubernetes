@@ -1,0 +1,74 @@
+parameters:
+  - name: Paths
+    type: object
+    default: []
+  - name: Repositories
+    type: object
+    default:
+      - Name: $(Build.Repository.Name)
+        Commitish: $(Build.SourceVersion)
+        WorkingDirectory: $(System.DefaultWorkingDirectory)
+  - name: SkipDefaultCheckout
+    type: boolean
+    default: false
+
+steps:
+  - ${{ if not(parameters.SkipDefaultCheckout) }}:
+    - checkout: none
+
+  - task: PowerShell@2
+    displayName: 'Sparse checkout repositories'
+    inputs:
+      targetType: inline
+      # Define this inline, because of the chicken/egg problem with loading a script when nothing
+      # has been checked out yet.
+      script: |
+        function SparseCheckout([Array]$paths, [Hashtable]$repository)
+        {
+            $paths = $paths -Join ' '
+
+            $dir = $repository.WorkingDirectory
+            if (!$dir) {
+              $dir = "./$($repository.Name)"
+            }
+            New-Item $dir -ItemType Directory -Force
+            Push-Location $dir
+
+            if (Test-Path .git/info/sparse-checkout) {
+              $hasInitialized = $true
+              Write-Host "Repository $($repository.Name) has already been initialized. Skipping this step."
+            } else {
+              Write-Host "Repository $($repository.Name) is being initialized."
+              git clone --no-checkout --filter=tree:0 git://github.com/$($repository.Name) .
+              git sparse-checkout init
+              git sparse-checkout set eng
+            }
+
+            $gitsparsecmd = "git sparse-checkout add $paths"
+            Write-Host $gitsparsecmd
+            Invoke-Expression -Command $gitsparsecmd
+
+            Write-Host "Set sparse checkout paths to:"
+            Get-Content .git/info/sparse-checkout
+
+            # sparse-checkout commands after initial checkout will auto-checkout again
+            if (!$hasInitialized) {
+              Write-Host "git checkout $($repository.Commitish)"
+              git checkout $($repository.Commitish)  # this will use the default branch if repo.Commitish is empty
+            } else {
+              Write-Host "Skipping checkout as repo has already been initialized"
+            }
+
+            Pop-Location
+        }
+
+        # Paths may be sourced as a yaml object literal OR a dynamically generated variable json string.
+        # If the latter, convertToJson will wrap the 'string' in quotes, so remove them.
+        $paths = '${{ convertToJson(parameters.Paths) }}'.Trim('"') | ConvertFrom-Json
+        # Replace windows backslash paths, as Azure Pipelines default directories are sometimes formatted like 'D:\a\1\s'
+        $repositories = '${{ convertToJson(parameters.Repositories) }}' -replace '\\', '/' | ConvertFrom-Json -AsHashtable
+        foreach ($repo in $Repositories) {
+          SparseCheckout $paths $repo
+        }
+      pwsh: true
+      workingDirectory: $(System.DefaultWorkingDirectory)

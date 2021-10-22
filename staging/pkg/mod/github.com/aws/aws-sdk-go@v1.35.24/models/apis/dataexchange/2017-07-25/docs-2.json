@@ -1,0 +1,595 @@
+{
+  "version" : "2.0",
+  "service" : "<p>This is the API reference for AWS Data Exchange.</p>",
+  "operations" : {
+    "CancelJob" : "<p>This operation cancels a job. Jobs can be cancelled only when they are in the WAITING state.</p>",
+    "CreateDataSet" : "<p>This operation creates a data set.</p>",
+    "CreateJob" : "<p>This operation creates a job.</p>",
+    "CreateRevision" : "<p>This operation creates a revision for a data set.</p>",
+    "DeleteAsset" : "<p>This operation deletes an asset.</p>",
+    "DeleteDataSet" : "<p>This operation deletes a data set.</p>",
+    "DeleteRevision" : "<p>This operation deletes a revision.</p>",
+    "GetAsset" : "<p>This operation returns information about an asset.</p>",
+    "GetDataSet" : "<p>This operation returns information about a data set.</p>",
+    "GetJob" : "<p>This operation returns information about a job.</p>",
+    "GetRevision" : "<p>This operation returns information about a revision.</p>",
+    "ListDataSetRevisions" : "<p>This operation lists a data set's revisions sorted by CreatedAt in descending order.</p>",
+    "ListDataSets" : "<p>This operation lists your data sets. When listing by origin OWNED, results are sorted by CreatedAt in descending order. When listing by origin ENTITLED, there is no order and the maxResults parameter is ignored.</p>",
+    "ListJobs" : "<p>This operation lists your jobs sorted by CreatedAt in descending order.</p>",
+    "ListRevisionAssets" : "<p>This operation lists a revision's assets sorted alphabetically in descending order.</p>",
+    "ListTagsForResource" : "<p>This operation lists the tags on the resource.</p>",
+    "StartJob" : "<p>This operation starts a job.</p>",
+    "TagResource" : "<p>This operation tags a resource.</p>",
+    "UntagResource" : "<p>This operation removes one or more tags from a resource.</p>",
+    "UpdateAsset" : "<p>This operation updates an asset.</p>",
+    "UpdateDataSet" : "<p>This operation updates a data set.</p>",
+    "UpdateRevision" : "<p>This operation updates a revision.</p>"
+  },
+  "shapes" : {
+    "AccessDeniedException" : {
+      "base" : "<p>Access to the resource is denied.</p>",
+      "refs" : { }
+    },
+    "Arn" : {
+      "base" : "<p>An Amazon Resource Name (ARN) that uniquely identifies an AWS resource.</p>",
+      "refs" : {
+        "Asset$Arn" : "<p>The ARN for the asset.</p>",
+        "AssetEntry$Arn" : "<p>The ARN for the asset.</p>",
+        "DataSet$Arn" : "<p>The ARN for the data set.</p>",
+        "DataSetEntry$Arn" : "<p>The ARN for the data set.</p>",
+        "Job$Arn" : "<p>The ARN for the job.</p>",
+        "JobEntry$Arn" : "<p>The ARN for the job.</p>",
+        "Revision$Arn" : "<p>The ARN for the revision.</p>",
+        "RevisionEntry$Arn" : "<p>The ARN for the revision.</p>",
+        "TaggedDataSet$Arn" : "<p>The ARN for the data set.</p>",
+        "TaggedRevision$Arn" : "<p>The ARN for the revision</p>"
+      }
+    },
+    "Asset" : {
+      "base" : "<p>An asset in AWS Data Exchange is a piece of data that can be stored as an S3 object. The asset can be a structured data file, an image file, or some other data file. When you create an import job for your files, you create an asset in AWS Data Exchange for each of those files.</p>",
+      "refs" : { }
+    },
+    "AssetDestinationEntry" : {
+      "base" : "<p>The destination for the asset.</p>",
+      "refs" : {
+        "ListOfAssetDestinationEntry$member" : null
+      }
+    },
+    "AssetDetails" : {
+      "base" : null,
+      "refs" : {
+        "Asset$AssetDetails" : "<p>Information about the asset, including its size.</p>",
+        "AssetEntry$AssetDetails" : "<p>Information about the asset, including its size.</p>"
+      }
+    },
+    "AssetEntry" : {
+      "base" : "<p>An asset in AWS Data Exchange is a piece of data that can be stored as an S3 object. The asset can be a structured data file, an image file, or some other data file. When you create an import job for your files, you create an asset in AWS Data Exchange for each of those files.</p>",
+      "refs" : {
+        "ListOfAssetEntry$member" : null
+      }
+    },
+    "AssetName" : {
+      "base" : "<p>The name of the asset. When importing from Amazon S3, the S3 object key is used as the asset name. When exporting to Amazon S3, the asset name is used as default target S3 object key.</p>",
+      "refs" : {
+        "Asset$Name" : "<p>The name of the asset When importing from Amazon S3, the S3 object key is used as the asset name. When exporting to Amazon S3, the asset name is used as default target S3 object key.</p>",
+        "AssetEntry$Name" : "<p>The name of the asset. When importing from Amazon S3, the S3 object key is used as the asset name. When exporting to Amazon S3, the asset name is used as default target S3 object key.</p>",
+        "ImportAssetFromSignedUrlJobErrorDetails$AssetName" : null,
+        "ImportAssetFromSignedUrlRequestDetails$AssetName" : "<p>The name of the asset. When importing from Amazon S3, the S3 object key is used as the asset name.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$AssetName" : "<p>The name for the asset associated with this import response.</p>",
+        "UpdateAssetRequest$Name" : "<p>The name of the asset. When importing from Amazon S3, the S3 object key is used as the asset name. When exporting to Amazon S3, the asset name is used as default target S3 object key.</p>"
+      }
+    },
+    "AssetSourceEntry" : {
+      "base" : "<p>The source of the assets.</p>",
+      "refs" : {
+        "ListOfAssetSourceEntry$member" : null
+      }
+    },
+    "AssetType" : {
+      "base" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+      "refs" : {
+        "Asset$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+        "AssetEntry$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+        "CreateDataSetRequest$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+        "DataSet$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+        "DataSetEntry$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>",
+        "TaggedDataSet$AssetType" : "<p>The type of file your data is stored in. Currently, the supported asset type is S3_SNAPSHOT.</p>"
+      }
+    },
+    "Code" : {
+      "base" : null,
+      "refs" : {
+        "JobError$Code" : "The code for the job error."
+      }
+    },
+    "ConflictException" : {
+      "base" : "<p>The request couldn't be completed because it conflicted with the current state of the resource.</p>",
+      "refs" : { }
+    },
+    "CreateDataSetRequest" : {
+      "base" : "<p>A request to create a data set that contains one or more revisions.</p>",
+      "refs" : { }
+    },
+    "CreateJobRequest" : {
+      "base" : "<p>The CreateJob request. AWS Data Exchange Jobs are asynchronous import or export operations used to create or copy assets. A data set owner can both import and export as they see fit. Someone with an entitlement to a data set can only export. Jobs are deleted 90 days after they are created. Created jobs must be started with the StartJob operation.</p>",
+      "refs" : { }
+    },
+    "CreateRevisionRequest" : {
+      "base" : "<p>Creates a revision for a data set. When they're created, revisions are not published to products, and therefore are not available to subscribers. To publish a revision to a data set in a product, the revision must first be finalized.</p>",
+      "refs" : { }
+    },
+    "DataSet" : {
+      "base" : "<p>A data set is an AWS resource with one or more revisions.</p>",
+      "refs" : { }
+    },
+    "DataSetEntry" : {
+      "base" : "<p>A data set is an AWS resource with one or more revisions.</p>",
+      "refs" : {
+        "ListOfDataSetEntry$member" : null
+      }
+    },
+    "Description" : {
+      "base" : "<p>A description of a resource.</p>",
+      "refs" : {
+        "CreateDataSetRequest$Description" : "<p>A description for the data set. This value can be up to 16,348 characters long.</p>",
+        "DataSet$Description" : "<p>The description for the data set.</p>",
+        "DataSetEntry$Description" : "<p>The description for the data set.</p>",
+        "TaggedDataSet$Description" : "<p>The description for the data set.</p>",
+        "UpdateDataSetRequest$Description" : "<p>The description for the data set.</p>"
+      }
+    },
+    "Details" : {
+      "base" : null,
+      "refs" : {
+        "JobError$Details" : null
+      }
+    },
+    "ExportAssetToSignedUrlRequestDetails" : {
+      "base" : "<p>Details of the operation to be performed by the job.</p>",
+      "refs" : {
+        "RequestDetails$ExportAssetToSignedUrl" : "<p>Details about the export to signed URL request.</p>"
+      }
+    },
+    "ExportAssetToSignedUrlResponseDetails" : {
+      "base" : "<p>The details of the export to signed URL response.</p>",
+      "refs" : {
+        "ResponseDetails$ExportAssetToSignedUrl" : "<p>Details for the export to signed URL response.</p>"
+      }
+    },
+    "ExportAssetsToS3RequestDetails" : {
+      "base" : "<p>Details of the operation to be performed by the job.</p>",
+      "refs" : {
+        "RequestDetails$ExportAssetsToS3" : "<p>Details about the export to Amazon S3 request.</p>"
+      }
+    },
+    "ExportAssetsToS3ResponseDetails" : {
+      "base" : "<p>Details about the export to Amazon S3 response.</p>",
+      "refs" : {
+        "ResponseDetails$ExportAssetsToS3" : "<p>Details for the export to Amazon S3 response.</p>"
+      }
+    },
+    "ExportServerSideEncryption" : {
+      "base" : "<p>Encryption configuration of the export job. Includes the encryption type as well as the AWS KMS key. The KMS key is only necessary if you chose the KMS encryption type.</p>",
+      "refs" : {
+        "ExportAssetsToS3RequestDetails$Encryption" : "<p>Encryption configuration for the export job.</p>",
+        "ExportAssetsToS3ResponseDetails$Encryption" : "<p>Encryption configuration of the export job.</p>"
+      }
+    },
+    "Id" : {
+      "base" : "<p>A unique identifier.</p>",
+      "refs" : {
+        "Asset$DataSetId" : "<p>The unique identifier for the data set associated with this asset.</p>",
+        "Asset$Id" : "<p>The unique identifier for the asset.</p>",
+        "Asset$RevisionId" : "<p>The unique identifier for the revision associated with this asset.</p>",
+        "Asset$SourceId" : "<p>The asset ID of the owned asset corresponding to the entitled asset being viewed. This parameter is returned when an asset owner is viewing the entitled copy of its owned asset.</p>",
+        "AssetDestinationEntry$AssetId" : "<p>The unique identifier for the asset.</p>",
+        "AssetEntry$DataSetId" : "<p>The unique identifier for the data set associated with this asset.</p>",
+        "AssetEntry$Id" : "<p>The unique identifier for the asset.</p>",
+        "AssetEntry$RevisionId" : "<p>The unique identifier for the revision associated with this asset.</p>",
+        "AssetEntry$SourceId" : "<p>The asset ID of the owned asset corresponding to the entitled asset being viewed. This parameter is returned when an asset owner is viewing the entitled copy of its owned asset.</p>",
+        "DataSet$Id" : "<p>The unique identifier for the data set.</p>",
+        "DataSet$SourceId" : "<p>The data set ID of the owned data set corresponding to the entitled data set being viewed. This parameter is returned when a data set owner is viewing the entitled copy of its owned data set.</p>",
+        "DataSetEntry$Id" : "<p>The unique identifier for the data set.</p>",
+        "DataSetEntry$SourceId" : "<p>The data set ID of the owned data set corresponding to the entitled data set being viewed. This parameter is returned when a data set owner is viewing the entitled copy of its owned data set.</p>",
+        "ExportAssetToSignedUrlRequestDetails$AssetId" : "<p>The unique identifier for the asset that is exported to a signed URL.</p>",
+        "ExportAssetToSignedUrlRequestDetails$DataSetId" : "<p>The unique identifier for the data set associated with this export job.</p>",
+        "ExportAssetToSignedUrlRequestDetails$RevisionId" : "<p>The unique identifier for the revision associated with this export request.</p>",
+        "ExportAssetToSignedUrlResponseDetails$AssetId" : "<p>The unique identifier for the asset associated with this export job.</p>",
+        "ExportAssetToSignedUrlResponseDetails$DataSetId" : "<p>The unique identifier for the data set associated with this export job.</p>",
+        "ExportAssetToSignedUrlResponseDetails$RevisionId" : "<p>The unique identifier for the revision associated with this export response.</p>",
+        "ExportAssetsToS3RequestDetails$DataSetId" : "<p>The unique identifier for the data set associated with this export job.</p>",
+        "ExportAssetsToS3RequestDetails$RevisionId" : "<p>The unique identifier for the revision associated with this export request.</p>",
+        "ExportAssetsToS3ResponseDetails$DataSetId" : "<p>The unique identifier for the data set associated with this export job.</p>",
+        "ExportAssetsToS3ResponseDetails$RevisionId" : "<p>The unique identifier for the revision associated with this export response.</p>",
+        "ImportAssetFromSignedUrlRequestDetails$DataSetId" : "<p>The unique identifier for the data set associated with this import job.</p>",
+        "ImportAssetFromSignedUrlRequestDetails$RevisionId" : "<p>The unique identifier for the revision associated with this import request.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$DataSetId" : "<p>The unique identifier for the data set associated with this import job.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$RevisionId" : "<p>The unique identifier for the revision associated with this import response.</p>",
+        "ImportAssetsFromS3RequestDetails$DataSetId" : "<p>The unique identifier for the data set associated with this import job.</p>",
+        "ImportAssetsFromS3RequestDetails$RevisionId" : "<p>The unique identifier for the revision associated with this import request.</p>",
+        "ImportAssetsFromS3ResponseDetails$DataSetId" : "<p>The unique identifier for the data set associated with this import job.</p>",
+        "ImportAssetsFromS3ResponseDetails$RevisionId" : "<p>The unique identifier for the revision associated with this import response.</p>",
+        "Job$Id" : "<p>The unique identifier for the job.</p>",
+        "JobEntry$Id" : "<p>The unique identifier for the job.</p>",
+        "Revision$DataSetId" : "<p>The unique identifier for the data set associated with this revision.</p>",
+        "Revision$Id" : "<p>The unique identifier for the revision.</p>",
+        "Revision$SourceId" : "<p>The revision ID of the owned revision corresponding to the entitled revision being viewed. This parameter is returned when a revision owner is viewing the entitled copy of its owned revision.</p>",
+        "RevisionEntry$DataSetId" : "<p>The unique identifier for the data set associated with this revision.</p>",
+        "RevisionEntry$Id" : "<p>The unique identifier for the revision.</p>",
+        "RevisionEntry$SourceId" : "<p>The revision ID of the owned revision corresponding to the entitled revision being viewed. This parameter is returned when a revision owner is viewing the entitled copy of its owned revision.</p>",
+        "TaggedDataSet$Id" : "<p>The unique identifier for the data set.</p>",
+        "TaggedDataSet$SourceId" : "<p>The data set ID of the owned data set corresponding to the entitled data set being viewed. This parameter is returned when a data set owner is viewing the entitled copy of its owned data set.</p>",
+        "TaggedRevision$DataSetId" : "<p>The unique identifier for the data set associated with this revision.</p>",
+        "TaggedRevision$Id" : "<p>The unique identifier for the revision.</p>",
+        "TaggedRevision$SourceId" : "<p>The revision ID of the owned revision corresponding to the entitled revision being viewed. This parameter is returned when a revision owner is viewing the entitled copy of its owned revision.</p>"
+      }
+    },
+    "ImportAssetFromSignedUrlJobErrorDetails" : {
+      "base" : null,
+      "refs" : {
+        "Details$ImportAssetFromSignedUrlJobErrorDetails" : null
+      }
+    },
+    "ImportAssetFromSignedUrlRequestDetails" : {
+      "base" : "<p>Details of the operation to be performed by the job.</p>",
+      "refs" : {
+        "RequestDetails$ImportAssetFromSignedUrl" : "<p>Details about the import from signed URL request.</p>"
+      }
+    },
+    "ImportAssetFromSignedUrlResponseDetails" : {
+      "base" : "<p>The details in the response for an import request, including the signed URL and other information.</p>",
+      "refs" : {
+        "ResponseDetails$ImportAssetFromSignedUrl" : "<p>Details for the import from signed URL response.</p>"
+      }
+    },
+    "ImportAssetsFromS3RequestDetails" : {
+      "base" : "<p>Details of the operation to be performed by the job.</p>",
+      "refs" : {
+        "RequestDetails$ImportAssetsFromS3" : "<p>Details about the import from Amazon S3 request.</p>"
+      }
+    },
+    "ImportAssetsFromS3ResponseDetails" : {
+      "base" : "<p>Details from an import from Amazon S3 response.</p>",
+      "refs" : {
+        "ResponseDetails$ImportAssetsFromS3" : "<p>Details for the import from Amazon S3 response.</p>"
+      }
+    },
+    "InternalServerException" : {
+      "base" : "An exception occurred with the service.",
+      "refs" : { }
+    },
+    "Job" : {
+      "base" : "<p>AWS Data Exchange jobs are asynchronous import or export operations used to create or copy assets. Jobs are deleted 90 days after they are created.</p>",
+      "refs" : { }
+    },
+    "JobEntry" : {
+      "base" : "AWS Data Exchange Jobs are asynchronous import or export operations used to create or copy assets. A data set owner can both import and export as they see fit. Someone with an entitlement to a data set can only export. Jobs are deleted 90 days after they are created.",
+      "refs" : {
+        "ListOfJobEntry$member" : null
+      }
+    },
+    "JobError" : {
+      "base" : "An error that occurred with the job request.",
+      "refs" : {
+        "ListOfJobError$member" : null
+      }
+    },
+    "JobErrorLimitName" : {
+      "base" : "The name of the limit that was reached.",
+      "refs" : {
+        "JobError$LimitName" : "<p>The name of the limit that was reached.</p>"
+      }
+    },
+    "JobErrorResourceTypes" : {
+      "base" : "The types of resource which the job error can apply to.",
+      "refs" : {
+        "JobError$ResourceType" : "The type of resource related to the error."
+      }
+    },
+    "LimitName" : {
+      "base" : null,
+      "refs" : {
+        "ServiceQuotaExceededException$LimitName" : "<p>The name of the quota that was exceeded.</p>"
+      }
+    },
+    "ListOfAssetDestinationEntry" : {
+      "base" : "<p>The destination where the assets will be exported.</p>",
+      "refs" : {
+        "ExportAssetsToS3RequestDetails$AssetDestinations" : "<p>The destination for the asset.</p>",
+        "ExportAssetsToS3ResponseDetails$AssetDestinations" : "<p>The destination in Amazon S3 where the asset is exported.</p>"
+      }
+    },
+    "ListOfAssetSourceEntry" : {
+      "base" : "<p>The list of sources for the assets.</p>",
+      "refs" : {
+        "Details$ImportAssetsFromS3JobErrorDetails" : null,
+        "ImportAssetsFromS3RequestDetails$AssetSources" : "<p>Is a list of S3 bucket and object key pairs.</p>",
+        "ImportAssetsFromS3ResponseDetails$AssetSources" : "<p>Is a list of Amazon S3 bucket and object key pairs.</p>"
+      }
+    },
+    "ListOfAssets" : {
+      "base" : "<p>The asset objects listed by the request.</p>",
+      "refs" : { }
+    },
+    "ListOfDataSets" : {
+      "base" : "<p>The data set objects listed by the request.</p>",
+      "refs" : { }
+    },
+    "ListOfJobs" : {
+      "base" : "<p>The token value retrieved from a previous call to access the next page of results.</p>",
+      "refs" : { }
+    },
+    "ListOfRevisions" : {
+      "base" : "<p>The revision objects listed by the request.</p>",
+      "refs" : { }
+    },
+    "Name" : {
+      "base" : "The name of the model.",
+      "refs" : {
+        "CreateDataSetRequest$Name" : "<p>The name of the data set.</p>",
+        "DataSet$Name" : "<p>The name of the data set.</p>",
+        "DataSetEntry$Name" : "<p>The name of the data set.</p>",
+        "TaggedDataSet$Name" : "<p>The name of the data set.</p>",
+        "UpdateDataSetRequest$Name" : "<p>The name of the data set.</p>"
+      }
+    },
+    "NextToken" : {
+      "base" : "<p>The token value retrieved from a previous call to access the next page of results.</p>",
+      "refs" : {
+        "ListOfAssets$NextToken" : "<p>The token value retrieved from a previous call to access the next page of results.</p>",
+        "ListOfDataSets$NextToken" : "<p>The token value retrieved from a previous call to access the next page of results.</p>",
+        "ListOfJobs$NextToken" : "<p>The token value retrieved from a previous call to access the next page of results.</p>",
+        "ListOfRevisions$NextToken" : "<p>The token value retrieved from a previous call to access the next page of results.</p>"
+      }
+    },
+    "Origin" : {
+      "base" : "<p>A property that defines the data set as OWNED by the account (for providers) or ENTITLED to the account (for subscribers). When an owned data set is published in a product, AWS Data Exchange creates a copy of the data set. Subscribers can access that copy of the data set as an entitled data set.</p>",
+      "refs" : {
+        "DataSet$Origin" : "<p>A property that defines the data set as OWNED by the account (for providers) or ENTITLED to the account (for subscribers).</p>",
+        "DataSetEntry$Origin" : "<p>A property that defines the data set as OWNED by the account (for providers) or ENTITLED to the account (for subscribers).</p>",
+        "TaggedDataSet$Origin" : "<p>A property that defines the data set as OWNED by the account (for providers) or ENTITLED to the account (for subscribers).</p>"
+      }
+    },
+    "OriginDetails" : {
+      "base" : null,
+      "refs" : {
+        "DataSet$OriginDetails" : "<p>If the origin of this data set is ENTITLED, includes the details for the product on AWS Marketplace.</p>",
+        "DataSetEntry$OriginDetails" : "<p>If the origin of this data set is ENTITLED, includes the details for the product on AWS Marketplace.</p>",
+        "TaggedDataSet$OriginDetails" : "<p>If the origin of this data set is ENTITLED, includes the details for the product on AWS Marketplace.</p>"
+      }
+    },
+    "RequestDetails" : {
+      "base" : "<p>The details for the request.</p>",
+      "refs" : {
+        "CreateJobRequest$Details" : "<p>The details for the CreateJob request.</p>"
+      }
+    },
+    "ResourceNotFoundException" : {
+      "base" : "<p>The resource couldn't be found.</p>",
+      "refs" : { }
+    },
+    "ResourceType" : {
+      "base" : null,
+      "refs" : {
+        "ConflictException$ResourceType" : "<p>The type of the resource with the conflict.</p>",
+        "ResourceNotFoundException$ResourceType" : "<p>The type of resource that couldn't be found.</p>"
+      }
+    },
+    "ResponseDetails" : {
+      "base" : "<p>Details for the response.</p>",
+      "refs" : {
+        "Job$Details" : "<p>Details about the job.</p>",
+        "JobEntry$Details" : "<p>Details of the operation to be performed by the job, such as export destination details or import source details.</p>"
+      }
+    },
+    "Revision" : {
+      "base" : "<p>A revision is a container for one or more assets.</p>",
+      "refs" : { }
+    },
+    "RevisionEntry" : {
+      "base" : "<p>A revision is a container for one or more assets.</p>",
+      "refs" : {
+        "ListOfRevisionEntry$member" : null
+      }
+    },
+    "S3SnapshotAsset" : {
+      "base" : "<p>The S3 object that is the asset.</p>",
+      "refs" : {
+        "AssetDetails$S3SnapshotAsset" : null
+      }
+    },
+    "ServerSideEncryptionTypes" : {
+      "base" : "<p>The types of encryption supported in export jobs to Amazon S3.</p>",
+      "refs" : {
+        "ExportServerSideEncryption$Type" : "<p>The type of server side encryption used for encrypting the objects in Amazon S3.</p>"
+      }
+    },
+    "ServiceLimitExceededException" : {
+      "base" : "<p>The request has exceeded the quotas imposed by the service.</p>",
+      "refs" : { }
+    },
+    "ServiceQuotaExceededException" : {
+      "base" : "<p>The request has exceeded the quotas imposed by the service.</p>",
+      "refs" : { }
+    },
+    "State" : {
+      "base" : null,
+      "refs" : {
+        "Job$State" : "<p>The state of the job.</p>",
+        "JobEntry$State" : "<p>The state of the job.</p>"
+      }
+    },
+    "TaggedDataSet" : {
+      "base" : "<p>A data set is an AWS resource with one or more revisions.</p>",
+      "refs" : { }
+    },
+    "TaggedRevision" : {
+      "base" : "<p>A revision tag is an optional label that you can assign to a revision when you create it. Each tag consists of a key and an optional value, both of which you define. When you use tagging, you can also use tag-based access control in IAM policies to control access to these data sets and revisions.</p>",
+      "refs" : { }
+    },
+    "TagsModel" : {
+      "base" : "You can assign metadata to your AWS Data Exchange resources in the form of tags. Each tag is a label that consists of a customer-defined key and an optional value that can make it easier to manage, search for, and filter resources.",
+      "refs" : { }
+    },
+    "ThrottlingException" : {
+      "base" : "<p>The limit on the number of requests per second was exceeded.</p>",
+      "refs" : { }
+    },
+    "Timestamp" : {
+      "base" : "<p>Dates and times in AWS Data Exchange are recorded in ISO 8601 format.</p>",
+      "refs" : {
+        "Asset$CreatedAt" : "<p>The date and time that the asset was created, in ISO 8601 format.</p>",
+        "Asset$UpdatedAt" : "<p>The date and time that the asset was last updated, in ISO 8601 format.</p>",
+        "AssetEntry$CreatedAt" : "<p>The date and time that the asset was created, in ISO 8601 format.</p>",
+        "AssetEntry$UpdatedAt" : "<p>The date and time that the asset was last updated, in ISO 8601 format.</p>",
+        "DataSet$CreatedAt" : "<p>The date and time that the data set was created, in ISO 8601 format.</p>",
+        "DataSet$UpdatedAt" : "<p>The date and time that the data set was last updated, in ISO 8601 format.</p>",
+        "DataSetEntry$CreatedAt" : "<p>The date and time that the data set was created, in ISO 8601 format.</p>",
+        "DataSetEntry$UpdatedAt" : "<p>The date and time that the data set was last updated, in ISO 8601 format.</p>",
+        "ExportAssetToSignedUrlResponseDetails$SignedUrlExpiresAt" : "<p>The date and time that the signed URL expires, in ISO 8601 format.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$SignedUrlExpiresAt" : "<p>The time and date at which the signed URL expires, in ISO 8601 format.</p>",
+        "Job$CreatedAt" : "<p>The date and time that the job was created, in ISO 8601 format.</p>",
+        "Job$UpdatedAt" : "<p>The date and time that the job was last updated, in ISO 8601 format.</p>",
+        "JobEntry$CreatedAt" : "<p>The date and time that the job was created, in ISO 8601 format.</p>",
+        "JobEntry$UpdatedAt" : "<p>The date and time that the job was last updated, in ISO 8601 format.</p>",
+        "Revision$CreatedAt" : "<p>The date and time that the revision was created, in ISO 8601 format.</p>",
+        "Revision$UpdatedAt" : "<p>The date and time that the revision was last updated, in ISO 8601 format.</p>",
+        "RevisionEntry$CreatedAt" : "<p>The date and time that the revision was created, in ISO 8601 format.</p>",
+        "RevisionEntry$UpdatedAt" : "<p>The date and time that the revision was last updated, in ISO 8601 format.</p>",
+        "TaggedDataSet$CreatedAt" : "<p>The date and time that the data set was created, in ISO 8601 format.</p>",
+        "TaggedDataSet$UpdatedAt" : "<p>The date and time that the data set was last updated, in ISO 8601 format.</p>",
+        "TaggedRevision$CreatedAt" : "<p>The date and time that the revision was created, in ISO 8601 format.</p>",
+        "TaggedRevision$UpdatedAt" : "<p>The date and time that the revision was last updated, in ISO 8601 format.</p>"
+      }
+    },
+    "Type" : {
+      "base" : null,
+      "refs" : {
+        "CreateJobRequest$Type" : "<p>The type of job to be created.</p>",
+        "Job$Type" : "<p>The job type.</p>",
+        "JobEntry$Type" : "<p>The job type.</p>"
+      }
+    },
+    "UpdateAssetRequest" : {
+      "base" : "<p>The request to update an asset.</p>",
+      "refs" : { }
+    },
+    "UpdateDataSetRequest" : {
+      "base" : "<p>The request to update a data set.</p>",
+      "refs" : { }
+    },
+    "UpdateRevisionRequest" : {
+      "base" : "<p>The request to update a revision.</p>",
+      "refs" : { }
+    },
+    "ValidationException" : {
+      "base" : "<p>The request was invalid.</p>",
+      "refs" : { }
+    },
+    "__boolean" : {
+      "base" : null,
+      "refs" : {
+        "Revision$Finalized" : "<p>To publish a revision to a data set in a product, the revision must first be finalized. Finalizing a revision tells AWS Data Exchange that changes to the assets in the revision are complete. After it's in this read-only state, you can publish the revision to your products.</p> <p>Finalized revisions can be published through the AWS Data Exchange console or the AWS Marketplace Catalog API, using the StartChangeSet AWS Marketplace Catalog API action. When using the API, revisions are uniquely identified by their ARN.</p>",
+        "RevisionEntry$Finalized" : "<p>To publish a revision to a data set in a product, the revision must first be finalized. Finalizing a revision tells AWS Data Exchange that your changes to the assets in the revision are complete. After it's in this read-only state, you can publish the revision to your products.</p> <p>Finalized revisions can be published through the AWS Data Exchange console or the AWS Marketplace Catalog API, using the StartChangeSet AWS Marketplace Catalog API action. When using the API, revisions are uniquely identified by their ARN.</p>",
+        "TaggedRevision$Finalized" : "<p>To publish a revision to a data set in a product, the revision must first be finalized. Finalizing a revision tells AWS Data Exchange that your changes to the assets in the revision are complete. After it's in this read-only state, you can publish the revision to your products.</p> <p>Finalized revisions can be published through the AWS Data Exchange console or the AWS Marketplace Catalog API, using the StartChangeSet AWS Marketplace Catalog API action. When using the API, revisions are uniquely identified by their ARN.</p>",
+        "UpdateRevisionRequest$Finalized" : "<p>Finalizing a revision tells AWS Data Exchange that your changes to the assets in the revision are complete. After it's in this read-only state, you can publish the revision to your products.</p>"
+      }
+    },
+    "__double" : {
+      "base" : null,
+      "refs" : {
+        "JobError$LimitValue" : "The value of the exceeded limit.",
+        "ServiceQuotaExceededException$LimitValue" : "<p>The maximum value for the service-specific limit.</p>"
+      }
+    },
+    "__doubleMin0" : {
+      "base" : null,
+      "refs" : {
+        "S3SnapshotAsset$Size" : "<p>The size of the S3 object that is the object.</p>"
+      }
+    },
+    "ListOfAssetEntry" : {
+      "base" : null,
+      "refs" : {
+        "ListOfAssets$Assets" : "<p>The asset objects listed by the request.</p>"
+      }
+    },
+    "ListOfDataSetEntry" : {
+      "base" : null,
+      "refs" : {
+        "ListOfDataSets$DataSets" : "<p>The data set objects listed by the request.</p>"
+      }
+    },
+    "ListOfJobEntry" : {
+      "base" : null,
+      "refs" : {
+        "ListOfJobs$Jobs" : "<p>The jobs listed by the request.</p>"
+      }
+    },
+    "ListOfJobError" : {
+      "base" : null,
+      "refs" : {
+        "Job$Errors" : "<p>The errors associated with jobs.</p>",
+        "JobEntry$Errors" : "<p>Errors for jobs.</p>"
+      }
+    },
+    "ListOfRevisionEntry" : {
+      "base" : null,
+      "refs" : {
+        "ListOfRevisions$Revisions" : "<p>The asset objects listed by the request.</p>"
+      }
+    },
+    "MapOf__string" : {
+      "base" : null,
+      "refs" : {
+        "CreateDataSetRequest$Tags" : "<p>A data set tag is an optional label that you can assign to a data set when you create it. Each tag consists of a key and an optional value, both of which you define. When you use tagging, you can also use tag-based access control in IAM policies to control access to these data sets and revisions.</p>",
+        "CreateRevisionRequest$Tags" : "<p>A revision tag is an optional label that you can assign to a revision when you create it. Each tag consists of a key and an optional value, both of which you define. When you use tagging, you can also use tag-based access control in IAM policies to control access to these data sets and revisions.</p>",
+        "TaggedDataSet$Tags" : "<p>The tags for the data set.</p>",
+        "TaggedRevision$Tags" : "<p>The tags for the revision.</p>",
+        "TagsModel$Tags" : "A label that consists of a customer-defined key and an optional value."
+      }
+    },
+    "__string" : {
+      "base" : null,
+      "refs" : {
+        "AccessDeniedException$Message" : "<p>Access to the resource is denied.</p>",
+        "AssetDestinationEntry$Bucket" : "<p>The S3 bucket that is the destination for the asset.</p>",
+        "AssetDestinationEntry$Key" : "<p>The name of the object in Amazon S3 for the asset.</p>",
+        "AssetSourceEntry$Bucket" : "<p>The S3 bucket that's part of the source of the asset.</p>",
+        "AssetSourceEntry$Key" : "<p>The name of the object in Amazon S3 for the asset.</p>",
+        "ConflictException$Message" : "<p>The request couldn't be completed because it conflicted with the current state of the resource.</p>",
+        "ConflictException$ResourceId" : "<p>The unique identifier for the resource with the conflict.</p>",
+        "ExportAssetToSignedUrlResponseDetails$SignedUrl" : "<p>The signed URL for the export request.</p>",
+        "ExportServerSideEncryption$KmsKeyArn" : "<p>The Amazon Resource Name (ARN) of the the AWS KMS key you want to use to encrypt the Amazon S3 objects. This parameter is required if you choose aws:kms as an encryption type.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$SignedUrl" : "<p>The signed URL.</p>",
+        "InternalServerException$Message" : "The message identifying the service exception that occurred.",
+        "JobError$Message" : "The message related to the job error.",
+        "JobError$ResourceId" : "The unique identifier for the resource related to the error.",
+        "OriginDetails$ProductId" : null,
+        "ResourceNotFoundException$Message" : "<p>The resource couldn't be found.</p>",
+        "ResourceNotFoundException$ResourceId" : "<p>The unique identifier for the resource that couldn't be found.</p>",
+        "ServiceQuotaExceededException$Message" : "<p>The request has exceeded the quotas imposed by the service.</p>",
+        "ThrottlingException$Message" : "<p>The limit on the number of requests per second was exceeded.</p>",
+        "ValidationException$Message" : "<p>The message that informs you about what was invalid about the request.</p>",
+        "MapOf__string$member" : null
+      }
+    },
+    "__stringMin0Max16384" : {
+      "base" : null,
+      "refs" : {
+        "CreateRevisionRequest$Comment" : "<p>An optional comment about the revision.</p>",
+        "Revision$Comment" : "<p>An optional comment about the revision.</p>",
+        "RevisionEntry$Comment" : "<p>An optional comment about the revision.</p>",
+        "TaggedRevision$Comment" : "<p>An optional comment about the revision.</p>",
+        "UpdateRevisionRequest$Comment" : "<p>An optional comment about the revision.</p>"
+      }
+    },
+    "__stringMin24Max24PatternAZaZ094AZaZ092AZaZ093" : {
+      "base" : null,
+      "refs" : {
+        "ImportAssetFromSignedUrlRequestDetails$Md5Hash" : "<p>The Base64-encoded Md5 hash for the asset, used to ensure the integrity of the file at that location.</p>",
+        "ImportAssetFromSignedUrlResponseDetails$Md5Hash" : "<p>The Base64-encoded Md5 hash for the asset, used to ensure the integrity of the file at that location.</p>"
+      }
+    }
+  }
+}

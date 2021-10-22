@@ -1,0 +1,12 @@
+Prior to starting a PR, please make sure you have read our
+[contributor tutorial](https://github.com/gophercloud/gophercloud/tree/master/docs/contributor-tutorial).
+
+Prior to a PR being reviewed, there needs to be a Github issue that the PR
+addresses. Replace the brackets and text below with that issue number.
+
+For #[PUT ISSUE NUMBER HERE]
+
+Links to the line numbers/files in the OpenStack source code that support the
+code in this PR:
+
+[PUT URLS HERE]

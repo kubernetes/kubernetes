@@ -1,0 +1,755 @@
+#data
+Test
+#errors
+(1,4): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "Test"
+
+#data
+<div></div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+
+#data
+<div>Test</div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       "Test"
+
+#data
+<di
+#errors
+(1,3): eof-in-tag-name
+(1,3): expected-doctype-but-got-eof
+#new-errors
+(1:4) eof-in-tag
+#document
+| <html>
+|   <head>
+|   <body>
+
+#data
+<div>Hello</div>
+<script>
+console.log("PASS");
+</script>
+<div>Bye</div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       "Hello"
+|     "
+"
+|     <script>
+|       "
+console.log("PASS");
+"
+|     "
+"
+|     <div>
+|       "Bye"
+
+#data
+<div foo="bar">Hello</div>
+#errors
+(1,15): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       foo="bar"
+|       "Hello"
+
+#data
+<div>Hello</div>
+<script>
+console.log("FOO<span>BAR</span>BAZ");
+</script>
+<div>Bye</div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       "Hello"
+|     "
+"
+|     <script>
+|       "
+console.log("FOO<span>BAR</span>BAZ");
+"
+|     "
+"
+|     <div>
+|       "Bye"
+
+#data
+<foo bar="baz"></foo><potato quack="duck"></potato>
+#errors
+(1,15): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <foo>
+|       bar="baz"
+|     <potato>
+|       quack="duck"
+
+#data
+<foo bar="baz"><potato quack="duck"></potato></foo>
+#errors
+(1,15): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <foo>
+|       bar="baz"
+|       <potato>
+|         quack="duck"
+
+#data
+<foo></foo bar="baz"><potato></potato quack="duck">
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,21): attributes-in-end-tag
+(1,51): attributes-in-end-tag
+#new-errors
+(1:21) end-tag-with-attributes
+(1:51) end-tag-with-attributes
+#document
+| <html>
+|   <head>
+|   <body>
+|     <foo>
+|     <potato>
+
+#data
+</ tttt>
+#errors
+(1,2): expected-closing-tag-but-got-char
+(1,8): expected-doctype-but-got-eof
+#new-errors
+(1:3) invalid-first-character-of-tag-name
+#document
+| <!--  tttt -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+<div FOO ><img><img></div>
+#errors
+(1,10): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       foo=""
+|       <img>
+|       <img>
+
+#data
+<p>Test</p<p>Test2</p>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,13): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "TestTest2"
+
+#data
+<rdar://problem/6869687>
+#errors
+(1,7): unexpected-character-after-solidus-in-tag
+(1,8): unexpected-character-after-solidus-in-tag
+(1,16): unexpected-character-after-solidus-in-tag
+(1,24): expected-doctype-but-got-start-tag
+(1,24): expected-closing-tag-but-got-eof
+#new-errors
+(1:8) unexpected-solidus-in-tag
+(1:9) unexpected-solidus-in-tag
+(1:17) unexpected-solidus-in-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <rdar:>
+|       6869687=""
+|       problem=""
+
+#data
+<A>test< /A>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,8): expected-tag-name
+(1,12): expected-closing-tag-but-got-eof
+#new-errors
+(1:9) invalid-first-character-of-tag-name
+#document
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|       "test< /A>"
+
+#data
+&lt;
+#errors
+(1,4): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "<"
+
+#data
+<body foo='bar'><body foo='baz' yo='mama'>
+#errors
+(1,16): expected-doctype-but-got-start-tag
+(1,42): unexpected-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     foo="bar"
+|     yo="mama"
+
+#data
+<body></br foo="bar"></body>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,21): attributes-in-end-tag
+(1,21): unexpected-end-tag-treated-as
+#new-errors
+(1:21) end-tag-with-attributes
+#document
+| <html>
+|   <head>
+|   <body>
+|     <br>
+
+#data
+<bdy><br foo="bar"></body>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,26): expected-one-end-tag-but-got-another
+#document
+| <html>
+|   <head>
+|   <body>
+|     <bdy>
+|       <br>
+|         foo="bar"
+
+#data
+<body></body></br foo="bar">
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,28): attributes-in-end-tag
+(1,28): unexpected-end-tag-after-body
+(1,28): unexpected-end-tag-treated-as
+#new-errors
+(1:28) end-tag-with-attributes
+#document
+| <html>
+|   <head>
+|   <body>
+|     <br>
+
+#data
+<bdy></body><br foo="bar">
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,12): expected-one-end-tag-but-got-another
+(1,26): unexpected-start-tag-after-body
+(1,26): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <bdy>
+|       <br>
+|         foo="bar"
+
+#data
+<html><body></body></html><!-- Hi there -->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+| <!--  Hi there  -->
+
+#data
+<html><body></body></html><!-- Comment A --><!-- Comment B --><!-- Comment C --><!-- Comment D --><!-- Comment E -->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+| <!--  Comment A  -->
+| <!--  Comment B  -->
+| <!--  Comment C  -->
+| <!--  Comment D  -->
+| <!--  Comment E  -->
+
+#data
+<html><body></body></html>x<!-- Hi there -->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,27): expected-eof-but-got-char
+#document
+| <html>
+|   <head>
+|   <body>
+|     "x"
+|     <!--  Hi there  -->
+
+#data
+<html><body></body></html>x<!-- Hi there --></html><!-- Again -->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,27): expected-eof-but-got-char
+#document
+| <html>
+|   <head>
+|   <body>
+|     "x"
+|     <!--  Hi there  -->
+| <!--  Again  -->
+
+#data
+<html><body></body></html>x<!-- Hi there --></body></html><!-- Again -->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,27): expected-eof-but-got-char
+#document
+| <html>
+|   <head>
+|   <body>
+|     "x"
+|     <!--  Hi there  -->
+| <!--  Again  -->
+
+#data
+<html><body><ruby><div><rp>xx</rp></div></ruby></body></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,27): XXX-undefined-error
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <rp>
+|           "xx"
+
+#data
+<html><body><ruby><div><rt>xx</rt></div></ruby></body></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,27): XXX-undefined-error
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <rt>
+|           "xx"
+
+#data
+<html><frameset><!--1--><noframes>A</noframes><!--2--></frameset><!--3--><noframes>B</noframes><!--4--></html><!--5--><noframes>C</noframes><!--6-->
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <frameset>
+|     <!-- 1 -->
+|     <noframes>
+|       "A"
+|     <!-- 2 -->
+|   <!-- 3 -->
+|   <noframes>
+|     "B"
+|   <!-- 4 -->
+|   <noframes>
+|     "C"
+| <!-- 5 -->
+| <!-- 6 -->
+
+#data
+<select><option>A<select><option>B<select><option>C<select><option>D<select><option>E<select><option>F<select><option>G<select>
+#errors
+(1,8): expected-doctype-but-got-start-tag
+(1,25): unexpected-select-in-select
+(1,59): unexpected-select-in-select
+(1,93): unexpected-select-in-select
+(1,127): unexpected-select-in-select
+#document
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+|         "A"
+|     <option>
+|       "B"
+|       <select>
+|         <option>
+|           "C"
+|     <option>
+|       "D"
+|       <select>
+|         <option>
+|           "E"
+|     <option>
+|       "F"
+|       <select>
+|         <option>
+|           "G"
+
+#data
+<dd><dd><dt><dt><dd><li><li>
+#errors
+(1,4): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <dd>
+|     <dd>
+|     <dt>
+|     <dt>
+|     <dd>
+|       <li>
+|       <li>
+
+#data
+<div><b></div><div><nobr>a<nobr>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,14): end-tag-too-early
+(1,32): unexpected-start-tag-implies-end-tag
+(1,32): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <b>
+|     <div>
+|       <b>
+|         <nobr>
+|           "a"
+|         <nobr>
+
+#data
+<head></head>
+<body></body>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   "
+"
+|   <body>
+
+#data
+<head></head> <style></style>ddd
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,21): unexpected-start-tag-out-of-my-head
+#document
+| <html>
+|   <head>
+|     <style>
+|   " "
+|   <body>
+|     "ddd"
+
+#data
+<kbd><table></kbd><col><select><tr>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,18): unexpected-end-tag-implies-table-voodoo
+(1,18): unexpected-end-tag
+(1,31): unexpected-start-tag-implies-table-voodoo
+(1,35): unexpected-table-element-start-tag-in-select-in-table
+(1,35): eof-in-table
+#document
+| <html>
+|   <head>
+|   <body>
+|     <kbd>
+|       <select>
+|       <table>
+|         <colgroup>
+|           <col>
+|         <tbody>
+|           <tr>
+
+#data
+<kbd><table></kbd><col><select><tr></table><div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,18): unexpected-end-tag-implies-table-voodoo
+(1,18): unexpected-end-tag
+(1,31): unexpected-start-tag-implies-table-voodoo
+(1,35): unexpected-table-element-start-tag-in-select-in-table
+(1,48): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <kbd>
+|       <select>
+|       <table>
+|         <colgroup>
+|           <col>
+|         <tbody>
+|           <tr>
+|       <div>
+
+#data
+<a><li><style></style><title></title></a>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,41): adoption-agency-1.3
+#document
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|     <li>
+|       <a>
+|         <style>
+|         <title>
+
+#data
+<font></p><p><meta><title></title></font>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,10): unexpected-end-tag
+(1,41): adoption-agency-1.3
+#document
+| <html>
+|   <head>
+|   <body>
+|     <font>
+|       <p>
+|     <p>
+|       <font>
+|         <meta>
+|         <title>
+
+#data
+<a><center><title></title><a>
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,29): unexpected-start-tag-implies-end-tag
+(1,29): adoption-agency-1.3
+(1,29): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|     <center>
+|       <a>
+|         <title>
+|       <a>
+
+#data
+<svg><title><div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,17): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg title>
+|         <div>
+
+#data
+<svg><title><rect><div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,23): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg title>
+|         <rect>
+|           <div>
+
+#data
+<svg><title><svg><div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,22): unexpected-html-element-in-foreign-content
+(1,22): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg title>
+|         <svg svg>
+|         <div>
+
+#data
+<img <="" FAIL>
+#errors
+(1,6): invalid-character-in-attribute-name
+(1,15): expected-doctype-but-got-start-tag
+#new-errors
+(1:6) unexpected-character-in-attribute-name
+#document
+| <html>
+|   <head>
+|   <body>
+|     <img>
+|       <=""
+|       fail=""
+
+#data
+<ul><li><div id='foo'/>A</li><li>B<div>C</div></li></ul>
+#errors
+(1,4): expected-doctype-but-got-start-tag
+(1,23): non-void-element-with-trailing-solidus
+(1,29): end-tag-too-early
+#new-errors
+(1:9-1:24) non-void-html-element-start-tag-with-trailing-solidus
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ul>
+|       <li>
+|         <div>
+|           id="foo"
+|           "A"
+|       <li>
+|         "B"
+|         <div>
+|           "C"
+
+#data
+<svg><em><desc></em>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,9): unexpected-html-element-in-foreign-content
+(1,20): adoption-agency-1.3
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|     <em>
+|       <desc>
+
+#data
+<table><tr><td><svg><desc><td></desc><circle>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg desc>
+|           <td>
+|             <circle>
+
+#data
+<svg><tfoot></mi><td>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,17): unexpected-end-tag
+(1,17): unexpected-end-tag
+(1,21): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg tfoot>
+|         <svg td>
+
+#data
+<math><mrow><mrow><mn>1</mn></mrow><mi>a</mi></mrow></math>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mrow>
+|         <math mrow>
+|           <math mn>
+|             "1"
+|         <math mi>
+|           "a"
+
+#data
+<!doctype html><input type="hidden"><frameset>
+#errors
+(1,46): unexpected-start-tag
+(1,46): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><input type="button"><frameset>
+#errors
+(1,46): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <input>
+|       type="button"

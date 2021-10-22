@@ -1,0 +1,17 @@
+[default]
+region = default_region
+
+[partial_creds]
+aws_access_key_id = AKID
+
+[profile alt_profile_name]
+region = alt_profile_name_region
+
+[creds_from_credentials]
+aws_access_key_id = creds_from_config_akid
+aws_secret_access_key = creds_from_config_secret
+
+[config_file_load_order]
+region = shared_config_other_region
+aws_access_key_id = shared_config_other_akid
+aws_secret_access_key = shared_config_other_secret

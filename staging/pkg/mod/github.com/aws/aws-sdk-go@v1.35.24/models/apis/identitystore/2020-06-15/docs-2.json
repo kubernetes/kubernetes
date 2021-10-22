@@ -1,0 +1,203 @@
+{
+  "version": "2.0",
+  "service": null,
+  "operations": {
+    "DescribeGroup": "<p>Retrieves the group metadata and attributes from <code>GroupId</code> in an identity store.</p>",
+    "DescribeUser": "<p>Retrieves the user metadata and attributes from <code>UserId</code> in an identity store.</p>",
+    "ListGroups": "<p>Lists the attribute name and value of the group that you specified in the search. We only support <code>DisplayName</code> as a valid filter attribute path currently, and filter is required. This API returns minimum attributes, including <code>GroupId</code> and group <code>DisplayName</code> in the response.</p>",
+    "ListUsers": "<p>Lists the attribute name and value of the user that you specified in the search. We only support <code>UserName</code> as a valid filter attribute path currently, and filter is required. This API returns minimum attributes, including <code>UserId</code> and <code>UserName</code> in the response.</p>"
+  },
+  "shapes": {
+    "AccessDeniedException": {
+      "base": "<p>You do not have sufficient access to perform this action.</p>",
+      "refs": {
+      }
+    },
+    "AttributePath": {
+      "base": null,
+      "refs": {
+        "Filter$AttributePath": "<p>The attribute path used to specify which attribute name to search. Length limit is 255 characters. For example, <code>UserName</code> is a valid attribute path for the <code>ListUsers</code> API, and <code>DisplayName</code> is a valid attribute path for the <code>ListGroups</code> API.</p>"
+      }
+    },
+    "DescribeGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeUserResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Filter": {
+      "base": "<p>A query filter used by <code>ListUsers</code> and <code>ListGroup</code>. This filter object provides the attribute name and attribute value to search users or groups.</p>",
+      "refs": {
+        "Filters$member": null
+      }
+    },
+    "Filters": {
+      "base": null,
+      "refs": {
+        "ListGroupsRequest$Filters": "<p>A list of <code>Filter</code> objects, which is used in the <code>ListUsers</code> and <code>ListGroups</code> request. </p>",
+        "ListUsersRequest$Filters": "<p>A list of <code>Filter</code> objects, which is used in the <code>ListUsers</code> and <code>ListGroups</code> request. </p>"
+      }
+    },
+    "Group": {
+      "base": "<p>A group object, which contains a specified group’s metadata and attributes.</p>",
+      "refs": {
+        "Groups$member": null
+      }
+    },
+    "GroupDisplayName": {
+      "base": null,
+      "refs": {
+        "DescribeGroupResponse$DisplayName": "<p>Contains the group’s display name value. The length limit is 1024 characters. This value can consist of letters, accented characters, symbols, numbers, punctuation, tab, new line, carriage return, space and non breaking space in this attribute. The characters “&lt;&gt;;:%” are excluded. This value is specified at the time the group is created and stored as an attribute of the group object in the identity store.</p>",
+        "Group$DisplayName": "<p>Contains the group’s display name value. The length limit is 1024 characters. This value can consist of letters, accented characters, symbols, numbers, punctuation, tab, new line, carriage return, space and non breaking space in this attribute. The characters “&lt;&gt;;:%” are excluded. This value is specified at the time the group is created and stored as an attribute of the group object in the identity store.</p>"
+      }
+    },
+    "Groups": {
+      "base": null,
+      "refs": {
+        "ListGroupsResponse$Groups": "<p>A list of <code>Group</code> objects in the identity store.</p>"
+      }
+    },
+    "IdentityStoreId": {
+      "base": null,
+      "refs": {
+        "DescribeGroupRequest$IdentityStoreId": "<p>The globally unique identifier for the identity store, such as d-1234567890. In this example, d- is a fixed prefix, and 1234567890 is a randomly generated string which contains number and lower case letters. This value is generated at the time that a new identity store is created.</p>",
+        "DescribeUserRequest$IdentityStoreId": "<p>The globally unique identifier for the identity store, such as d-1234567890. In this example, d- is a fixed prefix, and 1234567890 is a randomly generated string which contains number and lower case letters. This value is generated at the time that a new identity store is created.</p>",
+        "ListGroupsRequest$IdentityStoreId": "<p>The globally unique identifier for the identity store, such as d-1234567890. In this example, d- is a fixed prefix, and 1234567890 is a randomly generated string which contains number and lower case letters. This value is generated at the time that a new identity store is created.</p>",
+        "ListUsersRequest$IdentityStoreId": "<p>The globally unique identifier for the identity store, such as d-1234567890. In this example, d- is a fixed prefix, and 1234567890 is a randomly generated string which contains number and lower case letters. This value is generated at the time that a new identity store is created.</p>"
+      }
+    },
+    "InternalServerException": {
+      "base": "<p>The request processing has failed because of an unknown error, exception or failure with an internal server.</p>",
+      "refs": {
+      }
+    },
+    "ListGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGroupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListUsersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListGroupsRequest$MaxResults": "<p>The maximum number of results to be returned per request, which is used in the <code>ListUsers</code> and <code>ListGroups</code> request to specify how many results to return in one page. The length limit is 50 characters.</p>",
+        "ListUsersRequest$MaxResults": "<p>The maximum number of results to be returned per request, which is used in the <code>ListUsers</code> and <code>ListGroups</code> request to specify how many results to return in one page. The length limit is 50 characters.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$Message": null,
+        "InternalServerException$Message": null,
+        "ResourceNotFoundException$Message": null,
+        "ThrottlingException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListGroupsRequest$NextToken": "<p>The pagination token used for the <code>ListUsers</code> and <code>ListGroups</code> APIs. This value is generated by the identity store service and is returned in the API response if the total results are more than the size of one page, and when this token is used in the API request to search for the next page.</p>",
+        "ListGroupsResponse$NextToken": "<p>The pagination token used for the <code>ListUsers</code> and <code>ListGroups</code> APIs. This value is generated by the identity store service and is returned in the API response if the total results are more than the size of one page, and when this token is used in the API request to search for the next page.</p>",
+        "ListUsersRequest$NextToken": "<p>The pagination token used for the <code>ListUsers</code> and <code>ListGroups</code> APIs. This value is generated by the identity store service and is returned in the API response if the total results are more than the size of one page, and when this token is used in the API request to search for the next page.</p>",
+        "ListUsersResponse$NextToken": "<p>The pagination token used for the <code>ListUsers</code> and <code>ListGroups</code> APIs. This value is generated by the identity store service and is returned in the API response if the total results are more than the size of one page, and when this token is used in the API request to search for the next page.</p>"
+      }
+    },
+    "RequestId": {
+      "base": null,
+      "refs": {
+        "AccessDeniedException$RequestId": "<p>The identifier for each request. This value is a globally unique ID that is generated by the Identity Store service for each sent request, and is then returned inside the exception if the request fails.</p>",
+        "InternalServerException$RequestId": "<p>The identifier for each request. This value is a globally unique ID that is generated by the Identity Store service for each sent request, and is then returned inside the exception if the request fails.</p>",
+        "ResourceNotFoundException$RequestId": "<p>The identifier for each request. This value is a globally unique ID that is generated by the Identity Store service for each sent request, and is then returned inside the exception if the request fails.</p>",
+        "ThrottlingException$RequestId": "<p>The identifier for each request. This value is a globally unique ID that is generated by the Identity Store service for each sent request, and is then returned inside the exception if the request fails.</p>",
+        "ValidationException$RequestId": "<p>The identifier for each request. This value is a globally unique ID that is generated by the Identity Store service for each sent request, and is then returned inside the exception if the request fails.</p>"
+      }
+    },
+    "ResourceId": {
+      "base": null,
+      "refs": {
+        "DescribeGroupRequest$GroupId": "<p>The identifier for a group in the identity store.</p>",
+        "DescribeGroupResponse$GroupId": "<p>The identifier for a group in the identity store.</p>",
+        "DescribeUserRequest$UserId": "<p>The identifier for a user in the identity store.</p>",
+        "DescribeUserResponse$UserId": "<p>The identifier for a user in the identity store.</p>",
+        "Group$GroupId": "<p>The identifier for a group in the identity store.</p>",
+        "ResourceNotFoundException$ResourceId": "<p>The identifier for a resource in the identity store, which can be used as <code>UserId</code> or <code>GroupId</code>. The format for <code>ResourceId</code> is either <code>UUID</code> or <code>1234567890-UUID</code>, where <code>UUID</code> is a randomly generated value for each resource when it is created and <code>1234567890</code> represents the <code>IdentityStoreId</code> string value. In the case that the identity store is migrated from a legacy SSO identity store, the <code>ResourceId</code> for that identity store will be in the format of <code>UUID</code>. Otherwise, it will be in the <code>1234567890-UUID</code> format.</p>",
+        "User$UserId": "<p>The identifier for a user in the identity store.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Indicates that a requested resource is not found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceType": {
+      "base": null,
+      "refs": {
+        "ResourceNotFoundException$ResourceType": "<p>The type of resource in the Identity Store service, which is an enum object. Valid values include USER, GROUP, and IDENTITY_STORE.</p>"
+      }
+    },
+    "SensitiveStringType": {
+      "base": null,
+      "refs": {
+        "Filter$AttributeValue": "<p>Represents the data for an attribute. Each attribute value is described as a name-value pair. </p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>Indicates that the principal has crossed the throttling limits of the API operations.</p>",
+      "refs": {
+      }
+    },
+    "User": {
+      "base": "<p>A user object, which contains a specified user’s metadata and attributes.</p>",
+      "refs": {
+        "Users$member": null
+      }
+    },
+    "UserName": {
+      "base": null,
+      "refs": {
+        "DescribeUserResponse$UserName": "<p>Contains the user’s username value. The length limit is 128 characters. This value can consist of letters, accented characters, symbols, numbers and punctuation. The characters “&lt;&gt;;:%” are excluded. This value is specified at the time the user is created and stored as an attribute of the user object in the identity store.</p>",
+        "User$UserName": "<p>Contains the user’s username value. The length limit is 128 characters. This value can consist of letters, accented characters, symbols, numbers and punctuation. The characters “&lt;&gt;;:%” are excluded. This value is specified at the time the user is created and stored as an attribute of the user object in the identity store.</p>"
+      }
+    },
+    "Users": {
+      "base": null,
+      "refs": {
+        "ListUsersResponse$Users": "<p>A list of <code>User</code> objects in the identity store.</p>"
+      }
+    },
+    "ValidationException": {
+      "base": "<p>The request failed because it contains a syntax error.</p>",
+      "refs": {
+      }
+    }
+  }
+}

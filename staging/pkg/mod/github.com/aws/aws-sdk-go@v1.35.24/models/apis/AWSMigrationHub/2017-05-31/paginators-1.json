@@ -1,0 +1,34 @@
+{
+  "pagination": {
+    "ListApplicationStates": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ApplicationStateList"
+    },
+    "ListCreatedArtifacts": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "CreatedArtifactList"
+    },
+    "ListDiscoveredResources": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "DiscoveredResourceList"
+    },
+    "ListMigrationTasks": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "MigrationTaskSummaryList"
+    },
+    "ListProgressUpdateStreams": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ProgressUpdateStreamSummaryList"
+    }
+  }
+}

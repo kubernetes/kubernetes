@@ -1,0 +1,11 @@
+{
+  "commit": "a1eee0489c374782a934ec1f093abd16fa7718ca",
+  "readme": "/_/azure-rest-api-specs/specification/synapse/data-plane/readme.md",
+  "tag": "package-access-control-2020-08-01-preview",
+  "use": "@microsoft.azure/autorest.go@2.1.183",
+  "repository_url": "https://github.com/Azure/azure-rest-api-specs.git",
+  "autorest_command": "autorest --use=@microsoft.azure/autorest.go@2.1.183 --tag=package-access-control-2020-08-01-preview --go-sdk-folder=/_/azure-sdk-for-go --go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION /_/azure-rest-api-specs/specification/synapse/data-plane/readme.md",
+  "additional_properties": {
+    "additional_options": "--go --verbose --use-onever --version=V2 --go.license-header=MICROSOFT_MIT_NO_VERSION"
+  }
+}

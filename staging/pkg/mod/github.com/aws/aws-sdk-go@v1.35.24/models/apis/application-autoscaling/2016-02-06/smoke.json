@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "DescribeScalableTargets",
+            "input": {
+                "ServiceNamespace": "ec2"
+            },
+            "errorExpectedFromService": false
+        }
+    ]
+}

@@ -1,0 +1,111 @@
+parameters:
+- name: AdditionalParameters
+  type: object
+- name: DependsOn
+  type: object
+  default: null
+- name: CloudConfig
+  type: object
+  default: {}
+- name: MatrixConfigs
+  type: object
+  default: []
+- name: MatrixFilters
+  type: object
+  default: []
+- name: MatrixReplace
+  type: object
+  default: {}
+- name: JobTemplatePath
+  type: string
+# Set this to false to do a full checkout for private repositories with the azure pipelines service connection
+- name: SparseCheckout
+  type: boolean
+  default: true
+- name: SparseCheckoutPaths
+  type: object
+  default: []
+- name: Pool
+  type: string
+  default: azsdk-pool-mms-ubuntu-1804-general
+- name: OsVmImage
+  type: string
+  default: MMSUbuntu18.04
+# This parameter is only necessary if there are multiple invocations of this template within the SAME STAGE.
+# When that occurs, provide a name other than the default value.
+- name: GenerateJobName
+  type: string
+  default: 'generate_matrix'
+
+jobs:
+- job: ${{ parameters.GenerateJobName }}
+  variables:
+    displayNameFilter: $[ coalesce(variables.jobMatrixFilter, '.*') ]
+  pool:
+    name: ${{ parameters.Pool }}
+    vmImage: ${{ parameters.OsVmImage }}
+  displayName: Generate Job Matrix
+  ${{ if parameters.DependsOn }}:
+    dependsOn: ${{ parameters.DependsOn }}
+  steps:
+    # Skip sparse checkout for the `azure-sdk-for-<lang>-pr` private mirrored repositories
+    # as we require the github service connection to be loaded.
+    - ${{ if and(parameters.SparseCheckout, not(contains(variables['Build.DefinitionName'], '-pr - '))) }}:
+      - template: /eng/common/pipelines/templates/steps/sparse-checkout.yml
+        parameters:
+          ${{ if ne(length(parameters.SparseCheckoutPaths), 0) }}:
+            Paths: ${{ parameters.SparseCheckoutPaths }}
+          ${{ if and(eq(length(parameters.SparseCheckoutPaths), 0), ne(parameters.AdditionalParameters.ServiceDirectory, '')) }}:
+            Paths:
+              - ${{ parameters.AdditionalParameters.ServiceDirectory }}
+
+    - ${{ each config in parameters.MatrixConfigs }}:
+      - ${{ if eq(config.GenerateVMJobs, 'true') }}:
+        - task: Powershell@2
+          inputs:
+            pwsh: true
+            filePath: eng/common/scripts/job-matrix/Create-JobMatrix.ps1
+            arguments: >
+              -ConfigPath ${{ config.Path }}
+              -Selection ${{ config.Selection }}
+              -DisplayNameFilter '$(displayNameFilter)'
+              -Filters '${{ join(''',''', parameters.MatrixFilters) }}','container=^$','SupportedClouds=^$|${{ parameters.CloudConfig.Cloud }}'
+              -Replace '${{ join(''',''', parameters.MatrixReplace) }}'
+              -NonSparseParameters '${{ join(''',''', config.NonSparseParameters) }}'
+          displayName: Generate VM Job Matrix ${{ config.Name }}
+          name: generate_vm_job_matrix_${{ config.Name }}
+
+      - ${{ if eq(config.GenerateContainerJobs, 'true') }}:
+        - task: Powershell@2
+          inputs:
+            pwsh: true
+            filePath: eng/common/scripts/job-matrix/Create-JobMatrix.ps1
+            arguments: >
+              -ConfigPath ${{ config.Path }}
+              -Selection ${{ config.Selection }}
+              -DisplayNameFilter '$(displayNameFilter)'
+              -Filters '${{ join(''',''', parameters.MatrixFilters) }}', 'container=.*', 'SupportedClouds=^$|${{ parameters.CloudConfig.Cloud }}'
+              -NonSparseParameters '${{ join(''',''', config.NonSparseParameters) }}'
+          displayName: Generate Container Job Matrix
+          name: generate_container_job_matrix_${{ config.Name }}
+
+- ${{ each config in parameters.MatrixConfigs }}:
+  - ${{ if eq(config.GenerateVMJobs, 'true') }}:
+    - template: ${{ parameters.JobTemplatePath }}
+      parameters:
+        UsePlatformContainer: false
+        Matrix: dependencies.${{ parameters.GenerateJobName }}.outputs['generate_vm_job_matrix_${{ config.Name }}.matrix']
+        DependsOn: ${{ parameters.GenerateJobName }}
+        CloudConfig: ${{ parameters.CloudConfig }}
+        ${{ each param in parameters.AdditionalParameters }}:
+          ${{ param.key }}: ${{ param.value }}
+
+  - ${{ if eq(config.GenerateContainerJobs, 'true') }}:
+    - template: ${{ parameters.JobTemplatePath }}
+      parameters:
+        UsePlatformContainer: true
+        Matrix: dependencies.${{ parameters.GenerateJobName }}.outputs['generate_container_job_matrix_${{ config.Name }}.matrix']
+        DependsOn: ${{ parameters.GenerateJobName }}
+        CloudConfig: ${{ parameters.CloudConfig }}
+        ${{ each param in parameters.AdditionalParameters }}:
+          ${{ param.key }}: ${{ param.value }}

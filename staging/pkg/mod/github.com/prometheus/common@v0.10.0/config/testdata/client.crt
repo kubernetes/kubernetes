@@ -1,0 +1,96 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 3 (0x3)
+        Signature Algorithm: sha1WithRSAEncryption
+        Issuer: C=US, O=Prometheus, OU=Prometheus Certificate Authority, CN=Prometheus TLS CA
+        Validity
+            Not Before: Apr  5 08:10:12 2019 GMT
+            Not After : Mar 26 08:10:12 2059 GMT
+        Subject: C=US, O=Prometheus, CN=Client
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                RSA Public-Key: (2048 bit)
+                Modulus:
+                    00:b7:d3:b6:fc:22:5f:73:6a:32:b0:9a:43:a2:87:
+                    cb:1f:60:8f:8e:f6:04:93:be:fc:90:37:b0:61:f8:
+                    1b:ba:94:b3:7e:5e:1b:51:c6:df:99:a8:e1:df:aa:
+                    8d:f4:12:e3:e6:75:27:0c:ae:aa:de:82:ab:a9:54:
+                    f1:8a:81:f9:17:54:fd:e1:17:9a:d8:75:6a:99:c7:
+                    85:ce:29:dc:b1:6d:a6:ab:66:ea:64:02:fd:a0:b5:
+                    53:44:05:29:95:4a:3f:2e:ae:de:56:64:e2:55:9c:
+                    5e:d0:1a:68:42:00:7a:71:df:82:f9:08:23:d8:0d:
+                    72:41:77:91:31:2f:01:88:07:22:b1:40:db:a0:a2:
+                    be:dd:27:1f:1e:86:65:64:18:ab:68:d3:51:96:8e:
+                    06:3e:b0:f6:29:95:5f:4a:c6:f0:f8:f7:28:17:61:
+                    0e:95:02:a8:2d:fd:5d:84:1b:f3:cc:99:3d:3f:8d:
+                    4b:66:33:6b:58:0c:5c:ed:3e:44:88:48:98:34:bc:
+                    1f:df:f7:31:e5:60:87:43:1a:39:01:8e:78:1e:90:
+                    08:a3:ef:b4:fd:df:11:2e:a2:ea:31:db:95:2d:5e:
+                    68:3a:02:9a:af:0d:51:22:07:16:66:37:90:ed:ef:
+                    41:c1:b1:0f:88:7e:d1:0d:11:4a:18:f2:38:6b:22:
+                    6c:01
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Subject Key Identifier: 
+                3A:46:D1:C5:8C:42:60:AC:EF:0C:DD:4B:55:1E:F0:D7:5C:76:C3:33
+            X509v3 Authority Key Identifier: 
+                keyid:4D:02:BF:71:95:6A:AA:58:C5:9C:B8:83:67:5E:64:16:99:E1:2A:9E
+
+            Authority Information Access: 
+                CA Issuers - URI:http://example.com/ca/tls-ca.cer
+
+            X509v3 CRL Distribution Points: 
+
+                Full Name:
+                  URI:http://example.com/ca/tls-ca.crl
+
+            X509v3 Subject Alternative Name: 
+                email:client@prometheus.example.com
+    Signature Algorithm: sha1WithRSAEncryption
+         73:fc:87:f2:cf:e3:b1:df:2f:f7:bf:f9:74:dc:0b:f0:7f:95:
+         ef:77:ba:6a:7d:c6:c5:f3:d9:d6:c7:eb:f8:a8:30:d3:90:d5:
+         a5:0c:32:33:95:85:a2:05:6e:78:a7:07:a5:e0:cf:f4:65:ef:
+         d2:6d:86:66:2a:7f:13:78:2f:90:dd:9d:a4:34:d4:8f:df:41:
+         1b:0f:17:99:99:06:2d:26:86:e2:58:3e:84:ca:13:9e:00:ca:
+         82:07:63:e7:6c:df:e9:47:d6:b3:f7:51:1a:31:f4:3d:79:95:
+         e7:ea:bf:40:84:48:09:23:ba:31:b1:67:cd:05:50:ec:e6:0a:
+         d8:2b:7d:7d:73:7a:8a:5f:f7:72:28:57:9f:15:2d:b1:4e:a1:
+         3c:06:53:60:6e:b2:f9:04:08:81:3a:f2:ba:5d:7e:ac:93:f7:
+         3b:1a:de:07:6e:14:a2:0b:e2:28:6a:50:2d:d8:9b:3c:25:e2:
+         82:6b:90:7e:45:7b:dd:3a:7a:8e:71:99:a7:e8:88:5f:06:71:
+         5b:3f:18:85:70:f9:eb:c7:26:43:2b:49:8f:17:90:aa:ba:86:
+         8a:52:63:83:9f:9d:5d:79:53:af:6d:1a:7e:47:0d:ea:3f:33:
+         18:c0:5f:90:d0:c5:04:8b:e3:4a:45:3d:a6:8c:c3:d1:47:1c:
+         45:70:a4:75
+-----BEGIN CERTIFICATE-----
+MIIEKjCCAxKgAwIBAgIBAzANBgkqhkiG9w0BAQUFADBpMQswCQYDVQQGEwJVUzET
+MBEGA1UECgwKUHJvbWV0aGV1czEpMCcGA1UECwwgUHJvbWV0aGV1cyBDZXJ0aWZp
+Y2F0ZSBBdXRob3JpdHkxGjAYBgNVBAMMEVByb21ldGhldXMgVExTIENBMCAXDTE5
+MDQwNTA4MTAxMloYDzIwNTkwMzI2MDgxMDEyWjAzMQswCQYDVQQGEwJVUzETMBEG
+A1UECgwKUHJvbWV0aGV1czEPMA0GA1UEAwwGQ2xpZW50MIIBIjANBgkqhkiG9w0B
+AQEFAAOCAQ8AMIIBCgKCAQEAt9O2/CJfc2oysJpDoofLH2CPjvYEk778kDewYfgb
+upSzfl4bUcbfmajh36qN9BLj5nUnDK6q3oKrqVTxioH5F1T94Rea2HVqmceFzinc
+sW2mq2bqZAL9oLVTRAUplUo/Lq7eVmTiVZxe0BpoQgB6cd+C+Qgj2A1yQXeRMS8B
+iAcisUDboKK+3ScfHoZlZBiraNNRlo4GPrD2KZVfSsbw+PcoF2EOlQKoLf1dhBvz
+zJk9P41LZjNrWAxc7T5EiEiYNLwf3/cx5WCHQxo5AY54HpAIo++0/d8RLqLqMduV
+LV5oOgKarw1RIgcWZjeQ7e9BwbEPiH7RDRFKGPI4ayJsAQIDAQABo4IBDzCCAQsw
+DgYDVR0PAQH/BAQDAgeAMAkGA1UdEwQCMAAwEwYDVR0lBAwwCgYIKwYBBQUHAwIw
+HQYDVR0OBBYEFDpG0cWMQmCs7wzdS1Ue8NdcdsMzMB8GA1UdIwQYMBaAFE0Cv3GV
+aqpYxZy4g2deZBaZ4SqeMDwGCCsGAQUFBwEBBDAwLjAsBggrBgEFBQcwAoYgaHR0
+cDovL2V4YW1wbGUuY29tL2NhL3Rscy1jYS5jZXIwMQYDVR0fBCowKDAmoCSgIoYg
+aHR0cDovL2V4YW1wbGUuY29tL2NhL3Rscy1jYS5jcmwwKAYDVR0RBCEwH4EdY2xp
+ZW50QHByb21ldGhldXMuZXhhbXBsZS5jb20wDQYJKoZIhvcNAQEFBQADggEBAHP8
+h/LP47HfL/e/+XTcC/B/le93ump9xsXz2dbH6/ioMNOQ1aUMMjOVhaIFbninB6Xg
+z/Rl79JthmYqfxN4L5DdnaQ01I/fQRsPF5mZBi0mhuJYPoTKE54AyoIHY+ds3+lH
+1rP3URox9D15lefqv0CESAkjujGxZ80FUOzmCtgrfX1zeopf93IoV58VLbFOoTwG
+U2BusvkECIE68rpdfqyT9zsa3gduFKIL4ihqUC3Ymzwl4oJrkH5Fe906eo5xmafo
+iF8GcVs/GIVw+evHJkMrSY8XkKq6hopSY4OfnV15U69tGn5HDeo/MxjAX5DQxQSL
+40pFPaaMw9FHHEVwpHU=
+-----END CERTIFICATE-----

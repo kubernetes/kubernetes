@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "defaultRegion": "us-west-2",
+    "testCases": [
+        {
+            "operationName": "GetConnectors",
+            "input": {},
+            "errorExpectedFromService": false
+        },
+        {
+            "operationName": "DeleteReplicationJob",
+            "input": {
+                "replicationJobId": "invalidId"
+            },
+            "errorExpectedFromService": true
+        }
+    ]
+}

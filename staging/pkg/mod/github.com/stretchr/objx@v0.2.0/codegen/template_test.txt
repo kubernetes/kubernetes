@@ -1,0 +1,120 @@
+/*
+    Tests for {4} ({1} and []{1})
+*/
+func Test{4}(t *testing.T) {
+    val := {1}({2})
+    m := objx.Map{"value": val, "nothing": nil}
+
+    assert.Equal(t, val, m.Get("value").{4}())
+    assert.Equal(t, val, m.Get("value").Must{4}())
+    assert.Equal(t, {1}({3}), m.Get("nothing").{4}())
+    assert.Equal(t, val, m.Get("nothing").{4}({2}))
+    assert.Panics(t, func() {
+        m.Get("age").Must{4}()
+    })
+}
+
+func Test{4}Slice(t *testing.T) {
+    val := {1}({2})
+    m := objx.Map{"value": []{1}{ val }, "nothing": nil}
+
+    assert.Equal(t, val, m.Get("value").{4}Slice()[0])
+    assert.Equal(t, val, m.Get("value").Must{4}Slice()[0])
+    assert.Equal(t, []{1}(nil), m.Get("nothing").{4}Slice())
+    assert.Equal(t, val, m.Get("nothing").{4}Slice([]{1}{{1}({2})})[0])
+    assert.Panics(t, func() {
+        m.Get("nothing").Must{4}Slice()
+    })
+}
+
+func TestIs{4}(t *testing.T) {
+    m := objx.Map{"data": {1}({2})}
+
+    assert.True(t, m.Get("data").Is{4}())
+}
+
+func TestIs{4}Slice(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2})}}
+
+    assert.True(t, m.Get("data").Is{4}Slice())
+}
+
+func TestEach{4}(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2})}}
+    count := 0
+    replacedVals := make([]{1}, 0)
+    assert.Equal(t, m.Get("data"), m.Get("data").Each{4}(func(i int, val {1}) bool {
+        count++
+        replacedVals = append(replacedVals, val)
+
+        // abort early
+        return i != 2
+      }))
+
+    assert.Equal(t, count, 3)
+    assert.Equal(t, replacedVals[0], m.Get("data").Must{4}Slice()[0])
+    assert.Equal(t, replacedVals[1], m.Get("data").Must{4}Slice()[1])
+    assert.Equal(t, replacedVals[2], m.Get("data").Must{4}Slice()[2])
+}
+
+func TestWhere{4}(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2})}}
+
+    selected := m.Get("data").Where{4}(func(i int, val {1}) bool {
+        return i%2 == 0
+    }).Must{4}Slice()
+
+    assert.Equal(t, 3, len(selected))
+}
+
+func TestGroup{4}(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2})}}
+
+    grouped := m.Get("data").Group{4}(func(i int, val {1}) string {
+        return fmt.Sprintf("%v", i%2==0)
+    }).Data().(map[string][]{1})
+
+    assert.Equal(t, 2, len(grouped))
+    assert.Equal(t, 3, len(grouped["true"]))
+    assert.Equal(t, 3, len(grouped["false"]))
+}
+
+func TestReplace{4}(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2})}}
+    rawArr := m.Get("data").Must{4}Slice()
+
+    replaced := m.Get("data").Replace{4}(func(index int, val {1}) {1} {
+        if index < len(rawArr)-1 {
+            return rawArr[index+1]
+        }
+        return rawArr[0]
+    })
+    replacedArr := replaced.Must{4}Slice()
+
+    if assert.Equal(t, 6, len(replacedArr)) {
+        assert.Equal(t, replacedArr[0], rawArr[1])
+        assert.Equal(t, replacedArr[1], rawArr[2])
+        assert.Equal(t, replacedArr[2], rawArr[3])
+        assert.Equal(t, replacedArr[3], rawArr[4])
+        assert.Equal(t, replacedArr[4], rawArr[5])
+        assert.Equal(t, replacedArr[5], rawArr[0])
+    }
+}
+
+func TestCollect{4}(t *testing.T) {
+    m := objx.Map{"data": []{1}{{1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2}), {1}({2})}}
+
+    collected := m.Get("data").Collect{4}(func(index int, val {1}) interface{} {
+        return index
+    })
+    collectedArr := collected.MustInterSlice()
+
+    if assert.Equal(t, 6, len(collectedArr)) {
+        assert.Equal(t, collectedArr[0], 0)
+        assert.Equal(t, collectedArr[1], 1)
+        assert.Equal(t, collectedArr[2], 2)
+        assert.Equal(t, collectedArr[3], 3)
+        assert.Equal(t, collectedArr[4], 4)
+        assert.Equal(t, collectedArr[5], 5)
+    }
+}

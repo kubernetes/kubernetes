@@ -1,0 +1,449 @@
+{
+  "version": "2.0",
+  "service": "<p><fullname>Amazon RDS Data Service</fullname> <p>Amazon RDS provides an HTTP endpoint to run SQL statements on an Amazon Aurora Serverless DB cluster. To run these statements, you work with the Data Service API.</p> <p>For more information about the Data Service API, see <a href=\"https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/data-api.html\">Using the Data API for Aurora Serverless</a> in the <i>Amazon Aurora User Guide</i>.</p> <note> <p>If you have questions or comments related to the Data API, send email to <a href=\"mailto:Rds-data-api-feedback@amazon.com\">Rds-data-api-feedback@amazon.com</a>.</p> </note></p>",
+  "operations": {
+    "BatchExecuteStatement": "<p>Runs a batch SQL statement over an array of data.</p> <p>You can run bulk update and insert operations for multiple records using a DML statement with different parameter sets. Bulk operations can provide a significant performance improvement over individual insert and update operations.</p> <important> <p>If a call isn't part of a transaction because it doesn't include the <code>transactionID</code> parameter, changes that result from the call are committed automatically.</p> </important>",
+    "BeginTransaction": "<p>Starts a SQL transaction.</p> <pre><code> &lt;important&gt; &lt;p&gt;A transaction can run for a maximum of 24 hours. A transaction is terminated and rolled back automatically after 24 hours.&lt;/p&gt; &lt;p&gt;A transaction times out if no calls use its transaction ID in three minutes. If a transaction times out before it's committed, it's rolled back automatically.&lt;/p&gt; &lt;p&gt;DDL statements inside a transaction cause an implicit commit. We recommend that you run each DDL statement in a separate &lt;code&gt;ExecuteStatement&lt;/code&gt; call with &lt;code&gt;continueAfterTimeout&lt;/code&gt; enabled.&lt;/p&gt; &lt;/important&gt; </code></pre>",
+    "CommitTransaction": "<p>Ends a SQL transaction started with the <code>BeginTransaction</code> operation and commits the changes.</p>",
+    "ExecuteSql": "<p>Runs one or more SQL statements.</p> <important> <p>This operation is deprecated. Use the <code>BatchExecuteStatement</code> or <code>ExecuteStatement</code> operation.</p> </important>",
+    "ExecuteStatement": "<p>Runs a SQL statement against a database.</p> <important> <p>If a call isn't part of a transaction because it doesn't include the <code>transactionID</code> parameter, changes that result from the call are committed automatically.</p> </important> <p>The response size limit is 1 MB. If the call returns more than 1 MB of response data, the call is terminated.</p>",
+    "RollbackTransaction": "<p>Performs a rollback of a transaction. Rolling back a transaction cancels its changes.</p>"
+  },
+  "shapes": {
+    "Arn": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the Aurora Serverless DB cluster.</p>",
+        "BatchExecuteStatementRequest$secretArn": "<p>The name or ARN of the secret that enables access to the DB cluster.</p>",
+        "BeginTransactionRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the Aurora Serverless DB cluster.</p>",
+        "BeginTransactionRequest$secretArn": "<p>The name or ARN of the secret that enables access to the DB cluster.</p>",
+        "CommitTransactionRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the Aurora Serverless DB cluster.</p>",
+        "CommitTransactionRequest$secretArn": "<p>The name or ARN of the secret that enables access to the DB cluster.</p>",
+        "ExecuteSqlRequest$awsSecretStoreArn": "<p>The Amazon Resource Name (ARN) of the secret that enables access to the DB cluster.</p>",
+        "ExecuteSqlRequest$dbClusterOrInstanceArn": "<p>The ARN of the Aurora Serverless DB cluster.</p>",
+        "ExecuteStatementRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the Aurora Serverless DB cluster.</p>",
+        "ExecuteStatementRequest$secretArn": "<p>The name or ARN of the secret that enables access to the DB cluster.</p>",
+        "RollbackTransactionRequest$resourceArn": "<p>The Amazon Resource Name (ARN) of the Aurora Serverless DB cluster.</p>",
+        "RollbackTransactionRequest$secretArn": "<p>The name or ARN of the secret that enables access to the DB cluster.</p>"
+      }
+    },
+    "ArrayOfArray": {
+      "base": "<p>An array of arrays.</p> <note> <p>Some array entries can be null.</p> </note>",
+      "refs": {
+        "ArrayValue$arrayValues": "<p>An array of arrays.</p>"
+      }
+    },
+    "ArrayValue": {
+      "base": "<p>Contains an array.</p>",
+      "refs": {
+        "ArrayOfArray$member": null,
+        "Field$arrayValue": "<p>An array of values.</p>"
+      }
+    },
+    "ArrayValueList": {
+      "base": null,
+      "refs": {
+        "StructValue$attributes": "<p>The attributes returned in the record.</p>",
+        "Value$arrayValues": "<p>An array of column values.</p>"
+      }
+    },
+    "BadRequestException": {
+      "base": "<p>There is an error in the call or in a SQL statement.</p>",
+      "refs": {
+      }
+    },
+    "BatchExecuteStatementRequest": {
+      "base": "<p>The request parameters represent the input of a SQL statement over an array of data.</p>",
+      "refs": {
+      }
+    },
+    "BatchExecuteStatementResponse": {
+      "base": "<p>The response elements represent the output of a SQL statement over an array of data.</p>",
+      "refs": {
+      }
+    },
+    "BeginTransactionRequest": {
+      "base": "<p>The request parameters represent the input of a request to start a SQL transaction.</p>",
+      "refs": {
+      }
+    },
+    "BeginTransactionResponse": {
+      "base": "<p>The response elements represent the output of a request to start a SQL transaction.</p>",
+      "refs": {
+      }
+    },
+    "Blob": {
+      "base": null,
+      "refs": {
+        "Field$blobValue": "<p>A value of BLOB data type.</p>",
+        "Value$blobValue": "<p>A value for a column of BLOB data type.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "ColumnMetadata$isAutoIncrement": "<p>A value that indicates whether the column increments automatically.</p>",
+        "ColumnMetadata$isCaseSensitive": "<p>A value that indicates whether the column is case-sensitive.</p>",
+        "ColumnMetadata$isCurrency": "<p>A value that indicates whether the column contains currency values.</p>",
+        "ColumnMetadata$isSigned": "<p>A value that indicates whether an integer column is signed.</p>",
+        "ExecuteStatementRequest$continueAfterTimeout": "<p>A value that indicates whether to continue running the statement after the call times out. By default, the statement stops running when the call times out.</p> <important> <p>For DDL statements, we recommend continuing to run the statement after the call times out. When a DDL statement terminates before it is finished running, it can result in errors and possibly corrupted data structures.</p> </important>",
+        "ExecuteStatementRequest$includeResultMetadata": "<p>A value that indicates whether to include metadata in the results.</p>"
+      }
+    },
+    "BooleanArray": {
+      "base": "<p>An array of Boolean values.</p> <note> <p>Some array entries can be null.</p> </note>",
+      "refs": {
+        "ArrayValue$booleanValues": "<p>An array of Boolean values.</p>"
+      }
+    },
+    "BoxedBoolean": {
+      "base": null,
+      "refs": {
+        "BooleanArray$member": null,
+        "Field$booleanValue": "<p>A value of Boolean data type.</p>",
+        "Field$isNull": "<p>A NULL value.</p>",
+        "Value$bitValue": "<p>A value for a column of BIT data type.</p>",
+        "Value$isNull": "<p>A NULL value.</p>"
+      }
+    },
+    "BoxedDouble": {
+      "base": null,
+      "refs": {
+        "DoubleArray$member": null,
+        "Field$doubleValue": "<p>A value of double data type.</p>",
+        "Value$doubleValue": "<p>A value for a column of double data type.</p>"
+      }
+    },
+    "BoxedFloat": {
+      "base": null,
+      "refs": {
+        "Value$realValue": "<p>A value for a column of real data type.</p>"
+      }
+    },
+    "BoxedInteger": {
+      "base": null,
+      "refs": {
+        "Value$intValue": "<p>A value for a column of integer data type.</p>"
+      }
+    },
+    "BoxedLong": {
+      "base": null,
+      "refs": {
+        "Field$longValue": "<p>A value of long data type.</p>",
+        "LongArray$member": null,
+        "Value$bigIntValue": "<p>A value for a column of big integer data type.</p>"
+      }
+    },
+    "ColumnMetadata": {
+      "base": "<p>Contains the metadata for a column.</p>",
+      "refs": {
+        "Metadata$member": null
+      }
+    },
+    "CommitTransactionRequest": {
+      "base": "<p>The request parameters represent the input of a commit transaction request.</p>",
+      "refs": {
+      }
+    },
+    "CommitTransactionResponse": {
+      "base": "<p>The response elements represent the output of a commit transaction request.</p>",
+      "refs": {
+      }
+    },
+    "DbName": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementRequest$database": "<p>The name of the database.</p>",
+        "BatchExecuteStatementRequest$schema": "<p>The name of the database schema.</p>",
+        "BeginTransactionRequest$database": "<p>The name of the database.</p>",
+        "BeginTransactionRequest$schema": "<p>The name of the database schema.</p>",
+        "ExecuteSqlRequest$database": "<p>The name of the database.</p>",
+        "ExecuteSqlRequest$schema": "<p>The name of the database schema.</p>",
+        "ExecuteStatementRequest$database": "<p>The name of the database.</p>",
+        "ExecuteStatementRequest$schema": "<p>The name of the database schema.</p>"
+      }
+    },
+    "DecimalReturnType": {
+      "base": null,
+      "refs": {
+        "ResultSetOptions$decimalReturnType": "<p>A value that indicates how a field of <code>DECIMAL</code> type is represented in the response. The value of <code>STRING</code>, the default, specifies that it is converted to a String value. The value of <code>DOUBLE_OR_LONG</code> specifies that it is converted to a Long value if its scale is 0, or to a Double value otherwise.</p> <important> <p>Conversion to Double or Long can result in roundoff errors due to precision loss. We recommend converting to String, especially when working with currency values.</p> </important>"
+      }
+    },
+    "DoubleArray": {
+      "base": "<p>An array of floating point numbers.</p> <note> <p>Some array entries can be null.</p> </note>",
+      "refs": {
+        "ArrayValue$doubleValues": "<p>An array of integers.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "BadRequestException$message": "<p>The error message returned by this <code>BadRequestException</code> error.</p>",
+        "ForbiddenException$message": "<p>The error message returned by this <code>ForbiddenException</code> error.</p>",
+        "NotFoundException$message": "<p>The error message returned by this <code>NotFoundException</code> error.</p>",
+        "StatementTimeoutException$message": "<p>The error message returned by this <code>StatementTimeoutException</code> error.</p>"
+      }
+    },
+    "ExecuteSqlRequest": {
+      "base": "<p>The request parameters represent the input of a request to run one or more SQL statements.</p>",
+      "refs": {
+      }
+    },
+    "ExecuteSqlResponse": {
+      "base": "<p>The response elements represent the output of a request to run one or more SQL statements.</p>",
+      "refs": {
+      }
+    },
+    "ExecuteStatementRequest": {
+      "base": "<p>The request parameters represent the input of a request to run a SQL statement against a database.</p>",
+      "refs": {
+      }
+    },
+    "ExecuteStatementResponse": {
+      "base": "<p>The response elements represent the output of a request to run a SQL statement against a database.</p>",
+      "refs": {
+      }
+    },
+    "Field": {
+      "base": "<p>Contains a value.</p>",
+      "refs": {
+        "FieldList$member": null,
+        "SqlParameter$value": "<p>The value of the parameter.</p>"
+      }
+    },
+    "FieldList": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementResponse$generatedFields": "<p>Values for fields generated during the request.</p> <pre><code> &lt;note&gt; &lt;p&gt;The &lt;code&gt;generatedFields&lt;/code&gt; data isn't supported by Aurora PostgreSQL. To get the values of generated fields, use the &lt;code&gt;RETURNING&lt;/code&gt; clause. For more information, see &lt;a href=&quot;https://www.postgresql.org/docs/10/dml-returning.html&quot;&gt;Returning Data From Modified Rows&lt;/a&gt; in the PostgreSQL documentation.&lt;/p&gt; &lt;/note&gt; </code></pre>",
+        "SqlRecords$member": null,
+        "UpdateResult$generatedFields": "<p>Values for fields generated during the request.</p>"
+      }
+    },
+    "ForbiddenException": {
+      "base": "<p>There are insufficient privileges to make the call.</p>",
+      "refs": {
+      }
+    },
+    "Id": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementRequest$transactionId": "<p>The identifier of a transaction that was started by using the <code>BeginTransaction</code> operation. Specify the transaction ID of the transaction that you want to include the SQL statement in.</p> <p>If the SQL statement is not part of a transaction, don't set this parameter.</p>",
+        "BeginTransactionResponse$transactionId": "<p>The transaction ID of the transaction started by the call.</p>",
+        "CommitTransactionRequest$transactionId": "<p>The identifier of the transaction to end and commit.</p>",
+        "ExecuteStatementRequest$transactionId": "<p>The identifier of a transaction that was started by using the <code>BeginTransaction</code> operation. Specify the transaction ID of the transaction that you want to include the SQL statement in.</p> <p>If the SQL statement is not part of a transaction, don't set this parameter.</p>",
+        "RollbackTransactionRequest$transactionId": "<p>The identifier of the transaction to roll back.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "ColumnMetadata$arrayBaseColumnType": "<p>The type of the column.</p>",
+        "ColumnMetadata$nullable": "<p>A value that indicates whether the column is nullable.</p>",
+        "ColumnMetadata$precision": "<p>The precision value of a decimal number column.</p>",
+        "ColumnMetadata$scale": "<p>The scale value of a decimal number column.</p>",
+        "ColumnMetadata$type": "<p>The type of the column.</p>"
+      }
+    },
+    "InternalServerErrorException": {
+      "base": "<p>An internal error occurred.</p>",
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "ResultSetMetadata$columnCount": "<p>The number of columns in the result set.</p>",
+        "StatementTimeoutException$dbConnectionId": "<p>The database connection ID that executed the SQL statement.</p>"
+      }
+    },
+    "LongArray": {
+      "base": "<p>An array of integers.</p> <note> <p>Some array entries can be null.</p> </note>",
+      "refs": {
+        "ArrayValue$longValues": "<p>An array of floating point numbers.</p>"
+      }
+    },
+    "Metadata": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementResponse$columnMetadata": "<p>Metadata for the columns included in the results.</p>",
+        "ResultSetMetadata$columnMetadata": "<p>The metadata of the columns in the result set.</p>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The <code>resourceArn</code>, <code>secretArn</code>, or <code>transactionId</code> value can't be found.</p>",
+      "refs": {
+      }
+    },
+    "ParameterName": {
+      "base": null,
+      "refs": {
+        "SqlParameter$name": "<p>The name of the parameter.</p>"
+      }
+    },
+    "Record": {
+      "base": "<p>A record returned by a call.</p>",
+      "refs": {
+        "Records$member": null
+      }
+    },
+    "Records": {
+      "base": null,
+      "refs": {
+        "ResultFrame$records": "<p>The records in the result set.</p>"
+      }
+    },
+    "RecordsUpdated": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementResponse$numberOfRecordsUpdated": "<p>The number of records updated by the request.</p>",
+        "SqlStatementResult$numberOfRecordsUpdated": "<p>The number of records updated by a SQL statement.</p>"
+      }
+    },
+    "ResultFrame": {
+      "base": "<p>The result set returned by a SQL statement.</p>",
+      "refs": {
+        "SqlStatementResult$resultFrame": "<p>The result set of the SQL statement.</p>"
+      }
+    },
+    "ResultSetMetadata": {
+      "base": "<p>The metadata of the result set returned by a SQL statement.</p>",
+      "refs": {
+        "ResultFrame$resultSetMetadata": "<p>The result-set metadata in the result set.</p>"
+      }
+    },
+    "ResultSetOptions": {
+      "base": "<p>Options that control how the result set is returned.</p>",
+      "refs": {
+        "ExecuteStatementRequest$resultSetOptions": "<p>Options that control how the result set is returned.</p>"
+      }
+    },
+    "RollbackTransactionRequest": {
+      "base": "<p>The request parameters represent the input of a request to perform a rollback of a transaction.</p>",
+      "refs": {
+      }
+    },
+    "RollbackTransactionResponse": {
+      "base": "<p>The response elements represent the output of a request to perform a rollback of a transaction.</p>",
+      "refs": {
+      }
+    },
+    "Row": {
+      "base": null,
+      "refs": {
+        "Record$values": "<p>The values returned in the record.</p>"
+      }
+    },
+    "ServiceUnavailableError": {
+      "base": "<p>The service specified by the <code>resourceArn</code> parameter is not available.</p>",
+      "refs": {
+      }
+    },
+    "SqlParameter": {
+      "base": "<p>A parameter used in a SQL statement.</p>",
+      "refs": {
+        "SqlParametersList$member": null
+      }
+    },
+    "SqlParameterSets": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementRequest$parameterSets": "<p>The parameter set for the batch operation.</p> <p>The SQL statement is executed as many times as the number of parameter sets provided. To execute a SQL statement with no parameters, use one of the following options:</p> <ul> <li> <p>Specify one or more empty parameter sets.</p> </li> <li> <p>Use the <code>ExecuteStatement</code> operation instead of the <code>BatchExecuteStatement</code> operation.</p> </li> </ul> <note> <p>Array parameters are not supported.</p> </note>"
+      }
+    },
+    "SqlParametersList": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementRequest$parameters": "<p>The parameters for the SQL statement.</p> <note> <p>Array parameters are not supported.</p> </note>",
+        "SqlParameterSets$member": null
+      }
+    },
+    "SqlRecords": {
+      "base": null,
+      "refs": {
+        "ExecuteStatementResponse$records": "<p>The records returned by the SQL statement.</p>"
+      }
+    },
+    "SqlStatement": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementRequest$sql": "<p>The SQL statement to run.</p>",
+        "ExecuteSqlRequest$sqlStatements": "<p>One or more SQL statements to run on the DB cluster.</p> <p>You can separate SQL statements from each other with a semicolon (;). Any valid SQL statement is permitted, including data definition, data manipulation, and commit statements. </p>",
+        "ExecuteStatementRequest$sql": "<p>The SQL statement to run.</p>"
+      }
+    },
+    "SqlStatementResult": {
+      "base": "<p>The result of a SQL statement.</p> <pre><code> &lt;important&gt; &lt;p&gt;This data type is deprecated.&lt;/p&gt; &lt;/important&gt; </code></pre>",
+      "refs": {
+        "SqlStatementResults$member": null
+      }
+    },
+    "SqlStatementResults": {
+      "base": null,
+      "refs": {
+        "ExecuteSqlResponse$sqlStatementResults": "<p>The results of the SQL statement or statements.</p>"
+      }
+    },
+    "StatementTimeoutException": {
+      "base": "<p>The execution of the SQL statement timed out.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "ColumnMetadata$label": "<p>The label for the column.</p>",
+        "ColumnMetadata$name": "<p>The name of the column.</p>",
+        "ColumnMetadata$schemaName": "<p>The name of the schema that owns the table that includes the column.</p>",
+        "ColumnMetadata$tableName": "<p>The name of the table that includes the column.</p>",
+        "ColumnMetadata$typeName": "<p>The database-specific data type of the column.</p>",
+        "Field$stringValue": "<p>A value of string data type.</p>",
+        "StringArray$member": null,
+        "Value$stringValue": "<p>A value for a column of string data type.</p>"
+      }
+    },
+    "StringArray": {
+      "base": "<p>An array of strings.</p> <note> <p>Some array entries can be null.</p> </note>",
+      "refs": {
+        "ArrayValue$stringValues": "<p>An array of strings.</p>"
+      }
+    },
+    "StructValue": {
+      "base": "<p>A structure value returned by a call.</p>",
+      "refs": {
+        "Value$structValue": "<p>A value for a column of STRUCT data type.</p>"
+      }
+    },
+    "TransactionStatus": {
+      "base": null,
+      "refs": {
+        "CommitTransactionResponse$transactionStatus": "<p>The status of the commit operation.</p>",
+        "RollbackTransactionResponse$transactionStatus": "<p>The status of the rollback operation.</p>"
+      }
+    },
+    "TypeHint": {
+      "base": null,
+      "refs": {
+        "SqlParameter$typeHint": "<p>A hint that specifies the correct object type for data type mapping.</p> <p> <b>Values:</b> </p> <ul> <li> <p> <code>DECIMAL</code> - The corresponding <code>String</code> parameter value is sent as an object of <code>DECIMAL</code> type to the database.</p> </li> <li> <p> <code>TIMESTAMP</code> - The corresponding <code>String</code> parameter value is sent as an object of <code>TIMESTAMP</code> type to the database. The accepted format is <code>YYYY-MM-DD HH:MM:SS[.FFF]</code>.</p> </li> <li> <p> <code>TIME</code> - The corresponding <code>String</code> parameter value is sent as an object of <code>TIME</code> type to the database. The accepted format is <code>HH:MM:SS[.FFF]</code>.</p> </li> <li> <p> <code>DATE</code> - The corresponding <code>String</code> parameter value is sent as an object of <code>DATE</code> type to the database. The accepted format is <code>YYYY-MM-DD</code>.</p> </li> </ul>"
+      }
+    },
+    "UpdateResult": {
+      "base": "<p>The response elements represent the results of an update.</p>",
+      "refs": {
+        "UpdateResults$member": null
+      }
+    },
+    "UpdateResults": {
+      "base": null,
+      "refs": {
+        "BatchExecuteStatementResponse$updateResults": "<p>The execution results of each batch entry.</p>"
+      }
+    },
+    "Value": {
+      "base": "<p>Contains the value of a column.</p> <pre><code> &lt;important&gt; &lt;p&gt;This data type is deprecated.&lt;/p&gt; &lt;/important&gt; </code></pre>",
+      "refs": {
+        "ArrayValueList$member": null,
+        "Row$member": null
+      }
+    }
+  }
+}

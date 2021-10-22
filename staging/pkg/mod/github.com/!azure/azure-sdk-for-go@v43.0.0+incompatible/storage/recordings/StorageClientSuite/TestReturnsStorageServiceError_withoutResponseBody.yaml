@@ -1,0 +1,34 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:KDK7pp7S0qP6cJLfYovz5BqLUKmnYjcTjbvsJz2DHxg=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/non-existing-container/non-existing-blob
+    method: HEAD
+  response:
+    body: ""
+    headers:
+      Date:
+      - Tue, 28 May 2019 22:35:39 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Error-Code:
+      - ContainerNotFound
+      X-Ms-Request-Id:
+      - 37814711-e01e-00b7-16a5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 404 The specified container does not exist.
+    code: 404
+    duration: ""
