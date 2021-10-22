@@ -40,26 +40,27 @@ const (
 // GetNonzeroRequests returns the default cpu and memory resource request if none is found or
 // what is provided on the request.
 func GetNonzeroRequests(requests *v1.ResourceList) (int64, int64) {
-	return GetNonzeroRequestForResource(v1.ResourceCPU, requests),
-		GetNonzeroRequestForResource(v1.ResourceMemory, requests)
+	return GetRequestForResource(v1.ResourceCPU, requests, true),
+		GetRequestForResource(v1.ResourceMemory, requests, true)
 }
 
-// GetNonzeroRequestForResource returns the default resource request if none is found or
-// what is provided on the request.
-func GetNonzeroRequestForResource(resource v1.ResourceName, requests *v1.ResourceList) int64 {
+// GetRequestForResource returns the requested values unless nonZero is true and there is no defined request
+// for CPU and memory.
+// If nonZero is true and the resource has no defined request for CPU or memory, it returns a default value.
+func GetRequestForResource(resource v1.ResourceName, requests *v1.ResourceList, nonZero bool) int64 {
 	if requests == nil {
 		return 0
 	}
 	switch resource {
 	case v1.ResourceCPU:
 		// Override if un-set, but not if explicitly set to zero
-		if _, found := (*requests)[v1.ResourceCPU]; !found {
+		if _, found := (*requests)[v1.ResourceCPU]; !found && nonZero {
 			return DefaultMilliCPURequest
 		}
 		return requests.Cpu().MilliValue()
 	case v1.ResourceMemory:
 		// Override if un-set, but not if explicitly set to zero
-		if _, found := (*requests)[v1.ResourceMemory]; !found {
+		if _, found := (*requests)[v1.ResourceMemory]; !found && nonZero {
 			return DefaultMemoryRequest
 		}
 		return requests.Memory().Value()
