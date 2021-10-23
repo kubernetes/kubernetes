@@ -327,7 +327,7 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 			}
 			// If the PVC is invalid, we don't count the volume because
 			// there's no guarantee that it belongs to the running predicate.
-			klog.V(4).InfoS("Unable to look up PVC info, assuming PVC doesn't match predicate when counting limits", "pod", klog.KObj(pod),"PVC", pvcName,"err", err)
+			klog.V(4).InfoS("Unable to look up PVC info, assuming PVC doesn't match predicate when counting limits", "pod", klog.KObj(pod), "PVC", klog.KRef(pod.Namespace, pvcName), "err", err)
 			continue
 		}
 
@@ -343,7 +343,7 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 			// original PV where it was bound to, so we count the volume if
 			// it belongs to the running predicate.
 			if pl.matchProvisioner(pvc) {
-				klog.V(4).InfoS("PVC is not bound, assuming PVC matches predicate when counting limits", "pod", klog.KObj(pod),"PVC", pvcName)
+				klog.V(4).InfoS("PVC is not bound, assuming PVC matches predicate when counting limits", "pod", klog.KObj(pod), "PVC", klog.KRef(pod.Namespace, pvcName))
 				filteredVolumes.Insert(pvID)
 			}
 			continue
@@ -354,7 +354,7 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 			// If the PV is invalid and PVC belongs to the running predicate,
 			// log the error and count the PV towards the PV limit.
 			if pl.matchProvisioner(pvc) {
-				klog.V(4).InfoS("Unable to look up PV, assuming PV matches predicate when counting limits", "pod", klog.KObj(pod),"PVC", pvcName, "pvName", pvName, "err", err)
+				klog.V(4).InfoS("Unable to look up PV, assuming PV matches predicate when counting limits", "pod", klog.KObj(pod), "PVC", klog.KRef(pod.Namespace, pvcName), "PV", klog.KRef("", pvName), "err", err)
 				filteredVolumes.Insert(pvID)
 			}
 			continue
@@ -388,7 +388,7 @@ func getMaxVolLimitFromEnv() int {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
 			klog.ErrorS(err, "Unable to parse maximum PD volumes value, using default")
 		} else if parsedMaxVols <= 0 {
-			klog.ErrorS(nil,"Maximum PD volumes must be a positive value, using default")
+			klog.ErrorS(nil, "Maximum PD volumes must be a positive value, using default")
 		} else {
 			return parsedMaxVols
 		}

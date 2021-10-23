@@ -65,7 +65,7 @@ type Option func(runtime.Registry) error
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
-		klog.ErrorS(err,"Unable to initialize command options")
+		klog.ErrorS(err, "Unable to initialize command options")
 		os.Exit(1)
 	}
 
