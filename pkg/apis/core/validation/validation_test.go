@@ -5533,6 +5533,18 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+		{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			},
+		}}}},
 	}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
@@ -5555,6 +5567,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "G:\\mount", SubPath: ""},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
+		{Name: "ephemeral", MountPath: "/foobar"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -5852,6 +5865,18 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+		{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			},
+		}}}},
 	}
 
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
@@ -5863,6 +5888,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 	successCase := []core.VolumeDevice{
 		{Name: "abc", DevicePath: "/foo"},
 		{Name: "abc-123", DevicePath: "/usr/share/test"},
+		{Name: "ephemeral", DevicePath: "/disk"},
 	}
 	goodVolumeMounts := []core.VolumeMount{
 		{Name: "xyz", MountPath: "/foofoo"},
@@ -5888,7 +5914,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 	}
 
 	// Success Cases:
-	// Validate normal success cases - only PVC volumeSource
+	// Validate normal success cases - only PVC volumeSource or generic ephemeral volume
 	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}

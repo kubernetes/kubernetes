@@ -297,6 +297,13 @@ var (
 		SnapshotType:           DynamicCreatedSnapshot,
 		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
+	// BlockVolModeGenericEphemeralVolume is for generic ephemeral inline volumes in raw block mode.
+	BlockVolModeGenericEphemeralVolume = TestPattern{
+		Name:        "Generic Ephemeral-volume (block volmode) (late-binding)",
+		VolType:     GenericEphemeralVolume,
+		VolMode:     v1.PersistentVolumeBlock,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 
 	// Definitions for snapshot case
 
