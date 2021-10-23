@@ -65,7 +65,8 @@ type Option func(runtime.Registry) error
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
+		klog.ErrorS(err,"Unable to initialize command options")
+		os.Exit(1)
 	}
 
 	cmd := &cobra.Command{
@@ -196,7 +197,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				select {
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
-					klog.Info("Requested to terminate. Exiting.")
+					klog.InfoS("Requested to terminate, exiting")
 					os.Exit(0)
 				default:
 					// We lost the lock.
