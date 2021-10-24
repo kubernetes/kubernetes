@@ -53,7 +53,7 @@ const (
 	VolumeStatsInodesKey         = "volume_stats_inodes"
 	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
 	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
-	VolumeStatsHealthAbnormalKey = "volume_stats_health_abnormal"
+	VolumeStatsHealthStatusKey   = "volume_stats_health_status"
 	RunningPodsKey               = "running_pods"
 	RunningContainersKey         = "running_containers"
 	// Metrics keys of remote runtime operations

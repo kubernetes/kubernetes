@@ -47,8 +47,8 @@ func TestVolumeStatsCollector(t *testing.T) {
 		# TYPE kubelet_volume_stats_inodes_used gauge
 		# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
 		# TYPE kubelet_volume_stats_used_bytes gauge
-		# HELP kubelet_volume_stats_health_abnormal [ALPHA] Volume health status. The count is either 1 or 0
-		# TYPE kubelet_volume_stats_health_abnormal gauge
+		# HELP kubelet_volume_stats_health_status [ALPHA] Volume health status. The count is either 1 or 0
+		# TYPE kubelet_volume_stats_health_status gauge
 	`
 
 	var (
@@ -126,7 +126,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 			kubelet_volume_stats_inodes_free{namespace="testns",persistentvolumeclaim="testpvc"} 655344
 			kubelet_volume_stats_inodes_used{namespace="testns",persistentvolumeclaim="testpvc"} 16
 			kubelet_volume_stats_used_bytes{namespace="testns",persistentvolumeclaim="testpvc"} 4.21789696e+09
-			kubelet_volume_stats_health_abnormal{namespace="testns",persistentvolumeclaim="testpvc"} 1
+			kubelet_volume_stats_health_status{namespace="testns",persistentvolumeclaim="testpvc"} 1
 			`
 
 		metrics = []string{
@@ -136,7 +136,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 			"kubelet_volume_stats_inodes_free",
 			"kubelet_volume_stats_inodes_used",
 			"kubelet_volume_stats_used_bytes",
-			"kubelet_volume_stats_health_abnormal",
+			"kubelet_volume_stats_health_status",
 		}
 	)
 
