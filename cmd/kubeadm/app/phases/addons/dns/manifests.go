@@ -142,6 +142,13 @@ spec:
             items:
             - key: Corefile
               path: Corefile
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            k8s-app: kube-dns
 `
 
 	// CoreDNSConfigMap is the CoreDNS ConfigMap manifest
