@@ -152,7 +152,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
 	
 	if (!isAttached) {
-   framework.Failf("volume", v.Spec.VsphereVolume.VolumePath, "is not attached to node ", nodeName)
+   		framework.Failf("volume", v.Spec.VsphereVolume.VolumePath, "is not attached to node ", nodeName)
 	}
 	framework.ExpectNoError(err)
 
