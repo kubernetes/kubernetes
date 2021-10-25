@@ -132,7 +132,7 @@ func OperationCompleteHook(plugin, operationName string) func(types.CompleteFunc
 
 // FSGroupCompleteHook returns a hook to call when volume recursive permission is changed
 func FSGroupCompleteHook(plugin volume.VolumePlugin, spec *volume.Spec) func(types.CompleteFuncParam) {
-	return OperationCompleteHook(GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), spec), "volume_fsgroup_recursive_apply")
+	return OperationCompleteHook(GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), spec), "volume_apply_access_control")
 }
 
 // GetFullQualifiedPluginNameForVolume returns full qualified plugin name for
