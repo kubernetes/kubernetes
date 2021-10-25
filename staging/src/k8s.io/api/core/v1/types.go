@@ -5239,6 +5239,9 @@ const (
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// Swap, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// Supported if the feature gate NodeSwap is enabled
+	ResourceSwap ResourceName = "swap"
 )
 
 const (

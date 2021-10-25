@@ -35,6 +35,11 @@ func (rl *ResourceList) Memory() *resource.Quantity {
 	return rl.Name(ResourceMemory, resource.BinarySI)
 }
 
+// Swap returns the Swap limit if specified.
+func (rl *ResourceList) Swap() *resource.Quantity {
+	return rl.Name(ResourceSwap, resource.BinarySI)
+}
+
 // Storage returns the Storage limit if specified.
 func (rl *ResourceList) Storage() *resource.Quantity {
 	return rl.Name(ResourceStorage, resource.BinarySI)

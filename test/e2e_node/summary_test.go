@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -42,6 +44,16 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FailSwapOn = false
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
+			initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+			initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
+				SwapBehavior: "LimitedSwap",
+			}
+		})
 		ginkgo.AfterEach(func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
@@ -84,6 +96,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
+			swapLimit := node.Status.Capacity.Swap()
 			fsCapacityBounds := bounded(100*e2evolume.Mb, 10*e2evolume.Tb)
 			// Expectations for system containers.
 			sysContExpectations := func() types.GomegaMatcher {
@@ -107,6 +120,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(1*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
+						"SwapBytes":       bounded(0, swapLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -133,6 +147,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
+				"SwapBytes":       bounded(0, swapLimit),
 				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
@@ -154,6 +169,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(100*e2evolume.Kb, memoryLimit),
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
+					"SwapBytes":       bounded(0, swapLimit),
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
@@ -178,6 +194,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+							"SwapBytes":       bounded(0, 80*e2evolume.Mb),
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
@@ -225,6 +242,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+					"SwapBytes":       bounded(0, 80*e2evolume.Mb),
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
@@ -275,6 +293,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(10*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
+						"SwapBytes":       bounded(0, swapLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
