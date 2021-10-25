@@ -18,6 +18,7 @@ package admission
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -462,7 +463,9 @@ func TestValidateNamespace(t *testing.T) {
 			if evaluator.lv != tc.expectEvaluate {
 				t.Errorf("expected to evaluate %v, got %v", tc.expectEvaluate, evaluator.lv)
 			}
-			assertAggregatePodsWarnings(t, tc.expectWarnings, result.Warnings)
+			if !reflect.DeepEqual(result.Warnings, tc.expectWarnings) {
+				t.Errorf("expected warnings:\n%v\ngot\n%v", tc.expectWarnings, result.Warnings)
+			}
 		})
 	}
 }
@@ -651,22 +654,4 @@ func NewMockRecorder() *MockRecorder {
 }
 
 func (r MockRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
-}
-
-func assertAggregatePodsWarnings(t *testing.T, expected, actual []string) {
-	e, a := make(map[string]string), make(map[string]string)
-	for _, warning := range expected {
-		warningSplit := strings.Split(warning, ": ")
-		podNames := warningSplit[0]
-		reasons := warningSplit[1]
-		e[podNames] = reasons
-	}
-	for _, warning := range actual {
-		warningSplit := strings.Split(warning, ": ")
-		podNames := warningSplit[0]
-		reasons := warningSplit[1]
-		a[podNames] = reasons
-	}
-
-	assert.Equal(t, e, a, "unexpected warnings")
 }
