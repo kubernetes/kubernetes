@@ -150,7 +150,9 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-	framework.ExpectEqual(isAttached, true)
+	if (!isAttached) {
+   		framework.Failf("volume", v.Spec.VsphereVolume.VolumePath, "is not attached to node ", nodeName)
+	}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")

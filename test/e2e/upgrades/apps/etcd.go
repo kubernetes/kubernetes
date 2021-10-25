@@ -200,7 +200,7 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	framework.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
 	framework.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
-	framework.ExpectEqual(ratio > 0.75, true)
+	gomega.Expect(ratio).To(gomega.BeNumerically(">", 0.75), "ratio too small")
 }
 
 // Teardown does one final check of the data's availability.
