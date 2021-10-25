@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/utils/clock"
 )
 
@@ -196,7 +195,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	go func() {
 		for {
 			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
-				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", format.Pods(evictedPods))
+				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjs(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
 				time.Sleep(monitoringInterval)
@@ -365,7 +364,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
-	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", format.Pods(activePods))
+	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjs(activePods))
 
 	//record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
@@ -400,7 +399,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	for {
 		select {
 		case <-timeout.C():
-			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", format.Pods(pods))
+			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjs(pods))
 			return
 		case <-ticker.C():
 			for i, pod := range pods {
@@ -408,7 +407,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 					break
 				}
 				if i == len(pods)-1 {
-					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", format.Pods(pods))
+					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", klog.KObjs(pods))
 					return
 				}
 			}
