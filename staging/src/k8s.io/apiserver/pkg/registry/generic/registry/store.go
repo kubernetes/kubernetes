@@ -1126,7 +1126,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	}
 	wg := sync.WaitGroup{}
 	toProcess := make(chan int, 2*workersNumber)
-	errs := make(chan error, workersNumber)
+	errs := make(chan error, workersNumber+1)
 	workersExited := make(chan struct{})
 	distributorExited := make(chan struct{})
 
