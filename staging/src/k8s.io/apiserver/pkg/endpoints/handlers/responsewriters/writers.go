@@ -201,7 +201,8 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 			w.trace.Step("Write call finished",
 				utiltrace.Field{"writer", fmt.Sprintf("%T", w.w)},
 				utiltrace.Field{"size", len(p)},
-				utiltrace.Field{"firstWrite", firstWrite})
+				utiltrace.Field{"firstWrite", firstWrite},
+				utiltrace.Field{"err", err})
 		}()
 	}
 	if w.hasWritten {
