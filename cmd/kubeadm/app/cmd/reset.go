@@ -197,7 +197,6 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 	// initialize the workflow runner with the list of phases
 	resetRunner.AppendPhase(phases.NewPreflightPhase())
-	resetRunner.AppendPhase(phases.NewUpdateClusterStatus())
 	resetRunner.AppendPhase(phases.NewRemoveETCDMemberPhase())
 	resetRunner.AppendPhase(phases.NewCleanupNodePhase())
 
