@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -38,9 +40,29 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
+const (
+	// swap partition directory
+	swapDir  = "/mnt/swap"
+	swapSize = 512 // 512 Mi
+)
+
 var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	ginkgo.Context("when querying /stats/summary", func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FailSwapOn = false
+			initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+			initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
+				SwapBehavior: "LimitedSwap",
+			}
+		})
+		// setup
+		ginkgo.JustBeforeEach(func() {
+			gomega.Eventually(func() error {
+				return setupSwap(swapDir)
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+		})
+
 		ginkgo.AfterEach(func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
@@ -50,6 +72,13 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
+			// cleanup
+			ginkgo.JustAfterEach(func() {
+				gomega.Eventually(func() error {
+					return cleanupSwap(swapDir)
+				}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			})
+
 		})
 		ginkgo.It("should report resource usage through the stats api", func() {
 			const pod0 = "stats-busybox-0"
@@ -78,6 +107,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			const (
 				maxStartAge = time.Hour * 24 * 365 // 1 year
 				maxStatsAge = time.Minute
+				swapLimit   = swapSize * e2evolume.Mb
 			)
 			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
 			node := getLocalNode(f)
@@ -106,6 +136,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(1*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
+						"SwapBytes":       bounded(0, swapLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -132,6 +163,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
+				"SwapBytes":       bounded(0, swapLimit),
 				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
@@ -176,6 +208,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(100*e2evolume.Kb, memoryLimit),
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
+					"SwapBytes":       bounded(0, swapLimit),
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
@@ -200,6 +233,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+							"SwapBytes":       bounded(0, 80*e2evolume.Mb),
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
@@ -247,6 +281,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+					"SwapBytes":       bounded(0, 80*e2evolume.Mb),
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
@@ -296,6 +331,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(10*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
+						"SwapBytes":       bounded(0, swapLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -475,4 +511,24 @@ func recordSystemCgroupProcesses() {
 			}
 		}
 	}
+}
+
+func setupSwap(path string) error {
+	// set up a swap area 512Mi on specified path
+	swapDirCommand := fmt.Sprintf("dd if=/dev/zero of=%s bs=1M count=%d", path, swapSize)
+	mkswapCommand := fmt.Sprintf("mkswap %s", path)
+	swapOnCommand := fmt.Sprintf("swapon %s", path)
+	if err := exec.Command("/bin/sh", "-c",
+		fmt.Sprintf("%s && %s && %s", swapDirCommand, mkswapCommand, swapOnCommand)).Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cleanupSwap(path string) error {
+	if err := exec.Command("/bin/sh", "-c",
+		"swapoff %s && rm -rf %s", path, path).Run(); err != nil {
+		return err
+	}
+	return nil
 }
