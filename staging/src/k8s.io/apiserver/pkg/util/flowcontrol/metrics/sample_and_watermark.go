@@ -79,7 +79,7 @@ type sampleAndWaterMarkObserverGenerator struct {
 	waterMarks   *compbasemetrics.HistogramVec
 }
 
-var _ TimedObserverGenerator = (*sampleAndWaterMarkObserverGenerator)(nil)
+var _ TimedObserverGenerator = SampleAndWaterMarkObserverGenerator{}
 
 // NewSampleAndWaterMarkHistogramsGenerator makes a new one
 func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkObserverGenerator {

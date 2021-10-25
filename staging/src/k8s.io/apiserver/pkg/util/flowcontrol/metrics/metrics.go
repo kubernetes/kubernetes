@@ -104,6 +104,28 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	// PriorityLevelExecutionSeatsObserverGenerator creates observers of seats occupied throughout execution for priority levels
+	PriorityLevelExecutionSeatsObserverGenerator = NewSampleAndWaterMarkHistogramsGenerator(clock.RealClock{}, time.Millisecond,
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "priority_level_seat_count_samples",
+			Help:           "Periodic observations of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			ConstLabels:    map[string]string{phase: "executing"},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "priority_level_seat_count_watermarks",
+			Help:           "Watermarks of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			ConstLabels:    map[string]string{phase: "executing"},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel},
+	)
 	// PriorityLevelConcurrencyObserverPairGenerator creates pairs that observe concurrency for priority levels
 	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
 		&compbasemetrics.HistogramOpts{
@@ -295,6 +317,7 @@ var (
 		apiserverRequestExecutionSeconds,
 		apiserverEpochAdvances,
 	}.
+		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
 		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
 		Append(ReadWriteConcurrencyObserverPairGenerator.metrics()...)
 )
