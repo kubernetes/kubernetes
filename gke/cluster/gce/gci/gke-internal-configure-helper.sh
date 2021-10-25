@@ -253,7 +253,7 @@ function create-static-auth-kubeconfig-for-component {
   local component=$1
   echo "Creating token for component ${component}"
   local token="$(secure_random 32)"
-  append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "system:${component},uid:system:${component}"
+  append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "system:${component},uid:system:${component}${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   create-kubeconfig ${component} ${token}
   echo -n ${token} > /etc/srv/kubernetes/${component}/token
 }
