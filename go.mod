@@ -10,12 +10,17 @@ go 1.16
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
+	cloud.google.com/go v0.81.0
 	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18
 	github.com/Azure/go-autorest/autorest/adal v0.9.13
+	github.com/Azure/go-autorest/autorest/mocks v0.4.1
 	github.com/Azure/go-autorest/autorest/to v0.4.0
+	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.16.1-0.20210702024009-ea6160c1d0e3
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
+	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio v0.4.17
 	github.com/Microsoft/hcsshim v0.8.22
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
@@ -23,6 +28,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/containernetworking/cni v0.8.1
@@ -31,6 +37,8 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
+	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
+	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.2+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -38,41 +46,64 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
+	github.com/fatih/camelcase v1.0.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fvbommel/sortorder v1.0.1
+	github.com/go-logr/logr v1.2.0
+	github.com/go-logr/zapr v1.2.0
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.0.4
+	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
+	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
 	github.com/google/cadvisor v0.39.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
+	github.com/gophercloud/gophercloud v0.1.0
+	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/heketi/heketi v10.3.0+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
+	github.com/imdario/mergo v0.3.5
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
+	github.com/jonboulle/clockwork v0.2.2
 	github.com/libopenstorage/openstorage v1.0.0
+	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
+	github.com/mitchellh/go-wordwrap v1.0.0
+	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
+	github.com/moby/spdystream v0.2.0
+	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v1.0.2
 	github.com/opencontainers/selinux v1.8.2
+	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
+	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.28.0
+	github.com/prometheus/procfs v0.6.0
 	github.com/quobyte/api v0.1.8
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
+	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/storageos/go-api v2.2.0+incompatible
@@ -82,9 +113,15 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.0
 	go.etcd.io/etcd/client/pkg/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
+	go.etcd.io/etcd/server/v3 v3.5.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
+	go.opentelemetry.io/otel v0.20.0
+	go.opentelemetry.io/otel/exporters/otlp v0.20.0
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp v0.7.0
+	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
@@ -92,6 +129,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+	golang.org/x/text v0.3.6
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
 	gonum.org/v1/gonum v0.6.2
@@ -101,7 +139,10 @@ require (
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
+	gopkg.in/inf.v0 v0.9.1
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
+	gopkg.in/warnings.v0 v0.1.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
@@ -131,8 +172,15 @@ require (
 	k8s.io/mount-utils v0.0.0
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
+	k8s.io/sample-cli-plugin v0.0.0
+	k8s.io/sample-controller v0.0.0
 	k8s.io/system-validators v1.5.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.23
+	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
+	sigs.k8s.io/kustomize/api v0.8.11
+	sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
+	sigs.k8s.io/kustomize/kyaml v0.11.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 	sigs.k8s.io/yaml v1.2.0
 )

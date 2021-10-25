@@ -5,26 +5,24 @@ module k8s.io/cloud-provider
 go 1.16
 
 require (
-	github.com/google/go-cmp v0.5.5
-	github.com/spf13/cobra v1.2.1
-	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.7.0
+	github.com/google/uuid v1.1.2 // indirect
+	github.com/googleapis/gnostic v0.5.5 // indirect
+	github.com/onsi/ginkgo v1.14.0 // indirect
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
+	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55 // indirect
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
+	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
+	google.golang.org/appengine v1.6.7 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/component-base v0.0.0
-	k8s.io/controller-manager v0.0.0
 	k8s.io/klog/v2 v2.30.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8 // indirect
 )
 
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
-	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ../cloud-provider
-	k8s.io/component-base => ../component-base
-	k8s.io/controller-manager => ../controller-manager
 )
