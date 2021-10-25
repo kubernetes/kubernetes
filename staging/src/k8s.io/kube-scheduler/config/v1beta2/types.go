@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	v1 "k8s.io/kube-scheduler/config/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -287,7 +286,7 @@ type Extender struct {
 	// EnableHTTPS specifies whether https should be used to communicate with the extender
 	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *v1.ExtenderTLSConfig `json:"tlsConfig,omitempty"`
+	TLSConfig *ExtenderTLSConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout metav1.Duration `json:"httpTimeout,omitempty"`
@@ -305,8 +304,45 @@ type Extender struct {
 	//   will skip checking the resource in predicates.
 	// +optional
 	// +listType=atomic
-	ManagedResources []v1.ExtenderManagedResource `json:"managedResources,omitempty"`
+	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
 	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
 	// fail when the extender returns an error or is not reachable.
 	Ignorable bool `json:"ignorable,omitempty"`
+}
+
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name string `json:"name"`
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
+}
+
+// ExtenderTLSConfig contains settings to enable TLS with extender
+type ExtenderTLSConfig struct {
+	// Server should be accessed without verifying the TLS certificate. For testing only.
+	Insecure bool `json:"insecure,omitempty"`
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// certificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string `json:"serverName,omitempty"`
+
+	// Server requires TLS client certificate authentication
+	CertFile string `json:"certFile,omitempty"`
+	// Server requires TLS client certificate authentication
+	KeyFile string `json:"keyFile,omitempty"`
+	// Trusted root certificates for server
+	CAFile string `json:"caFile,omitempty"`
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte `json:"certData,omitempty"`
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte `json:"keyData,omitempty"`
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte `json:"caData,omitempty"`
 }
