@@ -289,6 +289,17 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	watchCountSamples = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watch_count_samples",
+			Help:           "count of watchers for mutating requests in API Priority and Fairness",
+			Buckets:        []float64{0, 1, 10, 100, 1000, 10000},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 	apiserverEpochAdvances = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -315,6 +326,7 @@ var (
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
+		watchCountSamples,
 		apiserverEpochAdvances,
 	}.
 		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
@@ -383,6 +395,12 @@ func ObserveExecutionDuration(ctx context.Context, priorityLevel, flowSchema str
 	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Observe(executionTime.Seconds())
 }
 
+// ObserveWatchCount notes a sampling of a watch count
+func ObserveWatchCount(ctx context.Context, priorityLevel, flowSchema string, count int) {
+	watchCountSamples.WithLabelValues(priorityLevel, flowSchema).Observe(float64(count))
+}
+
+// AddEpochAdvance notes an advance of the progress meter baseline for a given priority level
 func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
 	apiserverEpochAdvances.WithContext(ctx).WithLabelValues(priorityLevel, strconv.FormatBool(success)).Inc()
 }
