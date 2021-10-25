@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 )
 
 // readOnlyVerbs contains verbs for read-only requests.
@@ -91,11 +92,15 @@ func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo) ForgetWat
 	// FIXME: Clean this up.
 	var indexField string
 	if (requestInfo.Resource=="pods") {
+		klog.Infof("DEBUG: pods watch request: %s", requestInfo.Path)
 		reqURL, _ := url.Parse(requestInfo.Path)
 		opts := metainternalversion.ListOptions{}
 		_ = metainternalversionscheme.ParameterCodec.DecodeParameters(reqURL.Query(), metav1.SchemeGroupVersion, &opts)
+		klog.Infof("DEBUG: query: %#v", reqURL.Query())
 		if opts.FieldSelector!=nil {
+			klog.Infof("DEBUG: field selector: %#v", opts.FieldSelector.String())
 			if nodeName, ok := opts.FieldSelector.RequiresExactMatch("spec.nodeName"); ok {
+				klog.Infof("DEBUG: AA setting indexField: '%v'", nodeName)
 				indexField=nodeName
 			}
 		}
@@ -161,6 +166,7 @@ func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo)
 		// a different/more complex data structure here.
 		// For now, we kind-of simulate it by setting nodeName="" and assuming that
 		// this is the highest.
+		klog.Infof("DEBUG: BBB need to set indexField")
 		identifier.indexField = ""
 	}
 
@@ -176,5 +182,8 @@ func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo)
 		result += w.watchCount[*identifier]
 	}
 
+	if (requestInfo.Resource=="pods") {
+		klog.Infof("DEBUG: CCC watch_count: %v", result)
+	}
 	return result
 }
