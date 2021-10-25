@@ -40,7 +40,7 @@ const (
 	// result := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch("abcdef.1234567890123456")
 	// result == []string{"abcdef.1234567890123456","abcdef","1234567890123456"}
 	// len(result) == 3
-	validatedSubstringsSize = 3
+	ValidatedSubstringsSize = 3
 )
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -81,7 +81,7 @@ func (bts BootstrapTokenString) String() string {
 // is of the right format
 func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
-	if len(substrs) != validatedSubstringsSize {
+	if len(substrs) != ValidatedSubstringsSize {
 		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
 	}
 
