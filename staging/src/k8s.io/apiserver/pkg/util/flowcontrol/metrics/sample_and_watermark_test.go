@@ -37,7 +37,7 @@ const (
 	numIterations         = 100
 )
 
-var once sync.Once
+var registerMetrics sync.Once
 
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
@@ -64,7 +64,7 @@ func TestSampler(t *testing.T) {
 	saw := gen.Generate(0, 1, []string{})
 	regs := gen.metrics()
 	for _, reg := range regs {
-		once.Do(func() {
+		registerMetrics.Do(func() {
 			legacyregistry.MustRegister(reg)
 		})
 	}
