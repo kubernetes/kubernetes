@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -476,25 +477,37 @@ func produceConfigMapEvents(f *framework.Framework, stopc <-chan struct{}, minWa
 	tc := time.NewTicker(minWaitBetweenEvents)
 	defer tc.Stop()
 	i := 0
+	updates := 0
 	for range tc.C {
 		op := rand.Intn(3)
 		if len(existing) == 0 {
 			op = createEvent
 		}
 
-		cm := &v1.ConfigMap{}
 		switch op {
 		case createEvent:
-			cm.Name = name(i)
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name(i),
+				},
+			}
 			_, err := c.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create configmap %s in namespace %s", cm.Name, ns)
 			existing = append(existing, i)
 			i++
 		case updateEvent:
 			idx := rand.Intn(len(existing))
-			cm.Name = name(existing[idx])
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name(existing[idx]),
+					Labels: map[string]string{
+						"mutated": strconv.Itoa(updates),
+					},
+				},
+			}
 			_, err := c.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
 			framework.ExpectNoError(err, "Failed to update configmap %s in namespace %s", cm.Name, ns)
+			updates++
 		case deleteEvent:
 			idx := rand.Intn(len(existing))
 			err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name(existing[idx]), metav1.DeleteOptions{})
