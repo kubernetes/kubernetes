@@ -25,6 +25,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	"k8s.io/pod-security-admission/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
@@ -54,16 +57,22 @@ const maxRequestSize = int64(3 * 1024 * 1024)
 func NewServerCommand() *cobra.Command {
 	opts := options.NewOptions()
 
+	cmdName := "podsecurity-webhook"
+	if executable, err := os.Executable(); err == nil {
+		cmdName = filepath.Base(executable)
+	}
 	cmd := &cobra.Command{
-		Use: "podsecurity-webhook",
+		Use: cmdName,
 		Long: `The PodSecurity webhook is a standalone webhook server implementing the Pod
 Security Standards.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			verflag.PrintAndExitIfRequested()
 			return runServer(cmd.Context(), opts)
 		},
 		Args: cobra.NoArgs,
 	}
 	opts.AddFlags(cmd.Flags())
+	verflag.AddFlags(cmd.Flags())
 
 	return cmd
 }
