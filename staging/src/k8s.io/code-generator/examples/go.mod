@@ -12,9 +12,9 @@ require (
 )
 
 replace (
-	k8s.io/api => ../../api
-	k8s.io/apimachinery => ../../apimachinery
-	k8s.io/client-go => ../../client-go
+	k8s.io/api => ../../../../../_vmod/k8s.io/api
+	k8s.io/apimachinery => ../../../../../_vmod/k8s.io/apimachinery
+	k8s.io/client-go => ../../../../../_vmod/k8s.io/client-go
 )
 
 replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20211020163728-48258682683b
