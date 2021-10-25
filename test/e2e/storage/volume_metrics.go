@@ -304,6 +304,12 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 		key := volumeStatKeys[0]
 		kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
+		pvcName := pvcBlock.Namespace
+		pvcNamespace := pvcBlock.Name
+		if isEphemeral {
+			pvcName = ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0])
+			pvcNamespace = pod.Namespace
+		}
 		// Poll kubelet metrics waiting for the volume to be picked up
 		// by the volume stats collector
 		var kubeMetrics e2emetrics.KubeletMetrics
@@ -316,7 +322,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				framework.Logf("Error fetching kubelet metrics")
 				return false, err
 			}
-			if !findVolumeStatMetric(kubeletKeyName, pvcBlock.Namespace, pvcBlock.Name, kubeMetrics) {
+			if !findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics) {
 				return false, nil
 			}
 			return true, nil
@@ -325,7 +331,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
-			found := findVolumeStatMetric(kubeletKeyName, pvcBlock.Namespace, pvcBlock.Name, kubeMetrics)
+			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
 			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcBlock.Name, pvcBlock.Namespace, kubeletKeyName)
 		}
 
