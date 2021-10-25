@@ -108,7 +108,7 @@ func TestRegisterWatch(t *testing.T) {
 				t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 			}
 
-			forget := watchTracker.RegisterWatch(requestInfo)
+			forget := watchTracker.RegisterWatch(requestInfo, testCase.request)
 			if testCase.expected == nil {
 				if forget != nil {
 					t.Errorf("unexpected watch registered: %#v", watchTracker.watchCount)
@@ -151,7 +151,7 @@ func TestGetInterestedWatchCount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 		}
-		if forget := watchTracker.RegisterWatch(requestInfo); forget == nil {
+		if forget := watchTracker.RegisterWatch(requestInfo, req); forget == nil {
 			t.Errorf("watch wasn't registered: %#v", requestInfo)
 		}
 	}

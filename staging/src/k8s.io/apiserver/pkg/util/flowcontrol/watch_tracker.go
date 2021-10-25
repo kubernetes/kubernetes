@@ -17,7 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
-	"net/url"
+	"net/http"
 	"sync"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -61,7 +61,7 @@ type WatchTracker interface {
 	// RegisterWatch reqisters a watch with the provided requestInfo
 	// in the tracker. It returns the function that should be called
 	// to forget the watcher once it is finished.
-	RegisterWatch(requestInfo *request.RequestInfo) ForgetWatchFunc
+	RegisterWatch(requestInfo *request.RequestInfo, r *http.Request) ForgetWatchFunc
 
 	// GetInterestedWatchCount returns the number of watches that are
 	// potentially interested in a request with a given RequestInfo
@@ -84,7 +84,7 @@ func NewWatchTracker() WatchTracker {
 }
 
 // RegisterWatch implements WatchTracker interface.
-func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo) ForgetWatchFunc {
+func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo, r *http.Request) ForgetWatchFunc {
 	if requestInfo == nil || requestInfo.Verb != "watch" {
 		return nil
 	}
@@ -92,15 +92,10 @@ func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo) ForgetWat
 	// FIXME: Clean this up.
 	var indexField string
 	if (requestInfo.Resource=="pods") {
-		klog.Infof("DEBUG: pods watch request: %s", requestInfo.Path)
-		reqURL, _ := url.Parse(requestInfo.Path)
 		opts := metainternalversion.ListOptions{}
-		_ = metainternalversionscheme.ParameterCodec.DecodeParameters(reqURL.Query(), metav1.SchemeGroupVersion, &opts)
-		klog.Infof("DEBUG: query: %#v", reqURL.Query())
+		_ = metainternalversionscheme.ParameterCodec.DecodeParameters(r.URL.Query(), metav1.SchemeGroupVersion, &opts)
 		if opts.FieldSelector!=nil {
-			klog.Infof("DEBUG: field selector: %#v", opts.FieldSelector.String())
 			if nodeName, ok := opts.FieldSelector.RequiresExactMatch("spec.nodeName"); ok {
-				klog.Infof("DEBUG: AA setting indexField: '%v'", nodeName)
 				indexField=nodeName
 			}
 		}
@@ -166,7 +161,6 @@ func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo)
 		// a different/more complex data structure here.
 		// For now, we kind-of simulate it by setting nodeName="" and assuming that
 		// this is the highest.
-		klog.Infof("DEBUG: BBB need to set indexField")
 		identifier.indexField = ""
 	}
 
@@ -182,8 +176,10 @@ func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo)
 		result += w.watchCount[*identifier]
 	}
 
-	if (requestInfo.Resource=="pods") {
-		klog.Infof("DEBUG: CCC watch_count: %v", result)
+	if (result>=100) {
+		klog.Infof("DEBUG: watch_count for %s: %v", requestInfo.Resource, result);
+	} else if (result>=20) {
+		klog.Infof("DEBUG SMALL: watch_count for %s: %v", requestInfo.Resource, result);
 	}
 	return result
 }
