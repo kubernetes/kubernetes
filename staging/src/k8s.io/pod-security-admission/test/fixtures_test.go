@@ -46,7 +46,7 @@ func TestFixtures(t *testing.T) {
 
 	defaultChecks := policy.DefaultChecks()
 
-	const newestMinorVersionToTest = 22
+	const newestMinorVersionToTest = 23
 
 	policyVersions := computeVersionsToTest(t, defaultChecks)
 	newestMinorVersionWithPolicyChanges := policyVersions[len(policyVersions)-1].Minor()
