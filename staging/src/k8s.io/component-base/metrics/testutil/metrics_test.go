@@ -30,6 +30,8 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+var registerMetrics sync.Once
+
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
 		SampleCount: uint64Ptr(0),
@@ -517,7 +519,6 @@ func TestHistogramVec_Validate(t *testing.T) {
 }
 
 func TestGetHistogramVecFromGatherer(t *testing.T) {
-	var registerMetrics sync.Once
 	tests := []struct {
 		name    string
 		lvMap   map[string]string
