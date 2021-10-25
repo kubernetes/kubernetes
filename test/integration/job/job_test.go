@@ -38,7 +38,9 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	typedv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/features"
@@ -652,12 +654,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 			}
 			jobName := job.Name
 			jobNamespace := job.Namespace
+			jobClient := clientSet.BatchV1().Jobs(jobNamespace)
 
 			// (1) Unsuspend and set node selector in the same update.
 			nodeSelector := map[string]string{"foo": "bar"}
-			job.Spec.Template.Spec.NodeSelector = nodeSelector
-			job.Spec.Suspend = pointer.BoolPtr(false)
-			_, err = clientSet.BatchV1().Jobs(jobNamespace).Update(ctx, job, metav1.UpdateOptions{})
+			_, err = updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
+				j.Spec.Template.Spec.NodeSelector = nodeSelector
+				j.Spec.Suspend = pointer.BoolPtr(false)
+			})
 			if !featureGate {
 				if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
 					t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
@@ -691,12 +695,10 @@ func TestNodeSelectorUpdate(t *testing.T) {
 			}
 
 			// (3) Update node selector again. It should fail since the job is unsuspended.
-			var updatedJob *batchv1.Job
-			if updatedJob, err = clientSet.BatchV1().Jobs(jobNamespace).Get(ctx, jobName, metav1.GetOptions{}); err != nil {
-				t.Fatalf("can't find the job: %v", err)
-			}
-			updatedJob.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "baz"}
-			_, err = clientSet.BatchV1().Jobs(jobNamespace).Update(ctx, updatedJob, metav1.UpdateOptions{})
+			_, err = updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
+				j.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "baz"}
+			})
+
 			if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
 				t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
 			}
@@ -1013,4 +1015,18 @@ func setDuringTest(val *int, newVal int) func() {
 	return func() {
 		*val = origVal
 	}
+}
+
+func updateJob(ctx context.Context, jobClient typedv1.JobInterface, jobName string, updateFunc func(*batchv1.Job)) (*batchv1.Job, error) {
+	var job *batchv1.Job
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newJob, err := jobClient.Get(ctx, jobName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		updateFunc(newJob)
+		job, err = jobClient.Update(ctx, newJob, metav1.UpdateOptions{})
+		return err
+	})
+	return job, err
 }
