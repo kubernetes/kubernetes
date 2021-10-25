@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script checks whether packages under `vendor` directory have cyclic
-# dependencies on `main` or `staging` repositories.
+# dependencies on `main` or `vmod` repositories.
 # Usage: `hack/verify-no-vendor-cycles.sh`.
 
 set -o errexit
@@ -27,16 +27,16 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 export GO111MODULE=auto
 
-staging_repos=()
-kube::util::read-array staging_repos < <(kube::util::list_staging_repos)
-staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
+vmods=()
+kube::util::read-array vmods < <(kube::util::list_vmods)
+vmods_pattern=$(IFS="|"; echo "${vmods[*]}")
 
 cd "${KUBE_ROOT}"
 
-# Check for any module that is not main or staging and depends on main or staging
-bad_deps=$(go mod graph | grep -vE "^k8s.io\/(kubernetes|${staging_repos_pattern})" | grep -E "\sk8s.io\/(kubernetes|${staging_repos_pattern})" || true)
+# Check for any module that is not main or vmod and depends on main or vmod
+bad_deps=$(go mod graph | grep -vE "^k8s.io\/(kubernetes|${vmods_pattern})" | grep -E "\sk8s.io\/(kubernetes|${vmods_pattern})" || true)
 if [[ -n "${bad_deps}" ]]; then
-  echo "Found disallowed dependencies that transitively depend on k8s.io/kubernetes or staging modules:"
+  echo "Found disallowed dependencies that transitively depend on k8s.io/kubernetes or vmods:"
   echo "${bad_deps}"
   exit 1
 fi
@@ -48,9 +48,9 @@ kube::util::ensure-temp-dir
 go list -mod=vendor -test -deps -json ./vendor/... > "${KUBE_TEMP}/deps.json"
 
 # Check for any vendored package that imports main repo
-# Staging repos are explicitly excluded even though go list does not currently consider symlinks
-go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
+# vmods are explicitly excluded even though go list does not currently consider symlinks
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${vmods_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
 
-# Check for any vendored package that imports a staging repo
-# Staging repos are explicitly excluded even though go list does not currently consider symlinks
-go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
+# Check for any vendored package that imports a vmod
+# vmods are explicitly excluded even though go list does not currently consider symlinks
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${vmods_pattern})(/|$)" -exclude "^k8s\.io/(${vmods_pattern})(/|$)" "${KUBE_TEMP}/deps.json"

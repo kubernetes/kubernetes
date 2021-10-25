@@ -70,9 +70,8 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
 	hack/run-in-gopath.sh go2make                       \
 	    k8s.io/kubernetes/...                           \
-	    --prune  k8s.io/kubernetes/staging              \
+	    --prune  k8s.io/kubernetes/_vmod                \
 	    --prune  k8s.io/kubernetes/vendor               \
-	    k8s.io/kubernetes/vendor/k8s.io/...             \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                         \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \

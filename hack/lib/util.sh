@@ -583,12 +583,12 @@ EOF
 EOF
 }
 
-# list_staging_repos outputs a sorted list of repos in staging/src/k8s.io
-# each entry will just be the $repo portion of staging/src/k8s.io/$repo/...
+# list_vmods outputs a sorted list of virtual modules.  Each entry will just be
+# the $repo portion of `k8s.io/$repo/`.
 # $KUBE_ROOT must be set.
-function kube::util::list_staging_repos() {
+function kube::util::list_vmods() {
   (
-    cd "${KUBE_ROOT}/staging/src/k8s.io" && \
+    cd "${KUBE_ROOT}/_vmod/k8s.io" && \
     find . -mindepth 1 -maxdepth 1 -type d | cut -c 3- | sort
   )
 }

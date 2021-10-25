@@ -97,16 +97,16 @@ go mod edit -require "${dep}@${rev}"
 echo "Running: go mod edit -replace ${dep}=${replacement}@${rev}"
 go mod edit -replace "${dep}=${replacement}@${rev}"
 
-# Propagate pinned version to staging repos that also have that dependency
-for repo in $(kube::util::list_staging_repos); do
-  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+# Propagate pinned version to vmods that also have that dependency
+for vmod in $(kube::util::list_vmods); do
+  pushd "_vmod/k8s.io/${vmod}" >/dev/null 2>&1
     if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null 2>&1; then
       go mod edit -require "${dep}@${rev}"
       go mod edit -replace "${dep}=${replacement}@${rev}"
     fi
 
     # When replacing with a fork, always add a replace statement in all go.mod
-    # files (not just the root of the staging repos!) because there might be
+    # files (not just the root of the vmods!) because there might be
     # indirect dependencies on the fork.
     #
     # This is excessive, but the resulting commit should never be merged, so it
