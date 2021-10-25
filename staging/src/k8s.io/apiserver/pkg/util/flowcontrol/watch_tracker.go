@@ -17,8 +17,12 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"net/url"
 	"sync"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -41,6 +45,8 @@ type watchIdentifier struct {
 	resource  string
 	namespace string
 	name      string
+
+	indexField string
 }
 
 // ForgetWatchFunc is a function that should be called to forget
@@ -82,11 +88,26 @@ func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo) ForgetWat
 		return nil
 	}
 
+	// FIXME: Clean this up.
+	var indexField string
+	if (requestInfo.Resource=="pods") {
+		reqURL, _ := url.Parse(requestInfo.Path)
+		opts := metainternalversion.ListOptions{}
+		_ = metainternalversionscheme.ParameterCodec.DecodeParameters(reqURL.Query(), metav1.SchemeGroupVersion, &opts)
+		if opts.FieldSelector!=nil {
+			if nodeName, ok := opts.FieldSelector.RequiresExactMatch("spec.nodeName"); ok {
+				indexField=nodeName
+			}
+		}
+	}
+
 	identifier := &watchIdentifier{
 		apiGroup:  requestInfo.APIGroup,
 		resource:  requestInfo.Resource,
 		namespace: requestInfo.Namespace,
 		name:      requestInfo.Name,
+
+		indexField: indexField,
 	}
 
 	w.lock.Lock()
@@ -131,6 +152,17 @@ func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo)
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
+
+	// FIXME: clean this up
+	if (requestInfo.Resource=="pods") {
+		// FIXME: we don't have access to the object, so can't get it's nodeName here.
+		//
+		// The workaroudnd would be to take max from all, though it would require
+		// a different/more complex data structure here.
+		// For now, we kind-of simulate it by setting nodeName="" and assuming that
+		// this is the highest.
+		identifier.indexField = ""
+	}
 
 	result += w.watchCount[*identifier]
 
