@@ -578,6 +578,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
 		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
+
 	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
@@ -591,16 +592,15 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		delegationTarget:           delegationTarget,
 		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
+		Handler:                    apiServerHandler,
+
+		listedPathProvider: apiServerHandler,
 
 		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:       c.RequestTimeout,
 		ShutdownDelayDuration: c.ShutdownDelayDuration,
 		SecureServingInfo:     c.SecureServing,
 		ExternalAddress:       c.ExternalAddress,
-
-		Handler: apiServerHandler,
-
-		listedPathProvider: apiServerHandler,
 
 		openAPIConfig:           c.OpenAPIConfig,
 		skipOpenAPIInstallation: c.SkipOpenAPIInstallation,
@@ -626,6 +626,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageVersionManager: c.StorageVersionManager,
 
 		Version: c.Version,
+
+		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
 	for {
@@ -653,6 +655,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	// add poststarthooks that were preconfigured.  Using the add method will give us an error if the same name has already been registered.
 	for name, preconfiguredPostStartHook := range c.PostStartHooks {
 		if err := s.AddPostStartHook(name, preconfiguredPostStartHook.hook); err != nil {
+			return nil, err
+		}
+	}
+
+	// register mux signals from the delegated server
+	for k, v := range delegationTarget.MuxAndDiscoveryCompleteSignals() {
+		if err := s.RegisterMuxAndDiscoveryCompleteSignal(k, v); err != nil {
 			return nil, err
 		}
 	}
@@ -807,6 +816,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
+	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithAuditID(handler)
 	return handler
