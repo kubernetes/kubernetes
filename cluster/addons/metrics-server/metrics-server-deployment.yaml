@@ -54,8 +54,10 @@ spec:
         command:
         - /metrics-server
         - --metric-resolution=30s
-        - --kubelet-use-node-status-port
-        - --kubelet-insecure-tls
+        # These are needed for GKE, which doesn't support secure communication yet.
+        # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
+        - --kubelet-port=10255
+        - --deprecated-kubelet-completely-insecure=true
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
         - --cert-dir=/tmp
         - --secure-port=443
