@@ -744,7 +744,10 @@ func TestValidatePodController(t *testing.T) {
 					if len(tc.expectWarnings) > 0 {
 						expectedWarnDecision = metrics.DecisionDeny
 					}
-					expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, expectedWarnDecision, nsLevelVersion, metrics.ModeWarn})
+					// ValidatePodController does not enforce the policies so the Enforce label is irrelevant here
+					if warnLevel := nsLabels[api.WarnLevelLabel]; warnLevel != nsLabels[api.AuditLevelLabel] {
+						expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, expectedWarnDecision, nsLevelVersion, metrics.ModeWarn})
+					}
 				}
 			}
 			recorder.ExpectEvaluations(t, expectedEvaluations)
