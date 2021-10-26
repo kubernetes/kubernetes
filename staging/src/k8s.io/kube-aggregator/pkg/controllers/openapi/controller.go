@@ -140,6 +140,10 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 	if !exists || handler == nil {
 		return syncNothing, nil
 	}
+
+	specMap, err := c.downloader.DownloadV3(handler, etag)
+	c.openAPIAggregationManager.UpdateGroups(specMap)
+
 	returnSpec, newEtag, httpStatus, err := c.downloader.Download(handler, etag)
 	switch {
 	case err != nil:
