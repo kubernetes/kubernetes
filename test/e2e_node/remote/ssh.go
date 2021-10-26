@@ -44,8 +44,12 @@ func init() {
 	sshOptionsMap = map[string]string{
 		"gce": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
 	}
+	defaultGceKey := os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
+	if defaultGceKey == "" {
+		defaultGceKey = fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir)
+	}
 	sshDefaultKeyMap = map[string]string{
-		"gce": fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir),
+		"gce": defaultGceKey,
 	}
 }
 
