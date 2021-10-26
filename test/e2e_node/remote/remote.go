@@ -69,7 +69,7 @@ func copyKubeletConfigIfExists(kubeletConfigFile, dstDir string) error {
 }
 
 // CreateTestArchive creates the archive package for the node e2e test.
-func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string) (string, error) {
+func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string, installCredentialProvider bool) (string, error) {
 	klog.V(2).Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
@@ -88,6 +88,13 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 		return "", fmt.Errorf("failed to setup test package %q: %v", tardir, err)
 	}
 
+	// Add default kubelet credential provider into tardir
+	if installCredentialProvider {
+		if err := copyCredentialProviderBinary(tardir); err != nil {
+			return "", err
+		}
+	}
+
 	// Build the tar
 	out, err := exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
@@ -102,7 +109,7 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 }
 
 // RunRemote returns the command output, whether the exit was ok, and any errors
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string) (string, bool, error) {
+func RunRemote(suite TestSuite, archive string, host string, cleanup bool, installCredentialProvider bool, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string) (string, bool, error) {
 	// Create the temp staging directory
 	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
@@ -144,6 +151,16 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	if output, err := SSHNoSudo(host, "mkdir", resultDir); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to create test result directory %q on host %q: %v output: %q", resultDir, host, err, output)
+	}
+
+	// We want to add credential provider flags here as it will work for both node conformance and node e2e
+	// credential provider binary and config is copied into workspace by the test suite, we need to provide
+	// config and binary location to kubelet via flags.
+	if installCredentialProvider {
+		var err error
+		if testArgs, err = addCredentialProviderFlags(testArgs, workspace); err != nil {
+			return "", false, err
+		}
 	}
 
 	klog.V(2).Infof("Running test on %q", host)

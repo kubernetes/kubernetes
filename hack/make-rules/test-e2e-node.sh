@@ -50,6 +50,7 @@ runtime_config=${RUNTIME_CONFIG:-}
 ssh_user=${SSH_USER:-"${USER}"}
 ssh_key=${SSH_KEY:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
+install_credential_provider=${INSTALL_CREDENTIAL_PROVIDER:-false}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -178,6 +179,7 @@ if [ "${remote}" = true ] ; then
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --image-config-dir="${image_config_dir}" \
     --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
+    --install-credential-provider="${install_credential_provider}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?

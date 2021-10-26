@@ -96,3 +96,34 @@ func GetKubeletServerBin() string {
 	}
 	return bin
 }
+
+func BuildCredentialProvider() error {
+	klog.Infof("Building credential provider binaries...")
+	credentialRootDir, err := utils.GetCredentialProviderRootDir()
+	if err != nil {
+		return fmt.Errorf("failed to locate kubernetes root directory %v", err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	err = os.Chdir(credentialRootDir)
+	if err != nil {
+		return err
+	}
+
+	defer os.Chdir(cwd)
+
+	// In the future we can customize this with a flag to build any credential provider
+	cmd := exec.Command("make", "sample-credential-provider")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to build credential provider %v", err)
+	}
+
+	return nil
+}

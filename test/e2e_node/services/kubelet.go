@@ -283,7 +283,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--network-plugin=kubenet",
 		"--cni-bin-dir", cniBinDir,
 		"--cni-conf-dir", cniConfDir,
-		"--cni-cache-dir", cniCacheDir)
+		"--cni-cache-dir", cniCacheDir,
+	)
 
 	// Keep hostname override for convenience.
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.

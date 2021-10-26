@@ -70,6 +70,7 @@ var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name o
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+var installCredentialProvider = flag.Bool("install-credential-provider", false, "Test suite will build and install the default sample credential provider")
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -219,7 +220,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile)
+		remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile, *installCredentialProvider)
 		return
 	}
 
@@ -405,7 +406,9 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile) })
+	a.Do(func() {
+		a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile, *installCredentialProvider)
+	})
 	return a.path, a.err
 }
 
@@ -467,7 +470,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFla
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFileName, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, *installCredentialProvider, imageDesc, junitFileName, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
 	return &TestResult{
 		output: output,
 		err:    err,

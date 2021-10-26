@@ -34,6 +34,15 @@ func GetK8sRootDir() (string, error) {
 	return filepath.Join(dir, fmt.Sprintf("%s/", "k8s.io/kubernetes")), nil
 }
 
+func GetCredentialProviderRootDir() (string, error) {
+	dir, err := RootDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, fmt.Sprintf("%s/", "github.com/sample-credential-provider")), nil
+}
+
 // GetCAdvisorRootDir returns the root directory for cAdvisor, if present in the gopath.
 func GetCAdvisorRootDir() (string, error) {
 	dir, err := RootDir()

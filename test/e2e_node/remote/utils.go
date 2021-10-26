@@ -18,9 +18,13 @@ package remote
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // utils.go contains functions used across test suites.
@@ -115,4 +119,43 @@ func cleanupNodeProcesses(host string) {
 // Quotes a shell literal so it can be nested within another shell scope.
 func quote(s string) string {
 	return fmt.Sprintf("'\"'\"'%s'\"'\"'", s)
+}
+
+func copyCredentialProviderBinary(tardir string) error {
+	// build credential provider
+	if err := builder.BuildCredentialProvider(); err != nil {
+		return err
+	}
+
+	credentialProviderRootDir, err := utils.GetCredentialProviderRootDir()
+	if err != nil {
+		return fmt.Errorf("failed to locate credential provider root directory: %v", err)
+	}
+	credentialProviderBinDir := filepath.Join(credentialProviderRootDir, "sample-credential-provider")
+
+	if _, err := os.Stat(credentialProviderBinDir); err != nil {
+		return fmt.Errorf("failed to locate credential provider binary %s: %v", credentialProviderBinDir, err)
+	}
+
+	out, err := exec.Command("cp", credentialProviderBinDir, filepath.Join(tardir, "sample-credential-provider")).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy %q: %v Output: %q", "sample-credential-provider", err, out)
+	}
+
+	// copy credential config file
+	credentialProviderConfDir := filepath.Join(credentialProviderRootDir, "kubelet-image-credential.yaml")
+	out, err = exec.Command("cp", credentialProviderConfDir, filepath.Join(tardir, "kubelet-image-credential.yaml")).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy %q: %v Output: %q", "sample-credential-provider", err, out)
+	}
+
+	return nil
+}
+
+func addCredentialProviderFlags(testargs, workspace string) (string, error) {
+	klog.V(2).Infof("adding credential provider flags")
+	credentialConfigDir := filepath.Join(workspace, "kubelet-image-credential.yaml")
+	credentialBinDir := filepath.Join(workspace)
+	testargs = fmt.Sprintf("--kubelet-flags=\"--image-credential-provider-config=%s --image-credential-provider-bin-dir=%s\" ", credentialConfigDir, credentialBinDir) + testargs
+	return testargs, nil
 }

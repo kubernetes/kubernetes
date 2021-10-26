@@ -42,6 +42,8 @@ type DockerConfigProvider interface {
 // A DockerConfigProvider that simply reads the .dockercfg file
 type defaultDockerConfigProvider struct{}
 
+var warnOnce sync.Once
+
 // init registers our default provider, which simply reads the .dockercfg file.
 func init() {
 	RegisterCredentialProvider(".dockercfg",
@@ -70,6 +72,12 @@ type CachingDockerConfigProvider struct {
 
 // Enabled implements dockerConfigProvider
 func (d *defaultDockerConfigProvider) Enabled() bool {
+	if AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("Docker config credential provider is now disabled. Please use out of tree docker config provider")
+		})
+		return false
+	}
 	return true
 }
 
