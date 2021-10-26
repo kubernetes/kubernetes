@@ -352,7 +352,7 @@ func TestValidateNamespace(t *testing.T) {
 			expectAllowed:  true,
 			expectListPods: true,
 			expectEvaluate: api.LevelVersion{Level: api.LevelRestricted, Version: api.LatestVersion()},
-			expectWarnings: []string{"noruntimeclasspod: message", "runtimeclass1pod: message", "runtimeclass2pod: message"},
+			expectWarnings: []string{"noruntimeclasspod (and 2 other pods): message", "runtimeclass3pod: message, message2"},
 		},
 		{
 			name:                 "update with runtimeclass exempt pods",
@@ -362,10 +362,9 @@ func TestValidateNamespace(t *testing.T) {
 			expectAllowed:        true,
 			expectListPods:       true,
 			expectEvaluate:       api.LevelVersion{Level: api.LevelRestricted, Version: api.LatestVersion()},
-			expectWarnings:       []string{"noruntimeclasspod: message", "runtimeclass2pod: message"},
+			expectWarnings:       []string{"noruntimeclasspod (and 1 other pod): message", "runtimeclass3pod: message, message2"},
 		},
 
-		// TODO: test for aggregating pods with identical warnings
 		// TODO: test for bounding evalution time with a warning
 		// TODO: test for bounding pod count with a warning
 		// TODO: test for prioritizing evaluating pods from unique controllers
@@ -423,6 +422,9 @@ func TestValidateNamespace(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "runtimeclass2pod", Annotations: map[string]string{"error": "message"}},
 						Spec:       corev1.PodSpec{RuntimeClassName: pointer.String("runtimeclass2")},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "runtimeclass3pod", Annotations: map[string]string{"error": "message, message2"}},
 					},
 				}
 			}
