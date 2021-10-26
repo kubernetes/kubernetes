@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -294,6 +295,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
+		AlternativeServices:   filters.NewAlternativeServerInfo(nil),
 		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
 		RequestInfoResolver:   &request.RequestInfoFactory{},
 		RequestTimeout:        10 * time.Second,
