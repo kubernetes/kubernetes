@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sort"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -453,6 +454,15 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	return response
 }
 
+// podCount is used to track the number of pods sharing identical warnings when validating a namespace
+type podCount struct {
+	// podName is the lexically first pod name for the given warning
+	podName string
+
+	// podCount is the total number of pods with the same warnings
+	podCount int
+}
+
 func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace string, enforce api.LevelVersion) []string {
 	timeout := namespacePodCheckTimeout
 	if deadline, ok := ctx.Deadline(); ok {
@@ -471,7 +481,12 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 		return []string{"Failed to list pods"}
 	}
 
-	var warnings []string
+	var (
+		warnings []string
+
+		podWarnings        []string
+		podWarningsToCount = make(map[string]podCount)
+	)
 	if len(pods) > namespaceMaxPodsToCheck {
 		warnings = append(warnings, fmt.Sprintf("Large namespace: only checking the first %d of %d pods", namespaceMaxPodsToCheck, len(pods)))
 		pods = pods[0:namespaceMaxPodsToCheck]
@@ -484,15 +499,46 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 		}
 		r := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(enforce, &pod.ObjectMeta, &pod.Spec))
 		if !r.Allowed {
-			// TODO: consider aggregating results (e.g. multiple pods failed for the same reasons)
-			warnings = append(warnings, fmt.Sprintf("%s: %s", pod.Name, r.ForbiddenReason()))
+			warning := r.ForbiddenReason()
+			c, seen := podWarningsToCount[warning]
+			if !seen {
+				c.podName = pod.Name
+				podWarnings = append(podWarnings, warning)
+			} else if pod.Name < c.podName {
+				c.podName = pod.Name
+			}
+			c.podCount++
+			podWarningsToCount[warning] = c
 		}
 		if time.Now().After(deadline) {
-			return append(warnings, fmt.Sprintf("Timeout reached after checking %d pods", i+1))
+			warnings = append(warnings, fmt.Sprintf("Timeout reached after checking %d pods", i+1))
+			break
 		}
 	}
 
-	return warnings
+	// prepend pod names to warnings
+	decoratePodWarnings(podWarningsToCount, podWarnings)
+	// put warnings in a deterministic order
+	sort.Strings(podWarnings)
+
+	return append(warnings, podWarnings...)
+}
+
+// prefixes warnings with the pod names related to that warning
+func decoratePodWarnings(podWarningsToCount map[string]podCount, warnings []string) {
+	for i, warning := range warnings {
+		c := podWarningsToCount[warning]
+		switch c.podCount {
+		case 0:
+			// unexpected, just leave the warning alone
+		case 1:
+			warnings[i] = fmt.Sprintf("%s: %s", c.podName, warning)
+		case 2:
+			warnings[i] = fmt.Sprintf("%s (and 1 other pod): %s", c.podName, warning)
+		default:
+			warnings[i] = fmt.Sprintf("%s (and %d other pods): %s", c.podName, c.podCount-1, warning)
+		}
+	}
 }
 
 func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, error) {
