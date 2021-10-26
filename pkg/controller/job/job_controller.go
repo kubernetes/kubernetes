@@ -731,7 +731,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	suspendCondChanged := false
 	// Remove active pods if Job failed.
 	if finishedCondition != nil {
-		deleted, err := jm.deleteActivePods(&job, activePods)
+		deleted, err := jm.deleteActivePods(ctx, &job, activePods)
 		if uncounted == nil {
 			// Legacy behavior: pretend all active pods were successfully removed.
 			deleted = active
@@ -860,7 +860,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 // The method trackJobStatusAndRemoveFinalizers removes the finalizers, after
 // which the objects can actually be deleted.
 // Returns number of successfully deletions issued.
-func (jm *Controller) deleteActivePods(job *batch.Job, pods []*v1.Pod) (int32, error) {
+func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods []*v1.Pod) (int32, error) {
 	errCh := make(chan error, len(pods))
 	successfulDeletes := int32(len(pods))
 	wg := sync.WaitGroup{}
@@ -868,7 +868,7 @@ func (jm *Controller) deleteActivePods(job *batch.Job, pods []*v1.Pod) (int32, e
 	for i := range pods {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
-			if err := jm.podControl.DeletePod(job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
+			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
 				utilruntime.HandleError(err)
@@ -907,7 +907,7 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 					return
 				}
 			}
-			if err := jm.podControl.DeletePod(job.Namespace, pod.Name, job); err != nil {
+			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil {
 				failDelete(pod, err)
 			}
 		}(pods[i])
@@ -1377,7 +1377,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 					}
 					defer wait.Done()
-					err := jm.podControl.CreatePodsWithGenerateName(job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)
+					err := jm.podControl.CreatePodsWithGenerateName(ctx, job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)
 					if err != nil {
 						if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 							// If the namespace is being torn down, we can safely ignore
