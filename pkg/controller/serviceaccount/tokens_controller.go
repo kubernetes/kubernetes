@@ -308,15 +308,13 @@ func (e *TokensController) syncSecret() {
 		case sa == nil:
 			// Delete token
 			klog.V(4).Infof("syncSecret(%s/%s), service account does not exist, deleting token", secretInfo.namespace, secretInfo.name)
-			if retriable, err := e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
+			if retry, err = e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
 				klog.Errorf("error deleting serviceaccount token %s/%s for service account %s: %v", secretInfo.namespace, secretInfo.name, secretInfo.saName, err)
-				retry = retriable
 			}
 		default:
 			// Update token if needed
-			if retriable, err := e.generateTokenIfNeeded(sa, secret); err != nil {
+			if retry, err = e.generateTokenIfNeeded(sa, secret); err != nil {
 				klog.Errorf("error populating serviceaccount token %s/%s for service account %s: %v", secretInfo.namespace, secretInfo.name, secretInfo.saName, err)
-				retry = retriable
 			}
 		}
 	}
@@ -359,12 +357,9 @@ func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry
 
 // ensureReferencedToken makes sure at least one ServiceAccountToken secret exists, and is included in the serviceAccount's Secrets list
 func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccount) ( /* retry */ bool, error) {
-	if hasToken, err := e.hasReferencedToken(serviceAccount); err != nil {
-		// Don't retry cache lookup errors
+	if hasToken, err := e.hasReferencedToken(serviceAccount); err != nil || hasToken {
+		// Don't retry cache lookup errors, or a service account token already exists, and is referenced, short-circuit
 		return false, err
-	} else if hasToken {
-		// A service account token already exists, and is referenced, short-circuit
-		return false, nil
 	}
 
 	// We don't want to update the cache's copy of the service account
@@ -439,11 +434,8 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 				return nil
 			}
 
-			if hasToken, err := e.hasReferencedToken(liveServiceAccount); err != nil {
-				// Don't retry cache lookup errors
-				return nil
-			} else if hasToken {
-				// A service account token already exists, and is referenced, short-circuit
+			if hasToken, err := e.hasReferencedToken(liveServiceAccount); err != nil || hasToken {
+				// Don't retry cache lookup errors, or a service account token already exists and is referenced, short-circuit
 				return nil
 			}
 		}
@@ -569,12 +561,12 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 
 	// Save the secret
 	_, err = secrets.Update(context.TODO(), liveSecret, metav1.UpdateOptions{})
-	if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
-		// if we got a Conflict error, the secret was updated by someone else, and we'll get an update notification later
-		// if we got a NotFound error, the secret no longer exists, and we don't need to populate a token
-		return false, nil
-	}
 	if err != nil {
+		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
+			// if we got a Conflict error, the secret was updated by someone else, and we'll get an update notification later
+			// if we got a NotFound error, the secret no longer exists, and we don't need to populate a token
+			return false, nil
+		}
 		return true, err
 	}
 	return false, nil
@@ -586,11 +578,11 @@ func (e *TokensController) removeSecretReference(saNamespace string, saName stri
 	// so remove the secret from a freshly retrieved copy of the service account
 	serviceAccounts := e.client.CoreV1().ServiceAccounts(saNamespace)
 	serviceAccount, err := serviceAccounts.Get(context.TODO(), saName, metav1.GetOptions{})
-	// Ignore NotFound errors when attempting to remove a reference
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
 	if err != nil {
+		// Ignore NotFound errors when attempting to remove a reference
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -639,10 +631,10 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 
 	// Live lookup
 	sa, err = e.client.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	// Ensure UID matches if given
@@ -675,10 +667,10 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 
 	// Live lookup
 	secret, err := e.client.CoreV1().Secrets(ns).Get(context.TODO(), name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	// Ensure UID matches if given
