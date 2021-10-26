@@ -82,20 +82,13 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	opts, err := options.NewOptions()
-	if err != nil {
-		return TestServer{}, err
-	}
-
-	namedFlagSets := opts.Flags()
-	for _, f := range namedFlagSets.FlagSets {
+	opts := options.NewOptions()
+	opts.InitFlags()
+	nfs := opts.Flags
+	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)
 	}
 	fs.Parse(customFlags)
-
-	if err := opts.Complete(&namedFlagSets); err != nil {
-		return TestServer{}, err
-	}
 
 	if opts.SecureServing.BindPort != 0 {
 		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()
