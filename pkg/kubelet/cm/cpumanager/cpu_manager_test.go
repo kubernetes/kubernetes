@@ -17,8 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
+	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,6 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+)
+
+var (
+	// fake error for test
+	errFakeError = errors.New("fake error")
 )
 
 type mockState struct {
@@ -251,10 +256,10 @@ func TestCPUManagerAdd(t *testing.T) {
 			description: "cpu manager add - policy add container error",
 			updateErr:   nil,
 			policy: &mockPolicy{
-				err: fmt.Errorf("fake reg error"),
+				err: errFakeError,
 			},
 			expCPUSet:          cpuset.NewCPUSet(1, 2, 3, 4),
-			expAllocateErr:     fmt.Errorf("fake reg error"),
+			expAllocateErr:     errFakeError,
 			expAddContainerErr: nil,
 		},
 	}
@@ -280,14 +285,14 @@ func TestCPUManagerAdd(t *testing.T) {
 		mgr.activePods = func() []*v1.Pod { return nil }
 
 		err := mgr.Allocate(pod, container)
-		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
+		if !errors.Is(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
 		}
 
 		mgr.AddContainer(pod, container, "fakeID")
 		_, _, err = mgr.containerMap.GetContainerRef("fakeID")
-		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
+		if !errors.Is(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAddContainerErr, err)
 		}
@@ -688,7 +693,7 @@ func TestCPUManagerRemove(t *testing.T) {
 
 	mgr = &manager{
 		policy: &mockPolicy{
-			err: fmt.Errorf("fake error"),
+			err: errFakeError,
 		},
 		state:             state.NewMemoryState(),
 		containerRuntime:  mockRuntimeService{},
@@ -699,7 +704,7 @@ func TestCPUManagerRemove(t *testing.T) {
 
 	containerMap.Add("", "", containerID)
 	err = mgr.RemoveContainer(containerID)
-	if !reflect.DeepEqual(err, fmt.Errorf("fake error")) {
+	if !errors.Is(err, errFakeError) {
 		t.Errorf("CPU Manager RemoveContainer() error. expected error: fake error but got: %v", err)
 	}
 }
@@ -1046,14 +1051,14 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		mgr.activePods = func() []*v1.Pod { return nil }
 
 		err := mgr.Allocate(pod, container)
-		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
+		if !errors.Is(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
 		}
 
 		mgr.AddContainer(pod, container, "fakeID")
 		_, _, err = mgr.containerMap.GetContainerRef("fakeID")
-		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
+		if !errors.Is(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAddContainerErr, err)
 		}
