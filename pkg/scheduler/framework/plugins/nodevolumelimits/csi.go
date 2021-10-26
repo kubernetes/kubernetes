@@ -94,7 +94,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	csiNode, err := pl.csiNodeLister.Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default (2 releases)
-		klog.V(5).InfoS("Could not get a CSINode object for the node", "node", node.Name, "err", err)
+		klog.V(5).InfoS("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
 	}
 
 	newVolumes := make(map[string]string)
@@ -180,7 +180,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 			}
 			// If the PVC is invalid, we don't count the volume because
 			// there's no guarantee that it belongs to the running predicate.
-			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", pod.Namespace, pvcName))
+			klog.V(5).InfoS("Unable to look up PVC info", "pod", klog.KObj(pod), "PVC", klog.KRef(pod.Namespace, pvcName))
 			continue
 		}
 
@@ -209,17 +209,15 @@ func (pl *CSILimits) filterAttachableVolumes(
 // the information of the CSI driver that the plugin has been migrated to.
 func (pl *CSILimits) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
 	pvName := pvc.Spec.VolumeName
-	namespace := pvc.Namespace
-	pvcName := pvc.Name
 
 	if pvName == "" {
-		klog.V(5).InfoS("Persistent volume had no name for claim", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
+		klog.V(5).InfoS("Persistent volume had no name for claim", "PVC", klog.KObj(pvc))
 		return pl.getCSIDriverInfoFromSC(csiNode, pvc)
 	}
 
 	pv, err := pl.pvLister.Get(pvName)
 	if err != nil {
-		klog.V(5).InfoS("Unable to look up PV info for PVC and PV", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName), "PV", pvName)
+		klog.V(5).InfoS("Unable to look up PV info for PVC and PV", "PVC", klog.KObj(pvc), "PV", klog.KRef("", pvName))
 		// If we can't fetch PV associated with PVC, may be it got deleted
 		// or PVC was prebound to a PVC that hasn't been created yet.
 		// fallback to using StorageClass for volume counting
@@ -270,13 +268,13 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 	// If StorageClass is not set or not found, then PVC must be using immediate binding mode
 	// and hence it must be bound before scheduling. So it is safe to not count it.
 	if scName == "" {
-		klog.V(5).InfoS("PVC has no StorageClass", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
+		klog.V(5).InfoS("PVC has no StorageClass", "PVC", klog.KObj(pvc))
 		return "", ""
 	}
 
 	storageClass, err := pl.scLister.Get(scName)
 	if err != nil {
-		klog.V(5).InfoS("Could not get StorageClass for PVC", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName), "err", err)
+		klog.V(5).InfoS("Could not get StorageClass for PVC", "PVC", klog.KObj(pvc), "err", err)
 		return "", ""
 	}
 
