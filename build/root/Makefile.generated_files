@@ -70,8 +70,10 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
 	hack/run-in-gopath.sh go2make                       \
 	    k8s.io/kubernetes/...                           \
+	    --prune  k8s.io/kubernetes/staging              \
 	    --prune  k8s.io/kubernetes/_vmod                \
 	    --prune  k8s.io/kubernetes/vendor               \
+	    k8s.io/kubernetes/vendor/k8s.io/...             \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                         \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
@@ -112,9 +114,9 @@ endif
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s: tags)
 endif
-ALL_K8S_TAG_FILES := $(shell                             \
-    find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
-        | xargs grep --color=never -l '^// *+k8s:'       \
+ALL_K8S_TAG_FILES := $(shell                                \
+    find -L $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
+        | xargs grep --color=never -l '^// *+k8s:'          \
 )
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** found $(shell echo $(ALL_K8S_TAG_FILES) | wc -w) +k8s: tagged files)
