@@ -84,6 +84,12 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 .PHONY: FORCE
 FORCE:
 
+# HACK until vendor rename hackery dies:
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** populating vmods from staging)
+endif
+$(shell _vmod/populate-from-staging.sh)
+
 #
 # Helper logic to find which directories need codegen as quickly as possible.
 #
