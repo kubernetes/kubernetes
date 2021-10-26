@@ -304,8 +304,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 		key := volumeStatKeys[0]
 		kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
-		pvcName := pvcBlock.Namespace
-		pvcNamespace := pvcBlock.Name
+		pvcName := pvcBlock.Name
+		pvcNamespace := pvcBlock.Namespace
 		if isEphemeral {
 			pvcName = ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0])
 			pvcNamespace = pod.Namespace
@@ -327,12 +327,12 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(waitErr, "Unable to find metric %s for PVC %s/%s", kubeletKeyName, pvcBlock.Namespace, pvcBlock.Name)
+		framework.ExpectNoError(waitErr, "Unable to find metric %s for PVC %s/%s", kubeletKeyName, pvcNamespace, pvcName)
 
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcBlock.Name, pvcBlock.Namespace, kubeletKeyName)
+			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
