@@ -285,7 +285,7 @@ func tryCancelRequest(rt http.RoundTripper, req *http.Request) {
 	case utilnet.RoundTripperWrapper:
 		tryCancelRequest(rt.WrappedRoundTripper(), req)
 	default:
-		klog.Warningf("Unable to cancel request for %T", rt)
+		klog.V(4).InfoS("Unable to cancel request", "httpRoundTripper", rt)
 	}
 }
 
