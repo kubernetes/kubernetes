@@ -341,12 +341,12 @@ profiles:
 			name: "v1beta2 config file",
 			options: &Options{
 				ConfigFile: configFile,
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
-					return *cfg
+					return cfg
 				}(),
 				SecureServing: (&apiserveroptions.SecureServingOptions{
 					ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -417,9 +417,9 @@ profiles:
 			name: "v1beta1 config file",
 			options: &Options{
 				ConfigFile: v1beta1VersionConfig,
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg := configtesting.V1beta1ToInternalWithDefaults(t, v1beta1.KubeSchedulerConfiguration{})
-					return *cfg
+					return cfg
 				}(),
 				SecureServing: (&apiserveroptions.SecureServingOptions{
 					ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -490,12 +490,12 @@ profiles:
 			name: "config file in componentconfig/v1alpha1",
 			options: &Options{
 				ConfigFile: oldConfigFile,
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
-					return *cfg
+					return cfg
 				}(),
 				Logs: logs.NewOptions(),
 			},
@@ -520,10 +520,10 @@ profiles:
 		{
 			name: "kubeconfig flag",
 			options: &Options{
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
-					return *cfg
+					return cfg
 				}(),
 				SecureServing: (&apiserveroptions.SecureServingOptions{
 					ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -593,10 +593,10 @@ profiles:
 		{
 			name: "overridden master",
 			options: &Options{
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() *kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
-					return *cfg
+					return cfg
 				}(),
 				Master: insecureserver.URL,
 				SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -1228,6 +1228,13 @@ profiles:
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.options.ComponentConfig == nil {
+				if cfg, err := latest.Default(); err != nil {
+					t.Fatal(err)
+				} else {
+					tc.options.ComponentConfig = cfg
+				}
+			}
 			// create the config
 			config, err := tc.options.Config()
 
