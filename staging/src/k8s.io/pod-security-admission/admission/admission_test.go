@@ -730,12 +730,22 @@ func TestValidatePodController(t *testing.T) {
 			assert.Equal(t, tc.expectAuditAnnotations, result.AuditAnnotations, "unexpected AuditAnnotations")
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
 
-			expectedEvaluations := []EvaluationRecord{}
-			if _, ok := tc.expectAuditAnnotations["audit-violations"]; ok {
-				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeAudit})
-			}
-			if len(tc.expectWarnings) > 0 {
-				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeWarn})
+			var expectedEvaluations []EvaluationRecord
+			// evaluations should not happen on subresources (auto-skip) or on exemptions
+			if len(tc.subresource) == 0 && len(tc.expectAuditAnnotations["exempt"]) == 0 {
+				if _, podSpec, _ := a.PodSpecExtractor.ExtractPodSpec(tc.newObject); podSpec != nil {
+					var expectedAuditDecision metrics.Decision = metrics.DecisionAllow
+					if _, ok := tc.expectAuditAnnotations["audit-violations"]; ok {
+						expectedAuditDecision = metrics.DecisionDeny
+					}
+					expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, expectedAuditDecision, nsLevelVersion, metrics.ModeAudit})
+
+					var expectedWarnDecision metrics.Decision = metrics.DecisionAllow
+					if len(tc.expectWarnings) > 0 {
+						expectedWarnDecision = metrics.DecisionDeny
+					}
+					expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, expectedWarnDecision, nsLevelVersion, metrics.ModeWarn})
+				}
 			}
 			recorder.ExpectEvaluations(t, expectedEvaluations)
 		})

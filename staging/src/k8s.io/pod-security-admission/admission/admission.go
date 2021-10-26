@@ -461,6 +461,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		}
 	}
 
+	var auditDecision metrics.Decision = metrics.DecisionAllow
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
 		auditAnnotations[api.AuditViolationsAnnotationKey] = fmt.Sprintf(
@@ -468,11 +469,13 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 			nsPolicy.Audit.String(),
 			result.ForbiddenDetail(),
 		)
-		a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Audit, metrics.ModeAudit, attrs)
+		auditDecision = metrics.DecisionDeny
 	}
+	a.Metrics.RecordEvaluation(auditDecision, nsPolicy.Audit, metrics.ModeAudit, attrs)
 
 	// avoid adding warnings to a request we're already going to reject with an error
 	if response.Allowed {
+		var warnDecision metrics.Decision = metrics.DecisionAllow
 		// TODO: reuse previous evaluation if warn level+version is the same as audit or enforce level+version
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
 			// TODO: Craft a better user-facing warning message
@@ -481,8 +484,9 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 				nsPolicy.Warn.String(),
 				result.ForbiddenDetail(),
 			))
-			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Warn, metrics.ModeWarn, attrs)
+			warnDecision = metrics.DecisionDeny
 		}
+		a.Metrics.RecordEvaluation(warnDecision, nsPolicy.Warn, metrics.ModeWarn, attrs)
 	}
 
 	response.AuditAnnotations = auditAnnotations
