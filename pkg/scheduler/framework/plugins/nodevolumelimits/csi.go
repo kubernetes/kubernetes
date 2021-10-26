@@ -280,7 +280,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 
 	storageClass, err := pl.scLister.Get(scName)
 	if err != nil {
-		klog.V(5).InfoS("Could not get StorageClass for PVC", "storageClass", klog.KObj(storageClass), "PVC", klog.KObj(pvc), "err", err)
+		klog.V(5).InfoS("Could not get StorageClass for PVC", "PVC", klog.KObj(pvc), "err", err)
 		return "", ""
 	}
 

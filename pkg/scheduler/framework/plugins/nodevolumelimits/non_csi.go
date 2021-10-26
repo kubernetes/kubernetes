@@ -178,7 +178,7 @@ func newNonCSILimits(
 		filter = cinderVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
-		klog.ErrorS(errors.New("wrong filterName"), "Cannot create nonCSILimits plugin", "ebsVolumeFilterType", ebsVolumeFilterType, "gcePDVolumeFilterType", gcePDVolumeFilterType, "azureDiskVolumeFilterType", azureDiskVolumeFilterType, "cinderVolumeFilterType", cinderVolumeFilterType)
+		klog.ErrorS(errors.New("wrong filterName"), "Cannot create nonCSILimits plugin")
 		return nil
 	}
 	pl := &nonCSILimits{
