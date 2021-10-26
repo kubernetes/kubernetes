@@ -40,6 +40,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	"k8s.io/pod-security-admission/admission"
@@ -116,6 +118,11 @@ func (s *Server) Start(ctx context.Context) error {
 	// The webhook is stateless, so it's safe to expose everything on the insecure port for
 	// debugging or proxy purposes. The API server will not connect to an http webhook.
 	mux.HandleFunc("/", s.HandleValidate)
+
+	// Serve the global metrics registry.
+	metrics.LegacyMustRegister()
+	mux.Handle("/metrics",
+		compbasemetrics.HandlerFor(legacyregistry.DefaultGatherer, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}))
 
 	if s.insecureServing != nil {
 		if err := s.insecureServing.Serve(mux, 0, ctx.Done()); err != nil {
@@ -206,7 +213,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 	klog.V(1).InfoS("received request", "UID", review.Request.UID, "kind", review.Request.Kind, "resource", review.Request.Resource)
 
-	attributes := admission.RequestAttributes(review.Request, codecs.UniversalDeserializer())
+	attributes := api.RequestAttributes(review.Request, codecs.UniversalDeserializer())
 	response := s.delegate.Validate(ctx, attributes)
 	response.UID = review.Request.UID // Response UID must match request UID
 	review.Response = response
@@ -276,7 +283,7 @@ func Setup(c *Config) (*Server, error) {
 	s.delegate = &admission.Admission{
 		Configuration:    c.PodSecurityConfig,
 		Evaluator:        evaluator,
-		Metrics:          metrics.NewPrometheusRecorder(api.GetAPIVersion()),
+		Metrics:          metrics.DefaultRecorder(),
 		PodSpecExtractor: admission.DefaultPodSpecExtractor{},
 		PodLister:        admission.PodListerFromClient(client),
 		NamespaceGetter:  admission.NamespaceGetterFromListerAndClient(namespaceLister, client),

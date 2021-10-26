@@ -51,7 +51,7 @@ import (
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityadmissionapi "k8s.io/pod-security-admission/api"
-	podsecuritymetrics "k8s.io/pod-security-admission/metrics"
+	"k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
 )
 
@@ -94,13 +94,14 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not create PodSecurityRegistry: %w", err)
 	}
+	metrics.LegacyMustRegister()
 
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 		delegate: &podsecurityadmission.Admission{
 			Configuration:    config,
 			Evaluator:        evaluator,
-			Metrics:          podsecuritymetrics.NewPrometheusRecorder(podsecurityadmissionapi.GetAPIVersion()),
+			Metrics:          metrics.DefaultRecorder(),
 			PodSpecExtractor: podsecurityadmission.DefaultPodSpecExtractor{},
 		},
 	}, nil
