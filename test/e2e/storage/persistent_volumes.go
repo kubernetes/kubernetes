@@ -167,7 +167,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
 			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func() {
-				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PVC and non-pre-bound PV: test write access", func() {
-				pv, pvc, err = e2epv.CreatePVCPV(c, pvConfig, pvcConfig, ns, false)
+				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -185,7 +185,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PVC and a pre-bound PV: test write access", func() {
-				pv, pvc, err = e2epv.CreatePVCPV(c, pvConfig, pvcConfig, ns, true)
+				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -194,7 +194,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PV and a pre-bound PVC: test write access", func() {
-				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -232,7 +232,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Note: PVs are created before claims and no pre-binding
 			ginkgo.It("should create 2 PVs and 4 PVCs: test write access", func() {
 				numPVs, numPVCs := 2, 4
-				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
+				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
@@ -242,7 +242,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Note: PVs are created before claims and no pre-binding
 			ginkgo.It("should create 3 PVs and 3 PVCs: test write access", func() {
 				numPVs, numPVCs := 3, 3
-				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
+				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
@@ -252,7 +252,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Note: PVs are created before claims and no pre-binding.
 			ginkgo.It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
-				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
+				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
@@ -265,7 +265,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("when invoking the Recycle reclaim policy", func() {
 			ginkgo.BeforeEach(func() {
 				pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRecycle
-				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err, "BeforeEach: Failed to create PV/PVC")
 				framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
 			})

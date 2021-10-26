@@ -255,7 +255,7 @@ func createPVCPV(
 	}
 
 	framework.Logf("Creating PVC and PV")
-	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
+	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, f.Timeouts, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)
