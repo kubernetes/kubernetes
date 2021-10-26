@@ -86,10 +86,6 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 			return false, nil
 		}
 		if err := release(ctx, obj); err != nil {
-			// If the pod no longer exists, ignore the error.
-			if errors.IsNotFound(err) {
-				return false, nil
-			}
 			// Either someone else released it, or there was a transient error.
 			// The controller should requeue and try again if it's still stale.
 			return false, err
