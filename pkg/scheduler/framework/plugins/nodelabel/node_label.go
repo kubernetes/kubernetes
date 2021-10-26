@@ -51,7 +51,7 @@ func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, erro
 		return nil, err
 	}
 
-	klog.Warning("NodeLabel plugin is deprecated and will be removed in a future version; use NodeAffinity instead")
+	klog.InfoS("NodeLabel plugin is deprecated and will be removed in a future version, use NodeAffinity instead")
 	return &NodeLabel{
 		handle: handle,
 		args:   args,
