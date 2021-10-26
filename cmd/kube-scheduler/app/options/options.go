@@ -67,26 +67,17 @@ type Options struct {
 	WriteConfigTo string
 
 	Master string
-
-	// flags hold the parsed CLI flags.
-	flags *cliflag.NamedFlagSets
 }
 
 // NewOptions returns default scheduler app options.
 func NewOptions() (*Options, error) {
-	cfg, err := latest.Default()
-	if err != nil {
-		return nil, err
-	}
-
 	o := &Options{
-		ComponentConfig: *cfg,
-		SecureServing:   apiserveroptions.NewSecureServingOptions().WithLoopback(),
-		Authentication:  apiserveroptions.NewDelegatingAuthenticationOptions(),
-		Authorization:   apiserveroptions.NewDelegatingAuthorizationOptions(),
-		Deprecated:      &DeprecatedOptions{},
-		Metrics:         metrics.NewOptions(),
-		Logs:            logs.NewOptions(),
+		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
+		Deprecated:     &DeprecatedOptions{},
+		Metrics:        metrics.NewOptions(),
+		Logs:           logs.NewOptions(),
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -101,11 +92,42 @@ func NewOptions() (*Options, error) {
 	return o, nil
 }
 
-// Complete obtains the CLI args related with leaderelection, and override the values in `cfg`.
-// Then the `cfg` object is injected into the `options` object.
-func (o *Options) Complete(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
-	// Obtain CLI args related with leaderelection. Set them to `cfg` if specified in command line.
-	leaderelection := o.Flags().FlagSet("leader election")
+// Complete completes the remaining instantiation of the options obj.
+// In particular, it injects the latest internal versioned ComponentConfig.
+func (o *Options) Complete(nfs *cliflag.NamedFlagSets) error {
+	cfg, err := latest.Default()
+	if err != nil {
+		return err
+	}
+
+	// Obtain deprecated CLI args. Set them to cfg if specified in command line.
+	deprecated := nfs.FlagSet("deprecated")
+	if deprecated.Changed("profiling") {
+		cfg.EnableProfiling = o.ComponentConfig.EnableProfiling
+	}
+	if deprecated.Changed("contention-profiling") {
+		cfg.EnableContentionProfiling = o.ComponentConfig.EnableContentionProfiling
+	}
+	if deprecated.Changed("kubeconfig") {
+		cfg.ClientConnection.Kubeconfig = o.ComponentConfig.ClientConnection.Kubeconfig
+	}
+	if deprecated.Changed("kube-api-content-type") {
+		cfg.ClientConnection.ContentType = o.ComponentConfig.ClientConnection.ContentType
+	}
+	if deprecated.Changed("kube-api-qps") {
+		cfg.ClientConnection.QPS = o.ComponentConfig.ClientConnection.QPS
+	}
+	if deprecated.Changed("kube-api-burst") {
+		cfg.ClientConnection.Burst = o.ComponentConfig.ClientConnection.Burst
+	}
+	if deprecated.Changed("lock-object-namespace") {
+		cfg.LeaderElection.ResourceNamespace = o.ComponentConfig.LeaderElection.ResourceNamespace
+	}
+	if deprecated.Changed("lock-object-name") {
+		cfg.LeaderElection.ResourceName = o.ComponentConfig.LeaderElection.ResourceName
+	}
+	// Obtain CLI args related with leaderelection. Set them to cfg if specified in command line.
+	leaderelection := nfs.FlagSet("leader election")
 	if leaderelection.Changed("leader-elect") {
 		cfg.LeaderElection.LeaderElect = o.ComponentConfig.LeaderElection.LeaderElect
 	}
@@ -129,24 +151,17 @@ func (o *Options) Complete(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) 
 	}
 
 	o.ComponentConfig = *cfg
+	return nil
 }
 
 // Flags returns flags for a specific scheduler by section name
-func (o *Options) Flags() *cliflag.NamedFlagSets {
-	if o.flags != nil {
-		return o.flags
-	}
-
-	nfs := cliflag.NamedFlagSets{}
+func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs := nfs.FlagSet("misc")
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
-	// In some tests, o.SecureServing can be nil.
-	if o.SecureServing != nil {
-		o.SecureServing.AddFlags(nfs.FlagSet("secure serving"))
-	}
+	o.SecureServing.AddFlags(nfs.FlagSet("secure serving"))
 	o.Authentication.AddFlags(nfs.FlagSet("authentication"))
 	o.Authorization.AddFlags(nfs.FlagSet("authorization"))
 	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"), &o.ComponentConfig)
@@ -156,8 +171,7 @@ func (o *Options) Flags() *cliflag.NamedFlagSets {
 	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
 	o.Logs.AddFlags(nfs.FlagSet("logs"))
 
-	o.flags = &nfs
-	return o.flags
+	return nfs
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
@@ -169,9 +183,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err != nil {
 			return err
 		}
-		// Honor the CLI args before assigning `cfg` to `c.ComponentConfig`.
-		o.Complete(cfg)
-
 		if err := validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
 			return err
 		}
