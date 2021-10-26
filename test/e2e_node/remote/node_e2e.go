@@ -72,6 +72,10 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		}
 	}
 
+	if err := copyCredentialProviderBinary(tardir); err != nil {
+		return err
+	}
+
 	if systemSpecName != "" {
 		// Copy system spec file
 		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
@@ -85,6 +89,39 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	return nil
+}
+
+func copyCredentialProviderBinary(tardir string) error {
+
+	// build credential provider
+	if err := builder.BuildCredentialProvider(); err != nil {
+		return err
+	}
+
+	credentialProviderRootDir, err := utils.GetCredentialProviderRootDir()
+	if err != nil {
+		return fmt.Errorf("failed to locate credential provider root directory: %v", err)
+	}
+	credentialProviderBinDir := filepath.Join(credentialProviderRootDir, "sample-credential-provider")
+
+	if _, err := os.Stat(credentialProviderBinDir); err != nil {
+		return fmt.Errorf("failed to locate credential provider binary %s: %v", credentialProviderBinDir, err)
+	}
+
+	out, err := exec.Command("cp", credentialProviderBinDir, filepath.Join(tardir, "sample-credential-provider")).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy %q: %v Output: %q", "sample-credential-provider", err, out)
+	}
+
+	// copy credential config file
+	credentialProviderConfDir := filepath.Join(credentialProviderRootDir, "kubelet-image-credential.yaml")
+	out, err = exec.Command("cp", credentialProviderConfDir, filepath.Join(tardir, "kubelet-image-credential.yaml")).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy %q: %v Output: %q", "sample-credential-provider", err, out)
+	}
+
+	return nil
+
 }
 
 // prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
