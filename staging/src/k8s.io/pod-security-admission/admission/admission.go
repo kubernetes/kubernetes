@@ -446,7 +446,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
-		auditAnnotations["audit"] = fmt.Sprintf(
+		auditAnnotations[api.AuditViolationsAnnotationKey] = fmt.Sprintf(
 			"would violate PodSecurity %q: %s",
 			nsPolicy.Audit.String(),
 			result.ForbiddenDetail(),

@@ -650,7 +650,7 @@ func TestValidatePodController(t *testing.T) {
 			newObject:              &badDeploy,
 			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit-violations": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 		{
@@ -659,7 +659,7 @@ func TestValidatePodController(t *testing.T) {
 			oldObject:              &goodDeploy,
 			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit-violations": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 	}
