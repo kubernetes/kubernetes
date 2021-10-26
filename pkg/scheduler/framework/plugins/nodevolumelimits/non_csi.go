@@ -388,7 +388,7 @@ func getMaxVolLimitFromEnv() int {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
 			klog.ErrorS(err, "Unable to parse maximum PD volumes value, using default")
 		} else if parsedMaxVols <= 0 {
-			klog.ErrorS(nil, "Maximum PD volumes must be a positive value, using default")
+			klog.ErrorS(errors.New("maximum PD volumes is negative"), "Unable to parse maximum PD volumes value, using default")
 		} else {
 			return parsedMaxVols
 		}
