@@ -42,6 +42,8 @@ type Mode string
 
 type Recorder interface {
 	RecordEvaluation(Decision, api.LevelVersion, Mode, api.Attributes)
+	RecordExemption(api.Attributes)
+	RecordError(fatal bool, attrs api.Attributes)
 }
 
 var defaultRecorder = NewPrometheusRecorder(api.GetAPIVersion())
@@ -59,6 +61,8 @@ type PrometheusRecorder struct {
 	apiVersion api.Version
 
 	evaluationsCounter *metrics.CounterVec
+	exemptionsCounter  *metrics.CounterVec
+	errorsCounter      *metrics.CounterVec
 
 	registerOnce sync.Once
 }
@@ -74,21 +78,43 @@ func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
 		},
 		[]string{"decision", "policy_level", "policy_version", "mode", "request_operation", "resource", "subresource"},
 	)
+	exemptionsCounter := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "pod_security_exemptions_total",
+			Help:           "Number of exempt requests, not counting ignored or out of scope requests.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"request_operation", "resource", "subresource"},
+	)
+	errorsCounter := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "pod_security_errors_total",
+			Help:           "Number of errors prevent normal evaluation. Non-fatal errors are evaluated against a default policy.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"fatal", "request_operation", "resource", "subresource"},
+	)
 
 	return &PrometheusRecorder{
 		apiVersion:         version,
 		evaluationsCounter: evaluationsCounter,
+		exemptionsCounter:  exemptionsCounter,
+		errorsCounter:      errorsCounter,
 	}
 }
 
 func (r *PrometheusRecorder) MustRegister(registerFunc func(...metrics.Registerable)) {
 	r.registerOnce.Do(func() {
 		registerFunc(r.evaluationsCounter)
+		registerFunc(r.exemptionsCounter)
+		registerFunc(r.errorsCounter)
 	})
 }
 
 func (r *PrometheusRecorder) Reset() {
 	r.evaluationsCounter.Reset()
+	r.exemptionsCounter.Reset()
+	r.errorsCounter.Reset()
 }
 
 func (r *PrometheusRecorder) RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes) {
@@ -98,18 +124,32 @@ func (r *PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Leve
 	subresource := attrs.GetSubresource()
 
 	var version string
-		if policy.Version.Latest() {
-			version = "latest"
+	if policy.Version.Latest() {
+		version = "latest"
+	} else {
+		if !r.apiVersion.Older(policy.Version) {
+			version = policy.Version.String()
 		} else {
-			if !r.apiVersion.Older(policy.Version) {
-				version = policy.Version.String()
-			} else {
-				version = "future"
-			}
+			version = "future"
 		}
+	}
 
-		r.evaluationsCounter.WithLabelValues(dec, string(policy.Level),
-			version, string(evalMode), operation, resource, subresource).Inc()
+	r.evaluationsCounter.WithLabelValues(dec, string(policy.Level),
+		version, string(evalMode), operation, resource, subresource).Inc()
+}
+
+func (r *PrometheusRecorder) RecordExemption(attrs api.Attributes) {
+	operation := operationLabel(attrs.GetOperation())
+	resource := resourceLabel(attrs.GetResource())
+	subresource := attrs.GetSubresource()
+	r.exemptionsCounter.WithLabelValues(operation, resource, subresource).Inc()
+}
+
+func (r *PrometheusRecorder) RecordError(fatal bool, attrs api.Attributes) {
+	operation := operationLabel(attrs.GetOperation())
+	resource := resourceLabel(attrs.GetResource())
+	subresource := attrs.GetSubresource()
+	r.errorsCounter.WithLabelValues(strconv.FormatBool(fatal), operation, resource, subresource).Inc()
 }
 
 func resourceLabel(resource schema.GroupVersionResource) string {

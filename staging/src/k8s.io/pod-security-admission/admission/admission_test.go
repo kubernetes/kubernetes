@@ -731,7 +731,7 @@ func TestValidatePodController(t *testing.T) {
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
 
 			expectedEvaluations := []EvaluationRecord{}
-			if len(tc.expectAuditAnnotations) > 0 {
+			if _, ok := tc.expectAuditAnnotations["audit-violations"]; ok {
 				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeAudit})
 			}
 			if len(tc.expectWarnings) > 0 {
@@ -756,6 +756,9 @@ type EvaluationRecord struct {
 func (r *FakeRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
 	r.evaluations = append(r.evaluations, EvaluationRecord{attrs.GetName(), decision, policy, evalMode})
 }
+
+func (r *FakeRecorder) RecordExemption(api.Attributes)   {}
+func (r *FakeRecorder) RecordError(bool, api.Attributes) {}
 
 // ExpectEvaluation asserts that the evaluation was recorded, and clears the record.
 func (r *FakeRecorder) ExpectEvaluations(t *testing.T, expected []EvaluationRecord) {

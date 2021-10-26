@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -95,6 +96,65 @@ func TestRecordEvaluation(t *testing.T) {
 	}
 }
 
+func TestRecordExemption(t *testing.T) {
+	recorder := NewPrometheusRecorder(testVersion)
+	registry := testutil.NewFakeKubeRegistry("1.23.0")
+	recorder.MustRegister(registry.MustRegister)
+
+	for _, op := range operations {
+		for resource, expectedResource := range resourceExpectations {
+			recorder.RecordExemption(&api.AttributesRecord{
+				Resource:  resource,
+				Operation: op,
+			})
+			expectedLabels := map[string]string{
+				"request_operation": strings.ToLower(string(op)),
+				"resource":          expectedResource,
+				"subresource":       "",
+			}
+			val, err := testutil.GetCounterMetricValue(recorder.exemptionsCounter.With(expectedLabels))
+			require.NoError(t, err, expectedLabels)
+
+			if !assert.EqualValues(t, 1, val, expectedLabels) {
+				findMetric(t, registry, "pod_security_exemptions_total")
+			}
+
+			recorder.Reset()
+		}
+	}
+}
+
+func TestRecordError(t *testing.T) {
+	recorder := NewPrometheusRecorder(testVersion)
+	registry := testutil.NewFakeKubeRegistry("1.23.0")
+	recorder.MustRegister(registry.MustRegister)
+
+	for _, fatal := range []bool{true, false} {
+		for _, op := range operations {
+			for resource, expectedResource := range resourceExpectations {
+				recorder.RecordError(fatal, &api.AttributesRecord{
+					Resource:  resource,
+					Operation: op,
+				})
+				expectedLabels := map[string]string{
+					"fatal":             strconv.FormatBool(fatal),
+					"request_operation": strings.ToLower(string(op)),
+					"resource":          expectedResource,
+					"subresource":       "",
+				}
+				val, err := testutil.GetCounterMetricValue(recorder.errorsCounter.With(expectedLabels))
+				require.NoError(t, err, expectedLabels)
+
+				if !assert.EqualValues(t, 1, val, expectedLabels) {
+					findMetric(t, registry, "pod_security_errors_total")
+				}
+
+				recorder.Reset()
+			}
+		}
+	}
+}
+
 func levelVersion(level api.Level, version string) api.LevelVersion {
 	lv := api.LevelVersion{Level: level}
 	var err error
@@ -115,6 +175,8 @@ func findMetric(t *testing.T, gatherer metrics.Gatherer, metricName string) {
 					t.Logf("Found metric: %s", metric.String())
 				}
 			}
+			return
 		}
 	}
+	t.Errorf("Expected metric %s not found", metricName)
 }
