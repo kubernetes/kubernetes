@@ -17,6 +17,9 @@
 ENTRYPOINT = "../cmd/webhook/webhook.go"
 EXECUTABLE = "pod-security-webhook"
 
+# Relative to location in staging dir
+KUBE_ROOT = "../../../../.."
+
 IMAGE_DOCKERFILE = "Dockerfile"
 REGISTRY ?= "gcr.io/k8s-staging-sig-auth"
 IMAGE ?= "$(REGISTRY)/pod-security-webhook"
@@ -28,8 +31,8 @@ ARCH ?= amd64
 # Builds the PodSecurity webhook binary.
 build:
 	@echo Building PodSecurity webhook...
-	@GOOS=$(OS) GOARCH=$(ARCH) CGO_ENABLED=0 \
-		go build -o $(EXECUTABLE) $(ENTRYPOINT)
+	@LDFLAGS=`cd -P . && /usr/bin/env bash -c '. $(KUBE_ROOT)/hack/lib/version.sh && KUBE_ROOT=$(KUBE_ROOT) KUBE_GO_PACKAGE=k8s.io/kubernetes kube::version::ldflags'`; \
+	GOOS=$(OS) GOARCH=$(ARCH) CGO_ENABLED=0 go build -o $(EXECUTABLE) -ldflags "$$LDFLAGS" $(ENTRYPOINT)
 	@echo Done!
 
 # Builds the PodSecurity webhook Docker image.
