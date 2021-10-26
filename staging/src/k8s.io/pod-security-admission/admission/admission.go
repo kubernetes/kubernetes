@@ -432,6 +432,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	response := allowedResponse()
 	if enforce {
+		auditAnnotations[api.EnforcedPolicyAnnotationKey] = nsPolicy.Enforce.String()
+
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(fmt.Sprintf(
 				"pod violates PodSecurity %q: %s",
