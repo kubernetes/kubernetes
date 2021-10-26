@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -46,6 +47,8 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
+	openapiv3controller "k8s.io/kube-aggregator/pkg/controllers/openapiv3"
+	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
@@ -141,8 +144,11 @@ type APIAggregator struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
-	// openAPIAggregationController downloads and merges OpenAPI specs.
+	// openAPIAggregationController downloads and merges OpenAPI v2 specs.
 	openAPIAggregationController *openapicontroller.AggregationController
+
+	// openAPIV3AggregationController downloads and caches OpenAPI v3 specs.
+	openAPIV3AggregationController *openapiv3controller.AggregationController
 
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
@@ -344,6 +350,9 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
+			if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+				go s.openAPIV3AggregationController.Run(context.StopCh)
+			}
 			return nil
 		})
 	}
@@ -363,6 +372,18 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return preparedAPIAggregator{}, err
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+			specDownloaderV3 := openapiv3aggregator.NewDownloader()
+			openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
+				specDownloaderV3,
+				s.GenericAPIServer.NextDelegate(),
+				s.GenericAPIServer.Handler.NonGoRestfulMux)
+			if err != nil {
+				return preparedAPIAggregator{}, err
+			}
+			_ = openAPIV3Aggregator
+			s.openAPIV3AggregationController = openapiv3controller.NewAggregationController(openAPIV3Aggregator)
+		}
 	}
 
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
@@ -381,6 +402,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyHandler.updateAPIService(apiService)
 		if s.openAPIAggregationController != nil {
 			s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
+		}
+		if s.openAPIV3AggregationController != nil {
+			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
 		return nil
 	}
@@ -402,6 +426,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
 		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
+	}
+	if s.openAPIV3AggregationController != nil {
+		s.openAPIV3AggregationController.AddAPIService(proxyHandler, apiService)
 	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
@@ -445,6 +472,9 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
 	if s.openAPIAggregationController != nil {
+		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
+	}
+	if s.openAPIV3AggregationController != nil {
 		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
 	}
 	delete(s.proxyHandlers, apiServiceName)
