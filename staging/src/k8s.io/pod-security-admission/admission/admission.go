@@ -41,8 +41,8 @@ import (
 )
 
 const (
-	namespaceMaxPodsToCheck  = 3000
-	namespacePodCheckTimeout = 1 * time.Second
+	defaultNamespaceMaxPodsToCheck  = 3000
+	defaultNamespacePodCheckTimeout = 1 * time.Second
 )
 
 // Admission implements the core admission logic for the Pod Security Admission controller.
@@ -64,6 +64,9 @@ type Admission struct {
 	PodLister       PodLister
 
 	defaultPolicy api.Policy
+
+	namespaceMaxPodsToCheck  int
+	namespacePodCheckTimeout time.Duration
 }
 
 type NamespaceGetter interface {
@@ -152,6 +155,8 @@ func (a *Admission) CompleteConfiguration() error {
 			a.defaultPolicy = p
 		}
 	}
+	a.namespaceMaxPodsToCheck = defaultNamespaceMaxPodsToCheck
+	a.namespacePodCheckTimeout = defaultNamespacePodCheckTimeout
 
 	if a.PodSpecExtractor == nil {
 		a.PodSpecExtractor = &DefaultPodSpecExtractor{}
@@ -172,6 +177,9 @@ func (a *Admission) ValidateConfiguration() error {
 		} else if !reflect.DeepEqual(p, a.defaultPolicy) {
 			return fmt.Errorf("default policy does not match; CompleteConfiguration() was not called before ValidateConfiguration()")
 		}
+	}
+	if a.namespaceMaxPodsToCheck == 0 || a.namespacePodCheckTimeout == 0 {
+		return fmt.Errorf("namespace configuration not set; CompleteConfiguration() was not called before ValidateConfiguration()")
 	}
 	if a.Metrics == nil {
 		return fmt.Errorf("Metrics recorder required")
@@ -409,14 +417,14 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	}
 
 	if klog.V(5).Enabled() {
-		klog.InfoS("Pod Security evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
+		klog.InfoS("PodSecurity evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
 
 	response := allowedResponse()
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(fmt.Sprintf(
-				"Pod violates PodSecurity %q: %s",
+				"pod violates PodSecurity %q: %s",
 				nsPolicy.Enforce.String(),
 				result.ForbiddenDetail(),
 			))
@@ -429,7 +437,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
 		auditAnnotations["audit"] = fmt.Sprintf(
-			"Would violate PodSecurity %q: %s",
+			"would violate PodSecurity %q: %s",
 			nsPolicy.Audit.String(),
 			result.ForbiddenDetail(),
 		)
@@ -442,7 +450,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
 			// TODO: Craft a better user-facing warning message
 			response.Warnings = append(response.Warnings, fmt.Sprintf(
-				"Would violate PodSecurity %q: %s",
+				"would violate PodSecurity %q: %s",
 				nsPolicy.Warn.String(),
 				result.ForbiddenDetail(),
 			))
@@ -464,9 +472,10 @@ type podCount struct {
 }
 
 func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace string, enforce api.LevelVersion) []string {
-	timeout := namespacePodCheckTimeout
+	// start with the default timeout
+	timeout := a.namespacePodCheckTimeout
 	if deadline, ok := ctx.Deadline(); ok {
-		timeRemaining := time.Duration(0.9 * float64(time.Until(deadline))) // Leave a little time to respond.
+		timeRemaining := time.Until(deadline) / 2 // don't take more than half the remaining time
 		if timeout > timeRemaining {
 			timeout = timeRemaining
 		}
@@ -477,8 +486,8 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 
 	pods, err := a.PodLister.ListPods(ctx, namespace)
 	if err != nil {
-		klog.ErrorS(err, "Failed to list pods", "namespace", namespace)
-		return []string{"Failed to list pods"}
+		klog.ErrorS(err, "failed to list pods", "namespace", namespace)
+		return []string{"failed to list pods while checking new PodSecurity enforce level"}
 	}
 
 	var (
@@ -487,11 +496,12 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 		podWarnings        []string
 		podWarningsToCount = make(map[string]podCount)
 	)
-	if len(pods) > namespaceMaxPodsToCheck {
-		warnings = append(warnings, fmt.Sprintf("Large namespace: only checking the first %d of %d pods", namespaceMaxPodsToCheck, len(pods)))
-		pods = pods[0:namespaceMaxPodsToCheck]
+	totalPods := len(pods)
+	if len(pods) > a.namespaceMaxPodsToCheck {
+		pods = pods[0:a.namespaceMaxPodsToCheck]
 	}
 
+	checkedPods := len(pods)
 	for i, pod := range pods {
 		// short-circuit on exempt runtimeclass
 		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
@@ -510,10 +520,18 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 			c.podCount++
 			podWarningsToCount[warning] = c
 		}
-		if time.Now().After(deadline) {
-			warnings = append(warnings, fmt.Sprintf("Timeout reached after checking %d pods", i+1))
+		if err := ctx.Err(); err != nil { // deadline exceeded or context was cancelled
+			checkedPods = i + 1
 			break
 		}
+	}
+
+	if checkedPods < totalPods {
+		warnings = append(warnings, fmt.Sprintf("new PodSecurity enforce level only checked against the first %d of %d existing pods", checkedPods, totalPods))
+	}
+
+	if len(podWarnings) > 0 {
+		warnings = append(warnings, fmt.Sprintf("existing pods in namespace %q violate the new PodSecurity enforce level %q", namespace, enforce.String()))
 	}
 
 	// prepend pod names to warnings
