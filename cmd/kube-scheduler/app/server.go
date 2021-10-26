@@ -69,6 +69,7 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 		os.Exit(1)
 	}
 
+	namedFlagSets := opts.Flags()
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
 		Long: `The Kubernetes scheduler is a control plane process which assigns
@@ -80,6 +81,9 @@ kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := opts.Complete(&namedFlagSets); err != nil {
+				return err
+			}
 			return runCommand(cmd, opts, registryOptions...)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -93,7 +97,6 @@ for more information about scheduling and the kube-scheduler component.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := opts.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 	for _, f := range namedFlagSets.FlagSets {
@@ -101,7 +104,7 @@ for more information about scheduling and the kube-scheduler component.`,
 	}
 
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cliflag.SetUsageAndHelpFunc(cmd, *namedFlagSets, cols)
+	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
