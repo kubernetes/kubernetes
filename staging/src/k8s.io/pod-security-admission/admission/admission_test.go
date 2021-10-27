@@ -18,10 +18,14 @@ package admission
 
 import (
 	"context"
+	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 
 	"github.com/stretchr/testify/assert"
 
@@ -764,4 +768,61 @@ func (r *FakeRecorder) RecordError(bool, api.Attributes) {}
 func (r *FakeRecorder) ExpectEvaluations(t *testing.T, expected []EvaluationRecord) {
 	t.Helper()
 	assert.ElementsMatch(t, expected, r.evaluations)
+}
+
+func TestPrioritisePods(t *testing.T) {
+	isController := true
+	sampleOwnerReferences := []struct {
+		ownerRefs []metav1.OwnerReference
+	}{
+		{
+			ownerRefs: []metav1.OwnerReference{
+				{
+					UID:        uuid.NewUUID(),
+					Controller: &isController,
+				},
+			},
+		}, {
+			ownerRefs: []metav1.OwnerReference{
+				{
+					UID:        uuid.NewUUID(),
+					Controller: &isController,
+				},
+			},
+		}, {
+			ownerRefs: []metav1.OwnerReference{
+				{
+					UID:        uuid.NewUUID(),
+					Controller: &isController,
+				},
+			},
+		},
+	}
+
+	var pods []*corev1.Pod
+	randomSource := rand.NewSource(time.Now().Unix())
+	for _, sampleOwnerRef := range sampleOwnerReferences {
+		// Generate multiple pods for a controller
+		for i := 0; i < rand.New(randomSource).Intn(5)+len(sampleOwnerReferences); i++ {
+			pods = append(pods, &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: sampleOwnerRef.ownerRefs,
+				},
+				Spec: corev1.PodSpec{},
+			})
+		}
+	}
+	a := &Admission{}
+	prioritisedPods := a.prioritisePods(pods)
+	controllerRef := make(map[types.UID]bool)
+
+	for i := 0; i < len(sampleOwnerReferences); i++ {
+		if controllerRef[metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID] {
+			assert.Fail(t, "Pods are not prioritised based on uniqueness of the controller")
+		}
+		controllerRef[metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID] = true
+	}
+	if len(prioritisedPods) != len(pods) {
+		assert.Fail(t, "Pod count is not the same after prioritization")
+	}
 }
