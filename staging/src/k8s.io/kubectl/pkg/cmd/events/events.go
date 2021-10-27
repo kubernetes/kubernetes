@@ -38,8 +38,10 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -198,14 +200,21 @@ func (o EventsOptions) Run() error {
 			return err
 		}
 
-		for e := range eventWatch.ResultChan() {
-			if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
-				continue
-			}
-			event := e.Object.(*corev1.Event)
-			printOneEvent(w, *event, o.AllNamespaces)
-			w.Flush()
-		}
+		ctx, cancel := context.WithCancel(o.ctx)
+		defer cancel()
+		intr := interrupt.New(nil, cancel)
+		intr.Run(func() error {
+			_, err := watchtools.UntilWithoutRetry(ctx, eventWatch, func(e watch.Event) (bool, error) {
+				if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
+					return false, nil
+				}
+				event := e.Object.(*corev1.Event)
+				printOneEvent(w, *event, o.AllNamespaces)
+				w.Flush()
+				return false, nil
+			})
+			return err
+		})
 	}
 
 	return nil
