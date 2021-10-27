@@ -205,10 +205,16 @@ func printHeadings(w io.Writer, allNamespaces bool) {
 
 func printOneEvent(w io.Writer, e corev1.Event, allNamespaces bool) {
 	var interval string
-	if e.Count > 1 {
-		interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp.Time), e.Count, translateTimestampSince(e.FirstTimestamp.Time))
+	firstTimestampSince := translateMicroTimestampSince(e.EventTime)
+	if e.EventTime.IsZero() {
+		firstTimestampSince = translateTimestampSince(e.FirstTimestamp)
+	}
+	if e.Series != nil {
+		interval = fmt.Sprintf("%s (x%d over %s)", translateMicroTimestampSince(e.Series.LastObservedTime), e.Series.Count, firstTimestampSince)
+	} else if e.Count > 1 {
+		interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, firstTimestampSince)
 	} else {
-		interval = translateTimestampSince(eventTime(e))
+		interval = firstTimestampSince
 	}
 	if allNamespaces {
 		fmt.Fprintf(w, "%v\t", e.Namespace)
@@ -237,22 +243,36 @@ func (list SortableEvents) Less(i, j int) bool {
 	return eventTime(list[i]).Before(eventTime(list[j]))
 }
 
-// Some events have just an EventTime; if LastTimestamp is present we prefer that.
+// Return the time that should be used for sorting, which can come from
+// various places in corev1.Event.
 func eventTime(event corev1.Event) time.Time {
+	if event.Series != nil {
+		return event.Series.LastObservedTime.Time
+	}
 	if !event.LastTimestamp.Time.IsZero() {
 		return event.LastTimestamp.Time
 	}
 	return event.EventTime.Time
 }
 
-// translateTimestampSince returns the elapsed time since timestamp in
+// translateMicroTimestampSince returns the elapsed time since timestamp in
 // human-readable approximation.
-func translateTimestampSince(timestamp time.Time) string {
+func translateMicroTimestampSince(timestamp metav1.MicroTime) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
 
-	return duration.HumanDuration(time.Since(timestamp))
+	return duration.HumanDuration(time.Since(timestamp.Time))
+}
+
+// translateTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestampSince(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // Inspired by k8s.io/cli-runtime/pkg/resource splitResourceTypeName()
