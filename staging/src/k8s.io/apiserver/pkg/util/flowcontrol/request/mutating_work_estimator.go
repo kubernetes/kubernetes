@@ -24,27 +24,36 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
+const (
+	watchesPerSeat          = 10.0
+	eventAdditionalDuration = 5 * time.Millisecond
+	// TODO(wojtekt): Remove it once we tune the algorithm to not fail
+	// scalability tests.
+	enableMutatingWorkEstimator = false
+)
+
 func newMutatingWorkEstimator(countFn watchCountGetterFunc) WorkEstimatorFunc {
+	return newTestMutatingWorkEstimator(countFn, enableMutatingWorkEstimator)
+}
+
+func newTestMutatingWorkEstimator(countFn watchCountGetterFunc, enabled bool) WorkEstimatorFunc {
 	estimator := &mutatingWorkEstimator{
 		countFn: countFn,
+		enabled: enabled,
 	}
 	return estimator.estimate
 }
 
 type mutatingWorkEstimator struct {
 	countFn watchCountGetterFunc
+	enabled bool
 }
 
-const (
-	watchesPerSeat          = 10.0
-	eventAdditionalDuration = 5 * time.Millisecond
-)
-
 func (e *mutatingWorkEstimator) estimate(r *http.Request) WorkEstimate {
-	// TODO(wojtekt): Remove once we tune the algorithm to not fail
-	// scalability tests.
-	return WorkEstimate{
-		InitialSeats: 1,
+	if (!e.enabled) {
+		return WorkEstimate{
+			InitialSeats: 1,
+		}
 	}
 
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())

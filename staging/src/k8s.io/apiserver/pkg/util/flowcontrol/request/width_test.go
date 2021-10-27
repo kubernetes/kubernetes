@@ -252,136 +252,132 @@ func TestWorkEstimator(t *testing.T) {
 			countErr:             errors.New("unknown error"),
 			initialSeatsExpected: maximumSeats,
 		},
-		// TODO(wojtekt): Reenable these tests after tuning algorithm to
-		// not fail scalability tests.
-		/*
-			{
-				name:       "request verb is create, no watches",
-				requestURI: "http://server/apis/foo.bar/v1/foos",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "create",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        0,
-				additionalLatencyExpected: 0,
+		{
+			name:       "request verb is create, no watches",
+			requestURI: "http://server/apis/foo.bar/v1/foos",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "create",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is create, watches registered",
-				requestURI: "http://server/apis/foo.bar/v1/foos",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "create",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                29,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        3,
-				additionalLatencyExpected: 5 * time.Millisecond,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "request verb is create, watches registered",
+			requestURI: "http://server/apis/foo.bar/v1/foos",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "create",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is create, watches registered, no additional latency",
-				requestURI: "http://server/apis/foo.bar/v1/foos",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "create",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                5,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        0,
-				additionalLatencyExpected: 0,
+			watchCount:                29,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        3,
+			additionalLatencyExpected: 5 * time.Millisecond,
+		},
+		{
+			name:       "request verb is create, watches registered, no additional latency",
+			requestURI: "http://server/apis/foo.bar/v1/foos",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "create",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is create, watches registered, maximum is exceeded",
-				requestURI: "http://server/apis/foo.bar/v1/foos",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "create",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                199,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        20,
-				additionalLatencyExpected: 5 * time.Millisecond,
+			watchCount:                5,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "request verb is create, watches registered, maximum is exceeded",
+			requestURI: "http://server/apis/foo.bar/v1/foos",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "create",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is update, no watches",
-				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "update",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        0,
-				additionalLatencyExpected: 0,
+			watchCount:                199,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        20,
+			additionalLatencyExpected: 5 * time.Millisecond,
+		},
+		{
+			name:       "request verb is update, no watches",
+			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "update",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is update, watches registered",
-				requestURI: "http://server/apis/foor.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "update",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                29,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        3,
-				additionalLatencyExpected: 5 * time.Millisecond,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "request verb is update, watches registered",
+			requestURI: "http://server/apis/foor.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "update",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is patch, no watches",
-				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "patch",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        0,
-				additionalLatencyExpected: 0,
+			watchCount:                29,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        3,
+			additionalLatencyExpected: 5 * time.Millisecond,
+		},
+		{
+			name:       "request verb is patch, no watches",
+			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "patch",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is patch, watches registered",
-				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "patch",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                29,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        3,
-				additionalLatencyExpected: 5 * time.Millisecond,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "request verb is patch, watches registered",
+			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "patch",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is delete, no watches",
-				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "delete",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        0,
-				additionalLatencyExpected: 0,
+			watchCount:                29,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        3,
+			additionalLatencyExpected: 5 * time.Millisecond,
+		},
+		{
+			name:       "request verb is delete, no watches",
+			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "delete",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-			{
-				name:       "request verb is delete, watches registered",
-				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-				requestInfo: &apirequest.RequestInfo{
-					Verb:     "delete",
-					APIGroup: "foo.bar",
-					Resource: "foos",
-				},
-				watchCount:                29,
-				initialSeatsExpected:      1,
-				finalSeatsExpected:        3,
-				additionalLatencyExpected: 5 * time.Millisecond,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "request verb is delete, watches registered",
+			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "delete",
+				APIGroup: "foo.bar",
+				Resource: "foos",
 			},
-		*/
+			watchCount:                29,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        3,
+			additionalLatencyExpected: 5 * time.Millisecond,
+		},
 	}
 
 	for _, test := range tests {
@@ -396,7 +392,14 @@ func TestWorkEstimator(t *testing.T) {
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
 			}
-			estimator := NewWorkEstimator(countsFn, watchCountsFn)
+
+			// TODO(wojtek-t): Simplify it once we enable mutating work estimator
+			// by default.
+			testEstimator := &workEstimator{
+				listWorkEstimator:     newListWorkEstimator(countsFn),
+				mutatingWorkEstimator: newTestMutatingWorkEstimator(watchCountsFn, true),
+			}
+			estimator := WorkEstimatorFunc(testEstimator.estimate)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {
