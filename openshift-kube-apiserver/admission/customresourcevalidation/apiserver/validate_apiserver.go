@@ -167,7 +167,7 @@ func validateTLSSecurityProfile(fieldPath *field.Path, profile *configv1.TLSSecu
 	errs = append(errs, validateTLSSecurityProfileType(fieldPath, profile)...)
 
 	if profile.Type == configv1.TLSProfileCustomType && profile.Custom != nil {
-		errs = append(errs, validateCipherSuites(fieldPath.Child("custom", "ciphers"), profile.Custom.Ciphers)...)
+		errs = append(errs, validateCipherSuites(fieldPath.Child("custom", "ciphers"), profile.Custom.Ciphers, profile.Custom.MinTLSVersion)...)
 		errs = append(errs, validateMinTLSVersion(fieldPath.Child("custom", "minTLSVersion"), profile.Custom.MinTLSVersion)...)
 	}
 
@@ -212,14 +212,36 @@ func validateTLSSecurityProfileType(fieldPath *field.Path, profile *configv1.TLS
 	return errs
 }
 
-func validateCipherSuites(fieldPath *field.Path, suites []string) field.ErrorList {
+func validateCipherSuites(fieldPath *field.Path, suites []string, version configv1.TLSProtocolVersion) field.ErrorList {
 	errs := field.ErrorList{}
 
 	if ianaSuites := libgocrypto.OpenSSLToIANACipherSuites(suites); len(ianaSuites) == 0 {
 		errs = append(errs, field.Invalid(fieldPath, suites, "no supported cipher suite found"))
 	}
 
+	// Return an error if it is missing ECDHE_RSA_WITH_AES_128_GCM_SHA256 or
+	// ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 to prevent the http2 Server
+	// configuration to return an error when http2 required cipher suites aren't
+	// provided.
+	// See: go/x/net/http2.ConfigureServer for futher information.
+	if version < configv1.VersionTLS13 && !haveRequiredHTTP2CipherSuites(suites) {
+		errs = append(errs, field.Invalid(fieldPath, suites, "http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of ECDHE-RSA-AES128-GCM-SHA256 or ECDHE-ECDSA-AES128-GCM-SHA256)"))
+	}
+
 	return errs
+}
+
+func haveRequiredHTTP2CipherSuites(suites []string) bool {
+	for _, s := range suites {
+		switch s {
+		case "ECDHE-RSA-AES128-GCM-SHA256",
+			// Alternative MTI cipher to not discourage ECDSA-only servers.
+			// See http://golang.org/cl/30721 for further information.
+			"ECDHE-ECDSA-AES128-GCM-SHA256":
+			return true
+		}
+	}
+	return false
 }
 
 func validateMinTLSVersion(fieldPath *field.Path, version configv1.TLSProtocolVersion) field.ErrorList {
