@@ -38,7 +38,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
-func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
+func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, containerName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
 	zero := int64(0)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +59,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:            imageName,
+							Name:            containerName,
 							Image:           image,
 							SecurityContext: &v1.SecurityContext{},
 						},
