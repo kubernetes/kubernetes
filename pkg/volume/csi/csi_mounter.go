@@ -276,7 +276,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	c.supportsSELinux, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
 	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
+		// The volume is mounted. Return UncertainProgressError, so kubelet will unmount it when user deletes the pod.
+		return volumetypes.NewUncertainProgressError(fmt.Sprintf("error checking for SELinux support: %s", err))
 	}
 
 	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
