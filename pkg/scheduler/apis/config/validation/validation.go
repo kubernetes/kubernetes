@@ -129,7 +129,6 @@ var removedPluginsByVersion = []removedPlugins{
 	{
 		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
 		plugins: []string{
-			"NodeLabel",
 			"NodeResourcesLeastAllocated",
 			"NodeResourcesMostAllocated",
 			"RequestedToCapacityRatio",
@@ -182,7 +181,6 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"DefaultPreemption":               ValidateDefaultPreemptionArgs,
 		"InterPodAffinity":                ValidateInterPodAffinityArgs,
 		"NodeAffinity":                    ValidateNodeAffinityArgs,
-		"NodeLabel":                       ValidateNodeLabelArgs,
 		"NodeResourcesBalancedAllocation": ValidateNodeResourcesBalancedAllocationArgs,
 		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
 		"NodeResourcesLeastAllocated":     ValidateNodeResourcesLeastAllocatedArgs,

@@ -199,7 +199,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	})
 
 	badRemovedPlugins1 := validConfig.DeepCopy()
-	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeLabel", Weight: 2})
+	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
 
 	badRemovedPlugins3 := validConfig.DeepCopy()
 	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
@@ -498,7 +498,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	})
 
 	badRemovedPlugins1 := validConfig.DeepCopy()
-	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeLabel", Weight: 2})
+	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
 
 	badRemovedPlugins2 := validConfig.DeepCopy()
 	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})

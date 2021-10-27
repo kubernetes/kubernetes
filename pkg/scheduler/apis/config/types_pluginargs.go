@@ -56,26 +56,6 @@ type InterPodAffinityArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
-//
-// This plugin has been deprecated and is only configurable through the
-// scheduler policy API and the v1beta1 component config API. It is recommended
-// to use the NodeAffinity plugin instead.
-type NodeLabelArgs struct {
-	metav1.TypeMeta
-
-	// PresentLabels should be present for the node to be considered a fit for hosting the pod
-	PresentLabels []string
-	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
-	AbsentLabels []string
-	// Nodes that have labels in the list will get a higher score.
-	PresentLabelsPreference []string
-	// Nodes that don't have labels in the list will get a higher score.
-	AbsentLabelsPreference []string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeResourcesFitArgs holds arguments used to configure the NodeResourcesFit plugin.
 type NodeResourcesFitArgs struct {
 	metav1.TypeMeta
