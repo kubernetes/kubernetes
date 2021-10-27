@@ -267,6 +267,8 @@ var (
 		"SeccompDefault",
 		"SerializeImagePulls",
 		"ShowHiddenMetricsForVersion",
+		"ShutdownGracePeriodByPodPriority[*].Priority",
+		"ShutdownGracePeriodByPodPriority[*].ShutdownGracePeriodSeconds",
 		"StreamingConnectionIdleTimeout.Duration",
 		"SyncFrequency.Duration",
 		"SystemCgroups",
