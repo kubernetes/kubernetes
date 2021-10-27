@@ -30,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -69,6 +71,7 @@ type EventsOptions struct {
 	Namespace     string
 	Watch         bool
 	ForObject     string
+	ChunkSize     int64
 
 	forGVK  schema.GroupVersionKind
 	forName string
@@ -83,6 +86,7 @@ func NewEventsOptions(streams genericclioptions.IOStreams, watch bool) *EventsOp
 	return &EventsOptions{
 		IOStreams: streams,
 		Watch:     watch,
+		ChunkSize: cmdutil.DefaultChunkSize,
 	}
 }
 
@@ -109,6 +113,7 @@ func (o *EventsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested events, watch for more events.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.ForObject, "for", o.ForObject, "Filter events to only those pertaining to the specified resource.")
+	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 }
 
 func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
@@ -152,13 +157,23 @@ func (o EventsOptions) Run() error {
 	if o.AllNamespaces {
 		namespace = ""
 	}
-	listOptions := metav1.ListOptions{}
+	listOptions := metav1.ListOptions{Limit: cmdutil.DefaultChunkSize}
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
-	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, listOptions)
+	e := o.client.CoreV1().Events(namespace)
+	el := &corev1.EventList{}
+	err := runtimeresource.FollowContinue(&listOptions,
+		func(options metav1.ListOptions) (runtime.Object, error) {
+			newEvents, err := e.List(o.ctx, options)
+			if err != nil {
+				return nil, runtimeresource.EnhanceListError(err, options, "events")
+			}
+			el.Items = append(el.Items, newEvents.Items...)
+			return newEvents, nil
+		})
 
 	if err != nil {
 		return err
