@@ -18,6 +18,7 @@ package aggregator
 
 import (
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -132,7 +133,7 @@ func (s *Downloader) DownloadV3(handler http.Handler, etag string) (returnSpec m
 		return nil, nil
 	case http.StatusOK:
 		groups := &Thing{}
-		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(writer.data, groups); err != nil {
+		if err := json.Unmarshal(writer.data, groups); err != nil {
 			return nil, err
 		}
 
