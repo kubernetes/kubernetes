@@ -696,6 +696,10 @@ func (a *Admission) prioritisePods(pods []*corev1.Pod) []*corev1.Pod {
 
 		// short-circuit if pod from the same controller is evaluated
 		podOwnerControllerRef := metav1.GetControllerOfNoCopy(pod)
+		if podOwnerControllerRef == nil {
+			prioritisedPods = append(prioritisedPods, pod)
+			continue
+		}
 		if evaluatedControllers[podOwnerControllerRef.UID] {
 			replicatedPods = append(replicatedPods, pod)
 			continue
