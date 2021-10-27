@@ -181,6 +181,7 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			},
 			want: field.ErrorList{
 				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string{"UNKNOWN_CIPHER"}, "no supported cipher suite found"),
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string{"UNKNOWN_CIPHER"}, "http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of ECDHE-RSA-AES128-GCM-SHA256 or ECDHE-ECDSA-AES128-GCM-SHA256)"),
 			},
 		},
 		{
@@ -190,7 +191,7 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 				Custom: &configv1.CustomTLSProfile{
 					TLSProfileSpec: configv1.TLSProfileSpec{
 						Ciphers: []string{
-							"UNKNOWN_CIPHER", "ECDHE-ECDSA-CHACHA20-POLY1305",
+							"UNKNOWN_CIPHER", "ECDHE-RSA-AES128-GCM-SHA256",
 						},
 					},
 				},
@@ -207,6 +208,7 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			},
 			want: field.ErrorList{
 				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string(nil), "no supported cipher suite found"),
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string(nil), "http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of ECDHE-RSA-AES128-GCM-SHA256 or ECDHE-ECDSA-AES128-GCM-SHA256)"),
 			},
 		},
 		{
@@ -223,6 +225,45 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			want: field.ErrorList{
 				field.NotSupported(rootFieldPath.Child("custom", "minTLSVersion"), configv1.VersionTLS13, []string{string(configv1.VersionTLS10), string(configv1.VersionTLS11), string(configv1.VersionTLS12)}),
 			},
+		},
+		{
+			name: "custom profile missing required http2 ciphers",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"ECDSA-AES256-GCM-SHA384",
+							"ECDHE-RSA-AES256-GCM-SHA384",
+							"ECDHE-ECDSA-CHACHA20-POLY1305",
+							"ECDHE-RSA-CHACHA20-POLY1305",
+						},
+						MinTLSVersion: configv1.VersionTLS12,
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string{"ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384", "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"}, "http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of ECDHE-RSA-AES128-GCM-SHA256 or ECDHE-ECDSA-AES128-GCM-SHA256)"),
+			},
+		},
+		{
+			name: "custom profile with one required http2 ciphers",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"ECDSA-AES256-GCM-SHA384",
+							"ECDHE-RSA-AES256-GCM-SHA384",
+							"ECDHE-ECDSA-CHACHA20-POLY1305",
+							"ECDHE-RSA-CHACHA20-POLY1305",
+							"ECDHE-RSA-AES128-GCM-SHA256",
+						},
+						MinTLSVersion: configv1.VersionTLS12,
+					},
+				},
+			},
+			want: field.ErrorList{},
 		},
 	}
 	for _, tt := range tests {
