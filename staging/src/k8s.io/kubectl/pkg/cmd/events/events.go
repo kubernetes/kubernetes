@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -258,4 +259,33 @@ func translateTimestampSince(timestamp time.Time) string {
 	}
 
 	return duration.HumanDuration(time.Since(timestamp))
+}
+
+// Inspired by k8s.io/cli-runtime/pkg/resource splitResourceTypeName()
+
+// decodeResourceTypeName handles type/name resource formats and returns a resource tuple
+// (empty or not), whether it successfully found one, and an error
+func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupVersionKind, name string, found bool, err error) {
+	if !strings.Contains(s, "/") {
+		return
+	}
+	seg := strings.Split(s, "/")
+	if len(seg) != 2 {
+		err = fmt.Errorf("arguments in resource/name form may not have more than one slash")
+		return
+	}
+	resource, name := seg[0], seg[1]
+
+	var gvr schema.GroupVersionResource
+	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
+	if err != nil {
+		return
+	}
+	gvk, err = mapper.KindFor(gvr)
+	if err != nil {
+		return
+	}
+	found = true
+
+	return
 }
