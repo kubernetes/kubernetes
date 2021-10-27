@@ -91,7 +91,7 @@ var getOpenAPIDefs common.GetOpenAPIDefinitions = func(ref common.ReferenceCallb
 }
 
 func TestWrapGetOpenAPIDefinitions(t *testing.T) {
-	defs := WrapGetOpenAPIDefinitions(getOpenAPIDefs)(func(path string) spec.Ref {
+	defs := RestoreGetOpenAPIDefinitions(getOpenAPIDefs)(func(path string) spec.Ref {
 		return spec.Ref{}
 	})
 	def := defs["k8s.io/api/apps/v1.DeploymentCondition"]

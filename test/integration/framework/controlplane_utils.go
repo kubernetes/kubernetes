@@ -120,7 +120,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 			Description: "Default Response.",
 		},
 	}
-	openAPIConfig.GetDefinitions = utilopenapi.WrapGetOpenAPIDefinitions(openapi.GetOpenAPIDefinitions)
+	openAPIConfig.GetDefinitions = utilopenapi.RestoreGetOpenAPIDefinitions(openapi.GetOpenAPIDefinitions)
 
 	return openAPIConfig
 }

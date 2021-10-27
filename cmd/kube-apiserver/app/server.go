@@ -398,7 +398,7 @@ func buildGenericConfig(
 		}
 	}
 	// wrap the definitions to revert any changes from disabled features
-	getOpenAPIDefinitions := openapi.WrapGetOpenAPIDefinitions(generatedopenapi.GetOpenAPIDefinitions)
+	getOpenAPIDefinitions := openapi.RestoreGetOpenAPIDefinitions(generatedopenapi.GetOpenAPIDefinitions)
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(getOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(

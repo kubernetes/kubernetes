@@ -57,7 +57,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 
 			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
 			controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-			controlPlaneConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.WrapGetOpenAPIDefinitions(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+			controlPlaneConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.RestoreGetOpenAPIDefinitions(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
 				def := defs[typeToAddEnum]
 				// replace protocol to add the would-be enum field.

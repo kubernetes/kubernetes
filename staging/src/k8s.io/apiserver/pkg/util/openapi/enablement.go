@@ -28,17 +28,18 @@ import (
 // enumTypeDescriptionHeader is the header of enum section in schema description.
 const enumTypeDescriptionHeader = "Possible enum values:"
 
-// WrapGetOpenAPIDefinitions wraps a GetOpenAPIDefinitions to revert
+// RestoreGetOpenAPIDefinitions wraps a GetOpenAPIDefinitions to revert
 // any change to the schema that was made by a disabled feature.
-func WrapGetOpenAPIDefinitions(GetOpenAPIDefinitions common.GetOpenAPIDefinitions) common.GetOpenAPIDefinitions {
+func RestoreGetOpenAPIDefinitions(GetOpenAPIDefinitions common.GetOpenAPIDefinitions) common.GetOpenAPIDefinitions {
 	return func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 		defs := GetOpenAPIDefinitions(ref)
-		amendDefinitions(defs)
+		restoreDefinitions(defs)
 		return defs
 	}
 }
 
-func amendDefinitions(defs map[string]common.OpenAPIDefinition) {
+// restoreDefinitions restores any changes by disabled features from definition map.
+func restoreDefinitions(defs map[string]common.OpenAPIDefinition) {
 	// revert changes from OpenAPIEnums
 	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIEnums) {
 		for gvk, def := range defs {
