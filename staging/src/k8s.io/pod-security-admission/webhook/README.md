@@ -10,30 +10,19 @@ The webhook is available as a Docker image that lives within the SIG-Auth contai
 
 ### Configuring the Webhook Certificate
 
-You will need to provide a cert-key pair to serve the webhook securely. See the [Kubernetes documentation on certificates](https://kubernetes.io/docs/tasks/administer-cluster/certificates/#cfssl) for instructions on generating these files.
-
-```bash
-export CERT_PATH="..."
-export KEY_PATH="..."
-
-kubectl create secret tls pod-security-webhook -n pod-security-webhook \
-  --cert=$CERT_PATH \
-  --key=$KEY_PATH
-```
+Run `make certs` to generate a CA and serving certificate valid for `https://webhook.pod-security-webhook.svc`.
 
 ### Deploying the Webhook
 
 Apply the manifests to install the webhook in your cluster:
 
 ```bash
-kubectl apply -f manifests
+kubectl apply -k .
 ```
 
-Optionally, override the default configuration with [Kustomize](https://kustomize.io):
-
-```bash
-kustomize build $OVERLAY_DIRECTORY
-```
+This applies the manifests in the `manifests` subdirectory,
+creates a secret containing the serving certificate,
+and injects the CA bundle to the validating webhook.
 
 ### Configuring the Webhook
 
