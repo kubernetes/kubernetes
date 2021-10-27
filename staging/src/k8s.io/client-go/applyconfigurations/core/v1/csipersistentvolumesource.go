@@ -30,6 +30,7 @@ type CSIPersistentVolumeSourceApplyConfiguration struct {
 	NodeStageSecretRef         *SecretReferenceApplyConfiguration `json:"nodeStageSecretRef,omitempty"`
 	NodePublishSecretRef       *SecretReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty"`
 	ControllerExpandSecretRef  *SecretReferenceApplyConfiguration `json:"controllerExpandSecretRef,omitempty"`
+	NodeExpandSecretRef        *SecretReferenceApplyConfiguration `json:"nodeExpandSecretRef,omitempty"`
 }
 
 // CSIPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the CSIPersistentVolumeSource type for use with
@@ -113,5 +114,13 @@ func (b *CSIPersistentVolumeSourceApplyConfiguration) WithNodePublishSecretRef(v
 // If called multiple times, the ControllerExpandSecretRef field is set to the value of the last call.
 func (b *CSIPersistentVolumeSourceApplyConfiguration) WithControllerExpandSecretRef(value *SecretReferenceApplyConfiguration) *CSIPersistentVolumeSourceApplyConfiguration {
 	b.ControllerExpandSecretRef = value
+	return b
+}
+
+// WithNodeExpandSecretRef sets the NodeExpandSecretRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeExpandSecretRef field is set to the value of the last call.
+func (b *CSIPersistentVolumeSourceApplyConfiguration) WithNodeExpandSecretRef(value *SecretReferenceApplyConfiguration) *CSIPersistentVolumeSourceApplyConfiguration {
+	b.NodeExpandSecretRef = value
 	return b
 }
