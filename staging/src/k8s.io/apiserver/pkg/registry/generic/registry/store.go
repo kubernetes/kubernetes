@@ -1124,59 +1124,43 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
+
+	tokenBucket := make(chan struct{}, workersNumber)
+	errs := make(chan error, len(items))
 	wg := sync.WaitGroup{}
-	toProcess := make(chan int, 2*workersNumber)
-	errs := make(chan error, workersNumber+1)
-	workersExited := make(chan struct{})
-	distributorExited := make(chan struct{})
 
-	go func() {
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
-			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
-		})
-		defer close(distributorExited)
-		for i := 0; i < len(items); i++ {
-			select {
-			case toProcess <- i:
-			case <-workersExited:
-				klog.V(4).InfoS("workers already exited, and there are some items waiting to be processed", "finished", i, "total", len(items))
-				return
-			}
-		}
-		close(toProcess)
-	}()
+	for _, item := range items {
+		wg.Add(1)
+		tokenBucket <- struct{}{}
 
-	wg.Add(workersNumber)
-	for i := 0; i < workersNumber; i++ {
-		go func() {
+		go func(i runtime.Object) {
 			// panics don't cross goroutine boundaries
 			defer utilruntime.HandleCrash(func(panicReason interface{}) {
 				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
 			})
 			defer wg.Done()
-
-			for index := range toProcess {
-				accessor, err := meta.Accessor(items[index])
-				if err != nil {
-					errs <- err
-					return
-				}
-				// DeepCopy the deletion options because individual graceful deleters communicate changes via a mutating
-				// function in the delete strategy called in the delete method.  While that is always ugly, it works
-				// when making a single call.  When making multiple calls via delete collection, the mutation applied to
-				// pod/A can change the option ultimately used for pod/B.
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options.DeepCopy()); err != nil && !apierrors.IsNotFound(err) {
-					klog.V(4).InfoS("Delete object in DeleteCollection failed", "object", klog.KObj(accessor), "err", err)
-					errs <- err
-					return
-				}
+			defer func() {
+				<-tokenBucket
+			}()
+			accessor, err := meta.Accessor(i)
+			if err != nil {
+				errs <- err
+				return
 			}
-		}()
+
+			// DeepCopy the deletion options because individual graceful deleters communicate changes via a mutating
+			// function in the delete strategy called in the delete method.  While that is always ugly, it works
+			// when making a single call.  When making multiple calls via delete collection, the mutation applied to
+			// pod/A can change the option ultimately used for pod/B.
+			if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options.DeepCopy()); err != nil && !apierrors.IsNotFound(err) {
+				klog.V(4).InfoS("Delete object in DeleteCollection failed", "object", klog.KObj(accessor), "err", err)
+				errs <- err
+				return
+			}
+		}(item)
 	}
 	wg.Wait()
-	// notify distributor to exit
-	close(workersExited)
-	<-distributorExited
+
 	select {
 	case err := <-errs:
 		return nil, err
