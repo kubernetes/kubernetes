@@ -24,6 +24,8 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -495,18 +497,16 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 
 		podWarnings        []string
 		podWarningsToCount = make(map[string]podCount)
+		prioritisedPods    = a.prioritisePods(pods)
 	)
+
 	totalPods := len(pods)
+	checkedPods := len(pods)
 	if len(pods) > a.namespaceMaxPodsToCheck {
-		pods = pods[0:a.namespaceMaxPodsToCheck]
+		prioritisedPods = prioritisedPods[0:a.namespaceMaxPodsToCheck]
 	}
 
-	checkedPods := len(pods)
-	for i, pod := range pods {
-		// short-circuit on exempt runtimeclass
-		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
-			continue
-		}
+	for i, pod := range prioritisedPods {
 		r := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(enforce, &pod.ObjectMeta, &pod.Spec))
 		if !r.Allowed {
 			warning := r.ForbiddenReason()
@@ -677,6 +677,36 @@ func (a *Admission) exemptRuntimeClass(runtimeClass *string) bool {
 	// TODO: consider optimizing to O(1) lookup
 	return containsString(*runtimeClass, a.Configuration.Exemptions.RuntimeClasses)
 }
+
+// Filter and prioritise pods based on runtimeclass and uniqueness of the controller respectively for evaluation
+func (a *Admission) prioritisePods(pods []*corev1.Pod) []*corev1.Pod {
+	var replicatedPods []*corev1.Pod
+	var prioritisedPods []*corev1.Pod
+	totalEvaluatedPods := 0
+	evaluatedControllers := make(map[types.UID]bool)
+	for _, pod := range pods {
+		if totalEvaluatedPods == a.namespaceMaxPodsToCheck {
+			break
+		}
+
+		// short-circuit on exempt runtimeclass
+		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
+			continue
+		}
+
+		// short-circuit if pod from the same controller is evaluated
+		podOwnerControllerRef := metav1.GetControllerOfNoCopy(pod)
+		if evaluatedControllers[podOwnerControllerRef.UID] {
+			replicatedPods = append(replicatedPods, pod)
+			continue
+		}
+		prioritisedPods = append(prioritisedPods, pod)
+		evaluatedControllers[podOwnerControllerRef.UID] = true
+		totalEvaluatedPods++
+	}
+	return append(prioritisedPods, replicatedPods...)
+}
+
 func containsString(needle string, haystack []string) bool {
 	for _, s := range haystack {
 		if s == needle {
