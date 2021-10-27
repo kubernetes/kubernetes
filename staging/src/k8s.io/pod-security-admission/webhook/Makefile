@@ -43,10 +43,24 @@ container: build
 		-t $(IMAGE):$(TAG) .
 	@echo Done!
 
+# Creates a CA and serving certificate valid for webhook.pod-security-webhook.svc
+certs:
+	rm -fr pki
+	mkdir -p pki
+	openssl genrsa -out pki/ca.key 2048
+	openssl req -new -x509 -days 3650 -key pki/ca.key -subj "/CN=pod-security-webhook-ca-$(date +%s)" -out pki/ca.crt
+
+	openssl req -newkey rsa:2048 -nodes -keyout pki/tls.key -subj "/CN=webhook.pod-security-webhook.svc" -out pki/tls.csr
+
+	echo "subjectAltName=DNS:webhook.pod-security-webhook.svc" > pki/extensions.txt
+	echo "extendedKeyUsage=serverAuth" >> pki/extensions.txt
+	openssl x509 -req -extfile pki/extensions.txt -days 730 -in pki/tls.csr -CA pki/ca.crt -CAkey pki/ca.key -CAcreateserial -out pki/tls.crt
+
 # Publishes the PodSecurity webhook Docker image to the configured registry.
 push:
 	@docker push $(IMAGE):$(TAG)
 
 # Removes Pod Security Webhook artifacts.
 clean:
-	rm $(EXECUTABLE)
+	rm -f $(EXECUTABLE)
+	rm -fr pki

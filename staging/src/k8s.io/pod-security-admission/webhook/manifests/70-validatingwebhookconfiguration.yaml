@@ -24,6 +24,8 @@ webhooks:
           - pods
           - pods/ephemeralcontainers
     clientConfig:
+      # Populate with the CA for the serving certificate
+      caBundle: ""
       service:
         namespace: "pod-security-webhook"
         name: "webhook"
@@ -62,6 +64,8 @@ webhooks:
           - cronjobs
           - jobs
     clientConfig:
+      # Populate with the CA for the serving certificate
+      caBundle: ""
       service:
         namespace: "pod-security-webhook"
         name: "webhook"
