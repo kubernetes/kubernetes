@@ -415,8 +415,10 @@ function gke-setup-containerd {
   # Reuse docker group for containerd.
   local -r containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   cat > "${config_path}" <<EOF
+version = 2
+required_plugins = ["io.containerd.grpc.v1.cri"]
 # Kubernetes doesn't use containerd restart manager.
-disabled_plugins = ["restart"]
+disabled_plugins = ["io.containerd.internal.v1.restart"]
 oom_score = -999
 
 [debug]
@@ -425,21 +427,25 @@ oom_score = -999
 [grpc]
   gid = ${containerd_gid}
 
-[plugins.cri]
+[plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-[plugins.cri.cni]
+[plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
   conf_template = "${cni_template_path}"
-[plugins.cri.registry.mirrors."docker.io"]
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "runc"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
 
   if [[ "${ENABLE_GCFS:-}" == "true" ]]; then
     gke-setup-gcfs
     cat >> "${config_path}" <<EOF
-[plugins.cri.containerd]
+[plugins."io.containerd.grpc.v1.cri".containerd]
   snapshotter = "gcfs"
   disable_snapshot_annotations = false
 [proxy_plugins]
@@ -461,37 +467,17 @@ EOF
     mkdir -p "${containerd_opt_path}/lib"
 
     local -r containerd_sandbox_pod_annotations=${CONTAINERD_SANDBOX_POD_ANNOTATIONS:-'"dev.gvisor.*"'}
-
-    # Runtime configuration changed starting in containerd 1.3. Check the
-    # version and apply the respective configuration.
-    local -r version="$(containerd --version | awk '{ print $3 }')"
-    echo "containerd version ${version}"
-    local -r major="$(echo ${version} | awk -F '.' '{ print $1 }')"
-    local -r minor="$(echo ${version} | awk -F '.' '{ print $2 }')"
-    if [[ "${major}" -eq 1 && "${minor}" -le 2 ]]; then
-      cat >> "${config_path}" <<EOF
-[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
+    cat >> "${config_path}" <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
   runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
   pod_annotations = [ ${containerd_sandbox_pod_annotations} ]
-[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}.options]
-  RuntimeRoot = "${CONTAINERD_SANDBOX_RUNTIME_ROOT:-}"
-
-[plugins.opt]
-  path = "${containerd_opt_path}"
-EOF
-    else
-      cat >> "${config_path}" <<EOF
-[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
-  runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
-  pod_annotations = [ ${containerd_sandbox_pod_annotations} ]
-[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}.options]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}.options]
   TypeUrl = "io.containerd.runsc.v1.options"
   ConfigPath = "${shim_config_path}"
 
-[plugins.opt]
+[plugins."io.containerd.internal.v1.opt"]
   path = "${containerd_opt_path}"
 EOF
-    fi
   fi
   chmod 644 "${config_path}"
 
