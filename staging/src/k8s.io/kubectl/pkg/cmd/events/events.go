@@ -85,7 +85,7 @@ func NewEventsOptions(streams genericclioptions.IOStreams, watch bool) *EventsOp
 }
 
 // NewCmdEvents creates a new pod logs command
-func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEventsOptions(streams, false)
 
 	cmd := &cobra.Command{
@@ -95,7 +95,7 @@ func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -110,9 +110,9 @@ func (o *EventsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.ForObject, "for", o.ForObject, "Filter events to only those pertaining to the specified resource.")
 }
 
-func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	var err error
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, _, err = restClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,11 @@ func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	o.ctx = cmd.Context()
-	o.client, err = f.KubernetesClientSet()
+	clientConfig, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.client, err = kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
