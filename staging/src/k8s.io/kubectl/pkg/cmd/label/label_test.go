@@ -174,7 +174,20 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "b"},
 				},
 			},
-			labels:    map[string]string{"a": "b"},
+			labels: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:    map[string]string{"a": "c"},
 			expectErr: true,
 		},
 		{
@@ -586,7 +599,6 @@ func TestLabelMsg(t *testing.T) {
 			},
 			labels:    map[string]string{"a": "b"},
 			expectMsg: MsgNotLabeled,
-			expectErr: true,
 		},
 		{
 			obj: &v1.Pod{

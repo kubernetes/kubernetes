@@ -408,9 +408,9 @@ func updateDataChangeMsg(oldObj []byte, newObj []byte, overwrite bool) string {
 
 func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
-	for key := range labels {
-		if value, found := accessor.GetLabels()[key]; found {
-			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
+	for key, value := range labels {
+		if currValue, found := accessor.GetLabels()[key]; found && currValue != value {
+			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, currValue))
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
