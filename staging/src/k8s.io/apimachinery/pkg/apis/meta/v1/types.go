@@ -414,6 +414,8 @@ type ListOptions struct {
 	// This field is not supported when watch is true. Clients may start a watch from the last
 	// resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
+
+	ConsistentWatchCache bool `json:"consistentWatchCache,omitempty" protobuf:"varint,11,opt,name=consistentWatchCache"`
 }
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
