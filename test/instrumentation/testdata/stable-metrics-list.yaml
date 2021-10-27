@@ -1,3 +1,66 @@
+- name: pending_pods
+  subsystem: scheduler
+  help: Number of pending pods, by the queue type. 'active' means number of pods in
+    activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
+    of pods in unschedulableQ.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - queue
+- name: preemption_attempts_total
+  subsystem: scheduler
+  help: Total preemption attempts in the cluster till now
+  type: Counter
+  stabilityLevel: STABLE
+- name: preemption_victims
+  subsystem: scheduler
+  help: Number of selected preemption victims
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 5
+  - 10
+  - 15
+  - 20
+  - 25
+  - 30
+  - 35
+  - 40
+  - 45
+  - 50
+- name: schedule_attempts_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
+    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+- name: scheduling_attempt_duration_seconds
+  subsystem: scheduler
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
 - name: apiserver_request_duration_seconds
   help: Response latency distribution in seconds for each verb, dry run value, group,
     version, resource, subresource, scope and component.
