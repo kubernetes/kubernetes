@@ -330,6 +330,18 @@ const (
 	// Disables the OpenStack Cinder in-tree driver.
 	InTreePluginOpenStackUnregister featuregate.Feature = "InTreePluginOpenStackUnregister"
 
+	// owner: @humblec
+	// alpha: v1.23
+	//
+	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
+	CSIMigrationRBD featuregate.Feature = "csiMigrationRBD"
+
+	// owner: @humblec
+	// alpha: v1.23
+	//
+	// Disables the RBD in-tree driver.
+	InTreePluginRBDUnregister featuregate.Feature = "InTreePluginRBDUnregister"
+
 	// owner: @huffmanca, @dobsonj
 	// alpha: v1.19
 	// beta: v1.20
@@ -842,6 +854,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.Beta},
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationRBD:                                {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
+	InTreePluginRBDUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
 	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
