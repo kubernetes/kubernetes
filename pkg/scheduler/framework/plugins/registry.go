@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
@@ -61,7 +60,6 @@ func NewInTreeRegistry() runtime.Registry {
 		tainttoleration.Name:                       tainttoleration.New,
 		nodename.Name:                              nodename.New,
 		nodeports.Name:                             nodeports.New,
-		nodepreferavoidpods.Name:                   nodepreferavoidpods.New,
 		nodeaffinity.Name:                          nodeaffinity.New,
 		podtopologyspread.Name:                     podtopologyspread.New,
 		nodeunschedulable.Name:                     nodeunschedulable.New,
