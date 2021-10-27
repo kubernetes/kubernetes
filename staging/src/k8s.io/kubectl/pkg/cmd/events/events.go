@@ -130,7 +130,7 @@ func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGe
 			return err
 		}
 		if !found {
-			return fmt.Errorf("--watch-for must be in resource/name form")
+			return fmt.Errorf("--for must be in resource/name form")
 		}
 	}
 
