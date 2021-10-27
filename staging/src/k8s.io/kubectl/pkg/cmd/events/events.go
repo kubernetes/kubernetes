@@ -98,7 +98,6 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -144,11 +143,6 @@ func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGe
 		return err
 	}
 
-	return nil
-}
-
-func (o EventsOptions) Validate() error {
-	// Nothing to do here.
 	return nil
 }
 
