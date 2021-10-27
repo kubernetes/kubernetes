@@ -1087,6 +1087,22 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
 			svc.Spec.HealthCheckNodePort = 30000
 		}),
+		// create LoadBalancer service with Cluster traffic policy and no source ranges
+		makeTestService("ns2b", "svc2b", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.5",
+			}}
+			svc.Spec.HealthCheckNodePort = 30000
+		}),
 		// create NodePort service
 		makeTestService("ns3", "svc3", func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
@@ -1124,11 +1140,24 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Protocol: &tcpProtocol,
 			}}
 		}),
-		// create LoadBalancer endpoints
+		// create Local LoadBalancer endpoints. Note that since we aren't setting
+		// its NodeName, this endpoint will be considered non-local and ignored.
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.2"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+		// create Cluster LoadBalancer endpoints
+		makeTestEndpointSlice("ns2b", "svc2b", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.3"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     utilpointer.StringPtr("p80"),
@@ -1190,6 +1219,9 @@ COMMIT
 :KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
 :KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
 :KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SVC-PAZTZYUUMV5KCDZL - [0:0]
+:KUBE-FW-PAZTZYUUMV5KCDZL - [0:0]
+:KUBE-SEP-QDCEFMBQEGWIV4VT - [0:0]
 :KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
 :KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
 :KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
@@ -1219,6 +1251,17 @@ COMMIT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-PAZTZYUUMV5KCDZL
+-A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.5/32 --dport 80 -j KUBE-FW-PAZTZYUUMV5KCDZL
+-A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-MARK-MASQ
+-A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-SVC-PAZTZYUUMV5KCDZL
+-A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-PAZTZYUUMV5KCDZL
+-A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment ns2b/svc2b:p80 -j KUBE-SEP-QDCEFMBQEGWIV4VT
+-A KUBE-SEP-QDCEFMBQEGWIV4VT -m comment --comment ns2b/svc2b:p80 -s 10.180.0.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-QDCEFMBQEGWIV4VT -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
 -A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 -A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
@@ -4221,33 +4264,47 @@ COMMIT
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 	tcpProtocol := v1.ProtocolTCP
+	timeout := v1.DefaultClientIPServiceAffinitySeconds
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+		Spec: v1.ServiceSpec{
+			ClusterIP:             "172.20.1.1",
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			Selector:              map[string]string{"foo": "bar"},
+			Ports: []v1.ServicePort{
+				{
+					Name:       "",
+					TargetPort: intstr.FromInt(80),
+					Port:       80,
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+			SessionAffinity: v1.ServiceAffinityClientIP,
+			SessionAffinityConfig: &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{
+					TimeoutSeconds: &timeout,
+				},
+			},
+		},
+		Status: v1.ServiceStatus{
+			LoadBalancer: v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "10.1.2.3"},
+				},
+			},
+		},
+	}
+
 	testcases := []struct {
 		name                   string
 		terminatingFeatureGate bool
-		service                *v1.Service
 		endpointslice          *discovery.EndpointSlice
 		expectedIPTables       string
 	}{
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
 			terminatingFeatureGate: true,
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
-				Spec: v1.ServiceSpec{
-					ClusterIP:             "172.20.1.1",
-					Type:                  v1.ServiceTypeNodePort,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					Selector:              map[string]string{"foo": "bar"},
-					Ports: []v1.ServicePort{
-						{
-							Name:       "",
-							TargetPort: intstr.FromInt(80),
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-						},
-					},
-				},
-			},
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -4329,6 +4386,7 @@ COMMIT
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
@@ -4340,22 +4398,32 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -4365,23 +4433,6 @@ COMMIT
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints disabled, ready endpoints exist",
 			terminatingFeatureGate: false,
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
-				Spec: v1.ServiceSpec{
-					ClusterIP:             "172.20.1.1",
-					Type:                  v1.ServiceTypeNodePort,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					Selector:              map[string]string{"foo": "bar"},
-					Ports: []v1.ServicePort{
-						{
-							Name:       "",
-							TargetPort: intstr.FromInt(80),
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-						},
-					},
-				},
-			},
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -4463,6 +4514,7 @@ COMMIT
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
@@ -4474,22 +4526,32 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -4499,23 +4561,6 @@ COMMIT
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, only terminating endpoints exist",
 			terminatingFeatureGate: true,
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
-				Spec: v1.ServiceSpec{
-					ClusterIP:             "172.20.1.1",
-					Type:                  v1.ServiceTypeNodePort,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					Selector:              map[string]string{"foo": "bar"},
-					Ports: []v1.ServicePort{
-						{
-							Name:       "",
-							TargetPort: intstr.FromInt(80),
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-						},
-					},
-				},
-			},
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -4589,6 +4634,7 @@ COMMIT
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
 :KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
@@ -4599,18 +4645,27 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -4620,23 +4675,6 @@ COMMIT
 		{
 			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
 			terminatingFeatureGate: false,
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
-				Spec: v1.ServiceSpec{
-					ClusterIP:             "172.20.1.1",
-					Type:                  v1.ServiceTypeNodePort,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					Selector:              map[string]string{"foo": "bar"},
-					Ports: []v1.ServicePort{
-						{
-							Name:       "",
-							TargetPort: intstr.FromInt(80),
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-						},
-					},
-				},
-			},
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -4715,6 +4753,7 @@ COMMIT
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
@@ -4726,17 +4765,25 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -4756,7 +4803,7 @@ COMMIT
 			fp.OnServiceSynced()
 			fp.OnEndpointSlicesSynced()
 
-			fp.OnServiceAdd(testcase.service)
+			fp.OnServiceAdd(service)
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
@@ -4768,4 +4815,83 @@ COMMIT
 			assertIPTablesRulesNotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
 		})
 	}
+}
+
+func TestMasqueradeAll(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	fp.masqueradeAll = true
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(3001),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.4",
+			}}
+		}),
+	)
+
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.1"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	expected := `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-FW-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
+-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-MASQ
+-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`
+
+	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
 }
