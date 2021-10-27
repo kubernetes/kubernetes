@@ -55,6 +55,9 @@ const (
 	// should be changed appropriately.
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
+	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion. Defined in
+	// https://github.com/kubernetes/autoscaler/blob/e80ab518340f88f364fe3ef063f8303755125971/cluster-autoscaler/utils/deletetaint/delete.go#L36
+	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 )
 
 type cachedService struct {
@@ -669,6 +672,14 @@ func (s *Controller) getNodeConditionPredicate() NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		if _, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]; hasExcludeBalancerLabel {
 			return false
+		}
+
+		// Remove nodes that are about to be deleted by the cluster autoscaler.
+		for _, taint := range node.Spec.Taints {
+			if taint.Key == ToBeDeletedTaint {
+				klog.V(4).Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
+				return false
+			}
 		}
 
 		// If we have no info, don't accept
