@@ -18,8 +18,6 @@ package queueset
 
 import (
 	"context"
-	"fmt"
-	"math"
 	"time"
 
 	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -74,7 +72,7 @@ type request struct {
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
 	// This field is meaningful only while the request is waiting in the virtual world.
-	arrivalR SeatSeconds
+	arrivalR fcrequest.SeatSeconds
 
 	// startTime is the real time when the request began executing
 	startTime time.Time
@@ -85,8 +83,8 @@ type request struct {
 
 type completedWorkEstimate struct {
 	fcrequest.WorkEstimate
-	totalWork SeatSeconds // initial plus final work
-	finalWork SeatSeconds // only final work
+	totalWork fcrequest.SeatSeconds // initial plus final work
+	finalWork fcrequest.SeatSeconds // only final work
 }
 
 // queue is a sequence of requests that have arrived but not yet finished
@@ -97,7 +95,7 @@ type queue struct {
 
 	// nextDispatchR is the R progress meter reading at
 	// which the next request will be dispatched in the virtual world.
-	nextDispatchR SeatSeconds
+	nextDispatchR fcrequest.SeatSeconds
 
 	// requestsExecuting is the count in the real world.
 	requestsExecuting int
@@ -122,10 +120,10 @@ type queueSum struct {
 	MaxSeatsSum int
 
 	// TotalWorkSum is the sum of totalWork of the waiting requests
-	TotalWorkSum SeatSeconds
+	TotalWorkSum fcrequest.SeatSeconds
 }
 
-func (req *request) totalWork() SeatSeconds {
+func (req *request) totalWork() fcrequest.SeatSeconds {
 	return req.workEstimate.totalWork
 }
 
@@ -138,12 +136,12 @@ func (qs *queueSet) completeWorkEstimate(we *fcrequest.WorkEstimate) completedWo
 	}
 }
 
-func (qs *queueSet) computeInitialWork(we *fcrequest.WorkEstimate) SeatSeconds {
-	return SeatsTimesDuration(float64(we.InitialSeats), qs.estimatedServiceDuration)
+func (qs *queueSet) computeInitialWork(we *fcrequest.WorkEstimate) fcrequest.SeatSeconds {
+	return fcrequest.SeatsTimesDuration(float64(we.InitialSeats), qs.estimatedServiceDuration)
 }
 
-func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) SeatSeconds {
-	return SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
+func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) fcrequest.SeatSeconds {
+	return fcrequest.SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
 }
 
 func (q *queue) dumpLocked(includeDetails bool) debug.QueueDump {
@@ -183,45 +181,3 @@ func (q *queue) dumpLocked(includeDetails bool) debug.QueueDump {
 		QueueSum:          queueSum,
 	}
 }
-
-// SeatSeconds is a measure of work, in units of seat-seconds, using a fixed-point representation.
-// `SeatSeconds(n)` represents `n/ssScale` seat-seconds.
-// The constants `ssScale` and `ssScaleDigits` are private to the implementation here,
-// no other code should use them.
-type SeatSeconds uint64
-
-// MaxSeatsSeconds is the maximum representable value of SeatSeconds
-const MaxSeatSeconds = SeatSeconds(math.MaxUint64)
-
-// MinSeatSeconds is the lowest representable value of SeatSeconds
-const MinSeatSeconds = SeatSeconds(0)
-
-// SeatsTimeDuration produces the SeatSeconds value for the given factors.
-// This is intended only to produce small values, increments in work
-// rather than amount of work done since process start.
-func SeatsTimesDuration(seats float64, duration time.Duration) SeatSeconds {
-	return SeatSeconds(math.Round(seats * float64(duration/time.Nanosecond) / (1e9 / ssScale)))
-}
-
-// ToFloat converts to a floating-point representation.
-// This conversion may lose precision.
-func (ss SeatSeconds) ToFloat() float64 {
-	return float64(ss) / ssScale
-}
-
-// DurationPerSeat returns duration per seat.
-// This division may lose precision.
-func (ss SeatSeconds) DurationPerSeat(seats float64) time.Duration {
-	return time.Duration(float64(ss) / seats * (float64(time.Second) / ssScale))
-}
-
-// String converts to a string.
-// This is suitable for large as well as small values.
-func (ss SeatSeconds) String() string {
-	const div = SeatSeconds(ssScale)
-	quo := ss / div
-	rem := ss - quo*div
-	return fmt.Sprintf("%d.%08dss", quo, rem)
-}
-
-const ssScale = 1e8

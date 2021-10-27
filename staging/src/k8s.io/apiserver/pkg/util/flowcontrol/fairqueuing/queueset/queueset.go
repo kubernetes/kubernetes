@@ -105,7 +105,7 @@ type queueSet struct {
 
 	// currentR is the amount of seat-seconds allocated per queue since process startup.
 	// This is our generalization of the progress meter named R in the original fair queuing work.
-	currentR SeatSeconds
+	currentR fqrequest.SeatSeconds
 
 	// lastRealTime is what `clock.Now()` yielded when `virtualTime` was last updated
 	lastRealTime time.Time
@@ -422,7 +422,7 @@ func (qs *queueSet) syncTimeLocked(ctx context.Context) {
 	timeSinceLast := realNow.Sub(qs.lastRealTime)
 	qs.lastRealTime = realNow
 	prevR := qs.currentR
-	incrR := SeatsTimesDuration(qs.getVirtualTimeRatioLocked(), timeSinceLast)
+	incrR := fqrequest.SeatsTimesDuration(qs.getVirtualTimeRatioLocked(), timeSinceLast)
 	qs.currentR = prevR + incrR
 	switch {
 	case prevR > qs.currentR:
@@ -435,7 +435,7 @@ func (qs *queueSet) syncTimeLocked(ctx context.Context) {
 
 // rDecrement is the amount by which the progress meter R is wound backwards
 // when needed to avoid overflow.
-const rDecrement = MaxSeatSeconds / 2
+const rDecrement = fqrequest.MaxSeatSeconds / 2
 
 // highR is the threshold that triggers advance of the epoch.
 // That is, decrementing the global progress meter R by rDecrement.
@@ -444,7 +444,7 @@ const highR = rDecrement + rDecrement/2
 // advanceEpoch subtracts rDecrement from the global progress meter R
 // and all the readings that have been taked from that meter.
 // The now and incrR parameters are only used to add info to the log messages.
-func (qs *queueSet) advanceEpoch(ctx context.Context, now time.Time, incrR SeatSeconds) {
+func (qs *queueSet) advanceEpoch(ctx context.Context, now time.Time, incrR fqrequest.SeatSeconds) {
 	oldR := qs.currentR
 	qs.currentR -= rDecrement
 	klog.InfoS("Advancing epoch", "QS", qs.qCfg.Name, "when", now.Format(nsTimeFmt), "oldR", oldR, "newR", qs.currentR, "incrR", incrR)
@@ -550,7 +550,7 @@ func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interfac
 	offset := qs.enqueues % handSize
 	qs.enqueues++
 	bestQueueIdx := -1
-	minQueueSeatSeconds := MaxSeatSeconds
+	minQueueSeatSeconds := fqrequest.MaxSeatSeconds
 	for i := 0; i < handSize; i++ {
 		queueIdx := hand[(offset+i)%handSize]
 		queue := qs.queues[queueIdx]
@@ -745,11 +745,11 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 // the oldest waiting request is minimal, and also returns that request.
 // Returns nils if the head of the selected queue can not be dispatched now.
 func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
-	minVirtualFinish := MaxSeatSeconds
-	sMin := MaxSeatSeconds
-	dsMin := MaxSeatSeconds
-	sMax := MinSeatSeconds
-	dsMax := MinSeatSeconds
+	minVirtualFinish := fqrequest.MaxSeatSeconds
+	sMin := fqrequest.MaxSeatSeconds
+	dsMin := fqrequest.MaxSeatSeconds
+	sMax := fqrequest.MinSeatSeconds
+	dsMax := fqrequest.MinSeatSeconds
 	var minQueue *queue
 	var minIndex int
 	nq := len(qs.queues)
@@ -760,7 +760,7 @@ func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
 		if oldestWaiting != nil {
 			sMin = ssMin(sMin, queue.nextDispatchR)
 			sMax = ssMax(sMax, queue.nextDispatchR)
-			estimatedWorkInProgress := SeatsTimesDuration(float64(queue.seatsInUse), qs.estimatedServiceDuration)
+			estimatedWorkInProgress := fqrequest.SeatsTimesDuration(float64(queue.seatsInUse), qs.estimatedServiceDuration)
 			dsMin = ssMin(dsMin, queue.nextDispatchR-estimatedWorkInProgress)
 			dsMax = ssMax(dsMax, queue.nextDispatchR-estimatedWorkInProgress)
 			currentVirtualFinish := queue.nextDispatchR + oldestWaiting.totalWork()
@@ -812,14 +812,14 @@ func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
 	return minQueue, oldestReqFromMinQueue
 }
 
-func ssMin(a, b SeatSeconds) SeatSeconds {
+func ssMin(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
 	if a > b {
 		return b
 	}
 	return a
 }
 
-func ssMax(a, b SeatSeconds) SeatSeconds {
+func ssMax(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
 	if a < b {
 		return b
 	}
@@ -915,7 +915,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		// When a request finishes being served, and the actual service time was S,
 		// the queue’s start R is decremented by (G - S)*width.
-		r.queue.nextDispatchR -= SeatsTimesDuration(float64(r.InitialSeats()), qs.estimatedServiceDuration-actualServiceDuration)
+		r.queue.nextDispatchR -= fqrequest.SeatsTimesDuration(float64(r.InitialSeats()), qs.estimatedServiceDuration-actualServiceDuration)
 		qs.boundNextDispatchLocked(r.queue)
 	}
 }
