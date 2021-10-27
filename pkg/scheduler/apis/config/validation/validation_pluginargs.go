@@ -87,35 +87,6 @@ func validateHardPodAffinityWeight(path *field.Path, w int32) error {
 	return nil
 }
 
-// ValidateNodeLabelArgs validates that NodeLabelArgs are correct.
-func ValidateNodeLabelArgs(path *field.Path, args *config.NodeLabelArgs) error {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabels, args.AbsentLabels,
-		path.Child("presentLabels"), path.Child("absentLabels"))...)
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference,
-		path.Child("presentLabelsPreference"), path.Child("absentLabelsPreference"))...)
-
-	return allErrs.ToAggregate()
-}
-
-// validateNoConflict validates that presentLabels and absentLabels do not conflict.
-func validateNoConflict(presentLabels, absentLabels []string, presentPath, absentPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	m := make(map[string]int, len(presentLabels)) // label -> index
-	for i, l := range presentLabels {
-		m[l] = i
-	}
-	for i, l := range absentLabels {
-		if j, ok := m[l]; ok {
-			allErrs = append(allErrs, field.Invalid(presentPath.Index(j), l,
-				fmt.Sprintf("conflict with %v", absentPath.Index(i).String())))
-		}
-	}
-	return allErrs
-}
-
 // ValidatePodTopologySpreadArgs validates that PodTopologySpreadArgs are correct.
 // It replicates the validation from pkg/apis/core/validation.validateTopologySpreadConstraints
 // with an additional check for .labelSelector to be nil.
