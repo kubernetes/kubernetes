@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
 	"mime"
 	"net/http"
@@ -30,7 +31,6 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
 	"k8s.io/kube-openapi/pkg/builder"
@@ -102,7 +102,7 @@ func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
-	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(openapiSpec)
+	specBytes, err := json.Marshal(openapiSpec)
 	if err != nil {
 		return err
 	}
