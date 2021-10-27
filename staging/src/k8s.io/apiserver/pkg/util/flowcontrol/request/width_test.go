@@ -291,7 +291,7 @@ func TestWorkEstimator(t *testing.T) {
 			additionalLatencyExpected: 0,
 		},
 		{
-			name:       "request verb is create, watches registered, maximum is exceeded",
+			name:       "request verb is create, watches registered, maximum is capped",
 			requestURI: "http://server/apis/foo.bar/v1/foos",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "create",
@@ -300,8 +300,8 @@ func TestWorkEstimator(t *testing.T) {
 			},
 			watchCount:                199,
 			initialSeatsExpected:      1,
-			finalSeatsExpected:        20,
-			additionalLatencyExpected: 5 * time.Millisecond,
+			finalSeatsExpected:        10,
+			additionalLatencyExpected: 10 * time.Millisecond,
 		},
 		{
 			name:       "request verb is update, no watches",
