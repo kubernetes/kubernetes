@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/version"
@@ -76,7 +77,11 @@ func GetAPIVersion() Version {
 	if err != nil {
 		return v
 	}
-	minor, err := strconv.Atoi(apiVersion.Minor)
+	// split the "normal" + and - for semver stuff to get the leading minor number
+	minorString := strings.FieldsFunc(apiVersion.Minor, func(r rune) bool {
+		return !unicode.IsDigit(r)
+	})[0]
+	minor, err := strconv.Atoi(minorString)
 	if err != nil {
 		return v
 	}

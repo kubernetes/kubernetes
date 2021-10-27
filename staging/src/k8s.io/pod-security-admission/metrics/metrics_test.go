@@ -17,20 +17,21 @@ limitations under the License.
 package metrics
 
 import (
-	"strconv"
+	"bytes"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/pod-security-admission/api"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -71,21 +72,18 @@ func TestRecordEvaluation(t *testing.T) {
 								Resource:  resource,
 								Operation: op,
 							})
-							expectedLabels := map[string]string{
-								"decision":          string(decision),
-								"policy_level":      string(level),
-								"policy_version":    expectedVersion,
-								"mode":              string(mode),
-								"request_operation": strings.ToLower(string(op)),
-								"resource":          expectedResource,
-								"subresource":       "",
-							}
-							val, err := testutil.GetCounterMetricValue(recorder.evaluationsCounter.With(expectedLabels))
-							require.NoError(t, err, expectedLabels)
 
-							if !assert.EqualValues(t, 1, val, expectedLabels) {
-								findMetric(t, registry, "pod_security_evaluations_total")
+							if level == api.LevelPrivileged {
+								expectedVersion = "latest"
 							}
+							expected := fmt.Sprintf(`
+							# HELP pod_security_evaluations_total [ALPHA] Number of policy evaluations that occurred, not counting ignored or exempt requests.
+        	            	# TYPE pod_security_evaluations_total counter
+							pod_security_evaluations_total{decision="%s",mode="%s",policy_level="%s",policy_version="%s",request_operation="%s",resource="%s",subresource=""} 1
+							`, decision, mode, level, expectedVersion, strings.ToLower(string(op)), expectedResource)
+							expected = expectCachedMetrics("pod_security_evaluations_total", expected)
+
+							assert.NoError(t, testutil.GatherAndCompare(registry, bytes.NewBufferString(expected), "pod_security_evaluations_total"))
 
 							recorder.Reset()
 						}
@@ -103,23 +101,24 @@ func TestRecordExemption(t *testing.T) {
 
 	for _, op := range operations {
 		for resource, expectedResource := range resourceExpectations {
-			recorder.RecordExemption(&api.AttributesRecord{
-				Resource:  resource,
-				Operation: op,
-			})
-			expectedLabels := map[string]string{
-				"request_operation": strings.ToLower(string(op)),
-				"resource":          expectedResource,
-				"subresource":       "",
-			}
-			val, err := testutil.GetCounterMetricValue(recorder.exemptionsCounter.With(expectedLabels))
-			require.NoError(t, err, expectedLabels)
+			for _, subresource := range []string{"", "ephemeralcontainers"} {
+				recorder.RecordExemption(&api.AttributesRecord{
+					Resource:    resource,
+					Operation:   op,
+					Subresource: subresource,
+				})
 
-			if !assert.EqualValues(t, 1, val, expectedLabels) {
-				findMetric(t, registry, "pod_security_exemptions_total")
-			}
+				expected := fmt.Sprintf(`
+				# HELP pod_security_exemptions_total [ALPHA] Number of exempt requests, not counting ignored or out of scope requests.
+				# TYPE pod_security_exemptions_total counter
+				pod_security_exemptions_total{request_operation="%s",resource="%s",subresource="%s"} 1
+				`, strings.ToLower(string(op)), expectedResource, subresource)
+				expected = expectCachedMetrics("pod_security_exemptions_total", expected)
 
-			recorder.Reset()
+				assert.NoError(t, testutil.GatherAndCompare(registry, bytes.NewBufferString(expected), "pod_security_exemptions_total"))
+
+				recorder.Reset()
+			}
 		}
 	}
 }
@@ -136,18 +135,14 @@ func TestRecordError(t *testing.T) {
 					Resource:  resource,
 					Operation: op,
 				})
-				expectedLabels := map[string]string{
-					"fatal":             strconv.FormatBool(fatal),
-					"request_operation": strings.ToLower(string(op)),
-					"resource":          expectedResource,
-					"subresource":       "",
-				}
-				val, err := testutil.GetCounterMetricValue(recorder.errorsCounter.With(expectedLabels))
-				require.NoError(t, err, expectedLabels)
 
-				if !assert.EqualValues(t, 1, val, expectedLabels) {
-					findMetric(t, registry, "pod_security_errors_total")
-				}
+				expected := bytes.NewBufferString(fmt.Sprintf(`
+				# HELP pod_security_errors_total [ALPHA] Number of errors preventing normal evaluation. Non-fatal errors may result in the latest restricted profile being used for evaluation.
+				# TYPE pod_security_errors_total counter
+				pod_security_errors_total{fatal="%t",request_operation="%s",resource="%s",subresource=""} 1
+				`, fatal, strings.ToLower(string(op)), expectedResource))
+
+				assert.NoError(t, testutil.GatherAndCompare(registry, expected, "pod_security_errors_total"))
 
 				recorder.Reset()
 			}
@@ -164,19 +159,38 @@ func levelVersion(level api.Level, version string) api.LevelVersion {
 	return lv
 }
 
-// findMetric dumps non-zero metric samples for the metric with the given name, to help with debugging.
-func findMetric(t *testing.T, gatherer metrics.Gatherer, metricName string) {
-	t.Helper()
-	m, _ := gatherer.Gather()
-	for _, mFamily := range m {
-		if mFamily.GetName() == metricName {
-			for _, metric := range mFamily.GetMetric() {
-				if metric.GetCounter().GetValue() > 0 {
-					t.Logf("Found metric: %s", metric.String())
-				}
-			}
-			return
+// The cached metrics should always be present (value 0 if not counted).
+var expectedCachedMetrics = map[string][]string{
+	"pod_security_evaluations_total": {
+		`pod_security_evaluations_total{decision="allow",mode="enforce",policy_level="privileged",policy_version="latest",request_operation="create",resource="pod",subresource=""}`,
+		`pod_security_evaluations_total{decision="allow",mode="enforce",policy_level="privileged",policy_version="latest",request_operation="update",resource="pod",subresource=""}`,
+	},
+	"pod_security_exemptions_total": {
+		`pod_security_exemptions_total{request_operation="create",resource="controller",subresource=""}`,
+		`pod_security_exemptions_total{request_operation="create",resource="pod",subresource=""}`,
+		`pod_security_exemptions_total{request_operation="update",resource="controller",subresource=""}`,
+		`pod_security_exemptions_total{request_operation="update",resource="pod",subresource=""}`,
+	},
+}
+
+func expectCachedMetrics(metricName, expected string) string {
+	expectations := strings.Split(strings.TrimSpace(expected), "\n")
+	for i, expectation := range expectations {
+		expectations[i] = strings.TrimSpace(expectation) // Whitespace messes with sorting.
+	}
+	for _, cached := range expectedCachedMetrics[metricName] {
+		expectations = addZeroExpectation(expectations, cached)
+	}
+	sort.Strings(expectations[:len(expectations)-1])
+	return "\n" + strings.Join(expectations, "\n") + "\n"
+}
+
+// addZeroExpectation adds the mixin as an empty sample if not already present.
+func addZeroExpectation(currentExpectations []string, mixin string) []string {
+	for _, current := range currentExpectations {
+		if strings.HasPrefix(current, mixin) {
+			return currentExpectations // Mixin value already present.
 		}
 	}
-	t.Errorf("Expected metric %s not found", metricName)
+	return append(currentExpectations, fmt.Sprintf("%s 0", mixin))
 }
