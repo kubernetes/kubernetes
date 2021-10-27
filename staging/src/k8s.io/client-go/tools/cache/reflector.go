@@ -193,6 +193,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 	}
 	r.setExpectedType(expectedType)
+	r.FetchStream = true
 	return r
 }
 

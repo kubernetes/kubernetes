@@ -375,6 +375,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
 	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
 	reflector.WatchListPageSize = storageWatchListPageSize
+	reflector.FetchStream = false
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
