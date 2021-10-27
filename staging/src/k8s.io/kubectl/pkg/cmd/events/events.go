@@ -60,8 +60,8 @@ var (
 	# List recent events in all namespaces.
 	kubectl alpha events --all-namespaces
 
-	# List recent events, then wait for more events and list them as they arrive.
-	kubectl alpha events --watch`))
+	# List recent events for the specified pod, then wait for more events and list them as they arrive.
+	kubectl alpha events --for pod/web-pod-13je7 --watch`))
 )
 
 type EventsOptions struct {
