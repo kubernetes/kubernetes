@@ -26,7 +26,6 @@ const (
 	NodeLabel                       = "NodeLabel"
 	NodeName                        = "NodeName"
 	NodePorts                       = "NodePorts"
-	NodePreferAvoidPods             = "NodePreferAvoidPods"
 	NodeResourcesBalancedAllocation = "NodeResourcesBalancedAllocation"
 	NodeResourcesFit                = "NodeResourcesFit"
 	NodeResourcesLeastAllocated     = "NodeResourcesLeastAllocated"

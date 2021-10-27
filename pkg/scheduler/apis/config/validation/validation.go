@@ -130,8 +130,6 @@ var removedPluginsByVersion = []removedPlugins{
 		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
 		plugins: []string{
 			"NodeLabel",
-			"ServiceAffinity",
-			"NodePreferAvoidPods",
 			"NodeResourcesLeastAllocated",
 			"NodeResourcesMostAllocated",
 			"RequestedToCapacityRatio",
