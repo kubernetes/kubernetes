@@ -41,7 +41,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	compbasemetrics "k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	"k8s.io/pod-security-admission/admission"
@@ -107,6 +106,8 @@ type Server struct {
 	informerFactory kubeinformers.SharedInformerFactory
 
 	delegate *admission.Admission
+
+	metricsRegistry compbasemetrics.KubeRegistry
 }
 
 func (s *Server) Start(ctx context.Context) error {
@@ -119,10 +120,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// debugging or proxy purposes. The API server will not connect to an http webhook.
 	mux.HandleFunc("/", s.HandleValidate)
 
-	// Serve the global metrics registry.
-	metrics.LegacyMustRegister()
+	// Serve the metrics.
 	mux.Handle("/metrics",
-		compbasemetrics.HandlerFor(legacyregistry.DefaultGatherer, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}))
+		compbasemetrics.HandlerFor(s.metricsRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}))
 
 	if s.insecureServing != nil {
 		if err := s.insecureServing.Serve(mux, 0, ctx.Done()); err != nil {
@@ -279,11 +279,14 @@ func Setup(c *Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not create PodSecurityRegistry: %w", err)
 	}
+	metrics := metrics.NewPrometheusRecorder(api.GetAPIVersion())
+	s.metricsRegistry = compbasemetrics.NewKubeRegistry()
+	metrics.MustRegister(s.metricsRegistry.MustRegister)
 
 	s.delegate = &admission.Admission{
 		Configuration:    c.PodSecurityConfig,
 		Evaluator:        evaluator,
-		Metrics:          metrics.DefaultRecorder(),
+		Metrics:          metrics,
 		PodSpecExtractor: admission.DefaultPodSpecExtractor{},
 		PodLister:        admission.PodListerFromClient(client),
 		NamespaceGetter:  admission.NamespaceGetterFromListerAndClient(namespaceLister, client),

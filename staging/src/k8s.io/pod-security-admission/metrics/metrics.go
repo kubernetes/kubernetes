@@ -19,13 +19,11 @@ package metrics
 import (
 	"strconv"
 	"strings"
-	"sync"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -46,25 +44,12 @@ type Recorder interface {
 	RecordError(fatal bool, attrs api.Attributes)
 }
 
-var defaultRecorder = NewPrometheusRecorder(api.GetAPIVersion())
-
-func DefaultRecorder() Recorder {
-	return defaultRecorder
-}
-
-// MustRegister registers the global DefaultMetrics against the legacy registry.
-func LegacyMustRegister() {
-	defaultRecorder.MustRegister(legacyregistry.MustRegister)
-}
-
 type PrometheusRecorder struct {
 	apiVersion api.Version
 
 	evaluationsCounter *metrics.CounterVec
 	exemptionsCounter  *metrics.CounterVec
 	errorsCounter      *metrics.CounterVec
-
-	registerOnce sync.Once
 }
 
 var _ Recorder = &PrometheusRecorder{}
@@ -104,11 +89,9 @@ func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
 }
 
 func (r *PrometheusRecorder) MustRegister(registerFunc func(...metrics.Registerable)) {
-	r.registerOnce.Do(func() {
-		registerFunc(r.evaluationsCounter)
-		registerFunc(r.exemptionsCounter)
-		registerFunc(r.errorsCounter)
-	})
+	registerFunc(r.evaluationsCounter)
+	registerFunc(r.exemptionsCounter)
+	registerFunc(r.errorsCounter)
 }
 
 func (r *PrometheusRecorder) Reset() {
