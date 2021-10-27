@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -40,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -228,11 +232,24 @@ func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params 
 }
 
 func updateKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
-	// remove the state file
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
 	deleteMemoryManagerStateFile()
 
-	// Update the Kubelet configuration
-	framework.ExpectNoError(setKubeletConfiguration(f, cfg))
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
@@ -264,7 +281,7 @@ func getAllNUMANodes() []int {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
+var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager]", func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
@@ -305,6 +322,32 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.ToSlice())
 	}
 
+	waitingForHugepages := func(hugepagesCount int) {
+		gomega.Eventually(func() error {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResourceName2Mi)]
+			if !ok {
+				return fmt.Errorf("the node does not have the resource %s", hugepagesResourceName2Mi)
+			}
+
+			size, succeed := capacity.AsInt64()
+			if !succeed {
+				return fmt.Errorf("failed to convert quantity to int64")
+			}
+
+			// 512 Mb, the expected size in bytes
+			expectedSize := int64(hugepagesCount * hugepagesSize2M * 1024)
+			if size != expectedSize {
+				return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
+			}
+			return nil
+		}, time.Minute, framework.Poll).Should(gomega.BeNil())
+	}
+
 	ginkgo.BeforeEach(func() {
 		if isMultiNUMASupported == nil {
 			isMultiNUMASupported = pointer.BoolPtr(isMultiNUMA())
@@ -322,64 +365,23 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 	// dynamically update the kubelet configuration
 	ginkgo.JustBeforeEach(func() {
 		var err error
+		hugepagesCount := 8
 
 		// allocate hugepages
 		if *is2MiHugepagesSupported {
-			hugepagesCount := 256
 			ginkgo.By("Configuring hugepages")
 			gomega.Eventually(func() error {
-				if err := configureHugePages(hugepagesSize2M, hugepagesCount); err != nil {
-					return err
-				}
-				return nil
+				return configureHugePages(hugepagesSize2M, hugepagesCount)
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
-
-			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-
-			// stop the kubelet and wait until the server will restart it automatically
-			stopKubelet()
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-			restartKubelet(false)
-
-			// wait until the kubelet health check will pass
-			gomega.Eventually(func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
-
-			ginkgo.By("Waiting for hugepages resource to become available on the local node")
-			gomega.Eventually(func() error {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResourceName2Mi)]
-				if !ok {
-					return fmt.Errorf("the node does not have the resource %s", hugepagesResourceName2Mi)
-				}
-
-				size, succeed := capacity.AsInt64()
-				if !succeed {
-					return fmt.Errorf("failed to convert quantity to int64")
-				}
-
-				// 512 Mb, the expected size in bytes
-				expectedSize := int64(hugepagesCount * hugepagesSize2M * 1024)
-				if size != expectedSize {
-					return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
-				}
-				return nil
-			}, time.Minute, framework.Poll).Should(gomega.BeNil())
 		}
 
 		// get the old kubelet config
-		oldCfg, err = getCurrentKubeletConfig()
-		framework.ExpectNoError(err)
+		if oldCfg == nil {
+			gomega.Eventually(func() error {
+				oldCfg, err = e2enodekubelet.GetCurrentKubeletConfigFromFile()
+				return err
+			}, 5*time.Minute, 15*time.Second).Should(gomega.BeNil())
+		}
 
 		// update the kubelet config with new parameters
 		newCfg := getUpdatedKubeletConfig(oldCfg, kubeParams)
@@ -387,8 +389,11 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 
 		// request hugepages resources under the container
 		if *is2MiHugepagesSupported {
+			ginkgo.By("Waiting for hugepages resource to become available on the local node")
+			waitingForHugepages(hugepagesCount)
+
 			for i := 0; i < len(ctnParams); i++ {
-				ctnParams[i].hugepages2Mi = "128Mi"
+				ctnParams[i].hugepages2Mi = "8Mi"
 			}
 		}
 
@@ -404,20 +409,21 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 		}
 
 		// release hugepages
-		gomega.Eventually(func() error {
-			return configureHugePages(hugepagesSize2M, 0)
-		}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
+		if *is2MiHugepagesSupported {
+			ginkgo.By("Releasing allocated hugepages")
+			gomega.Eventually(func() error {
+				return configureHugePages(hugepagesSize2M, 0)
+			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
+		}
 
-		// update the kubelet config with old values
-		updateKubeletConfig(f, oldCfg)
+		// update the kubelet config with old parameters
+		if oldCfg != nil {
+			updateKubeletConfig(f, oldCfg)
+		}
 
-		// wait until the kubelet health check will pass and will continue to pass for specified period of time
-		gomega.Eventually(func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
-		gomega.Consistently(func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
+		if *is2MiHugepagesSupported {
+			waitingForHugepages(0)
+		}
 	})
 
 	ginkgo.Context("with static policy", func() {

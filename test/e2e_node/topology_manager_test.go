@@ -27,23 +27,23 @@ import (
 	"sync"
 	"time"
 
-	testutils "k8s.io/kubernetes/test/utils"
-
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -237,8 +237,18 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 	// Dump the config -- debug
 	framework.Logf("New kubelet config is %s", *newCfg)
 
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
@@ -947,7 +957,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 	ginkgo.AfterEach(func() {
 		// restore kubelet config
-		setOldKubeletConfig(f, oldCfg)
+		setOldKubeletConfig(oldCfg)
 	})
 }
 

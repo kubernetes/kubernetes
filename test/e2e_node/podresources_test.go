@@ -43,6 +43,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -494,7 +495,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 
 }
 
-func podresourcesGetAllocatableResourcesTests(f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
+func podresourcesGetAllocatableResourcesTests(cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
 	ginkgo.By("checking the devices known to the kubelet")
 	resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 	framework.ExpectNoErrorWithOffset(1, err)
@@ -553,7 +554,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
 			defer func() {
 				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
+				setOldKubeletConfig(oldCfg)
 
 				// Delete state file to allow repeated runs
 				deleteStateFile()
@@ -577,7 +578,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			ginkgo.By("checking List()")
 			podresourcesListTests(f, cli, sd)
 			ginkgo.By("checking GetAllocatableResources()")
-			podresourcesGetAllocatableResourcesTests(f, cli, sd, onlineCPUs, reservedSystemCPUs)
+			podresourcesGetAllocatableResourcesTests(cli, sd, onlineCPUs, reservedSystemCPUs)
 
 		})
 
@@ -589,7 +590,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
 			defer func() {
 				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
+				setOldKubeletConfig(oldCfg)
 
 				// Delete state file to allow repeated runs
 				deleteStateFile()
@@ -612,7 +613,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 			// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 			// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
-			podresourcesGetAllocatableResourcesTests(f, cli, sd, cpuset.CPUSet{}, cpuset.CPUSet{})
+			podresourcesGetAllocatableResourcesTests(cli, sd, cpuset.CPUSet{}, cpuset.CPUSet{})
 		})
 
 	})
@@ -635,7 +636,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
 			defer func() {
 				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
+				setOldKubeletConfig(oldCfg)
 
 				// Delete state file to allow repeated runs
 				deleteStateFile()
@@ -649,7 +650,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			defer conn.Close()
 
 			podresourcesListTests(f, cli, nil)
-			podresourcesGetAllocatableResourcesTests(f, cli, nil, onlineCPUs, reservedSystemCPUs)
+			podresourcesGetAllocatableResourcesTests(cli, nil, onlineCPUs, reservedSystemCPUs)
 		})
 
 		ginkgo.It("should return the expected responses with cpumanager none policy", func() {
@@ -660,7 +661,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
 			defer func() {
 				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
+				setOldKubeletConfig(oldCfg)
 
 				// Delete state file to allow repeated runs
 				deleteStateFile()
@@ -675,7 +676,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 			// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 			// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
-			podresourcesGetAllocatableResourcesTests(f, cli, nil, cpuset.CPUSet{}, cpuset.CPUSet{})
+			podresourcesGetAllocatableResourcesTests(cli, nil, cpuset.CPUSet{}, cpuset.CPUSet{})
 		})
 
 		ginkgo.It("should return the expected error with the feature gate disabled", func() {
@@ -717,7 +718,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
 			defer func() {
 				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
+				setOldKubeletConfig(oldCfg)
 
 				// Delete state file to allow repeated runs
 				deleteStateFile()
@@ -829,7 +830,23 @@ func configurePodResourcesInKubelet(f *framework.Framework, cleanStateFile bool,
 		}
 	}
 	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
@@ -849,8 +866,23 @@ func enablePodResourcesFeatureGateInKubelet(f *framework.Framework) (oldCfg *kub
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {

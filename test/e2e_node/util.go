@@ -50,10 +50,12 @@ import (
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -157,12 +159,7 @@ func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *kubeletconfig.KubeletConfiguration)) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	ginkgo.BeforeEach(func() {
-		configEnabled, err := isKubeletConfigEnabled(f)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(configEnabled, true, "The Dynamic Kubelet Configuration feature is not enabled.\n"+
-			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
-			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
-		oldCfg, err = getCurrentKubeletConfig()
+		oldCfg, err := getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
@@ -170,12 +167,45 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 			return
 		}
 
-		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+		// Update the Kubelet configuration.
+		ginkgo.By("Stopping the kubelet")
+		startKubelet := stopKubelet()
+
+		// wait until the kubelet health check will fail
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+		ginkgo.By("Starting the kubelet")
+		startKubelet()
+
+		// wait until the kubelet health check will succeed
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 	})
 	ginkgo.AfterEach(func() {
 		if oldCfg != nil {
-			err := setKubeletConfiguration(f, oldCfg)
-			framework.ExpectNoError(err)
+			// Update the Kubelet configuration.
+			ginkgo.By("Stopping the kubelet")
+			startKubelet := stopKubelet()
+
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+
+			ginkgo.By("Starting the kubelet")
+			startKubelet()
+
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 		}
 	})
 }
@@ -191,64 +221,6 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 		return true, nil
 	}
 	return v, nil
-}
-
-// Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
-// with the new configuration. Returns an error if the configuration after waiting for restartGap
-// doesn't match what you attempted to set, or if the dynamic configuration feature is disabled.
-// You should only call this from serial tests.
-func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.KubeletConfiguration) error {
-	const (
-		restartGap   = 40 * time.Second
-		pollInterval = 5 * time.Second
-	)
-
-	// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
-	if configEnabled, err := isKubeletConfigEnabled(f); err != nil {
-		return err
-	} else if !configEnabled {
-		return fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
-			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
-			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
-	}
-
-	// create the ConfigMap with the new configuration
-	cm, err := createConfigMap(f, kubeCfg)
-	if err != nil {
-		return err
-	}
-
-	// create the reference and set Node.Spec.ConfigSource
-	src := &v1.NodeConfigSource{
-		ConfigMap: &v1.ConfigMapNodeConfigSource{
-			Namespace:        "kube-system",
-			Name:             cm.Name,
-			KubeletConfigKey: "kubelet",
-		},
-	}
-
-	// set the source, retry a few times in case we are competing with other writers
-	gomega.Eventually(func() error {
-		if err := setNodeConfigSource(f, src); err != nil {
-			return err
-		}
-		return nil
-	}, time.Minute, time.Second).Should(gomega.BeNil())
-
-	// poll for new config, for a maximum wait of restartGap
-	gomega.Eventually(func() error {
-		newKubeCfg, err := getCurrentKubeletConfig()
-		if err != nil {
-			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
-		}
-		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
-			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
-		}
-		klog.Infof("new configuration has taken effect")
-		return nil
-	}, restartGap, pollInterval).Should(gomega.BeNil())
-
-	return nil
 }
 
 // sets the current node's configSource, this should only be called from Serial tests
@@ -273,16 +245,6 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	}
 
 	return nil
-}
-
-// creates a configmap containing kubeCfg in kube-system namespace
-func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
-	cmap := newKubeletConfigMap("testcfg", internalKC)
-	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cmap, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return cmap, nil
 }
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
@@ -447,8 +409,9 @@ func stopKubelet() func() {
 	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
 
 	return func() {
-		stdout, err := exec.Command("sudo", "systemctl", "start", kubeletServiceName).CombinedOutput()
-		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
+		// we should restart service, otherwise the transient service start will fail
+		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
+		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 	}
 }
 

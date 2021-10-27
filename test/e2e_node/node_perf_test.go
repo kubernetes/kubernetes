@@ -24,10 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
 	"github.com/onsi/ginkgo"
@@ -46,7 +48,24 @@ func makeNodePerfPod(w workloads.NodePerfWorkload) *v1.Pod {
 
 func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
 	if cfg != nil {
-		framework.ExpectNoError(setKubeletConfiguration(f, cfg))
+		// Update the Kubelet configuration.
+		ginkgo.By("Stopping the kubelet")
+		startKubelet := stopKubelet()
+
+		// wait until the kubelet health check will fail
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
+
+		ginkgo.By("Starting the kubelet")
+		startKubelet()
+
+		// wait until the kubelet health check will succeed
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 	}
 
 	// Wait for the Kubelet to be ready.

@@ -34,13 +34,14 @@ import (
 	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 )
 
 // Helper for makeCPUManagerPod().
@@ -60,12 +61,12 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 			Image: busyboxImage,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(ctnAttr.cpuRequest),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(ctnAttr.cpuLimit),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
 			Command: []string{"sh", "-c", cpusetCmd},
@@ -109,7 +110,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 	// RoundUp reserved CPUs to get only integer cores.
 	cpuRes.RoundUp(0)
 
-	return cpuCap.Value(), (cpuCap.Value() - cpuRes.Value()), cpuRes.Value()
+	return cpuCap.Value(), cpuCap.Value() - cpuRes.Value(), cpuRes.Value()
 }
 
 func waitForContainerRemoval(containerName, podName, podNS string) {
@@ -190,71 +191,75 @@ func deleteStateFile() {
 	framework.ExpectNoError(err, "error deleting state file")
 }
 
-func setOldKubeletConfig(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration) {
+func setOldKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration) {
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
 	// Delete the CPU Manager state file so that the old Kubelet configuration
-	// can take effect.i
+	// can take effect
 	deleteStateFile()
 
 	if oldCfg != nil {
-		framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 	}
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+}
+
+type cpuManagerKubeletArguments struct {
+	policyName              string
+	cleanStateFile          bool
+	enableCPUManager        bool
+	enableCPUManagerOptions bool
+	reservedSystemCPUs      cpuset.CPUSet
+	options                 map[string]string
 }
 
 func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Disable CPU Manager in Kubelet.
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-	}
-	newCfg.FeatureGates["CPUManager"] = false
-
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+	oldCfg = configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
+		enableCPUManager: false,
+	})
 
 	return oldCfg
 }
 
-func configureCPUManagerInKubelet(f *framework.Framework, policyName string, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet, enableOptions bool, options map[string]string) (oldCfg *kubeletconfig.KubeletConfiguration) {
+func configureCPUManagerInKubelet(f *framework.Framework, kubeletArguments *cpuManagerKubeletArguments) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
+
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
-	newCfg.FeatureGates["CPUManager"] = true
-	newCfg.FeatureGates["CPUManagerPolicyOptions"] = enableOptions
-	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = enableOptions
-	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = enableOptions
 
-	// After graduation of the CPU Manager feature to Beta, the CPU Manager
-	// "none" policy is ON by default. But when we set the CPU Manager policy to
-	// "static" in this test and the Kubelet is restarted so that "static"
-	// policy can take effect, there will always be a conflict with the state
-	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
-	// be "none" whereas we are trying to restart Kubelet with "static"
-	// policy). Therefore, we delete the state file so that we can proceed
-	// with the tests.
-	// Only delete the state file at the begin of the tests.
-	if cleanStateFile {
-		deleteStateFile()
+	newCfg.FeatureGates["CPUManager"] = kubeletArguments.enableCPUManager
+
+	newCfg.FeatureGates["CPUManagerPolicyOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
+
+	newCfg.CPUManagerPolicy = kubeletArguments.policyName
+	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+
+	if kubeletArguments.options != nil {
+		newCfg.CPUManagerPolicyOptions = kubeletArguments.options
 	}
 
-	newCfg.CPUManagerPolicy = policyName
-	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
-	newCfg.CPUManagerPolicyOptions = options
-
-	if reservedSystemCPUs.Size() > 0 {
-		cpus := reservedSystemCPUs.String()
+	if kubeletArguments.reservedSystemCPUs.Size() > 0 {
+		cpus := kubeletArguments.reservedSystemCPUs.String()
 		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
 		newCfg.ReservedSystemCPUs = cpus
 	} else {
@@ -269,8 +274,37 @@ func configureCPUManagerInKubelet(f *framework.Framework, policyName string, cle
 			newCfg.KubeReserved["cpu"] = "200m"
 		}
 	}
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	// After graduation of the CPU Manager feature to Beta, the CPU Manager
+	// "none" policy is ON by default. But when we set the CPU Manager policy to
+	// "static" in this test and the Kubelet is restarted so that "static"
+	// policy can take effect, there will always be a conflict with the state
+	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
+	// be "none" whereas we are trying to restart Kubelet with "static"
+	// policy). Therefore, we delete the state file so that we can proceed
+	// with the tests.
+	// Only delete the state file at the begin of the tests.
+	if kubeletArguments.cleanStateFile {
+		deleteStateFile()
+	}
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
@@ -590,7 +624,12 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 
 		// Enable CPU Manager in the kubelet.
-		oldCfg = configureCPUManagerInKubelet(f, string(cpumanager.PolicyStatic), true, cpuset.CPUSet{}, false, nil)
+		oldCfg = configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   true,
+			reservedSystemCPUs: cpuset.CPUSet{},
+			cleanStateFile:     true,
+		})
 
 		ginkgo.By("running a non-Gu pod")
 		runNonGuPodTest(f, cpuCap)
@@ -657,7 +696,11 @@ func runCPUManagerTests(f *framework.Framework) {
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		ginkgo.By("enable cpu manager in kubelet without delete state file")
-		configureCPUManagerInKubelet(f, string(cpumanager.PolicyStatic), false, cpuset.CPUSet{}, false, nil)
+		configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   true,
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
 
 		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
@@ -681,13 +724,20 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		framework.Logf("SMT level %d", smtLevel)
 
-		cleanStateFile := true
 		// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
 		// check what we do have in the node.
 		cpuPolicyOptions := map[string]string{
 			cpumanager.FullPCPUsOnlyOption: "true",
 		}
-		oldCfg = configureCPUManagerInKubelet(f, string(cpumanager.PolicyStatic), cleanStateFile, cpuset.NewCPUSet(0), true, cpuPolicyOptions)
+		oldCfg = configureCPUManagerInKubelet(f,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				enableCPUManager:        true,
+				cleanStateFile:          true,
+				reservedSystemCPUs:      cpuset.NewCPUSet(0),
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			})
 
 		// the order between negative and positive doesn't really matter
 		runSMTAlignmentNegativeTests(f)
@@ -695,7 +745,7 @@ func runCPUManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.AfterEach(func() {
-		setOldKubeletConfig(f, oldCfg)
+		setOldKubeletConfig(oldCfg)
 	})
 }
 
