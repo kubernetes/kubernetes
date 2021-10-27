@@ -20,28 +20,35 @@ import (
 	"fmt"
 	"strings"
 
-	runtimeresource "k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Copied from k8s.io/cli-runtime/pkg/resource because unexported
-type resourceTuple struct {
-	Resource string
-	Name     string
-}
+// Inspired by k8s.io/cli-runtime/pkg/resource splitResourceTypeName()
 
 // splitResourceTypeName handles type/name resource formats and returns a resource tuple
 // (empty or not), whether it successfully found one, and an error
-func splitResourceTypeName(s string) (resourceTuple, bool, error) {
+func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupVersionKind, name string, found bool, err error) {
 	if !strings.Contains(s, "/") {
-		return resourceTuple{}, false, nil
+		return
 	}
 	seg := strings.Split(s, "/")
 	if len(seg) != 2 {
-		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
+		err = fmt.Errorf("arguments in resource/name form may not have more than one slash")
+		return
 	}
 	resource, name := seg[0], seg[1]
-	if len(resource) == 0 || len(name) == 0 || len(runtimeresource.SplitResourceArgument(resource)) != 1 {
-		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
+
+	var gvr schema.GroupVersionResource
+	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
+	if err != nil {
+		return
 	}
-	return resourceTuple{Resource: resource, Name: name}, true, nil
+	gvk, err = mapper.KindFor(gvr)
+	if err != nil {
+		return
+	}
+	found = true
+
+	return
 }

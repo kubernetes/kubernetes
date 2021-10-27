@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -68,8 +69,8 @@ type EventsOptions struct {
 	Watch         bool
 	ForObject     string
 
-	forResource string // decoded version of ForObject
-	forName     string
+	forGVK  schema.GroupVersionKind
+	forName string
 
 	ctx    context.Context
 	client *kubernetes.Clientset
@@ -118,14 +119,18 @@ func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGe
 	}
 
 	if o.ForObject != "" {
-		tuple, found, err := splitResourceTypeName(o.ForObject)
+		mapper, err := restClientGetter.ToRESTMapper()
+		if err != nil {
+			return err
+		}
+		var found bool
+		o.forGVK, o.forName, found, err = decodeResourceTypeName(mapper, o.ForObject)
 		if err != nil {
 			return err
 		}
 		if !found {
 			return fmt.Errorf("--watch-for must be in resource/name form")
 		}
-		o.forName, o.forResource = tuple.Name, tuple.Resource
 	}
 
 	o.ctx = cmd.Context()
@@ -155,7 +160,7 @@ func (o EventsOptions) Run() error {
 	listOptions := metav1.ListOptions{}
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
-			fields.OneTermEqualSelector("involvedObject.kind", o.forResource),
+			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, listOptions)
