@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -78,7 +77,6 @@ func NewInTreeRegistry() runtime.Registry {
 		nodevolumelimits.AzureDiskName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
 		nodevolumelimits.CinderName:                runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
 		interpodaffinity.Name:                      runtime.FactoryAdapter(fts, interpodaffinity.New),
-		nodelabel.Name:                             nodelabel.New,
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
 		defaultpreemption.Name:                     runtime.FactoryAdapter(fts, defaultpreemption.New),
