@@ -1537,7 +1537,10 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "os": {
+          "name": "c'V{E犓`ɜɅc"
+        }
       }
     },
     "volumeClaimTemplates": [
@@ -1547,11 +1550,11 @@
           "generateName": "492",
           "namespace": "493",
           "selfLink": "494",
-          "uid": "4LM桵Ţ宧ʜ嵹ʌ5Ë}",
-          "resourceVersion": "932117408350471144",
-          "generation": 4446917721686139397,
-          "creationTimestamp": "2013-04-06T12:27:00Z",
-          "deletionGracePeriodSeconds": -2948232978388571762,
+          "uid": "`",
+          "resourceVersion": "5863709333089187294",
+          "generation": 6477367096865964611,
+          "creationTimestamp": "2097-02-11T08:53:04Z",
+          "deletionGracePeriodSeconds": 5497143372256332223,
           "labels": {
             "496": "497"
           },
@@ -1563,9 +1566,9 @@
               "apiVersion": "500",
               "kind": "501",
               "name": "502",
-              "uid": "憲Ħ焵i,ŋ",
+              "uid": "Z穑S13t",
               "controller": false,
-              "blockOwnerDeletion": false
+              "blockOwnerDeletion": true
             }
           ],
           "finalizers": [
@@ -1575,7 +1578,7 @@
           "managedFields": [
             {
               "manager": "505",
-              "operation": "Ʀ§:Ǫ魚Emv看ƜZ穑S",
+              "operation": "董缞濪葷cŲNª",
               "apiVersion": "506",
               "fieldsType": "507",
               "subresource": "508"
@@ -1584,30 +1587,33 @@
         },
         "spec": {
           "accessModes": [
-            "Is{豘ñ澀j劎笜釼鮭Ɯ"
+            "豘ñ澀j劎笜釼鮭Ɯ镶Eq荣¿S5Tƙ"
           ],
           "selector": {
             "matchLabels": {
-              "789--9opn2/8.--4-___..1.N_l..-_.1-j---30q.-2_9.9-..-JA-H-C5-8_--4.__z22": "E_3-a__w.___-_-mv9h.-7.s__-_g6_-_N4-R._P-___0..X"
+              "N_l..-_.1-j---30q.-2_9.9-..-JA-H-5": "8_--4.__z2-.T2I"
             },
             "matchExpressions": [
               {
-                "key": "R_-U7-F34-6.-_-O-F__h9",
-                "operator": "Exists"
+                "key": "7--4a06y7-dt--5--8-69vc31o-865227qok-3-v8e7wfk4ek.hi93f---z-4-q24gt/Mw.___-_-mv9h.-7.s__-_g6_-_No",
+                "operator": "In",
+                "values": [
+                  "D.9-F_A-t0-o.7_a-t.-d6h__._-.Z-Q.1-B.__--wr_-Iu9._.UT-o"
+                ]
               }
             ]
           },
           "resources": {
             "limits": {
-              "獪霛圦Ƶ": "159"
+              "xġ疾ɇù扻喥|{軈ĕʦ竳÷ 骵蓧": "587"
             },
             "requests": {
-              "-劺b": "142"
+              "": "856"
             }
           },
           "volumeName": "515",
           "storageClassName": "516",
-          "volumeMode": "ê婼SƸ炃\u0026-Ƹ绿浠穸æǷ^ɘʘ",
+          "volumeMode": "涼ĥ訛\\`ĝňYuĞyÜ蛃慕ʓvâ",
           "dataSource": {
             "apiGroup": "517",
             "kind": "518",
@@ -1620,19 +1626,19 @@
           }
         },
         "status": {
-          "phase": "h蹤?攫垳ȿūDmÒ侠泊蠻毜鷟傚罢ț",
+          "phase": "忣àÂƺ琰Ȃ芋醳鮩!廊臚cɶċ",
           "accessModes": [
-            "\u003e7u?=ȳ皆Cds壋"
+            "v}鮩澊聝楧"
           ],
           "capacity": {
-            "H%": "764"
+            "问Ð7ɞŶJŖ)j{驟ʦcȃ": "657"
           },
           "conditions": [
             {
-              "type": "A麭T棞詢¡ɅǏõxġ疾ɇ",
-              "status": "=击S",
-              "lastProbeTime": "2806-03-31T09:12:56Z",
-              "lastTransitionTime": "2430-10-28T09:53:06Z",
+              "type": "ņȎZȐ樾'Ż£劾ů",
+              "status": "Q¢鬣_棈Ý泷",
+              "lastProbeTime": "2156-05-28T07:29:36Z",
+              "lastTransitionTime": "2066-08-08T11:27:30Z",
               "reason": "523",
               "message": "524"
             }
@@ -1641,34 +1647,34 @@
       }
     ],
     "serviceName": "525",
-    "podManagementPolicy": "軈ĕʦ竳÷ 骵蓧應ĸ簋涼ĥ訛\\`ĝňY",
+    "podManagementPolicy": "婵=ǻ",
     "updateStrategy": {
-      "type": "Ä嚕uʟ膠ĉ班康%m忣àÂƺ琰Ȃ",
+      "type": "ɝÔȗ$`Ž#",
       "rollingUpdate": {
-        "partition": 804652982
+        "partition": -1644040574
       }
     },
-    "revisionHistoryLimit": -827620894,
-    "minReadySeconds": -619299042
+    "revisionHistoryLimit": -1205784111,
+    "minReadySeconds": 1505300966
   },
   "status": {
-    "observedGeneration": 5447372700200122498,
-    "replicas": -2070785865,
-    "readyReplicas": 1702437783,
-    "currentReplicas": -1694062357,
-    "updatedReplicas": -296989682,
+    "observedGeneration": 7422250233075984176,
+    "replicas": -326265137,
+    "readyReplicas": 1683394621,
+    "currentReplicas": 1862659237,
+    "updatedReplicas": 798811297,
     "currentRevision": "526",
     "updateRevision": "527",
-    "collisionCount": 1261428189,
+    "collisionCount": -1290326833,
     "conditions": [
       {
-        "type": "鮩澊聝楧p问Ð7ɞŶJŖ)j{驟ʦ",
-        "status": "N崑-ņȎ",
-        "lastTransitionTime": "2128-12-14T15:28:07Z",
+        "type": "´Aƺå嫹^Ȇɀ*ǹ",
+        "status": "蟷尨BABȳ",
+        "lastTransitionTime": "2464-04-30T23:47:03Z",
         "reason": "528",
         "message": "529"
       }
     ],
-    "availableReplicas": -346713296
+    "availableReplicas": -1012893423
   }
 }

@@ -31,10 +31,10 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: -619299042
-  podManagementPolicy: 軈ĕʦ竳÷ 骵蓧應ĸ簋涼ĥ訛\`ĝňY
+  minReadySeconds: 1505300966
+  podManagementPolicy: 婵=ǻ
   replicas: 896585016
-  revisionHistoryLimit: -827620894
+  revisionHistoryLimit: -1205784111
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -740,6 +740,8 @@ spec:
       nodeName: "395"
       nodeSelector:
         "391": "392"
+      os:
+        name: c'V{E犓`ɜɅc
       overhead:
         D輷: "792"
       preemptionPolicy: m珢\%傢z¦Ā竚ĐȌƨǴ叆
@@ -1058,42 +1060,42 @@ spec:
           volumePath: "103"
   updateStrategy:
     rollingUpdate:
-      partition: 804652982
-    type: Ä嚕uʟ膠ĉ班康%m忣àÂƺ琰Ȃ
+      partition: -1644040574
+    type: ɝÔȗ$`Ž#
   volumeClaimTemplates:
   - metadata:
       annotations:
         "498": "499"
       clusterName: "504"
-      creationTimestamp: "2013-04-06T12:27:00Z"
-      deletionGracePeriodSeconds: -2948232978388571762
+      creationTimestamp: "2097-02-11T08:53:04Z"
+      deletionGracePeriodSeconds: 5497143372256332223
       finalizers:
       - "503"
       generateName: "492"
-      generation: 4446917721686139397
+      generation: 6477367096865964611
       labels:
         "496": "497"
       managedFields:
       - apiVersion: "506"
         fieldsType: "507"
         manager: "505"
-        operation: Ʀ§:Ǫ魚Emv看ƜZ穑S
+        operation: 董缞濪葷cŲNª
         subresource: "508"
       name: "491"
       namespace: "493"
       ownerReferences:
       - apiVersion: "500"
-        blockOwnerDeletion: false
+        blockOwnerDeletion: true
         controller: false
         kind: "501"
         name: "502"
-        uid: 憲Ħ焵i,ŋ
-      resourceVersion: "932117408350471144"
+        uid: Z穑S13t
+      resourceVersion: "5863709333089187294"
       selfLink: "494"
-      uid: 4LM桵Ţ宧ʜ嵹ʌ5Ë}
+      uid: '`'
     spec:
       accessModes:
-      - Is{豘ñ澀j劎笜釼鮭Ɯ
+      - 豘ñ澀j劎笜釼鮭Ɯ镶Eq荣¿S5Tƙ
       dataSource:
         apiGroup: "517"
         kind: "518"
@@ -1104,44 +1106,46 @@ spec:
         name: "522"
       resources:
         limits:
-          獪霛圦Ƶ: "159"
+          xġ疾ɇù扻喥|{軈ĕʦ竳÷ 骵蓧: "587"
         requests:
-          -劺b: "142"
+          "": "856"
       selector:
         matchExpressions:
-        - key: R_-U7-F34-6.-_-O-F__h9
-          operator: Exists
+        - key: 7--4a06y7-dt--5--8-69vc31o-865227qok-3-v8e7wfk4ek.hi93f---z-4-q24gt/Mw.___-_-mv9h.-7.s__-_g6_-_No
+          operator: In
+          values:
+          - D.9-F_A-t0-o.7_a-t.-d6h__._-.Z-Q.1-B.__--wr_-Iu9._.UT-o
         matchLabels:
-          789--9opn2/8.--4-___..1.N_l..-_.1-j---30q.-2_9.9-..-JA-H-C5-8_--4.__z22: E_3-a__w.___-_-mv9h.-7.s__-_g6_-_N4-R._P-___0..X
+          N_l..-_.1-j---30q.-2_9.9-..-JA-H-5: 8_--4.__z2-.T2I
       storageClassName: "516"
-      volumeMode: ê婼SƸ炃&-Ƹ绿浠穸æǷ^ɘʘ
+      volumeMode: 涼ĥ訛\`ĝňYuĞyÜ蛃慕ʓvâ
       volumeName: "515"
     status:
       accessModes:
-      - '>7u?=ȳ皆Cds壋'
+      - v}鮩澊聝楧
       capacity:
-        H%: "764"
+        问Ð7ɞŶJŖ)j{驟ʦcȃ: "657"
       conditions:
-      - lastProbeTime: "2806-03-31T09:12:56Z"
-        lastTransitionTime: "2430-10-28T09:53:06Z"
+      - lastProbeTime: "2156-05-28T07:29:36Z"
+        lastTransitionTime: "2066-08-08T11:27:30Z"
         message: "524"
         reason: "523"
-        status: =击S
-        type: A麭T棞詢¡ɅǏõxġ疾ɇ
-      phase: h蹤?攫垳ȿūDmÒ侠泊蠻毜鷟傚罢ț
+        status: Q¢鬣_棈Ý泷
+        type: ņȎZȐ樾'Ż£劾ů
+      phase: 忣àÂƺ琰Ȃ芋醳鮩!廊臚cɶċ
 status:
-  availableReplicas: -346713296
-  collisionCount: 1261428189
+  availableReplicas: -1012893423
+  collisionCount: -1290326833
   conditions:
-  - lastTransitionTime: "2128-12-14T15:28:07Z"
+  - lastTransitionTime: "2464-04-30T23:47:03Z"
     message: "529"
     reason: "528"
-    status: N崑-ņȎ
-    type: 鮩澊聝楧p问Ð7ɞŶJŖ)j{驟ʦ
-  currentReplicas: -1694062357
+    status: 蟷尨BABȳ
+    type: ´Aƺå嫹^Ȇɀ*ǹ
+  currentReplicas: 1862659237
   currentRevision: "526"
-  observedGeneration: 5447372700200122498
-  readyReplicas: 1702437783
-  replicas: -2070785865
+  observedGeneration: 7422250233075984176
+  readyReplicas: 1683394621
+  replicas: -326265137
   updateRevision: "527"
-  updatedReplicas: -296989682
+  updatedReplicas: 798811297

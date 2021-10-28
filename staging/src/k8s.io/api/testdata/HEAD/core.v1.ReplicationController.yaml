@@ -734,6 +734,8 @@ spec:
       nodeName: "391"
       nodeSelector:
         "387": "388"
+      os:
+        name: +&ɃB沅零șPî壣
       overhead:
         D傕Ɠ栊闔虝巒瀦ŕ: "124"
       preemptionPolicy: Iƭĳ韺ʧ>
@@ -1048,14 +1050,14 @@ spec:
           storagePolicyName: "101"
           volumePath: "99"
 status:
-  availableReplicas: 138992869
+  availableReplicas: 1559072561
   conditions:
-  - lastTransitionTime: "2455-07-16T22:37:15Z"
+  - lastTransitionTime: "2124-10-20T09:17:54Z"
     message: "488"
     reason: "487"
-    status: 嬜Š&?鳢.ǀŭ瘢颦z疵
-    type: 零șPî壣V礆á¤拈tY圻醆锛[
-  fullyLabeledReplicas: -1754098513
-  observedGeneration: -7169014491472696647
-  readyReplicas: -877836536
-  replicas: 1205668420
+    status: ŭ瘢颦z疵悡nȩ純z邜
+    type: Y圻醆锛[M牍Ƃ氙吐ɝ鶼
+  fullyLabeledReplicas: -1872689134
+  observedGeneration: 5029735218517286947
+  readyReplicas: 1791185938
+  replicas: 157451826

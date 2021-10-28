@@ -31,12 +31,13 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 2115665292
-  progressDeadlineSeconds: -164140734
+  minReadySeconds: -779806398
+  paused: true
+  progressDeadlineSeconds: -43713883
   replicas: 896585016
-  revisionHistoryLimit: 237456757
+  revisionHistoryLimit: 440570496
   rollbackTo:
-    revision: 1498428055681994500
+    revision: -7008927308432218140
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -47,7 +48,7 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: ʔF{ȃ騑ȫ(踶ǊđƟÝɹ橽ƴåj
+    type: Ýɹ橽ƴåj}c殶ėŔ裑烴<暉Ŝ!
   template:
     metadata:
       annotations:
@@ -746,6 +747,8 @@ spec:
       nodeName: "395"
       nodeSelector:
         "391": "392"
+      os:
+        name: c'V{E犓`ɜɅc
       overhead:
         D輷: "792"
       preemptionPolicy: m珢\%傢z¦Ā竚ĐȌƨǴ叆
@@ -1063,17 +1066,17 @@ spec:
           storagePolicyName: "105"
           volumePath: "103"
 status:
-  availableReplicas: -1624946983
-  collisionCount: 165914268
+  availableReplicas: 376262938
+  collisionCount: 955020766
   conditions:
-  - lastTransitionTime: "2398-05-12T06:43:28Z"
-    lastUpdateTime: "2322-02-12T18:39:07Z"
+  - lastTransitionTime: "2294-05-20T00:00:03Z"
+    lastUpdateTime: "2909-01-09T22:03:18Z"
     message: "492"
     reason: "491"
-    status: ȇ>尪璎妽4LM桵Ţ宧ʜ
-    type: mv看ƜZ
-  observedGeneration: -1635909846206320942
-  readyReplicas: -859094691
-  replicas: -253906853
-  unavailableReplicas: -779806398
-  updatedReplicas: -602665165
+    status: 5Ë
+    type: ĈȖ董缞濪葷cŲ
+  observedGeneration: 6595930309397245706
+  readyReplicas: -408821490
+  replicas: -98839735
+  unavailableReplicas: 632292328
+  updatedReplicas: -691251015
