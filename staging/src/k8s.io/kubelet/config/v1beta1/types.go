@@ -510,7 +510,7 @@ type KubeletConfiguration struct {
 	//   requested resources;
 	// - `best-effort`: kubelet will favor pods with NUMA alignment of CPU and device
 	//   resources;
-	// - `none`: kublet has no knowledge of NUMA alignment of a pod's CPU and device resources.
+	// - `none`: kubelet has no knowledge of NUMA alignment of a pod's CPU and device resources.
 	// - `single-numa-node`: kubelet only allows pods with a single NUMA alignment
 	//   of CPU and device resources.
 	//
