@@ -733,3 +733,18 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		oldGeneratorName,
 	)
 }
+
+// Difference removes any elements of subArray from fullArray and returns the result
+func Difference(fullArray []string, subArray []string) []string {
+	exclude := make(map[string]bool, len(subArray))
+	for _, elem := range subArray {
+		exclude[elem] = true
+	}
+	var result []string
+	for _, elem := range fullArray {
+		if _, found := exclude[elem]; !found {
+			result = append(result, elem)
+		}
+	}
+	return result
+}

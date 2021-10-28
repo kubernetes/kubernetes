@@ -29,6 +29,7 @@ const (
 	claimBoundTimeout                = 3 * time.Minute
 	pvReclaimTimeout                 = 3 * time.Minute
 	pvBoundTimeout                   = 3 * time.Minute
+	pvCreateTimeout                  = 3 * time.Minute
 	pvDeleteTimeout                  = 3 * time.Minute
 	pvDeleteSlowTimeout              = 20 * time.Minute
 	snapshotCreateTimeout            = 5 * time.Minute
@@ -67,6 +68,9 @@ type TimeoutContext struct {
 	// PVBound is how long PVs have to become bound.
 	PVBound time.Duration
 
+	// PVCreate is how long PVs have to be created.
+	PVCreate time.Duration
+
 	// PVDelete is how long PVs have to become deleted.
 	PVDelete time.Duration
 
@@ -95,6 +99,7 @@ func NewTimeoutContextWithDefaults() *TimeoutContext {
 		ClaimBound:                claimBoundTimeout,
 		PVReclaim:                 pvReclaimTimeout,
 		PVBound:                   pvBoundTimeout,
+		PVCreate:                  pvCreateTimeout,
 		PVDelete:                  pvDeleteTimeout,
 		PVDeleteSlow:              pvDeleteSlowTimeout,
 		SnapshotCreate:            snapshotCreateTimeout,
