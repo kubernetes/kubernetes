@@ -30,6 +30,8 @@ type Attributes interface {
 	GetNamespace() string
 	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
 	GetResource() schema.GroupVersionResource
+	// GetKind is the name of the kind being requested.  For example: Pod
+	GetKind() schema.GroupVersionKind
 	// GetSubresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".

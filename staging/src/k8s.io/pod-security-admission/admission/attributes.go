@@ -27,6 +27,7 @@ import (
 type AttributesRecord struct {
 	Name        string
 	Namespace   string
+	Kind        schema.GroupVersionKind
 	Resource    schema.GroupVersionResource
 	Subresource string
 	Operation   admissionv1.Operation
@@ -40,6 +41,9 @@ func (a *AttributesRecord) GetName() string {
 }
 func (a *AttributesRecord) GetNamespace() string {
 	return a.Namespace
+}
+func (a *AttributesRecord) GetKind() schema.GroupVersionKind {
+	return a.Kind
 }
 func (a *AttributesRecord) GetResource() schema.GroupVersionResource {
 	return a.Resource
@@ -80,6 +84,9 @@ func (a *attributes) GetName() string {
 }
 func (a *attributes) GetNamespace() string {
 	return a.r.Namespace
+}
+func (a *attributes) GetKind() schema.GroupVersionKind {
+	return schema.GroupVersionKind(a.r.Kind)
 }
 func (a *attributes) GetResource() schema.GroupVersionResource {
 	return schema.GroupVersionResource(a.r.Resource)
