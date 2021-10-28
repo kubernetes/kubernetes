@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -107,8 +108,10 @@ func TestRegisterWatch(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 			}
+			ctx := request.WithRequestInfo(context.Background(), requestInfo)
+			r := testCase.request.WithContext(ctx)
 
-			forget := watchTracker.RegisterWatch(requestInfo)
+			forget := watchTracker.RegisterWatch(r)
 			if testCase.expected == nil {
 				if forget != nil {
 					t.Errorf("unexpected watch registered: %#v", watchTracker.watchCount)
@@ -151,7 +154,8 @@ func TestGetInterestedWatchCount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 		}
-		if forget := watchTracker.RegisterWatch(requestInfo); forget == nil {
+		r := req.WithContext(request.WithRequestInfo(context.Background(), requestInfo))
+		if forget := watchTracker.RegisterWatch(r); forget == nil {
 			t.Errorf("watch wasn't registered: %#v", requestInfo)
 		}
 	}

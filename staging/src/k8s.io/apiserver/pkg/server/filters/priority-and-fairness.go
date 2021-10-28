@@ -186,7 +186,7 @@ func WithPriorityAndFairness(
 				served = true
 				setResponseHeaders(classification, w)
 
-				forgetWatch = fcIfc.RegisterWatch(requestInfo)
+				forgetWatch = fcIfc.RegisterWatch(r)
 
 				// Notify the main thread that we're ready to start the watch.
 				close(shouldStartWatchCh)

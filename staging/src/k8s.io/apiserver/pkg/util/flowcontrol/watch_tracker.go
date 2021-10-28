@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"net/http"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,10 +52,10 @@ type ForgetWatchFunc func()
 // of watches in the system for the purpose of estimating the
 // cost of incoming mutating requests.
 type WatchTracker interface {
-	// RegisterWatch reqisters a watch with the provided requestInfo
+	// RegisterWatch reqisters a watch based on the provided http.Request
 	// in the tracker. It returns the function that should be called
 	// to forget the watcher once it is finished.
-	RegisterWatch(requestInfo *request.RequestInfo) ForgetWatchFunc
+	RegisterWatch(r *http.Request) ForgetWatchFunc
 
 	// GetInterestedWatchCount returns the number of watches that are
 	// potentially interested in a request with a given RequestInfo
@@ -77,8 +78,9 @@ func NewWatchTracker() WatchTracker {
 }
 
 // RegisterWatch implements WatchTracker interface.
-func (w *watchTracker) RegisterWatch(requestInfo *request.RequestInfo) ForgetWatchFunc {
-	if requestInfo == nil || requestInfo.Verb != "watch" {
+func (w *watchTracker) RegisterWatch(r *http.Request) ForgetWatchFunc {
+	requestInfo, ok := request.RequestInfoFrom(r.Context())
+	if !ok || requestInfo == nil || requestInfo.Verb != "watch" {
 		return nil
 	}
 
