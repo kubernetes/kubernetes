@@ -173,7 +173,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
 			defer deletePodsSync(f, restartNeverPods)
 
-			completedPods := waitForPods(f, podCountRestartNever, time.Minute)
+			completedPods := waitForPods(f, podCountRestartNever, startTimeout)
 			if len(completedPods) < podCountRestartNever {
 				framework.Failf("Failed to run sufficient restartNever pods, got %d but expected %d", len(completedPods), podCountRestartNever)
 			}
@@ -205,11 +205,9 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			// restart may think these old pods are consuming CPU and we
 			// will get an OutOfCpu error.
 			ginkgo.By("verifying restartNever pods succeed and restartAlways pods stay running")
-			for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
-				postRestartRunningPods := waitForPods(f, numAllPods, time.Minute)
-				if len(postRestartRunningPods) < numAllPods {
-					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
-				}
+			postRestartRunningPods := waitForPods(f, numAllPods, startTimeout)
+			if len(postRestartRunningPods) < numAllPods {
+				framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 			}
 		})
 	})
