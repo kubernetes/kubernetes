@@ -108,7 +108,7 @@ func (c *FakeEndpointSlices) Update(ctx context.Context, endpointSlice *v1beta1.
 // Delete takes name of the endpointSlice and deletes it. Returns an error if one occurs.
 func (c *FakeEndpointSlices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(endpointslicesResource, c.ns, name), &v1beta1.EndpointSlice{})
+		Invokes(testing.NewDeleteActionWithOptions(endpointslicesResource, c.ns, name, opts), &v1beta1.EndpointSlice{})
 
 	return err
 }

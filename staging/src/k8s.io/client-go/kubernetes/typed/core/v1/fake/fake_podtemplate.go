@@ -108,7 +108,7 @@ func (c *FakePodTemplates) Update(ctx context.Context, podTemplate *corev1.PodTe
 // Delete takes name of the podTemplate and deletes it. Returns an error if one occurs.
 func (c *FakePodTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podtemplatesResource, c.ns, name), &corev1.PodTemplate{})
+		Invokes(testing.NewDeleteActionWithOptions(podtemplatesResource, c.ns, name, opts), &corev1.PodTemplate{})
 
 	return err
 }

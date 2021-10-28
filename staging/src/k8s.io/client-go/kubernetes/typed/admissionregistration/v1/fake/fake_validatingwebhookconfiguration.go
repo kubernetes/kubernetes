@@ -102,7 +102,7 @@ func (c *FakeValidatingWebhookConfigurations) Update(ctx context.Context, valida
 // Delete takes name of the validatingWebhookConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakeValidatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(validatingwebhookconfigurationsResource, name), &admissionregistrationv1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootDeleteActionWithOptions(validatingwebhookconfigurationsResource, name, opts), &admissionregistrationv1.ValidatingWebhookConfiguration{})
 	return err
 }
 
