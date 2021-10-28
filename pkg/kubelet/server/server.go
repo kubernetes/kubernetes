@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
@@ -356,8 +358,8 @@ func (s *Server) InstallDefaultHandlers() {
 	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
-	// cAdvisor metrics are exposed under the secured handler as well
-	r := compbasemetrics.NewKubeRegistry()
+	// cAdvisor container metrics require a blocking registry
+	br := prometheus.NewBlockingRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
@@ -376,15 +378,10 @@ func (s *Server) InstallDefaultHandlers() {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
-	cadvisorOpts := cadvisorv2.RequestOptions{
-		IdType:    cadvisorv2.TypeName,
-		Count:     1,
-		Recursive: true,
-	}
-	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
-	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	br.MustRegisterRaw(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}))
+	br.MustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
-		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+		promhttp.HandlerForTransactional(br, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
