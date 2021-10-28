@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Kubernetes",
+    "version": "v1.23.0"
+  },
+  "paths": {
+    "/openid/v1/jwks/": {
+      "get": {
+        "tags": [
+          "openid"
+        ],
+        "description": "get service account issuer OpenID JSON Web Key Set (contains public token verification keys)",
+        "operationId": "getServiceAccountIssuerOpenIDKeyset",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/jwk-set+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {}
+}
