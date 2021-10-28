@@ -52,25 +52,6 @@ write_files:
       [Install]
       WantedBy=kubernetes.target
 
-  - path: /etc/systemd/system/kube-master-internal-route.service
-    permissions: 0644
-    owner: root
-    content: |
-      [Unit]
-      Description=Configure kube internal route
-      Requires=kube-master-installation.service
-      After=kube-master-installation.service
-
-      [Service]
-      Type=oneshot
-      RemainAfterExit=yes
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --retry-connrefused --connect-timeout 10 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
-      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/kube-master-internal-route.sh
-      ExecStart=/home/kubernetes/bin/kube-master-internal-route.sh
-
-      [Install]
-      WantedBy=kubernetes.target
-
   - path: /etc/systemd/system/kube-master-configuration.service
     permissions: 0644
     owner: root
