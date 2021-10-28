@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
@@ -356,7 +358,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
-	r := compbasemetrics.NewKubeRegistry()
+	r := prometheus.NewRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
@@ -375,15 +377,13 @@ func (s *Server) InstallDefaultHandlers() {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
-	cadvisorOpts := cadvisorv2.RequestOptions{
-		IdType:    cadvisorv2.TypeName,
-		Count:     1,
-		Recursive: true,
-	}
-	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
-	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	container := metrics.NewContainerCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{})
+	machine := metrics.NewMachineCollector(prometheusHostAdapter{s.host}, includedMetrics)
+	nameTypeCache := metrics.NewCachedGatherer(container.Collect, machine.Collect)
+	nameTypeGatherer := prometheus.NewMultiTRegistry(prometheus.ToTransactionalGatherer(r), nameTypeCache)
+
 	s.restfulCont.Handle(cadvisorMetricsPath,
-		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+		promhttp.HandlerForTransactional(nameTypeGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
