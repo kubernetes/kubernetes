@@ -187,6 +187,10 @@ func (o EventsOptions) Run() error {
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
+	if o.Watch {
+		return o.runWatch(namespace, listOptions)
+	}
+
 	e := o.client.CoreV1().Events(namespace)
 	el := &corev1.EventList{}
 	err := runtimeresource.FollowContinue(&listOptions,
@@ -212,32 +216,32 @@ func (o EventsOptions) Run() error {
 		printOneEvent(w, e, o.AllNamespaces)
 	}
 	w.Flush()
-	if o.Watch {
-		if len(el.Items) > 0 {
-			// start watch from after the most recent item in the list
-			listOptions.ResourceVersion = el.Items[len(el.Items)-1].ResourceVersion
-		}
-		eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, listOptions)
-		if err != nil {
-			return err
-		}
+	return nil
+}
 
-		ctx, cancel := context.WithCancel(o.ctx)
-		defer cancel()
-		intr := interrupt.New(nil, cancel)
-		intr.Run(func() error {
-			_, err := watchtools.UntilWithoutRetry(ctx, eventWatch, func(e watch.Event) (bool, error) {
-				if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
-					return false, nil
-				}
-				event := e.Object.(*corev1.Event)
-				printOneEvent(w, *event, o.AllNamespaces)
-				w.Flush()
-				return false, nil
-			})
-			return err
-		})
+func (o EventsOptions) runWatch(namespace string, listOptions metav1.ListOptions) error {
+	eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, listOptions)
+	if err != nil {
+		return err
 	}
+	w := printers.GetNewTabWriter(o.Out)
+	printHeadings(w, o.AllNamespaces)
+
+	ctx, cancel := context.WithCancel(o.ctx)
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
+	intr.Run(func() error {
+		_, err := watchtools.UntilWithoutRetry(ctx, eventWatch, func(e watch.Event) (bool, error) {
+			if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
+				return false, nil
+			}
+			event := e.Object.(*corev1.Event)
+			printOneEvent(w, *event, o.AllNamespaces)
+			w.Flush()
+			return false, nil
+		})
+		return err
+	})
 
 	return nil
 }
