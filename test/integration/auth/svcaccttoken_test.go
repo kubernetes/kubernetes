@@ -54,12 +54,16 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// This key is for testing purposes only and is not considered secure.
-const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+const (
+	// This key is for testing purposes only and is not considered secure.
+	ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
 AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 /IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END EC PRIVATE KEY-----`
+
+	tokenExpirationSeconds = 60*60 + 7
+)
 
 func TestServiceAccountTokenCreate(t *testing.T) {
 
@@ -382,7 +386,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 
 	t.Run("expiration extended token", func(t *testing.T) {
-		var requestExp int64 = 60*60 + 7
+		var requestExp int64 = tokenExpirationSeconds
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
 				Audiences:         []string{"api"},
@@ -431,6 +435,56 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkExpiration(t, treq, requestExp)
 		expStatus := treq.Status.ExpirationTimestamp.Time.Unix()
 		if expStatus < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+			t.Errorf("unexpected expiration returned in tokenrequest status %d, should within range of %d +- %d seconds", expStatus, assumedExpiry, leeway)
+		}
+	})
+
+	t.Run("extended expiration extended does not apply for other audiences", func(t *testing.T) {
+		var requestExp int64 = tokenExpirationSeconds
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"not-the-api", "api"},
+				ExpirationSeconds: &requestExp,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       pod.Name,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+		pod, delPod := createDeletePod(t, cs, pod)
+		defer delPod()
+		treq.Spec.BoundObjectRef.UID = pod.UID
+
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		// Give some tolerance to avoid flakiness since we are using real time.
+		var leeway int64 = 10
+		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(60*60) * time.Second))
+		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+
+		warnAfter := getSubObject(t, getPayload(t, treq.Status.Token), "kubernetes.io", "warnafter")
+		if warnAfter != "null" {
+			t.Errorf("warn after should be empty.Found: %s", warnAfter)
+		}
+
+		exp, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "exp"), 10, 64)
+		if err != nil {
+			t.Fatalf("error parsing exp: %v", err)
+		}
+		if exp < int64(actualExpiry)-leeway || exp > int64(actualExpiry)+leeway {
+			t.Errorf("unexpected token exp %d, should within range of %d +- %d seconds", exp, actualExpiry, leeway)
+		}
+
+		checkExpiration(t, treq, requestExp)
+		expStatus := treq.Status.ExpirationTimestamp.Time.Unix()
+		if expStatus < int64(assumedExpiry)-leeway {
 			t.Errorf("unexpected expiration returned in tokenrequest status %d, should within range of %d +- %d seconds", expStatus, assumedExpiry, leeway)
 		}
 	})
