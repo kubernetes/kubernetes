@@ -241,9 +241,16 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time
 
-	// The number of actively running pods.
+	// The number of pending and running pods.
 	// +optional
 	Active int32
+
+	// The number of active pods which have a Ready condition.
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (disabled by default).
+	// +optional
+	Ready *int32
 
 	// The number of pods which reached phase Succeeded.
 	// +optional

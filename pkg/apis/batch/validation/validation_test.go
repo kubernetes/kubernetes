@@ -692,9 +692,36 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Status: batch.JobStatus{
+					Active:    2,
+					Succeeded: 3,
+					Failed:    4,
+					Ready:     pointer.Int32(1),
+				},
+			},
+		},
+		"nil ready": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Status: batch.JobStatus{
 					Active:    1,
-					Succeeded: 1,
+					Succeeded: 2,
 					Failed:    3,
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Status: batch.JobStatus{
+					Active:    2,
+					Succeeded: 3,
+					Failed:    4,
 				},
 			},
 		},
@@ -720,12 +747,15 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				Status: batch.JobStatus{
 					Active:    -1,
 					Succeeded: -2,
-					Failed:    3,
+					Failed:    -3,
+					Ready:     pointer.Int32(-1),
 				},
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 				{Type: field.ErrorTypeInvalid, Field: "status.succeeded"},
+				{Type: field.ErrorTypeInvalid, Field: "status.failed"},
+				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 			},
 		},
 		"empty and duplicated uncounted pods": {
