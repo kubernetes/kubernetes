@@ -507,10 +507,10 @@ func TestLogsForObjectWithClient(t *testing.T) {
 		expectedError     string
 	}{
 		{
-			name:          "two container pod without default container selected",
-			podFn:         testPodWithTwoContainers,
-			podLogOptions: &corev1.PodLogOptions{},
-			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+			name:              "two container pod without default container selected should default to the first one",
+			podFn:             testPodWithTwoContainers,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
 		},
 		{
 			name: "two container pod with default container selected",
@@ -535,14 +535,14 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			expectedFieldPath: `spec.containers{foo-2-c2}`,
 		},
 		{
-			name: "two container pod with non-existing default container selected",
+			name: "two container pod with non-existing default container selected should defualt to the first container",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
 				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "non-existing"}
 				return pod
 			},
-			podLogOptions: &corev1.PodLogOptions{},
-			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
 		},
 		{
 			name: "two container pod with default container set, but allContainers also set",
