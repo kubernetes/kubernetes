@@ -806,17 +806,6 @@ func (HTTPHeader) SwaggerDoc() map[string]string {
 	return map_HTTPHeader
 }
 
-var map_LifecycleHandler = map[string]string{
-	"":          "LifecycleHandler defines a specific action that should be taken",
-	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
-	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
-}
-
-func (LifecycleHandler) SwaggerDoc() map[string]string {
-	return map_LifecycleHandler
-}
-
 var map_HostAlias = map[string]string{
 	"":          "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
 	"ip":        "IP address of the host file entry.",
@@ -894,6 +883,17 @@ var map_Lifecycle = map[string]string{
 
 func (Lifecycle) SwaggerDoc() map[string]string {
 	return map_Lifecycle
+}
+
+var map_LifecycleHandler = map[string]string{
+	"":          "LifecycleHandler defines a specific action that should be taken in a lifecycle hook.  This type has a strong relationship to ProbeHandler - overlapping fields should be identical.",
+	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the http request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+}
+
+func (LifecycleHandler) SwaggerDoc() map[string]string {
+	return map_LifecycleHandler
 }
 
 var map_LimitRange = map[string]string{
@@ -1793,7 +1793,7 @@ func (Probe) SwaggerDoc() map[string]string {
 }
 
 var map_ProbeHandler = map[string]string{
-	"":          "ProbeHandler defines a specific action that should be taken",
+	"":          "ProbeHandler defines a specific action that should be taken in a probe. This type has a strong relationship to LifecycleHandler - overlapping fields should be identical.",
 	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
 	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
