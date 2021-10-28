@@ -148,7 +148,6 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber, pluginName)
 
 		framework.ExpectNotEqual(len(updatedStorageMetrics.latencyMetrics), 0, "Error fetching c-m updated storage metrics")
-		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 
 		volumeOperations := []string{"volume_provision", "volume_detach", "volume_attach"}
 
@@ -208,7 +207,6 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err, "failed to get controller manager metrics")
 		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics, pluginName)
 
-		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 		verifyMetricCount(storageOpMetrics, updatedStorageMetrics, "volume_provision", true)
 	}
 
@@ -268,7 +266,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -332,7 +332,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -432,7 +434,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Forced detach metric should be present
 		forceDetachKey := "attachdetach_controller_forced_detaches"
 		_, ok := updatedControllerMetrics[forceDetachKey]
-		framework.ExpectEqual(ok, true, "Key %q not found in A/D Controller metrics", forceDetachKey)
+		if !ok {
+			framework.Failf("Key %q not found in A/D Controller metrics", forceDetachKey)
+		}
 
 		// Wait and validate
 		totalVolumesKey := "attachdetach_controller_total_volumes"
@@ -640,19 +644,11 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 type storageControllerMetrics struct {
 	latencyMetrics map[string]int64
-	statusMetrics  map[string]statusMetricCounts
-}
-
-type statusMetricCounts struct {
-	successCount int64
-	failCount    int64
-	otherCount   int64
 }
 
 func newStorageControllerMetrics() *storageControllerMetrics {
 	return &storageControllerMetrics{
 		latencyMetrics: make(map[string]int64),
-		statusMetrics:  make(map[string]statusMetricCounts),
 	}
 }
 
@@ -706,27 +702,9 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 		oldLatencyCount = 0
 	}
 
-	oldStatusCount := int64(0)
-	if oldStatusCounts, ok := oldMetrics.statusMetrics[metricName]; ok {
-		if expectFailure {
-			oldStatusCount = oldStatusCounts.failCount
-		} else {
-			oldStatusCount = oldStatusCounts.successCount
-		}
-	}
-
 	newLatencyCount, ok := newMetrics.latencyMetrics[metricName]
-	if !expectFailure {
-		framework.ExpectEqual(ok, true, "Error getting updated latency metrics for %s", metricName)
-	}
-	newStatusCounts, ok := newMetrics.statusMetrics[metricName]
-	framework.ExpectEqual(ok, true, "Error getting updated status metrics for %s", metricName)
-
-	newStatusCount := int64(0)
-	if expectFailure {
-		newStatusCount = newStatusCounts.failCount
-	} else {
-		newStatusCount = newStatusCounts.successCount
+	if !expectFailure && !ok {
+		framework.Failf("Error getting updated latency metrics for %s", metricName)
 	}
 
 	// It appears that in a busy cluster some spurious detaches are unavoidable
@@ -735,7 +713,6 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 	if !expectFailure {
 		gomega.Expect(newLatencyCount).To(gomega.BeNumerically(">", oldLatencyCount), "New latency count %d should be more than old count %d for action %s", newLatencyCount, oldLatencyCount, metricName)
 	}
-	gomega.Expect(newStatusCount).To(gomega.BeNumerically(">", oldStatusCount), "New status count %d should be more than old count %d for action %s", newStatusCount, oldStatusCount, metricName)
 }
 
 func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginName string) *storageControllerMetrics {
@@ -754,27 +731,6 @@ func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginN
 				}
 				result.latencyMetrics[operation] = count
 			}
-		case "storage_operation_status_count":
-			for _, sample := range samples {
-				count := int64(sample.Value)
-				operation := string(sample.Metric["operation_name"])
-				status := string(sample.Metric["status"])
-				statusCounts := result.statusMetrics[operation]
-				metricPluginName := string(sample.Metric["volume_plugin"])
-				if len(pluginName) > 0 && pluginName != metricPluginName {
-					continue
-				}
-				switch status {
-				case "success":
-					statusCounts.successCount = count
-				case "fail-unknown":
-					statusCounts.failCount = count
-				default:
-					statusCounts.otherCount = count
-				}
-				result.statusMetrics[operation] = statusCounts
-			}
-
 		}
 	}
 	return result
