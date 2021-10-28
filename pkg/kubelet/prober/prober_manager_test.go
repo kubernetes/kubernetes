@@ -38,7 +38,7 @@ func init() {
 }
 
 var defaultProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		Exec: &v1.ExecAction{},
 	},
 	TimeoutSeconds:   1,

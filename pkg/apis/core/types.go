@@ -2022,7 +2022,7 @@ type ExecAction struct {
 // alive or ready to receive traffic.
 type Probe struct {
 	// The action taken to determine the health of a container
-	Handler
+	ProbeHandler
 	// Length of time before health checking is activated.  In seconds.
 	// +optional
 	InitialDelaySeconds int32
@@ -2188,9 +2188,29 @@ type Container struct {
 	TTY bool
 }
 
-// Handler defines a specific action that should be taken
+// ProbeHandler defines a specific action that should be taken in a probe.
+// This type has a strong relationship to LifecycleHandler - overlapping fields
+// should be identical.
 // TODO: pass structured data to these actions, and document that data here.
-type Handler struct {
+type ProbeHandler struct {
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	// +optional
+	Exec *ExecAction
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *HTTPGetAction
+	// TCPSocket specifies an action involving a TCP port.
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+type LifecycleHandler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
 	// +optional
@@ -2211,7 +2231,7 @@ type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
 	// +optional
-	PostStart *Handler
+	PostStart *LifecycleHandler
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
@@ -2222,7 +2242,7 @@ type Lifecycle struct {
 	// period. Other management of the container blocks until the hook completes
 	// or until the termination grace period is reached.
 	// +optional
-	PreStop *Handler
+	PreStop *LifecycleHandler
 }
 
 // The below types are used by kube_client and api_server.

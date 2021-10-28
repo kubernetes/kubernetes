@@ -117,7 +117,7 @@ func hasPauseProbe(pod *v1.Pod) bool {
 }
 
 var pauseProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,

@@ -806,15 +806,15 @@ func (HTTPHeader) SwaggerDoc() map[string]string {
 	return map_HTTPHeader
 }
 
-var map_Handler = map[string]string{
-	"":          "Handler defines a specific action that should be taken",
+var map_LifecycleHandler = map[string]string{
+	"":          "LifecycleHandler defines a specific action that should be taken",
 	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
 	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
 }
 
-func (Handler) SwaggerDoc() map[string]string {
-	return map_Handler
+func (LifecycleHandler) SwaggerDoc() map[string]string {
+	return map_LifecycleHandler
 }
 
 var map_HostAlias = map[string]string{
@@ -1790,6 +1790,17 @@ var map_Probe = map[string]string{
 
 func (Probe) SwaggerDoc() map[string]string {
 	return map_Probe
+}
+
+var map_ProbeHandler = map[string]string{
+	"":          "ProbeHandler defines a specific action that should be taken",
+	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the http request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+}
+
+func (ProbeHandler) SwaggerDoc() map[string]string {
+	return map_ProbeHandler
 }
 
 var map_ProjectedVolumeSource = map[string]string{

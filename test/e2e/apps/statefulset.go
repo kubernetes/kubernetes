@@ -71,7 +71,7 @@ const (
 )
 
 var httpProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/index.html",
 			Port: intstr.IntOrString{IntVal: 80},
