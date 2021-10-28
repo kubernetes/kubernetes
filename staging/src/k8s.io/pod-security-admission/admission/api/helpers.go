@@ -34,45 +34,45 @@ func ToPolicy(defaults PodSecurityDefaults) (policyapi.Policy, error) {
 	)
 
 	if len(defaults.Enforce) == 0 {
-		errs = appendErr(errs, requiredErr, "Enforce.Level")
+		errs = appendErr(errs, requiredErr, "enforce")
 	} else {
 		p.Enforce.Level, err = policyapi.ParseLevel(defaults.Enforce)
-		errs = appendErr(errs, err, "Enforce.Level")
+		errs = appendErr(errs, err, "enforce")
 	}
 
 	if len(defaults.EnforceVersion) == 0 {
-		errs = appendErr(errs, requiredErr, "Enforce.Version")
+		errs = appendErr(errs, requiredErr, "enforce-version")
 	} else {
 		p.Enforce.Version, err = policyapi.ParseVersion(defaults.EnforceVersion)
-		errs = appendErr(errs, err, "Enforce.Version")
+		errs = appendErr(errs, err, "enforce-version")
 	}
 
 	if len(defaults.Audit) == 0 {
-		errs = appendErr(errs, requiredErr, "Audit.Level")
+		errs = appendErr(errs, requiredErr, "audit")
 	} else {
 		p.Audit.Level, err = policyapi.ParseLevel(defaults.Audit)
-		errs = appendErr(errs, err, "Audit.Level")
+		errs = appendErr(errs, err, "audit")
 	}
 
 	if len(defaults.AuditVersion) == 0 {
-		errs = appendErr(errs, requiredErr, "Audit.Version")
+		errs = appendErr(errs, requiredErr, "audit-version")
 	} else {
 		p.Audit.Version, err = policyapi.ParseVersion(defaults.AuditVersion)
-		errs = appendErr(errs, err, "Audit.Version")
+		errs = appendErr(errs, err, "audit-version")
 	}
 
 	if len(defaults.Warn) == 0 {
-		errs = appendErr(errs, requiredErr, "Warn.Level")
+		errs = appendErr(errs, requiredErr, "warn")
 	} else {
 		p.Warn.Level, err = policyapi.ParseLevel(defaults.Warn)
-		errs = appendErr(errs, err, "Warn.Level")
+		errs = appendErr(errs, err, "warn")
 	}
 
 	if len(defaults.WarnVersion) == 0 {
-		errs = appendErr(errs, requiredErr, "Warn.Version")
+		errs = appendErr(errs, requiredErr, "warn-version")
 	} else {
 		p.Warn.Version, err = policyapi.ParseVersion(defaults.WarnVersion)
-		errs = appendErr(errs, err, "Warn.Version")
+		errs = appendErr(errs, err, "warn-version")
 	}
 
 	return p, errors.NewAggregate(errs)

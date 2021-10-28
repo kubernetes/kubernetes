@@ -460,7 +460,9 @@ func TestValidateNamespace(t *testing.T) {
 			attrs := &AttributesRecord{
 				Object:      newObject,
 				OldObject:   oldObject,
+				Name:        newObject.Name,
 				Namespace:   newObject.Name,
+				Kind:        schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"},
 				Resource:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"},
 				Subresource: tc.subresource,
 				Operation:   operation,
@@ -592,6 +594,7 @@ func TestValidatePodController(t *testing.T) {
 		newObject runtime.Object
 		// for update
 		oldObject runtime.Object
+		gvk       schema.GroupVersionKind
 		gvr       schema.GroupVersionResource
 
 		expectWarnings         []string
@@ -602,40 +605,47 @@ func TestValidatePodController(t *testing.T) {
 			subresource: "status",
 			newObject:   &badDeploy,
 			oldObject:   &goodDeploy,
+			gvk:         schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 		},
 		{
 			desc:             "namespace in exemptNamespaces will be exempted",
 			newObject:        &badDeploy,
+			gvk:              schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:              schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			exemptNamespaces: []string{testNamespace},
 		},
 		{
 			desc:                 "runtimeClass in exemptRuntimeClasses will be exempted",
 			newObject:            &badDeploy,
+			gvk:                  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                  schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			exemptRuntimeClasses: []string{"containerd"},
 		},
 		{
 			desc:        "user in exemptUsers will be exempted",
 			newObject:   &badDeploy,
+			gvk:         schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			exemptUsers: []string{"testuser"},
 		},
 		{
 			desc:      "podMetadata == nil && podSpec == nil will skip verification",
 			newObject: &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo-rc"}},
+			gvk:       schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ReplicationController"},
 			gvr:       schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"},
 		},
 		{
 			desc:                   "good deploy creates and produce nothing",
 			newObject:              &goodDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			expectAuditAnnotations: map[string]string{},
 		},
 		{
 			desc:                   "bad deploy creates produce correct user-visible warnings and correct auditAnnotations",
 			newObject:              &badDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
@@ -644,6 +654,7 @@ func TestValidatePodController(t *testing.T) {
 			desc:                   "bad spec updates don't block on enforce failures and returns correct information",
 			newObject:              &badDeploy,
 			oldObject:              &goodDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
@@ -660,6 +671,7 @@ func TestValidatePodController(t *testing.T) {
 			attrs := &AttributesRecord{
 				testName,
 				testNamespace,
+				tc.gvk,
 				tc.gvr,
 				tc.subresource,
 				operation,
