@@ -66,10 +66,9 @@ func (r *resourceAllocationScorer) score(
 	score := r.scorer(requested, allocatable)
 
 	if klog.V(10).Enabled() {
-		klog.Infof(
-			"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
-			pod.Name, node.Name, r.Name,
-			allocatable, requested, score,
+		klog.InfoS("Listing internal info for allocatable resources, requested resources and score", "pod",
+			klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
+			"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
 		)
 	}
 
@@ -100,7 +99,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 		}
 	}
 	if klog.V(10).Enabled() {
-		klog.Infof("requested resource %v not considered for node score calculation", resource)
+		klog.InfoS("Requested resource is omitted for node score calculation", "resourceName", resource)
 	}
 	return 0, 0
 }
