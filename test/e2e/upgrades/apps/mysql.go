@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -173,7 +174,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(count >= t.successfulWrites, true)
+	gomega.Expect(count).To(gomega.BeNumerically(">=", t.successfulWrites), "count is too small")
 }
 
 // addName adds a new value to the db.
