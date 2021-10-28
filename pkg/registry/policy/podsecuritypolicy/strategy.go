@@ -72,16 +72,14 @@ func (strategy) Canonicalize(obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	opts := validation.PodSecurityPolicyValidationOptions{}
-	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy), opts)
+	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	opts := validation.PodSecurityPolicyValidationOptions{}
-	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy), opts)
+	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
