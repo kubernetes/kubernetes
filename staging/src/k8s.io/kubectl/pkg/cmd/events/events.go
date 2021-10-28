@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	eventsUsageStr = "events"
+	eventsUsageStr = "events [--for TYPE/NAME] [--watch]"
 )
 
 var (
