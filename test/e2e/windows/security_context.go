@@ -50,7 +50,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		f.TestContainerOutput("check set user", podUserName, 0, []string{"ContainerAdministrator"})
 	})
 
-	ginkgo.It("should not be able to create pods with unknown usernames", func() {
+	ginkgo.It("should not be able to create pods with unknown usernames at Pod level", func() {
 		ginkgo.By("Creating a pod with an invalid username")
 		podInvalid := f.PodClient().Create(runAsUserNamePod(toPtr("FooLish")))
 
@@ -95,6 +95,22 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 
 			return false
 		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
+	})
+
+	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func() {
+		ginkgo.By("Creating a pod with an invalid username at container level and pod running as ContainerUser")
+		p := runAsUserNamePod(toPtr("FooLish"))
+		p.Spec.SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
+		podInvalid := f.PodClient().Create(p)
+
+		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
+
+		podInvalid, _ = f.PodClient().Get(context.TODO(), podInvalid.Name, metav1.GetOptions{})
+		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
+		if podTerminatedReason != "ContainerCannotRun" && podTerminatedReason != "StartError" {
+			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)
+		}
 	})
 
 	ginkgo.It("should override SecurityContext username if set", func() {
