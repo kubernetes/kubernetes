@@ -419,10 +419,11 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	if klog.V(5).Enabled() {
 		klog.InfoS("PodSecurity evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
-
+	cachedResults := make(map[api.LevelVersion]policy.AggregateCheckResult)
 	response := allowedResponse()
 	if enforce {
-		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
+		result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec))
+		if !result.Allowed {
 			response = forbiddenResponse(fmt.Sprintf(
 				"pod violates PodSecurity %q: %s",
 				nsPolicy.Enforce.String(),
@@ -432,27 +433,38 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		} else {
 			a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
 		}
+		cachedResults[nsPolicy.Enforce] = result
 	}
 
-	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
-	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
+	// reuse previous evaluation if audit level+version is the same as enforce level+version
+
+	auditResult, ok := cachedResults[nsPolicy.Audit]
+	if !ok {
+		auditResult = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec))
+		cachedResults[nsPolicy.Audit] = auditResult
+	}
+	if !auditResult.Allowed {
 		auditAnnotations["audit"] = fmt.Sprintf(
 			"would violate PodSecurity %q: %s",
 			nsPolicy.Audit.String(),
-			result.ForbiddenDetail(),
+			auditResult.ForbiddenDetail(),
 		)
 		a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Audit, metrics.ModeAudit, attrs)
 	}
 
 	// avoid adding warnings to a request we're already going to reject with an error
 	if response.Allowed {
-		// TODO: reuse previous evaluation if warn level+version is the same as audit or enforce level+version
-		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
+		// reuse previous evaluation if warn level+version is the same as audit or enforce level+version
+		warnResult, ok := cachedResults[nsPolicy.Warn]
+		if !ok {
+			warnResult = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec))
+		}
+		if !warnResult.Allowed {
 			// TODO: Craft a better user-facing warning message
 			response.Warnings = append(response.Warnings, fmt.Sprintf(
 				"would violate PodSecurity %q: %s",
 				nsPolicy.Warn.String(),
-				result.ForbiddenDetail(),
+				warnResult.ForbiddenDetail(),
 			))
 			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Warn, metrics.ModeWarn, attrs)
 		}
