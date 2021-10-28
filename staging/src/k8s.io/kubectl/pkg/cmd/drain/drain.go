@@ -297,17 +297,18 @@ func (o *DrainCmdOptions) RunDrain() error {
 		return err
 	}
 
-	printObj, err := o.ToPrinter("drained")
-	if err != nil {
-		return err
-	}
-
 	drainedNodes := sets.NewString()
 	var fatal error
 
 	for _, info := range o.nodeInfos {
 		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
+
+			printObj, err := o.ToPrinter("drained")
+			if err != nil {
+				return err
+			}
+
 			printObj(info.Object, o.Out)
 		} else {
 			if o.drainer.IgnoreErrors && len(o.nodeInfos) > 1 {
