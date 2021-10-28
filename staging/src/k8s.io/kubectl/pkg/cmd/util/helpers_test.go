@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
 )
@@ -359,5 +361,129 @@ func TestDifferenceFunc(t *testing.T) {
 		})) {
 			t.Errorf("%s -> Expected: %v, but got: %v", tc.name, tc.expected, result)
 		}
+	}
+}
+
+type fakeEmptyType struct{}
+
+func (obj *fakeEmptyType) GetObjectKind() schema.ObjectKind { return obj }
+
+func (obj *fakeEmptyType) SetGroupVersionKind(_ schema.GroupVersionKind) {}
+
+func (obj *fakeEmptyType) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind("", "")
+}
+
+func (obj *fakeEmptyType) DeepCopyObject() runtime.Object { return nil }
+
+func TestStandardErrorMessage(t *testing.T) {
+	originalConfigFilePath := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
+	defer func() {
+		os.Setenv(clientcmd.RecommendedConfigPathEnvVar, originalConfigFilePath)
+	}()
+
+	fakeConfigFile, err := os.CreateTemp(os.TempDir(), "test-config-*")
+	if err != nil {
+		t.Errorf("createTemp failed: %v", err)
+	}
+	fakeConfigFile.Close()
+	defer func() {
+		_ = os.Remove(fakeConfigFile.Name())
+	}()
+
+	testCases := []struct {
+		name            string
+		err             error
+		configFilePath  string
+		expectedHandled bool
+		expectedMessage string
+	}{
+		{
+			name:            "should handle api status error with unauthorized reason",
+			err:             errors.NewUnauthorized("foo"),
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "error: You must be logged in to the server (foo)",
+		},
+		{
+			name:            "should handle api status error with reason other than unauthorized",
+			err:             errors.NewBadRequest("foo"),
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "Error from server (BadRequest): foo",
+		},
+		{
+			name:            "should handle api status error with no reason",
+			err:             &errors.StatusError{ErrStatus: metav1.Status{Message: "foo"}},
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "Error from server: foo",
+		},
+		{
+			name:            "should handle unexpected object error",
+			err:             &errors.UnexpectedObjectError{Object: &fakeEmptyType{}},
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "Server returned an unexpected response: unexpected object: &{}",
+		},
+		{
+			name: "should handle connection refused and return host/port message if default config exists",
+			err: &url.Error{
+				URL: "http://localhost:8080",
+				Err: fmt.Errorf("connection refused"),
+			},
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "The connection to the server localhost:8080 was refused - did you specify the right host or port?",
+		},
+		{
+			name: "should handle connection refused and return host/port message if host is not the default host",
+			err: &url.Error{
+				URL: "https://foo",
+				Err: fmt.Errorf("connection refused"),
+			},
+			configFilePath:  "/this/file/does/not/exist",
+			expectedHandled: true,
+			expectedMessage: "The connection to the server foo was refused - did you specify the right host or port?",
+		},
+		{
+			name: "should handle connection refused and return host/port message if host is default host and config file exists",
+			err: &url.Error{
+				URL: "http://localhost:8080",
+				Err: fmt.Errorf("connection refused"),
+			},
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: true,
+			expectedMessage: "The connection to the server localhost:8080 was refused - did you specify the right host or port?",
+		},
+		{
+			name: "should handle connection refused and return configuration file missing message if host is default host and config file does not exist",
+			err: &url.Error{
+				URL: "http://localhost:8080",
+				Err: fmt.Errorf("connection refused"),
+			},
+			configFilePath:  "/this/file/does/not/exist",
+			expectedHandled: true,
+			expectedMessage: "The connection to the server localhost:8080 was refused - the default host was attempted because a configuration file was not found at /this/file/does/not/exist",
+		},
+		{
+			name:            "should return false if error is not handled",
+			err:             fmt.Errorf("this will not be handled"),
+			configFilePath:  fakeConfigFile.Name(),
+			expectedHandled: false,
+			expectedMessage: "",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("StandardErrorMessage %s", tc.name), func(tt *testing.T) {
+			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.configFilePath)
+			actualMessage, actualHandled := StandardErrorMessage(tc.err)
+			if actualMessage != tc.expectedMessage {
+				tt.Errorf("message mismatch. expected %q to equal %q", actualMessage, tc.expectedMessage)
+			}
+			if actualHandled != tc.expectedHandled {
+				tt.Errorf("handled mismatch. expected %v to equal %v", actualHandled, tc.expectedHandled)
+			}
+		})
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"strings"
@@ -238,11 +239,33 @@ func StandardErrorMessage(err error) (string, bool) {
 			if server, err := url.Parse(t.URL); err == nil {
 				host = server.Host
 			}
+
+			// If a connection refused error occurs for the default server and the default configuration file does not
+			// exist, return an error letting the user know the config file was not found and its expected location.
+			if isDefaultServer(t.URL) {
+				configFile := clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename()
+				if _, err := os.Stat(configFile); errors.Is(err, fs.ErrNotExist) {
+					return fmt.Sprintf("The connection to the server %s was refused - the default host was attempted because a configuration file was not found at %s", host, configFile), true
+				}
+			}
+
 			return fmt.Sprintf("The connection to the server %s was refused - did you specify the right host or port?", host), true
 		}
 		return fmt.Sprintf("Unable to connect to the server: %v", t.Err), true
 	}
 	return "", false
+}
+
+func isDefaultServer(urlToCheck string) bool {
+	parsedUrl, err := url.Parse(urlToCheck)
+	if err != nil {
+		return false
+	}
+	parsedDefaultUrl, err := url.Parse(clientcmd.ClusterDefaults.Server)
+	if err != nil {
+		return false
+	}
+	return parsedUrl.Scheme == parsedDefaultUrl.Scheme && parsedUrl.Host == parsedDefaultUrl.Host
 }
 
 // MultilineError returns a string representing an error that splits sub errors into their own
