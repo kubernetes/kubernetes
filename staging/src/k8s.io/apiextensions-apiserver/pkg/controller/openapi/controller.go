@@ -169,7 +169,7 @@ func (c *Controller) sync(name string) error {
 		}
 		delete(c.crdSpecs, name)
 		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", name)
-		regenerationCounter.With(map[string]string{"crd": name, "reason": "remove"})
+		regenerationCounter.With(map[string]string{"crd": name, "reason": "remove"}).Inc()
 		return c.updateSpecLocked()
 	}
 
@@ -190,7 +190,7 @@ func (c *Controller) sync(name string) error {
 	if updated {
 		reason = "update"
 	}
-	regenerationCounter.With(map[string]string{"crd": name, "reason": reason})
+	regenerationCounter.With(map[string]string{"crd": name, "reason": reason}).Inc()
 	return c.updateSpecLocked()
 }
 
