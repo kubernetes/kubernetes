@@ -68,12 +68,34 @@ var (
 	kubectl alpha events --for pod/web-pod-13je7 --watch`))
 )
 
-type EventsOptions struct {
+// EventsFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
+// reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
+// the logic itself easy to unit test.
+type EventsFlags struct {
+	RESTClientGetter genericclioptions.RESTClientGetter
+
 	AllNamespaces bool
-	Namespace     string
 	Watch         bool
 	ForObject     string
 	ChunkSize     int64
+	genericclioptions.IOStreams
+}
+
+// NewEventsFlags returns a default EventsFlags
+func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *EventsFlags {
+	return &EventsFlags{
+		RESTClientGetter: restClientGetter,
+		IOStreams:        streams,
+		ChunkSize:        cmdutil.DefaultChunkSize,
+	}
+}
+
+// EventsOptions is a set of options that allows you to list events.  This is the object reflects the
+// runtime needs of an events command, making the logic itself easy to unit test.
+type EventsOptions struct {
+	Namespace     string
+	AllNamespaces bool
+	Watch         bool
 
 	forGVK  schema.GroupVersionKind
 	forName string
@@ -84,17 +106,9 @@ type EventsOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewEventsOptions(streams genericclioptions.IOStreams, watch bool) *EventsOptions {
-	return &EventsOptions{
-		IOStreams: streams,
-		Watch:     watch,
-		ChunkSize: cmdutil.DefaultChunkSize,
-	}
-}
-
-// NewCmdEvents creates a new pod logs command
+// NewCmdEvents creates a new events command
 func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewEventsOptions(streams, false)
+	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
 		Use:                   eventsUsageStr,
@@ -103,54 +117,62 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
+			o, err := flags.ToOptions(cmd.Context(), args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.AddFlags(cmd)
+	flags.AddFlags(cmd)
 	return cmd
 }
 
-func (o *EventsOptions) AddFlags(cmd *cobra.Command) {
+// AddFlags registers flags for a cli.
+func (o *EventsFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested events, watch for more events.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.ForObject, "for", o.ForObject, "Filter events to only those pertaining to the specified resource.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 }
 
-func (o *EventsOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
+// ToOptions converts from CLI inputs to runtime inputs.
+func (flags *EventsFlags) ToOptions(ctx context.Context, args []string) (*EventsOptions, error) {
+	o := &EventsOptions{
+		ctx:           ctx,
+		AllNamespaces: flags.AllNamespaces,
+		Watch:         flags.Watch,
+		IOStreams:     flags.IOStreams,
+	}
 	var err error
-	o.Namespace, _, err = restClientGetter.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, _, err = flags.RESTClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if o.ForObject != "" {
-		mapper, err := restClientGetter.ToRESTMapper()
+	if flags.ForObject != "" {
+		mapper, err := flags.RESTClientGetter.ToRESTMapper()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		var found bool
-		o.forGVK, o.forName, found, err = decodeResourceTypeName(mapper, o.ForObject)
+		o.forGVK, o.forName, found, err = decodeResourceTypeName(mapper, flags.ForObject)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !found {
-			return fmt.Errorf("--for must be in resource/name form")
+			return nil, fmt.Errorf("--for must be in resource/name form")
 		}
 	}
 
-	o.ctx = cmd.Context()
-	clientConfig, err := restClientGetter.ToRESTConfig()
+	clientConfig, err := flags.RESTClientGetter.ToRESTConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	o.client, err = kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return o, nil
 }
 
 // Run retrieves events
