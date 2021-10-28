@@ -1370,38 +1370,8 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		// First write session affinity rules, if applicable.
-		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-			for _, endpointChain := range readyEndpointChains {
-				args = append(args[:0],
-					"-A", string(svcChain),
-				)
-				args = proxier.appendServiceCommentLocked(args, svcNameString)
-				args = append(args,
-					"-m", "recent", "--name", string(endpointChain),
-					"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
-					"-j", string(endpointChain),
-				)
-				proxier.natRules.Write(args)
-			}
-		}
-
-		// Now write loadbalancing rules
-		numReadyEndpoints := len(readyEndpointChains)
-		for i, endpointChain := range readyEndpointChains {
-			// Balancing rules in the per-service chain.
-			args = append(args[:0], "-A", string(svcChain))
-			args = proxier.appendServiceCommentLocked(args, svcNameString)
-			if i < (numReadyEndpoints - 1) {
-				// Each rule is a probabilistic match.
-				args = append(args,
-					"-m", "statistic",
-					"--mode", "random",
-					"--probability", proxier.probability(numReadyEndpoints-i))
-			}
-			// The final (or only if n == 1) rule is a guaranteed match.
-			proxier.natRules.Write(args, "-j", string(endpointChain))
-		}
+		// Write rules jumping from svcChain to readyEndpointChains
+		proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcChain, readyEndpointChains, args)
 
 		// The logic below this applies only if this service is marked as OnlyLocal
 		if !svcInfo.NodeLocalExternal() {
@@ -1445,36 +1415,8 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			proxier.natRules.Write(args)
 		} else {
-			// First write session affinity rules only over local endpoints, if applicable.
-			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-				for _, endpointChain := range localEndpointChains {
-					proxier.natRules.Write(
-						"-A", string(svcXlbChain),
-						"-m", "comment", "--comment", svcNameString,
-						"-m", "recent", "--name", string(endpointChain),
-						"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
-						"-j", string(endpointChain))
-				}
-			}
-
-			// Setup probability filter rules only over local endpoints
-			for i, endpointChain := range localEndpointChains {
-				// Balancing rules in the per-service chain.
-				args = append(args[:0],
-					"-A", string(svcXlbChain),
-					"-m", "comment", "--comment",
-					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
-				)
-				if i < (numLocalEndpoints - 1) {
-					// Each rule is a probabilistic match.
-					args = append(args,
-						"-m", "statistic",
-						"--mode", "random",
-						"--probability", proxier.probability(numLocalEndpoints-i))
-				}
-				// The final (or only if n == 1) rule is a guaranteed match.
-				proxier.natRules.Write(args, "-j", string(endpointChain))
-			}
+			// Write rules jumping from svcXlbChain to localEndpointChains
+			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcXlbChain, localEndpointChains, args)
 		}
 	}
 
@@ -1669,4 +1611,39 @@ func (proxier *Proxier) openPort(lp netutils.LocalPort, replacementPortsMap map[
 
 	klog.V(2).InfoS("Opened local port", "port", lp)
 	replacementPortsMap[lp] = socket
+}
+
+func (proxier *Proxier) writeServiceToEndpointRules(svcNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpointChains []utiliptables.Chain, args []string) {
+	// First write session affinity rules, if applicable.
+	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+		for _, endpointChain := range endpointChains {
+			args = append(args[:0],
+				"-A", string(svcChain),
+			)
+			args = proxier.appendServiceCommentLocked(args, svcNameString)
+			args = append(args,
+				"-m", "recent", "--name", string(endpointChain),
+				"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
+				"-j", string(endpointChain),
+			)
+			proxier.natRules.Write(args)
+		}
+	}
+
+	// Now write loadbalancing rules.
+	numEndpoints := len(endpointChains)
+	for i, endpointChain := range endpointChains {
+		// Balancing rules in the per-service chain.
+		args = append(args[:0], "-A", string(svcChain))
+		args = proxier.appendServiceCommentLocked(args, svcNameString)
+		if i < (numEndpoints - 1) {
+			// Each rule is a probabilistic match.
+			args = append(args,
+				"-m", "statistic",
+				"--mode", "random",
+				"--probability", proxier.probability(numEndpoints-i))
+		}
+		// The final (or only if n == 1) rule is a guaranteed match.
+		proxier.natRules.Write(args, "-j", string(endpointChain))
+	}
 }

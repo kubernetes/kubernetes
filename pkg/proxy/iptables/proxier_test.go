@@ -1849,7 +1849,7 @@ COMMIT
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Balancing rule 0 for ns1/svc1:p80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -2168,7 +2168,7 @@ COMMIT
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m recent --name KUBE-SEP-ZX7GRIZKSNUQ3LAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Balancing rule 0 for ns1/svc1:p80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -2216,7 +2216,7 @@ COMMIT
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.2.1:80
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Balancing rule 0 for ns1/svc1:p80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 10.20.30.51 -j KUBE-NODEPORTS
 COMMIT
 `
@@ -2264,7 +2264,7 @@ COMMIT
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Balancing rule 0 for ns1/svc1:p80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 10.20.30.51 -j KUBE-NODEPORTS
 COMMIT
 `
@@ -3652,7 +3652,7 @@ COMMIT
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -4437,8 +4437,8 @@ COMMIT
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `,
@@ -4557,8 +4557,8 @@ COMMIT
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `,
@@ -4665,8 +4665,8 @@ COMMIT
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `,
