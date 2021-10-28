@@ -207,6 +207,15 @@ func (o EventsOptions) Run() error {
 		return err
 	}
 
+	if len(el.Items) == 0 {
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No events found.")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No events found in %s namespace.\n", o.Namespace)
+		}
+		return nil
+	}
+
 	w := printers.GetNewTabWriter(o.Out)
 
 	sort.Sort(SortableEvents(el.Items))
@@ -225,7 +234,7 @@ func (o EventsOptions) runWatch(namespace string, listOptions metav1.ListOptions
 		return err
 	}
 	w := printers.GetNewTabWriter(o.Out)
-	printHeadings(w, o.AllNamespaces)
+	headingsPrinted := false
 
 	ctx, cancel := context.WithCancel(o.ctx)
 	defer cancel()
@@ -236,6 +245,10 @@ func (o EventsOptions) runWatch(namespace string, listOptions metav1.ListOptions
 				return false, nil
 			}
 			event := e.Object.(*corev1.Event)
+			if !headingsPrinted {
+				printHeadings(w, o.AllNamespaces)
+				headingsPrinted = true
+			}
 			printOneEvent(w, *event, o.AllNamespaces)
 			w.Flush()
 			return false, nil
