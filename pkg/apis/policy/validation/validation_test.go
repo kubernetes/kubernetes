@@ -590,7 +590,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{})
+		errs := ValidatePodSecurityPolicy(v.psp)
 		if len(errs) == 0 {
 			t.Errorf("%s expected errors but got none", k)
 			continue
@@ -613,7 +613,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	// Should not be able to update to an invalid policy.
 	for k, v := range errorCases {
 		v.psp.ResourceVersion = "444" // Required for updates.
-		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{})
+		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp)
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected update errors but got none", k)
 			continue
@@ -743,13 +743,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range successCases {
-		if errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
 		}
 
 		// Should be able to update to a valid PSP.
 		v.psp.ResourceVersion = "444" // Required for updates.
-		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp); len(errs) != 0 {
 			t.Errorf("Expected success for %s update, got %v", k, errs)
 		}
 	}
@@ -786,7 +786,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 	for _, strVolume := range volumes.List() {
 		psp := validPSP()
 		psp.Spec.Volumes = []policy.FSType{policy.FSType(strVolume)}
-		errs := ValidatePodSecurityPolicy(psp, PodSecurityPolicyValidationOptions{})
+		errs := ValidatePodSecurityPolicy(psp)
 		if len(errs) != 0 {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
@@ -1127,12 +1127,11 @@ func TestAllowEphemeralVolumeType(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
-				opts := PodSecurityPolicyValidationOptions{}
 				var errs field.ErrorList
 				if oldPSP == nil {
-					errs = ValidatePodSecurityPolicy(newPSP, opts)
+					errs = ValidatePodSecurityPolicy(newPSP)
 				} else {
-					errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP, opts)
+					errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP)
 				}
 				if len(errs) > 0 {
 					t.Errorf("expected no errors, got: %v", errs)

@@ -92,23 +92,19 @@ func ValidatePodDisruptionBudgetStatusUpdate(status, oldStatus policy.PodDisrupt
 // trailing dashes are allowed.
 var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
-// PodSecurityPolicyValidationOptions contains additional parameters for ValidatePodSecurityPolicy.
-type PodSecurityPolicyValidationOptions struct {
-}
-
 // ValidatePodSecurityPolicy validates a PodSecurityPolicy and returns an ErrorList
 // with any errors.
-func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
+func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(psp.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidatePodSecurityPolicySpec validates a PodSecurityPolicySpec and returns an ErrorList
 // with any errors.
-func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, opts PodSecurityPolicyValidationOptions, fldPath *field.Path) field.ErrorList {
+func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
@@ -116,7 +112,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, opts PodS
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
-	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(opts, fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
 	if len(spec.RequiredDropCapabilities) > 0 && hasCap(policy.AllowAllCapabilities, spec.AllowedCapabilities) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("requiredDropCapabilities"), spec.RequiredDropCapabilities,
 			"must be empty when all capabilities are allowed by a wildcard"))
@@ -324,7 +320,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 }
 
 // validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
-func validatePodSecurityPolicyVolumes(opts PodSecurityPolicyValidationOptions, fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
+func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allowed := psputil.GetAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
@@ -523,11 +519,11 @@ func validateRuntimeClassStrategy(fldPath *field.Path, rc *policy.RuntimeClassSt
 }
 
 // ValidatePodSecurityPolicyUpdate validates a PSP for updates.
-func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
+func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
