@@ -535,7 +535,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			expectedFieldPath: `spec.containers{foo-2-c2}`,
 		},
 		{
-			name: "two container pod with non-existing default container selected should defualt to the first container",
+			name: "two container pod with non-existing default container selected should default to the first container",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
 				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "non-existing"}
