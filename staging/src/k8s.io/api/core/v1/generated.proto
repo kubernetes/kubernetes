@@ -3181,12 +3181,10 @@ message PodExecOptions {
   optional bool stdin = 1;
 
   // Redirect the standard output stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stdout = 2;
 
   // Redirect the standard error stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stderr = 3;
 
