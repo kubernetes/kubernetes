@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -41,8 +41,8 @@ func NewFakeManagerWithHint(hint *TopologyHint) Manager {
 	}
 }
 
-func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyHint {
-	klog.InfoS("GetAffinity", "podUID", podUID, "containerName", containerName)
+func (m *fakeManager) GetAffinity(podUID string, containerName string, resouceName string) TopologyHint {
+	klog.InfoS("GetAffinity", "podUID", podUID, "containerName", containerName, "resouceName", resouceName)
 	if m.hint == nil {
 		return TopologyHint{}
 	}

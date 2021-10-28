@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -50,14 +50,14 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		bestHint, admit := s.calculateAffinity(pod, &container)
+		bestHint, providersHints, admit := s.calculateAffinity(pod, &container)
 		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 
 		if !admit {
 			return admission.GetPodAdmitResult(&TopologyAffinityError{})
 		}
 		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
-		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
+		s.setTopologyHints(string(pod.UID), container.Name, bestHint, providersHints)
 
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
@@ -79,9 +79,9 @@ func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Con
 	return providersHints
 }
 
-func (s *containerScope) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
+func (s *containerScope) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, []map[string][]TopologyHint, bool) {
 	providersHints := s.accumulateProvidersHints(pod, container)
 	bestHint, admit := s.policy.Merge(providersHints)
 	klog.InfoS("ContainerTopologyHint", "bestHint", bestHint)
-	return bestHint, admit
+	return bestHint, providersHints, admit
 }

@@ -275,7 +275,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 
 		// Call Topology Manager to get the aligned socket affinity across all hint providers.
-		hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+		hint := p.affinity.GetAffinity(string(pod.UID), container.Name, string(v1.ResourceCPU))
 		klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
 
 		// Allocate CPUs according to the NUMA affinity contained in the hint.

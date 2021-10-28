@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -94,7 +94,7 @@ type HintProvider interface {
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
-	GetAffinity(podUID string, containerName string) TopologyHint
+	GetAffinity(podUID string, containerName string, resourceName string) TopologyHint
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
@@ -103,6 +103,14 @@ type TopologyHint struct {
 	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
+}
+
+// TopologyHints is a struct containing all available hints for a container
+type TopologyHints struct {
+	// MergedHint containing the merged hints for a Container
+	MergedHint TopologyHint
+	// ProviderHints containing collected hints from providers for a container
+	ProviderHints []map[string][]TopologyHint
 }
 
 // IsEqual checks if TopologyHint are equal
@@ -180,8 +188,8 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	return manager, nil
 }
 
-func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
-	return m.scope.GetAffinity(podUID, containerName)
+func (m *manager) GetAffinity(podUID string, containerName string, resourceName string) TopologyHint {
+	return m.scope.GetAffinity(podUID, containerName, resourceName)
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {

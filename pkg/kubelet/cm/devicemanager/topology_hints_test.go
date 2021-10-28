@@ -35,7 +35,7 @@ type mockAffinityStore struct {
 	hint topologymanager.TopologyHint
 }
 
-func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
+func (m *mockAffinityStore) GetAffinity(podUID string, containerName string, resourceName string) topologymanager.TopologyHint {
 	return m.hint
 }
 

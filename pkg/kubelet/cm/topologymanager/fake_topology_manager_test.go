@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -49,7 +49,7 @@ func TestFakeGetAffinity(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		fm := fakeManager{}
-		actual := fm.GetAffinity(tc.podUID, tc.containerName)
+		actual := fm.GetAffinity(tc.podUID, tc.containerName, "")
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}
