@@ -102,6 +102,8 @@ func NewOptions() *Options {
 	o.SecureServing.ServerCert.PairName = "kube-scheduler"
 	o.SecureServing.BindPort = kubeschedulerconfig.DefaultKubeSchedulerPort
 
+	o.initFlags()
+
 	return o
 }
 
@@ -171,8 +173,8 @@ func (o *Options) ApplyLeaderElectionTo(cfg *kubeschedulerconfig.KubeSchedulerCo
 	o.ComponentConfig = cfg
 }
 
-// InitFlags initializes flags by section name.
-func (o *Options) InitFlags() {
+// initFlags initializes flags by section name.
+func (o *Options) initFlags() {
 	if o.Flags != nil {
 		return
 	}

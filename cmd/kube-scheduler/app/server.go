@@ -89,7 +89,6 @@ for more information about scheduling and the kube-scheduler component.`,
 		},
 	}
 
-	opts.InitFlags()
 	nfs := opts.Flags
 	verflag.AddFlags(nfs.FlagSet("global"))
 	globalflag.AddGlobalFlags(nfs.FlagSet("global"), cmd.Name())

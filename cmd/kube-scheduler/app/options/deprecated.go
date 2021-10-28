@@ -30,6 +30,7 @@ import (
 type DeprecatedOptions struct {
 	componentbaseconfig.DebuggingConfiguration
 	componentbaseconfig.ClientConnectionConfiguration
+	// Note that only the deprecated options (lock-object-name and lock-object-namespace) are populated here.
 	componentbaseconfig.LeaderElectionConfiguration
 
 	Port int

@@ -83,7 +83,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	opts := options.NewOptions()
-	opts.InitFlags()
 	nfs := opts.Flags
 	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)

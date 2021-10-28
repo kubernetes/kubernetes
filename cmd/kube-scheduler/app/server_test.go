@@ -258,7 +258,6 @@ profiles:
 			opts.SecureServing.Listener = makeListener(t)
 			defer opts.SecureServing.Listener.Close()
 
-			opts.InitFlags()
 			nfs := opts.Flags
 			for _, f := range nfs.FlagSets {
 				fs.AddFlagSet(f)
