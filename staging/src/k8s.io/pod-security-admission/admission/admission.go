@@ -30,9 +30,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/admission/api/validation"
 	"k8s.io/pod-security-admission/api"
@@ -239,13 +241,13 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		return badRequestResponse("failed to decode namespace")
 	}
 
-	newPolicy, newErr := a.PolicyToEvaluate(namespace.Labels)
+	newPolicy, newErrs := a.PolicyToEvaluate(namespace.Labels)
 
 	switch attrs.GetOperation() {
 	case admissionv1.Create:
 		// require valid labels on create
-		if newErr != nil {
-			return invalidResponse(newErr.Error())
+		if len(newErrs) > 0 {
+			return invalidResponse(attrs, newErrs)
 		}
 		return sharedAllowedResponse()
 
@@ -261,11 +263,11 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(oldObj))
 			return badRequestResponse("failed to decode old namespace")
 		}
-		oldPolicy, oldErr := a.PolicyToEvaluate(oldNamespace.Labels)
+		oldPolicy, oldErrs := a.PolicyToEvaluate(oldNamespace.Labels)
 
 		// require valid labels on update if they have changed
-		if newErr != nil && (oldErr == nil || newErr.Error() != oldErr.Error()) {
-			return invalidResponse(newErr.Error())
+		if len(newErrs) > 0 && (len(oldErrs) == 0 || !reflect.DeepEqual(newErrs, oldErrs)) {
+			return invalidResponse(attrs, newErrs)
 		}
 
 		// Skip dry-running pods:
@@ -327,8 +329,8 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
 	}
-	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
-	if nsPolicyErr == nil && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
+	if len(nsPolicyErrs) == 0 && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		return sharedAllowedResponse()
 	}
 
@@ -358,7 +360,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 			return sharedAllowedResponse()
 		}
 	}
-	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, &pod.ObjectMeta, &pod.Spec, attrs, true)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), &pod.ObjectMeta, &pod.Spec, attrs, true)
 }
 
 // ValidatePodController evaluates a pod controller create or update request against the effective policy for the namespace.
@@ -379,8 +381,8 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
 	}
-	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
-	if nsPolicyErr == nil && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
+	if len(nsPolicyErrs) == 0 && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		return sharedAllowedResponse()
 	}
 
@@ -398,7 +400,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
 		return sharedAllowedResponse()
 	}
-	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, attrs, false)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), podMetadata, podSpec, attrs, false)
 }
 
 // EvaluatePod evaluates the given policy against the given pod(-like) object.
@@ -559,7 +561,7 @@ func decoratePodWarnings(podWarningsToCount map[string]podCount, warnings []stri
 	}
 }
 
-func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, error) {
+func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, field.ErrorList) {
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
 }
 
@@ -592,8 +594,11 @@ func forbiddenResponse(msg string) *admissionv1.AdmissionResponse {
 }
 
 // invalidResponse is the response used for namespace requests when namespace labels are invalid.
-func invalidResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonInvalid, 422)
+func invalidResponse(attrs api.Attributes, fieldErrors field.ErrorList) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed: false,
+		Result:  &apierrors.NewInvalid(attrs.GetKind().GroupKind(), attrs.GetName(), fieldErrors).ErrStatus,
+	}
 }
 
 // badRequestResponse is the response used when a request cannot be processed.
