@@ -82,14 +82,14 @@ func FindOrDefaultContainerByName(pod *v1.Pod, name string, quiet bool, warn io.
 	// pick the first container as per existing behavior
 	container = &pod.Spec.Containers[0]
 	if !quiet && (len(pod.Spec.Containers) > 1 || len(pod.Spec.InitContainers) > 0 || len(pod.Spec.EphemeralContainers) > 0) {
-		fmt.Fprintf(warn, "Defaulted container %q out of: %s\n", container.Name, allContainerNames(pod))
+		fmt.Fprintf(warn, "Defaulted container %q out of: %s\n", container.Name, AllContainerNames(pod))
 	}
 
 	klog.V(4).Infof("Defaulting container name to %s", container.Name)
 	return &pod.Spec.Containers[0], nil
 }
 
-func allContainerNames(pod *v1.Pod) string {
+func AllContainerNames(pod *v1.Pod) string {
 	var containers []string
 	for _, container := range pod.Spec.Containers {
 		containers = append(containers, container.Name)
