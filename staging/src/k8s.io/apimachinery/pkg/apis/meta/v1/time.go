@@ -55,6 +55,15 @@ func Now() Time {
 	return Time{time.Now()}
 }
 
+// String returns "<nil>" if the value is nil otherwise calls String on the
+// underlying time.Time
+func (t *Time) String() string {
+	if t == nil {
+		return "<nil>"
+	}
+	return t.Time.String()
+}
+
 // IsZero returns true if the value is nil or time is zero.
 func (t *Time) IsZero() bool {
 	if t == nil {

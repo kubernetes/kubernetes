@@ -239,3 +239,51 @@ func TestTimeIsZero(t *testing.T) {
 		})
 	}
 }
+
+func TestPointerTimeString(t *testing.T) {
+	now := time.Now()
+	t1 := NewTime(now)
+	t2 := NewTime(time.Unix(2000, 0).UTC())
+	cases := []struct {
+		name   string
+		x      *Time
+		result string
+	}{
+		{"nil", nil, "<nil>"},
+		{"!nil", &t1, now.String()},
+		{"explicit !nil", &t2, "1970-01-01 00:33:20 +0000 UTC"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.String()
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
+			}
+		})
+	}
+}
+
+func TestTimeString(t *testing.T) {
+	now := time.Now()
+	t1 := NewTime(now)
+	t2 := NewTime(time.Unix(1000, 0).UTC())
+	cases := []struct {
+		name   string
+		x      Time
+		result string
+	}{
+		{"zero", NewTime(time.Time{}), "0001-01-01 00:00:00 +0000 UTC"},
+		{"now", t1, now.String()},
+		{"explicit", t2, "1970-01-01 00:16:40 +0000 UTC"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.String()
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
+			}
+		})
+	}
+}

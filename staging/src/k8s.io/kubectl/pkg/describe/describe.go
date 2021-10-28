@@ -4357,7 +4357,8 @@ func describeNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy) (string, e
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
-		w.Write(LEVEL_0, "Created on:\t%s\n", networkPolicy.CreationTimestamp)
+		// Use a pointer to the CreationTimestamp because *v1.Time is a Stringer.
+		w.Write(LEVEL_0, "Created on:\t%s\n", &networkPolicy.CreationTimestamp)
 		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
 		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
 		describeNetworkPolicySpec(networkPolicy.Spec, w)

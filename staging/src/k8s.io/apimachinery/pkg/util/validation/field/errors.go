@@ -58,7 +58,12 @@ func (v *Error) ErrorBody() string {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {
-				value = reflectValue.Elem().Interface()
+				var ok bool
+				// It is possible for the pointer to a type to be a Stringer, but not the type itself.
+				// If the pointer is a Stringer, then use the Stringer implementation of the pointer.
+				if value, ok = reflectValue.Interface().(fmt.Stringer); !ok {
+					value = reflectValue.Elem().Interface()
+				}
 			}
 		}
 		switch t := value.(type) {
