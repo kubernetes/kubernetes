@@ -202,10 +202,14 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 
 func checkIfNvidiaGPUsExistOnNode() bool {
 	// Cannot use `lspci` because it is not installed on all distros by default.
-	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
+	out, err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Output()
 	if err != nil {
 		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
 		return false
 	}
-	return true
+	if len(out) != 0 {
+		framework.Logf("found matching devices: %b", out)
+		return true
+	}
+	return false
 }
