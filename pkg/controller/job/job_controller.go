@@ -800,14 +800,11 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		}
 	}
 
-	forget = false
 	// Check if the number of jobs succeeded increased since the last check. If yes "forget" should be true
 	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
 	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
 	// In this case, we should clear the backoff delay.
-	if job.Status.Succeeded < succeeded {
-		forget = true
-	}
+	forget = job.Status.Succeeded < succeeded
 
 	if uncounted != nil {
 		needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
