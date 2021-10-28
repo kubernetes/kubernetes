@@ -1537,40 +1537,44 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "os": {
+          "name": "c'V{E犓`ɜɅc"
+        }
       }
     },
     "strategy": {
-      "type": "ʔF{ȃ騑ȫ(踶ǊđƟÝɹ橽ƴåj",
+      "type": "Ýɹ橽ƴåj}c殶ėŔ裑烴\u003c暉Ŝ!",
       "rollingUpdate": {
         "maxUnavailable": 2,
         "maxSurge": 3
       }
     },
-    "minReadySeconds": 2115665292,
-    "revisionHistoryLimit": 237456757,
+    "minReadySeconds": -779806398,
+    "revisionHistoryLimit": 440570496,
+    "paused": true,
     "rollbackTo": {
-      "revision": 1498428055681994500
+      "revision": -7008927308432218140
     },
-    "progressDeadlineSeconds": -164140734
+    "progressDeadlineSeconds": -43713883
   },
   "status": {
-    "observedGeneration": -1635909846206320942,
-    "replicas": -253906853,
-    "updatedReplicas": -602665165,
-    "readyReplicas": -859094691,
-    "availableReplicas": -1624946983,
-    "unavailableReplicas": -779806398,
+    "observedGeneration": 6595930309397245706,
+    "replicas": -98839735,
+    "updatedReplicas": -691251015,
+    "readyReplicas": -408821490,
+    "availableReplicas": 376262938,
+    "unavailableReplicas": 632292328,
     "conditions": [
       {
-        "type": "mv看ƜZ",
-        "status": "ȇ\u003e尪璎妽4LM桵Ţ宧ʜ",
-        "lastUpdateTime": "2322-02-12T18:39:07Z",
-        "lastTransitionTime": "2398-05-12T06:43:28Z",
+        "type": "ĈȖ董缞濪葷cŲ",
+        "status": "5Ë",
+        "lastUpdateTime": "2909-01-09T22:03:18Z",
+        "lastTransitionTime": "2294-05-20T00:00:03Z",
         "reason": "491",
         "message": "492"
       }
     ],
-    "collisionCount": 165914268
+    "collisionCount": 955020766
   }
 }
