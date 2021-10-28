@@ -34,7 +34,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/connrotation"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/util/print"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -614,7 +614,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
-				t.Fatalf("wanted no events, but got some: %s", spew.Sprintf("%#v", is))
+				t.Fatalf("wanted no events, but got some: %s", print.PrettyPrintObject(is, true))
 			}
 		}
 	}

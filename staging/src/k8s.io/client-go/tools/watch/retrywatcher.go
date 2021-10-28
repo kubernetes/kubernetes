@@ -24,8 +24,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -33,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/print"
 )
 
 // resourceVersionGetter is an interface used to get resource version from events.
@@ -191,7 +190,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				errObject := apierrors.FromObject(event.Object)
 				statusErr, ok := errObject.(*apierrors.StatusError)
 				if !ok {
-					klog.Error(spew.Sprintf("Received an error which is not *metav1.Status but %#+v", event.Object))
+					klog.Error("Received an error which is not *metav1.Status but %s", print.PrettyPrintObject(event.Object, true))
 					// Retry unknown errors
 					return false, 0
 				}
@@ -220,7 +219,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(spew.Sprintf("Retrying after unexpected error: %#+v", event.Object))
+					klog.V(5).Info("Retrying after unexpected error: %s", print.PrettyPrintObject(event.Object, true))
 
 					// Retry
 					return false, statusDelay

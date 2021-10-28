@@ -35,6 +35,7 @@ rules:
       - k8s.io/kubernetes/pkg/securitycontext
       - k8s.io/kubernetes/pkg/util/hash
       - k8s.io/kubernetes/pkg/util/node
+      - k8s.io/kubernetes/pkg/util/print
       - k8s.io/kubernetes/pkg/util/parsers
       - k8s.io/kubernetes/pkg/util/taints
       - k8s.io/kubernetes/pkg/proxy/util

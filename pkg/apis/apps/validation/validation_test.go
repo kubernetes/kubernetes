@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -32,6 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/print"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -2403,7 +2403,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 
 		errs := ValidateDeploymentStatus(&status, field.NewPath("status"))
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := spew.Sprintf("%#v", errs)
+			errString := print.PrettyPrintObject(errs, true)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}
@@ -2474,7 +2474,7 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 
 		errs := ValidateDeploymentStatusUpdate(to, from)
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := spew.Sprintf("%#v", errs)
+			errString := print.PrettyPrintObject(errs, true)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}

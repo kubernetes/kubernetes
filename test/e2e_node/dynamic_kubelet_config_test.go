@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +32,7 @@ import (
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/util/print"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -960,7 +959,7 @@ func (tc *nodeConfigTestCase) checkNodeConfigSource(f *framework.Framework) {
 		}
 		actual := node.Spec.ConfigSource
 		if !apiequality.Semantic.DeepEqual(tc.configSource, actual) {
-			return fmt.Errorf(spew.Sprintf("checkNodeConfigSource: case %s: expected %#v but got %#v", tc.desc, tc.configSource, actual))
+			return fmt.Errorf("checkNodeConfigSource: case %s: expected %s but got %s", tc.desc, print.PrettyPrintObject(tc.configSource, true), print.PrettyPrintObject(actual, true))
 		}
 		return nil
 	}, timeout, interval).Should(gomega.BeNil())
@@ -997,11 +996,11 @@ func expectConfigStatus(tc *nodeConfigTestCase, actual *v1.NodeConfigStatus) err
 		expectAssigned.ConfigMap.ResourceVersion = tc.configMap.ResourceVersion
 	}
 	if !apiequality.Semantic.DeepEqual(expectAssigned, actual.Assigned) {
-		errs = append(errs, spew.Sprintf("expected Assigned %#v but got %#v", expectAssigned, actual.Assigned))
+		errs = append(errs, fmt.Sprintf("expected Assigned %s but got %s", print.PrettyPrintObject(expectAssigned, true), print.PrettyPrintObject(actual.Assigned, true)))
 	}
 	// check LastKnownGood matches tc.expectConfigStatus.lastKnownGood
 	if !apiequality.Semantic.DeepEqual(tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood) {
-		errs = append(errs, spew.Sprintf("expected LastKnownGood %#v but got %#v", tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood))
+		errs = append(errs, fmt.Sprintf("expected LastKnownGood %s but got %s", print.PrettyPrintObject(tc.expectConfigStatus.lastKnownGood, true), print.PrettyPrintObject(actual.LastKnownGood, true)))
 	}
 	// check Active matches Assigned or LastKnownGood, depending on tc.expectConfigStatus.lkgActive
 	expectActive := expectAssigned
@@ -1009,7 +1008,7 @@ func expectConfigStatus(tc *nodeConfigTestCase, actual *v1.NodeConfigStatus) err
 		expectActive = tc.expectConfigStatus.lastKnownGood
 	}
 	if !apiequality.Semantic.DeepEqual(expectActive, actual.Active) {
-		errs = append(errs, spew.Sprintf("expected Active %#v but got %#v", expectActive, actual.Active))
+		errs = append(errs, fmt.Sprintf("expected Active %s but got %s", print.PrettyPrintObject(expectActive, true), print.PrettyPrintObject(actual.Active, true)))
 	}
 	// check Error
 	if tc.expectConfigStatus.err != actual.Error {
@@ -1034,7 +1033,7 @@ func (tc *nodeConfigTestCase) checkConfig(f *framework.Framework) {
 			return fmt.Errorf("checkConfig: case %s: %v", tc.desc, err)
 		}
 		if !apiequality.Semantic.DeepEqual(tc.expectConfig, actual) {
-			return fmt.Errorf(spew.Sprintf("checkConfig: case %s: expected %#v but got %#v", tc.desc, tc.expectConfig, actual))
+			return fmt.Errorf("checkConfig: case %s: expected %s but got %s", tc.desc, print.PrettyPrintObject(tc.expectConfig, true), print.PrettyPrintObject(actual, true))
 		}
 		return nil
 	}, timeout, interval).Should(gomega.BeNil())
@@ -1186,7 +1185,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		}
 		// compare to expected
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
+			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, print.PrettyPrintObject(expect, true), print.PrettyPrintObject(actual, true))
 		}
 		return nil
 	}, timeout, interval).Should(gomega.BeNil())

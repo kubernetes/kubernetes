@@ -222,6 +222,7 @@ rules:
       - k8s.io/kubernetes/pkg/util/oom
       - k8s.io/kubernetes/pkg/util/parsers
       - k8s.io/kubernetes/pkg/util/pod
+      - k8s.io/kubernetes/pkg/util/print
       - k8s.io/kubernetes/pkg/util/procfs
       - k8s.io/kubernetes/pkg/util/removeall
       - k8s.io/kubernetes/pkg/util/resizefs
