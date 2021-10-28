@@ -158,33 +158,33 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, error)
 	)
 	if level, ok := labels[EnforceLevelLabel]; ok {
 		p.Enforce.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Enforce.Level")
+		errs = appendErr(errs, err, EnforceLevelLabel)
 	}
 	if version, ok := labels[EnforceVersionLabel]; ok {
 		p.Enforce.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Enforce.Version")
+		errs = appendErr(errs, err, EnforceVersionLabel)
 	}
 	if level, ok := labels[AuditLevelLabel]; ok {
 		p.Audit.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Audit.Level")
+		errs = appendErr(errs, err, AuditLevelLabel)
 		if err != nil {
 			p.Audit.Level = LevelPrivileged // Fail open for audit.
 		}
 	}
 	if version, ok := labels[AuditVersionLabel]; ok {
 		p.Audit.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Audit.Version")
+		errs = appendErr(errs, err, AuditVersionLabel)
 	}
 	if level, ok := labels[WarnLevelLabel]; ok {
 		p.Warn.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Warn.Level")
+		errs = appendErr(errs, err, WarnLevelLabel)
 		if err != nil {
 			p.Warn.Level = LevelPrivileged // Fail open for warn.
 		}
 	}
 	if version, ok := labels[WarnVersionLabel]; ok {
 		p.Warn.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Warn.Version")
+		errs = appendErr(errs, err, WarnVersionLabel)
 	}
 	return p, errors.NewAggregate(errs)
 }
