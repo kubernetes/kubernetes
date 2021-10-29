@@ -67,8 +67,18 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	}
 }
 
+type testWatchCache struct {
+	*watchCache
+}
+
+func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
+	w.watchCache.RLock()
+	defer w.watchCache.RUnlock()
+	return w.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
+}
+
 // newTestWatchCache just adds a fake clock.
-func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
+func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return storage.NamespaceKeyFunc("prefix", obj)
 	}
@@ -89,7 +99,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	wc.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
 	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
 
-	return wc
+	return &testWatchCache{watchCache: wc}
 }
 
 func TestWatchCacheBasic(t *testing.T) {
@@ -180,7 +190,7 @@ func TestEvents(t *testing.T) {
 
 	// Test for Added event.
 	{
-		_, err := store.GetAllEventsSince(1)
+		_, err := store.getAllEventsSince(1)
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
@@ -189,7 +199,7 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(2)
+		result, err := store.getAllEventsSince(2)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -213,13 +223,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with not full cache.
 	{
-		_, err := store.GetAllEventsSince(1)
+		_, err := store.getAllEventsSince(1)
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(3)
+		result, err := store.getAllEventsSince(3)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -247,13 +257,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with full cache - there should be elements from 5 to 9.
 	{
-		_, err := store.GetAllEventsSince(3)
+		_, err := store.getAllEventsSince(3)
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(4)
+		result, err := store.getAllEventsSince(4)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -272,7 +282,7 @@ func TestEvents(t *testing.T) {
 	store.Delete(makeTestPod("pod", uint64(10)))
 
 	{
-		result, err := store.GetAllEventsSince(9)
+		result, err := store.getAllEventsSince(9)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -302,13 +312,13 @@ func TestMarker(t *testing.T) {
 		makeTestPod("pod2", 9),
 	}, "9")
 
-	_, err := store.GetAllEventsSince(8)
+	_, err := store.getAllEventsSince(8)
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Getting events from 8 should return no events,
 	// even though there is a marker there.
-	result, err := store.GetAllEventsSince(9)
+	result, err := store.getAllEventsSince(9)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,7 +329,7 @@ func TestMarker(t *testing.T) {
 	pod := makeTestPod("pods", 12)
 	store.Add(pod)
 	// Getting events from 8 should still work and return one event.
-	result, err = store.GetAllEventsSince(9)
+	result, err = store.getAllEventsSince(9)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -782,7 +792,7 @@ func TestDynamicCache(t *testing.T) {
 	}
 }
 
-func loadEventWithDuration(cache *watchCache, count int, interval time.Duration) {
+func loadEventWithDuration(cache *testWatchCache, count int, interval time.Duration) {
 	for i := 0; i < count; i++ {
 		event := &watchCacheEvent{
 			Key:        fmt.Sprintf("event-%d", i+cache.startIndex),
@@ -793,7 +803,7 @@ func loadEventWithDuration(cache *watchCache, count int, interval time.Duration)
 	cache.endIndex = cache.startIndex + count
 }
 
-func checkCacheElements(cache *watchCache) bool {
+func checkCacheElements(cache *testWatchCache) bool {
 	for i := cache.startIndex; i < cache.endIndex; i++ {
 		location := i % cache.capacity
 		if cache.cache[location].Key != fmt.Sprintf("event-%d", i) {
@@ -829,7 +839,7 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	// Force cache resize.
 	addEvent("key4", 50, later.Add(time.Second))
 
-	_, err := store.GetAllEventsSince(15)
+	_, err := store.getAllEventsSince(15)
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
