@@ -296,7 +296,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 				fmt.Sprintf("--port=%d", containerPort),
 			},
 			ReadinessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Port:   intstr.FromInt(int(containerPort)),

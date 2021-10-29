@@ -5930,12 +5930,12 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 }
 
 func TestValidateProbe(t *testing.T) {
-	handler := core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}}
+	handler := core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}}
 	// These fields must be positive.
 	positiveFields := [...]string{"InitialDelaySeconds", "TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
 	successCases := []*core.Probe{nil}
 	for _, field := range positiveFields {
-		probe := &core.Probe{Handler: handler}
+		probe := &core.Probe{ProbeHandler: handler}
 		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(10)
 		successCases = append(successCases, probe)
 	}
@@ -5948,7 +5948,7 @@ func TestValidateProbe(t *testing.T) {
 
 	errorCases := []*core.Probe{{TimeoutSeconds: 10, InitialDelaySeconds: 10}}
 	for _, field := range positiveFields {
-		probe := &core.Probe{Handler: handler}
+		probe := &core.Probe{ProbeHandler: handler}
 		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(-10)
 		errorCases = append(errorCases, probe)
 	}
@@ -5982,7 +5982,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler: core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler: core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 				},
 				fldPath: fldPath,
 			},
@@ -5991,7 +5991,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:             core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:        core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					InitialDelaySeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6001,7 +6001,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:        core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:   core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TimeoutSeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6011,7 +6011,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					PeriodSeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6021,7 +6021,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:     core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					SuccessThreshold: -1,
 				},
 				fldPath: fldPath,
@@ -6031,7 +6031,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:     core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					FailureThreshold: -1,
 				},
 				fldPath: fldPath,
@@ -6041,7 +6041,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
 				},
 				fldPath: fldPath,
@@ -6051,7 +6051,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(0),
 				},
 				fldPath: fldPath,
@@ -6061,7 +6061,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(1),
 				},
 				fldPath: fldPath,
@@ -6087,7 +6087,7 @@ func Test_validateProbe(t *testing.T) {
 }
 
 func TestValidateHandler(t *testing.T) {
-	successCases := []core.Handler{
+	successCases := []core.ProbeHandler{
 		{Exec: &core.ExecAction{Command: []string{"echo"}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65535), Host: "host", Scheme: "HTTP"}},
@@ -6096,12 +6096,12 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
-		if errs := validateHandler(&h, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := []core.Handler{
+	errorCases := []core.ProbeHandler{
 		{},
 		{Exec: &core.ExecAction{Command: []string{}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
@@ -6111,7 +6111,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
-		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %#v", h)
 		}
 	}
@@ -6309,7 +6309,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						Lifecycle: &core.Lifecycle{
-							PreStop: &core.Handler{
+							PreStop: &core.LifecycleHandler{
 								Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
 							},
 						},
@@ -6328,7 +6328,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						LivenessProbe: &core.Probe{
-							Handler: core.Handler{
+							ProbeHandler: core.ProbeHandler{
 								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
 							},
 							SuccessThreshold: 1,
@@ -6365,7 +6365,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						ReadinessProbe: &core.Probe{
-							Handler: core.Handler{
+							ProbeHandler: core.ProbeHandler{
 								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
 							},
 						},
@@ -6584,7 +6584,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "life-123",
 			Image: "image",
 			Lifecycle: &core.Lifecycle{
-				PreStop: &core.Handler{
+				PreStop: &core.LifecycleHandler{
 					Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
 				},
 			},
@@ -6754,7 +6754,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						Exec: &core.ExecAction{},
 					},
 				},
@@ -6767,7 +6767,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						HTTPGet: &core.HTTPGetAction{},
 					},
 				},
@@ -6780,7 +6780,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 				},
@@ -6793,7 +6793,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						TCPSocket: &core.TCPSocketAction{
 							Port: intstr.FromInt(0),
 						},
@@ -6808,7 +6808,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{},
+					PreStop: &core.LifecycleHandler{},
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
@@ -6819,7 +6819,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				ReadinessProbe: &core.Probe{
-					Handler: core.Handler{
+					ProbeHandler: core.ProbeHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(10),
@@ -6833,7 +6833,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				LivenessProbe: &core.Probe{
-					Handler: core.Handler{
+					ProbeHandler: core.ProbeHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 				},
@@ -6846,7 +6846,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				LivenessProbe: &core.Probe{
-					Handler: core.Handler{},
+					ProbeHandler: core.ProbeHandler{},
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",

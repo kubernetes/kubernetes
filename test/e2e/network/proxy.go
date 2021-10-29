@@ -163,7 +163,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					"tlsdest2": 462,
 				},
 				ReadinessProbe: &v1.Probe{
-					Handler: v1.Handler{
+					ProbeHandler: v1.ProbeHandler{
 						HTTPGet: &v1.HTTPGetAction{
 							Port: intstr.FromInt(80),
 						},

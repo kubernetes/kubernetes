@@ -74,7 +74,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"netexec"},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							Exec: &v1.ExecAction{
 								Command: []string{
 									"sh", "-c", "netstat -na | grep LISTEN | grep -v 8080 | grep 80",

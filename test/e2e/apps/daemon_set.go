@@ -513,7 +513,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		}
 		// delay shutdown by 15s to allow containers to overlap in time
 		ds.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
-			PreStop: &v1.Handler{
+			PreStop: &v1.LifecycleHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{"/bin/sh", "-c", "sleep 15"},
 				},
@@ -521,7 +521,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		}
 		// use a readiness probe that can be forced to fail (by changing the contents of /var/tmp/ready)
 		ds.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
-			Handler: v1.Handler{
+			ProbeHandler: v1.ProbeHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{"/bin/sh", "-ec", `touch /var/tmp/ready; [[ "$( cat /var/tmp/ready )" == "" ]]`},
 				},
