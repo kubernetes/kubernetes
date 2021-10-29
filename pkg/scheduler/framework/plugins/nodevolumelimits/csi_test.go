@@ -547,13 +547,6 @@ func TestCSILimits(t *testing.T) {
 		},
 		// ephemeral volumes
 		{
-			newPod:      ephemeralVolumePod,
-			filterName:  "csi",
-			driverNames: []string{ebsCSIDriverName},
-			test:        "ephemeral volume feature disabled",
-			wantStatus:  framework.NewStatus(framework.Error, "volume xyz is a generic ephemeral volume, but that feature is disabled in kube-scheduler"),
-		},
-		{
 			newPod:           ephemeralVolumePod,
 			filterName:       "csi",
 			ephemeralEnabled: true,
@@ -568,7 +561,7 @@ func TestCSILimits(t *testing.T) {
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz is not owned by pod"),
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -657,8 +650,6 @@ func TestCSILimits(t *testing.T) {
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csitrans.New(),
-
-				enableGenericEphemeralVolume: test.ephemeralEnabled,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

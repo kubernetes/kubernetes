@@ -105,7 +105,6 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 

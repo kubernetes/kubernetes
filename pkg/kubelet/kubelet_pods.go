@@ -2038,9 +2038,6 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 		case volume.PersistentVolumeClaim != nil:
 			pvcName = volume.PersistentVolumeClaim.ClaimName
 		case volume.Ephemeral != nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-				continue
-			}
 			pvcName = ephemeral.VolumeClaimName(pod, &volume)
 		default:
 			continue

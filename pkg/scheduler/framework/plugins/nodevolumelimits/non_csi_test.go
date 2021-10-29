@@ -87,11 +87,6 @@ func TestEphemeralLimits(t *testing.T) {
 		wantStatus       *framework.Status
 	}{
 		{
-			newPod:     ephemeralVolumePod,
-			test:       "volume feature disabled",
-			wantStatus: framework.NewStatus(framework.Error, "volume xyz is a generic ephemeral volume, but that feature is disabled in kube-scheduler"),
-		},
-		{
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			test:             "volume missing",
@@ -102,7 +97,7 @@ func TestEphemeralLimits(t *testing.T) {
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			test:             "volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz is not owned by pod"),
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -123,9 +118,7 @@ func TestEphemeralLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			fts := feature.Features{
-				EnableGenericEphemeralVolume: test.ephemeralEnabled,
-			}
+			fts := feature.Features{}
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
 			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
