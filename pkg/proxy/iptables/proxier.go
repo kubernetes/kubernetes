@@ -1065,7 +1065,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Handle traffic that loops back to the originator with SNAT.
 			proxier.natRules.Write(
 				args,
-				"-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(epInfo.IP())),
+				"-s", epInfo.IP(),
 				"-j", string(KubeMarkMasqChain))
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
@@ -1104,7 +1104,7 @@ func (proxier *Proxier) syncProxyRules() {
 			args = append(args[:0],
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
-				"-d", utilproxy.ToCIDR(svcInfo.ClusterIP()),
+				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
 			)
 			if proxier.masqueradeAll {
@@ -1132,7 +1132,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 				"-m", protocol, "-p", protocol,
-				"-d", utilproxy.ToCIDR(svcInfo.ClusterIP()),
+				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
 				"-j", "REJECT",
 			)
@@ -1178,7 +1178,7 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args[:0],
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(externalIP)),
+					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
 
@@ -1214,7 +1214,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(externalIP)),
+					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", "REJECT",
 				)
@@ -1240,7 +1240,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
+					"-d", ingress,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
 				// jump to service firewall chain
@@ -1279,7 +1279,10 @@ func (proxier *Proxier) syncProxyRules() {
 					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
-						proxier.natRules.Write(args, "-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)), "-j", string(chosenChain))
+						proxier.natRules.Write(
+							args,
+							"-s", ingress,
+							"-j", string(chosenChain))
 					}
 				}
 
@@ -1292,7 +1295,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
+					"-d", ingress,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", "REJECT",
 				)
