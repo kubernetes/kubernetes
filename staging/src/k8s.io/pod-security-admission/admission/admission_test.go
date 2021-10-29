@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
@@ -765,12 +765,6 @@ func TestPrioritisePods(t *testing.T) {
 	a := &Admission{}
 	prioritisedPods := a.prioritisePods(pods)
 	controllerRef := make(map[types.UID]bool)
-
-	for i := 0; i < len(pods); i++ {
-		t.Log(metav1.GetControllerOfNoCopy(pods[i]).UID)
-		t.Log(metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID)
-		t.Log("\n")
-	}
 
 	for i := 0; i < len(sampleOwnerReferences); i++ {
 		if controllerRef[metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID] {

@@ -501,12 +501,19 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 	)
 
 	totalPods := len(pods)
-	checkedPods := len(pods)
 	if len(pods) > a.namespaceMaxPodsToCheck {
 		prioritisedPods = prioritisedPods[0:a.namespaceMaxPodsToCheck]
 	}
 
+	checkedPods := len(pods)
 	for i, pod := range prioritisedPods {
+		checkedPods = i + 1
+
+		// short-circuit on exempt runtimeclass
+		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
+			continue
+		}
+
 		r := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(enforce, &pod.ObjectMeta, &pod.Spec))
 		if !r.Allowed {
 			warning := r.ForbiddenReason()
@@ -521,7 +528,6 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 			podWarningsToCount[warning] = c
 		}
 		if err := ctx.Err(); err != nil { // deadline exceeded or context was cancelled
-			checkedPods = i + 1
 			break
 		}
 	}
@@ -682,18 +688,8 @@ func (a *Admission) exemptRuntimeClass(runtimeClass *string) bool {
 func (a *Admission) prioritisePods(pods []*corev1.Pod) []*corev1.Pod {
 	var replicatedPods []*corev1.Pod
 	var prioritisedPods []*corev1.Pod
-	totalEvaluatedPods := 0
 	evaluatedControllers := make(map[types.UID]bool)
 	for _, pod := range pods {
-		if totalEvaluatedPods == a.namespaceMaxPodsToCheck {
-			break
-		}
-
-		// short-circuit on exempt runtimeclass
-		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
-			continue
-		}
-
 		// short-circuit if pod from the same controller is evaluated
 		podOwnerControllerRef := metav1.GetControllerOfNoCopy(pod)
 		if podOwnerControllerRef == nil {
@@ -706,7 +702,6 @@ func (a *Admission) prioritisePods(pods []*corev1.Pod) []*corev1.Pod {
 		}
 		prioritisedPods = append(prioritisedPods, pod)
 		evaluatedControllers[podOwnerControllerRef.UID] = true
-		totalEvaluatedPods++
 	}
 	return append(prioritisedPods, replicatedPods...)
 }
