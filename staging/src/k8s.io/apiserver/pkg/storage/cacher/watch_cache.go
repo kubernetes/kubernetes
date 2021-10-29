@@ -632,12 +632,6 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 	return result, nil
 }
 
-func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	w.RLock()
-	defer w.RUnlock()
-	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
-}
-
 func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
