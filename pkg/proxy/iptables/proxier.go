@@ -1224,80 +1224,78 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture load-balancer ingress.
 		fwChain := svcInfo.serviceFirewallChainName
 		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
-			if ingress != "" {
-				if hasEndpoints {
-					// create service firewall chain
-					if chain, ok := existingNATChains[fwChain]; ok {
-						proxier.natChains.WriteBytes(chain)
-					} else {
-						proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
-					}
-					activeNATChains[fwChain] = true
-					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
-					// This currently works for loadbalancers that preserves source ips.
-					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-
-					args = append(args[:0],
-						"-A", string(kubeServicesChain),
-						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-						"-m", protocol, "-p", protocol,
-						"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
-						"--dport", strconv.Itoa(svcInfo.Port()),
-					)
-					// jump to service firewall chain
-					proxier.natRules.Write(args, "-j", string(fwChain))
-
-					args = append(args[:0],
-						"-A", string(fwChain),
-						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-					)
-
-					// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
-					chosenChain := svcXlbChain
-					// If we are proxying globally, we need to masquerade in case we cross nodes.
-					// If we are proxying only locally, we can retain the source IP.
-					if !svcInfo.NodeLocalExternal() {
-						proxier.natRules.Write(args, "-j", string(KubeMarkMasqChain))
-						chosenChain = svcChain
-					}
-
-					if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
-						// allow all sources, so jump directly to the KUBE-SVC or KUBE-XLB chain
-						proxier.natRules.Write(args, "-j", string(chosenChain))
-					} else {
-						// firewall filter based on each source range
-						allowFromNode := false
-						for _, src := range svcInfo.LoadBalancerSourceRanges() {
-							proxier.natRules.Write(args, "-s", src, "-j", string(chosenChain))
-							_, cidr, err := netutils.ParseCIDRSloppy(src)
-							if err != nil {
-								klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
-							} else if cidr.Contains(proxier.nodeIP) {
-								allowFromNode = true
-							}
-						}
-						// generally, ip route rule was added to intercept request to loadbalancer vip from the
-						// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
-						// Need to add the following rule to allow request on host.
-						if allowFromNode {
-							proxier.natRules.Write(args, "-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)), "-j", string(chosenChain))
-						}
-					}
-
-					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
-					// It means the packet cannot go thru the firewall, then mark it for DROP
-					proxier.natRules.Write(args, "-j", string(KubeMarkDropChain))
+			if hasEndpoints {
+				// create service firewall chain
+				if chain, ok := existingNATChains[fwChain]; ok {
+					proxier.natChains.WriteBytes(chain)
 				} else {
-					// No endpoints.
-					proxier.filterRules.Write(
-						"-A", string(kubeExternalServicesChain),
-						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
-						"-m", protocol, "-p", protocol,
-						"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
-						"--dport", strconv.Itoa(svcInfo.Port()),
-						"-j", "REJECT",
-					)
+					proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
 				}
+				activeNATChains[fwChain] = true
+				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
+				// This currently works for loadbalancers that preserves source ips.
+				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+
+				args = append(args[:0],
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
+					"--dport", strconv.Itoa(svcInfo.Port()),
+				)
+				// jump to service firewall chain
+				proxier.natRules.Write(args, "-j", string(fwChain))
+
+				args = append(args[:0],
+					"-A", string(fwChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
+				)
+
+				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
+				chosenChain := svcXlbChain
+				// If we are proxying globally, we need to masquerade in case we cross nodes.
+				// If we are proxying only locally, we can retain the source IP.
+				if !svcInfo.NodeLocalExternal() {
+					proxier.natRules.Write(args, "-j", string(KubeMarkMasqChain))
+					chosenChain = svcChain
+				}
+
+				if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
+					// allow all sources, so jump directly to the KUBE-SVC or KUBE-XLB chain
+					proxier.natRules.Write(args, "-j", string(chosenChain))
+				} else {
+					// firewall filter based on each source range
+					allowFromNode := false
+					for _, src := range svcInfo.LoadBalancerSourceRanges() {
+						proxier.natRules.Write(args, "-s", src, "-j", string(chosenChain))
+						_, cidr, err := netutils.ParseCIDRSloppy(src)
+						if err != nil {
+							klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
+						} else if cidr.Contains(proxier.nodeIP) {
+							allowFromNode = true
+						}
+					}
+					// generally, ip route rule was added to intercept request to loadbalancer vip from the
+					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
+					// Need to add the following rule to allow request on host.
+					if allowFromNode {
+						proxier.natRules.Write(args, "-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)), "-j", string(chosenChain))
+					}
+				}
+
+				// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
+				// It means the packet cannot go thru the firewall, then mark it for DROP
+				proxier.natRules.Write(args, "-j", string(KubeMarkDropChain))
+			} else {
+				// No endpoints.
+				proxier.filterRules.Write(
+					"-A", string(kubeExternalServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
+					"--dport", strconv.Itoa(svcInfo.Port()),
+					"-j", "REJECT",
+				)
 			}
 		}
 
