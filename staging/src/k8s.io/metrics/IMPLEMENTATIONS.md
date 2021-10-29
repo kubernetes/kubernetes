@@ -39,3 +39,5 @@ They are listed here for convenience.***
   They are listed here for convenience.***
 
  - [KEDA](https://github.com/kedacore/keda). A Kubernetes-based Event Driven Autoscaling component. It provides event driven scale for any container running in Kubernetes.
+
+- [New Relic Metrics Adapter](https://github.com/newrelic/newrelic-k8s-metrics-adapter). Implementation of the external metrics provider. It provides the capability to autoscale the cluster using New Relic telemetry data like infrastucture services or applications. More information [here](https://docs.newrelic.com/docs/kubernetes-pixie/kubernetes-integration/newrelic-hpa-metrics-adapter/newrelic-metrics-adapter/).
