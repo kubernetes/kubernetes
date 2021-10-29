@@ -36,7 +36,6 @@ const (
 	numIterations         = 100
 )
 
-
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
    it, checking that the count in the sampling histogram is correct at

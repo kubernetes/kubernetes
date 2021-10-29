@@ -29,7 +29,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
 		SampleCount: uint64Ptr(0),
@@ -576,7 +575,6 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			}
 			vec := metrics.NewHistogramVec(HistogramOpts, labels)
 			legacyregistry.Register(vec)
-
 			// Observe two metrics with same value for label1 but different value of label2.
 			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
 			vec.WithLabelValues("value1-0", "value2-1").Observe(2.5)
