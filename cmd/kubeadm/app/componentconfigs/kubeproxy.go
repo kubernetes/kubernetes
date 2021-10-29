@@ -118,3 +118,8 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, kp.config.ClientConnection.Kubeconfig)
 	}
 }
+
+// Mutate is NOP for the kube-proxy config
+func (kp *kubeProxyConfig) Mutate() error {
+	return nil
+}

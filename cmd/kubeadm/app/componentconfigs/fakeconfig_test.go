@@ -110,6 +110,10 @@ func (cc *clusterConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadma
 	cc.config.KubernetesVersion = "bar"
 }
 
+func (cc *clusterConfig) Mutate() error {
+	return nil
+}
+
 // fakeKnown replaces temporarily during the execution of each test here known (in configset.go)
 var fakeKnown = []*handler{
 	&clusterConfigHandler,
