@@ -19,7 +19,6 @@ package scale
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"sync"
 	"time"
 
@@ -315,7 +314,7 @@ func (f *IngressScaleFramework) dumpLatencies() {
 	formattedData := f.GetFormattedLatencies()
 	if f.OutputFile != "" {
 		f.Logger.Infof("Dumping scale test latencies to file %s...", f.OutputFile)
-		ioutil.WriteFile(f.OutputFile, []byte(formattedData), 0644)
+		os.WriteFile(f.OutputFile, []byte(formattedData), 0644)
 		return
 	}
 	f.Logger.Infof("\n%v", formattedData)

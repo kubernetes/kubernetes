@@ -19,7 +19,6 @@ package dns
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -452,7 +451,7 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 			}
 		}
 	}
-	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+	if err := os.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
 		klog.ErrorS(err, "Could not write dns nameserver in the file", "path", resolvePath)
 	}
 }

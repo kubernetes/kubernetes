@@ -18,7 +18,6 @@ package devicemanager
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -52,7 +51,7 @@ const (
 )
 
 func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
-	socketDir, err = ioutil.TempDir("", "device_plugin")
+	socketDir, err = os.MkdirTemp("", "device_plugin")
 	if err != nil {
 		return
 	}
@@ -564,7 +563,7 @@ func TestCheckpoint(t *testing.T) {
 	resourceName2 := "domain2.com/resource2"
 	resourceName3 := "domain2.com/resource3"
 	as := assert.New(t)
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
@@ -882,7 +881,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
@@ -980,7 +979,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1071,7 +1070,7 @@ func TestUpdatePluginResources(t *testing.T) {
 
 	as := assert.New(t)
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1126,7 +1125,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1188,7 +1187,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 func TestResetExtendedResource(t *testing.T) {
 	as := assert.New(t)
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)

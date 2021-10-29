@@ -24,7 +24,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -76,7 +76,7 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 	if !filepath.IsAbs(fname) {
 		return nil, fmt.Errorf("seccomp profile path must be absolute, but got relative path %q", fname)
 	}
-	file, err := ioutil.ReadFile(filepath.FromSlash(fname))
+	file, err := os.ReadFile(filepath.FromSlash(fname))
 	if err != nil {
 		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", fname, err)
 	}

@@ -19,7 +19,6 @@ package guestbook
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -278,7 +277,7 @@ func dialHTTP(request, hostPort string) (string, error) {
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), nil
 		}

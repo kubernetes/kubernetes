@@ -400,7 +400,7 @@ func handleSecretFromEnvFileSources(secret *corev1.Secret, envFileSources []stri
 // addKeyFromFileToSecret adds a key with the given name to a Secret, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToSecret(secret *corev1.Secret, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

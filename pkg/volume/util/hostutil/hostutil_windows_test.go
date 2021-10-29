@@ -20,7 +20,6 @@ limitations under the License.
 package hostutil
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -37,7 +36,7 @@ func TestGetFileType(t *testing.T) {
 			"Directory Test",
 			FileTypeDirectory,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				return tempDir, tempDir, err
 			},
 		},
@@ -45,7 +44,7 @@ func TestGetFileType(t *testing.T) {
 			"File Test",
 			FileTypeFile,
 			func() (string, string, error) {
-				tempFile, err := ioutil.TempFile("", "test-get-filetype")
+				tempFile, err := os.CreateTemp("", "test-get-filetype")
 				if err != nil {
 					return "", "", err
 				}

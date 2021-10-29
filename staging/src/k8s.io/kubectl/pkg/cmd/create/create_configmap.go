@@ -379,7 +379,7 @@ func handleConfigMapFromEnvFileSources(configMap *corev1.ConfigMap, envFileSourc
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToConfigMap(configMap *corev1.ConfigMap, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

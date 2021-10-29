@@ -19,7 +19,6 @@ package delete
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,7 +103,7 @@ func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPro
 		return body == nil && policy == nil
 	}
 	var parsedBody metav1.DeleteOptions
-	rawBody, _ := ioutil.ReadAll(body)
+	rawBody, _ := io.ReadAll(body)
 	json.Unmarshal(rawBody, &parsedBody)
 	if parsedBody.PropagationPolicy == nil {
 		return false

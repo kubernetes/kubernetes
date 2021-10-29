@@ -21,7 +21,7 @@ package cm
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -134,7 +134,7 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 
 // getMemoryCapacity returns the memory capacity on the machine in bytes.
 func getMemoryCapacity() (uint64, error) {
-	out, err := ioutil.ReadFile("/proc/meminfo")
+	out, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, err
 	}

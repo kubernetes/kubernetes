@@ -18,7 +18,7 @@ package disk
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,7 +42,7 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 func TestCacheRoundTripper(t *testing.T) {
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	defer os.RemoveAll(cacheDir)
 	if err != nil {
 		t.Fatal(err)
@@ -56,14 +56,14 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
 		StatusCode: http.StatusOK,
 	}
 	resp, err := cache.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		StatusCode: http.StatusNotModified,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Other Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Other Content"))),
 	}
 
 	resp, err = cache.RoundTrip(req)
@@ -87,7 +87,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 
 	// Read body and make sure we have the initial content
-	content, err = ioutil.ReadAll(resp.Body)
+	content, err = io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	assert := assert.New(t)
 
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	os.RemoveAll(cacheDir)
 	defer os.RemoveAll(cacheDir)
 
@@ -117,14 +117,14 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
 		StatusCode: http.StatusOK,
 	}
 	resp, err := cache.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

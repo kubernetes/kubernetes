@@ -26,7 +26,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -177,7 +176,7 @@ func SimpleGET(c *http.Client, url, host string) (string, error) {
 		return "", err
 	}
 	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
+	rawBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", err
 	}
@@ -532,7 +531,7 @@ func ingressToManifest(ing *networkingv1.Ingress, path string) error {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}
 
-	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+	if err := os.WriteFile(path, serialized, 0600); err != nil {
 		return fmt.Errorf("error in writing ingress to file: %s", err)
 	}
 	return nil

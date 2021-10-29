@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -81,7 +80,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 

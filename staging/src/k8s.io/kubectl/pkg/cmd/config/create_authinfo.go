@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -216,7 +215,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientCertificate.Provided() {
 		certPath := o.clientCertificate.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
+			modifiedAuthInfo.ClientCertificateData, _ = os.ReadFile(certPath)
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
 			certPath, _ = filepath.Abs(certPath)
@@ -229,7 +228,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientKey.Provided() {
 		keyPath := o.clientKey.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
+			modifiedAuthInfo.ClientKeyData, _ = os.ReadFile(keyPath)
 			modifiedAuthInfo.ClientKey = ""
 		} else {
 			keyPath, _ = filepath.Abs(keyPath)

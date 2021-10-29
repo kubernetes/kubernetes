@@ -18,7 +18,6 @@ package dns
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -595,7 +594,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 	}
 
 	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
-	tmpfile, err := ioutil.TempFile("", "tmpResolvConf")
+	tmpfile, err := os.CreateTemp("", "tmpResolvConf")
 	if err != nil {
 		t.Fatal(err)
 	}

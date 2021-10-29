@@ -19,7 +19,6 @@ package genericclioptions
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -32,7 +31,7 @@ import (
 func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
 	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
-	templateFile, err := ioutil.TempFile("", "printers_jsonpath_flags")
+	templateFile, err := os.CreateTemp("", "printers_jsonpath_flags")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

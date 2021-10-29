@@ -18,7 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -225,7 +225,7 @@ func TestRunHandlerExecFailure(t *testing.T) {
 func TestRunHandlerHttpFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("fake http error")
 	expectedResp := http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error())),
+		Body: io.NopCloser(strings.NewReader(expectedErr.Error())),
 	}
 	fakeHTTPGetter := fakeHTTP{err: expectedErr, resp: &expectedResp}
 	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil)

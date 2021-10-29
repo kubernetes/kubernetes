@@ -765,7 +765,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			return nil
 		}
 
-		content, err := ioutil.ReadFile(path)
+		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

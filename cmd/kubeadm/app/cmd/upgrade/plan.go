@@ -19,7 +19,6 @@ package upgrade
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -185,7 +184,7 @@ func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, clien
 	docmap := kubeadmapi.DocumentMap{}
 
 	if cfgPath != "" {
-		bytes, err := ioutil.ReadFile(cfgPath)
+		bytes, err := os.ReadFile(cfgPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read config file %q", cfgPath)
 		}

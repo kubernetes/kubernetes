@@ -19,7 +19,6 @@ package run
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -180,7 +179,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+						Body:       io.NopCloser(bytes.NewBuffer([]byte("{}"))),
 					}, nil
 				}),
 			}
@@ -338,7 +337,7 @@ func TestGenerateService(t *testing.T) {
 					case test.expectPOST && m == "POST" && p == "/namespaces/test/services":
 						sawPOST = true
 						body := cmdtesting.ObjBody(codec, &test.service)
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}
@@ -569,7 +568,7 @@ func TestExpose(t *testing.T) {
 						body := cmdtesting.ObjBody(codec, pod)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case m == "POST" && p == "/namespaces/test/services":
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}

@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -261,10 +260,10 @@ func TestAdditionalAuth(t *testing.T) {
 }
 
 func TestEmbedClientCert(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile(os.TempDir(), "")
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
 	defer os.Remove(fakeCertFile.Name())
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificateData = fakeData
@@ -280,10 +279,10 @@ func TestEmbedClientCert(t *testing.T) {
 }
 
 func TestEmbedClientKey(t *testing.T) {
-	fakeKeyFile, _ := ioutil.TempFile(os.TempDir(), "")
+	fakeKeyFile, _ := os.CreateTemp(os.TempDir(), "")
 	defer os.Remove(fakeKeyFile.Name())
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
+	os.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientKeyData = fakeData
@@ -326,7 +325,7 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 }
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile(os.TempDir(), "cert-file")
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "cert-file")
 	defer os.Remove(fakeCertFile.Name())
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
@@ -569,7 +568,7 @@ func TestUnsetBytes(t *testing.T) {
 }
 
 func TestCAClearsInsecure(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile(os.TempDir(), "ca-file")
+	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "ca-file")
 	defer os.Remove(fakeCAFile.Name())
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
@@ -638,10 +637,10 @@ func TestInsecureClearsCA(t *testing.T) {
 }
 
 func TestCADataClearsCA(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile(os.TempDir(), "")
+	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "")
 	defer os.Remove(fakeCAFile.Name())
 	fakeData := []byte("cadata")
-	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
+	os.WriteFile(fakeCAFile.Name(), fakeData, 0600)
 
 	clusterInfoWithCAData := clientcmdapi.NewCluster()
 	clusterInfoWithCAData.CertificateAuthorityData = fakeData
@@ -852,7 +851,7 @@ func TestToBool(t *testing.T) {
 }
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
-	fakeKubeFile, _ := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
 	defer os.Remove(fakeKubeFile.Name())
 	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
 	if err != nil {

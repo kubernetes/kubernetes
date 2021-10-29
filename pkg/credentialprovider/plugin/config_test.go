@@ -17,7 +17,6 @@ limitations under the License.
 package plugin
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -225,7 +224,7 @@ providers:
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "config.yaml")
+			file, err := os.CreateTemp("", "config.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}

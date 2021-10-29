@@ -272,7 +272,7 @@ func scsiHostRescan() {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
-			ioutil.WriteFile(name, data, 0666)
+			os.WriteFile(name, data, 0666)
 		}
 	}
 }

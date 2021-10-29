@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -128,7 +127,7 @@ func checkURL(url string, header http.Header, expectedStatus int, expectedToCont
 	if resp.StatusCode != expectedStatus {
 		return fmt.Errorf("unexpected response: got %d, want %d", resp.StatusCode, expectedStatus)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

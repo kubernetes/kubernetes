@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -60,7 +59,7 @@ var (
 )
 
 func stringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+	return io.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func watchBody(events ...watch.Event) string {
@@ -413,7 +412,7 @@ func createTestDir(t *testing.T, path string) {
 }
 
 func writeTestFile(t *testing.T, path string, contents string) {
-	if err := ioutil.WriteFile(path, []byte(contents), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
 		t.Fatalf("error creating test file %#v", err)
 	}
 }
@@ -614,7 +613,7 @@ func TestDirectoryBuilder(t *testing.T) {
 }
 
 func setupKustomizeDirectory() (string, error) {
-	path, err := ioutil.TempDir("/tmp", "")
+	path, err := os.MkdirTemp("/tmp", "")
 	if err != nil {
 		return "", err
 	}
@@ -685,7 +684,7 @@ resources:
 	}
 
 	for filename, content := range contents {
-		err = ioutil.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
+		err = os.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
 		if err != nil {
 			return "", err
 		}

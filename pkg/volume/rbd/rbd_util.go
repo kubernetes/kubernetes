@@ -88,7 +88,7 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 			name := f.Name()
 			// First match pool, then match name.
 			poolFile := filepath.Join(sysPath, name, "pool")
-			poolBytes, err := ioutil.ReadFile(poolFile)
+			poolBytes, err := os.ReadFile(poolFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", poolFile, err)
 				continue
@@ -98,7 +98,7 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 				continue
 			}
 			imgFile := filepath.Join(sysPath, name, "name")
-			imgBytes, err := ioutil.ReadFile(imgFile)
+			imgBytes, err := os.ReadFile(imgFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", imgFile, err)
 				continue
@@ -129,7 +129,7 @@ func getMaxNbds() (int, error) {
 
 	klog.V(4).Infof("found nbds max parameters file at %s", maxNbdsPath)
 
-	maxNbdBytes, err := ioutil.ReadFile(maxNbdsPath)
+	maxNbdBytes, err := os.ReadFile(maxNbdsPath)
 	if err != nil {
 		return 0, fmt.Errorf("rbd-nbd: failed to read max_nbds from %s err: %q", maxNbdsPath, err)
 	}
@@ -167,13 +167,13 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 			klog.V(4).Infof("error reading nbd info directory %s: %v", nbdPath, err)
 			continue
 		}
-		pidBytes, err := ioutil.ReadFile(filepath.Join(nbdPath, "pid"))
+		pidBytes, err := os.ReadFile(filepath.Join(nbdPath, "pid"))
 		if err != nil {
 			klog.V(5).Infof("did not find valid pid file in dir %s: %v", nbdPath, err)
 			continue
 		}
 		cmdlineFileName := filepath.Join("/proc", strings.TrimSpace(string(pidBytes)), "cmdline")
-		rawCmdline, err := ioutil.ReadFile(cmdlineFileName)
+		rawCmdline, err := os.ReadFile(cmdlineFileName)
 		if err != nil {
 			klog.V(4).Infof("failed to read cmdline file %s: %v", cmdlineFileName, err)
 			continue

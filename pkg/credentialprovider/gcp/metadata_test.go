@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -35,11 +34,11 @@ import (
 )
 
 func createProductNameFile() (string, error) {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary test file: %v", err)
 	}
-	return file.Name(), ioutil.WriteFile(file.Name(), []byte("Google"), 0600)
+	return file.Name(), os.WriteFile(file.Name(), []byte("Google"), 0600)
 }
 
 // The tests here are run in this fashion to ensure TestAllProvidersNoMetadata

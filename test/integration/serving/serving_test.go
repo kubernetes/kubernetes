@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -90,7 +89,7 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 
 	// authenticate to apiserver via bearer token
 	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
-	tokenFile, err := ioutil.TempFile("", "kubeconfig")
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +106,7 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 	defer server.TearDownFn()
 
 	// create kubeconfig for the apiserver
-	apiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +132,7 @@ users:
 	apiserverConfig.Close()
 
 	// create BROKEN kubeconfig for the apiserver
-	brokenApiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	brokenApiserverConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +272,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := ioutil.ReadFile(serverCertPath)
+				serverCert, err := os.ReadFile(serverCertPath)
 				if err != nil {
 					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
@@ -297,7 +296,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}
@@ -315,7 +314,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				if err != nil {
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}
@@ -396,7 +395,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := ioutil.ReadFile(serverCertPath)
+				serverCert, err := os.ReadFile(serverCertPath)
 				if err != nil {
 					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
@@ -420,7 +419,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}

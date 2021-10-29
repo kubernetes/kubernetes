@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -146,7 +145,7 @@ func newTestGOAWAYServer() (*httptest.Server, error) {
 		return
 	})
 	postHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqBody, err := ioutil.ReadAll(r.Body)
+		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -212,7 +211,7 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body and status code is %d, error: %v", resp.StatusCode, err)
 		}
@@ -252,7 +251,7 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body, error: %v", err)
 	}

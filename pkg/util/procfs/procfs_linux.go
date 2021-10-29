@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -61,7 +60,7 @@ func containerNameFromProcCgroup(content string) (string, error) {
 // return docker/nginx. Assumes that the process is part of exactly one cgroup hierarchy.
 func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 	filePath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", os.ErrNotExist
@@ -138,7 +137,7 @@ func getPids(re *regexp.Regexp) []int {
 				continue
 			}
 
-			cmdline, err := ioutil.ReadFile(filepath.Join("/proc", entry.Name(), "cmdline"))
+			cmdline, err := os.ReadFile(filepath.Join("/proc", entry.Name(), "cmdline"))
 			if err != nil {
 				klog.V(4).Infof("Error reading file %s: %+v", filepath.Join("/proc", entry.Name(), "cmdline"), err)
 				continue

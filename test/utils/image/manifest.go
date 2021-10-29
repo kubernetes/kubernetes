@@ -20,7 +20,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -73,7 +72,7 @@ func initReg() RegistryList {
 		return registry
 	}
 
-	fileContent, err := ioutil.ReadFile(repoList)
+	fileContent, err := os.ReadFile(repoList)
 	if err != nil {
 		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
 	}

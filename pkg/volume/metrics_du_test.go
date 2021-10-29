@@ -20,7 +20,6 @@ limitations under the License.
 package volume_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -74,7 +73,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	}
 
 	// Write a file and expect Used to increase
-	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
+	os.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
 	actual, err = metrics.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)

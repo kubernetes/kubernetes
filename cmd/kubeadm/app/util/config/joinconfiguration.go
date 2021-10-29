@@ -17,9 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
-
 	"github.com/pkg/errors"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -75,7 +74,7 @@ func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
-	b, err := ioutil.ReadFile(cfgPath)
+	b, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}

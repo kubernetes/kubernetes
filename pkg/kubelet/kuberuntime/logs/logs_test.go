@@ -19,7 +19,6 @@ package logs
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/utils/pointer"
 	"os"
@@ -72,7 +71,7 @@ func TestLogOptions(t *testing.T) {
 }
 
 func TestReadLogs(t *testing.T) {
-	file, err := ioutil.TempFile("", "TestFollowLogs")
+	file, err := os.CreateTemp("", "TestFollowLogs")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}

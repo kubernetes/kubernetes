@@ -26,7 +26,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"regexp"
 	"sync"
 	"time"
@@ -562,10 +561,10 @@ func (d *kubeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON,
 // only be redirected to stdout.
 func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
 	if outputStream == nil {
-		outputStream = ioutil.Discard
+		outputStream = io.Discard
 	}
 	if errorStream == nil {
-		errorStream = ioutil.Discard
+		errorStream = io.Discard
 	}
 	var err error
 	if tty {

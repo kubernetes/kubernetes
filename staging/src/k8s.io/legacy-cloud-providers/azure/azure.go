@@ -22,7 +22,6 @@ package azure
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -648,7 +647,7 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 		return nil, nil
 	}
 
-	configContents, err := ioutil.ReadAll(configReader)
+	configContents, err := io.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}

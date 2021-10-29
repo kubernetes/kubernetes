@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,7 +49,7 @@ controlPlaneEndpoint: "3.4.5.6"
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
-	tmpDir, err := ioutil.TempDir("", "kubeadm-init-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-init-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}

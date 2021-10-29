@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -391,7 +390,7 @@ func dialHTTP(request string, addr net.Addr) (string, error) {
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), nil
 		}
@@ -489,7 +488,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	f, err := ioutil.TempFile("/uploads", "upload")
+	f, err := os.CreateTemp("/uploads", "upload")
 	if err != nil {
 		result["error"] = "Unable to open file for write"
 		bytes, err := json.Marshal(result)

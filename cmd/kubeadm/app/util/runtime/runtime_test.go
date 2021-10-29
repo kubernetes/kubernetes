@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
@@ -337,7 +336,7 @@ func TestIsExistingSocket(t *testing.T) {
 		{
 			name: "Valid domain socket is detected as such",
 			proc: func(t *testing.T) {
-				tmpFile, err := ioutil.TempFile("", tempPrefix)
+				tmpFile, err := os.CreateTemp("", tempPrefix)
 				if err != nil {
 					t.Fatalf("unexpected error by TempFile: %v", err)
 				}
@@ -359,7 +358,7 @@ func TestIsExistingSocket(t *testing.T) {
 		{
 			name: "Regular file is not a domain socket",
 			proc: func(t *testing.T) {
-				tmpFile, err := ioutil.TempFile("", tempPrefix)
+				tmpFile, err := os.CreateTemp("", tempPrefix)
 				if err != nil {
 					t.Fatalf("unexpected error by TempFile: %v", err)
 				}

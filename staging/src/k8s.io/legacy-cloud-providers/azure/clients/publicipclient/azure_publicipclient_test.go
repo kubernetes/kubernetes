@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -70,7 +69,7 @@ func TestGet(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -126,7 +125,7 @@ func TestGetNotFound(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -147,7 +146,7 @@ func TestGetInternalError(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -168,7 +167,7 @@ func TestGetThrottle(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,
@@ -200,7 +199,7 @@ func TestGetVMSSPublicIPAddress(t *testing.T) {
 	assert.NoError(t, err)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewReader(pip)),
+		Body:       io.NopCloser(bytes.NewReader(pip)),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -261,7 +260,7 @@ func TestGetVMSSPublicIPAddressNotFound(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic/ipconfigurations/ipConfig/publicipaddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResourceWithDecorators(gomock.Any(), resourceID, gomock.Any()).Return(response, nil).Times(1)
@@ -282,7 +281,7 @@ func TestGetVMSSPublicIPAddressInternalError(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic/ipconfigurations/ipConfig/publicipaddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResourceWithDecorators(gomock.Any(), resourceID, gomock.Any()).Return(response, nil).Times(1)
@@ -304,7 +303,7 @@ func TestGetVMSSPublicIPAddressThrottle(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic/ipconfigurations/ipConfig/publicipaddresses/pip1"
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,
@@ -334,7 +333,7 @@ func TestList(t *testing.T) {
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(responseBody)),
+			Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
@@ -351,7 +350,7 @@ func TestListNotFound(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses"
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -372,7 +371,7 @@ func TestListInternalError(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses"
 	response := &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -394,7 +393,7 @@ func TestListThrottle(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,
@@ -423,7 +422,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
-			Body:       ioutil.NopCloser(bytes.NewReader(responseBody)),
+			Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 	pipClient := getTestPublicIPAddressClient(armClient)
@@ -447,12 +446,12 @@ func TestListWithNextPage(t *testing.T) {
 	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+			Body:       io.NopCloser(bytes.NewReader(pagedResponse)),
 		}, nil)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(partialResponse)),
+			Body:       io.NopCloser(bytes.NewReader(partialResponse)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
 	pipClient := getTestPublicIPAddressClient(armClient)
@@ -529,7 +528,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		if test.prepareErr == nil {
 			armClient.EXPECT().Send(gomock.Any(), req).Return(&http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
+				Body:       io.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
 			}, test.sendErr)
 			armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any())
 		}
@@ -573,14 +572,14 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	if test.prepareErr == nil {
 		armClient.EXPECT().Send(gomock.Any(), req).Return(&http.Response{
 			StatusCode: http.StatusNotFound,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
 		}, test.sendErr)
 		armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any())
 	}
 
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(`{"foo":"bar"}`))),
+		Body:       io.NopCloser(bytes.NewBuffer([]byte(`{"foo":"bar"}`))),
 	}
 	expected := network.PublicIPAddressListResult{}
 	expected.Response = autorest.Response{Response: response}
@@ -598,7 +597,7 @@ func TestCreateOrUpdate(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+		Body:       io.NopCloser(bytes.NewReader([]byte(""))),
 	}
 	armClient.EXPECT().PutResource(gomock.Any(), to.String(pip.ID), pip).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
@@ -615,7 +614,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+		Body:       io.NopCloser(bytes.NewReader([]byte(""))),
 	}
 	armClient.EXPECT().PutResource(gomock.Any(), to.String(pip.ID), pip).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
@@ -666,7 +665,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,

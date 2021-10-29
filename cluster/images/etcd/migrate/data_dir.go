@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,7 +127,7 @@ func (v *VersionFile) Exists() (bool, error) {
 
 // Read parses the version.txt file and returns it's contents.
 func (v *VersionFile) Read() (*EtcdVersionPair, error) {
-	data, err := ioutil.ReadFile(v.path)
+	data, err := os.ReadFile(v.path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version file %s: %v", v.path, err)
 	}
@@ -143,7 +142,7 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
 	data := []byte(fmt.Sprintf("%s/%s", vp.version, vp.storageVersion))
-	return ioutil.WriteFile(v.path, data, 0666)
+	return os.WriteFile(v.path, data, 0666)
 }
 
 func exists(path string) (bool, error) {

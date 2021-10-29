@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -117,7 +116,7 @@ func TestGet(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster"
 	response := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -176,7 +175,7 @@ func TestGetThrottle(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster"
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,
@@ -201,7 +200,7 @@ func TestGetNotFound(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster"
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -222,7 +221,7 @@ func TestGetInternalError(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster"
 	response := &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, nil).Times(1)
@@ -248,7 +247,7 @@ func TestList(t *testing.T) {
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(responseBody)),
+			Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
@@ -292,7 +291,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		if test.prepareErr == nil {
 			armClient.EXPECT().Send(gomock.Any(), req).Return(&http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
+				Body:       io.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
 			}, test.sendErr)
 			armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any())
 		}
@@ -336,14 +335,14 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	if test.prepareErr == nil {
 		armClient.EXPECT().Send(gomock.Any(), req).Return(&http.Response{
 			StatusCode: http.StatusNotFound,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))),
 		}, test.sendErr)
 		armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any())
 	}
 
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(`{"foo":"bar"}`))),
+		Body:       io.NopCloser(bytes.NewBuffer([]byte(`{"foo":"bar"}`))),
 	}
 	expected := containerservice.ManagedClusterListResult{}
 	expected.Response = autorest.Response{Response: response}
@@ -365,7 +364,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
-			Body:       ioutil.NopCloser(bytes.NewReader(responseBody)),
+			Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 	mcClient := getTestManagedClusterClient(armClient)
@@ -391,12 +390,12 @@ func TestListWithNextPage(t *testing.T) {
 	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+			Body:       io.NopCloser(bytes.NewReader(pagedResponse)),
 		}, nil)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewReader(responseBody)),
+			Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		}, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
 	mcClient := getTestManagedClusterClient(armClient)
@@ -447,7 +446,7 @@ func TestListThrottle(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters"
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,
@@ -474,7 +473,7 @@ func TestCreateOrUpdate(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+		Body:       io.NopCloser(bytes.NewReader([]byte(""))),
 	}
 	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(mc.ID), mc, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
@@ -491,7 +490,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
 		StatusCode: http.StatusNotFound,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+		Body:       io.NopCloser(bytes.NewReader([]byte(""))),
 	}
 	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(mc.ID), mc, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
@@ -544,7 +543,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 
 	response := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	throttleErr := &retry.Error{
 		HTTPStatusCode: http.StatusTooManyRequests,

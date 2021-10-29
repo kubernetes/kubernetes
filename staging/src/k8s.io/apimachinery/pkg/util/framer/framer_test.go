@@ -19,7 +19,6 @@ package framer
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 )
 
@@ -34,7 +33,7 @@ func TestRead(t *testing.T) {
 		0x08,
 	}
 	b := bytes.NewBuffer(data)
-	r := NewLengthDelimitedFrameReader(ioutil.NopCloser(b))
+	r := NewLengthDelimitedFrameReader(io.NopCloser(b))
 	buf := make([]byte, 1)
 	if n, err := r.Read(buf); err != io.ErrShortBuffer && n != 1 && bytes.Equal(buf, []byte{0x01}) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
@@ -79,7 +78,7 @@ func TestReadLarge(t *testing.T) {
 		0x08,
 	}
 	b := bytes.NewBuffer(data)
-	r := NewLengthDelimitedFrameReader(ioutil.NopCloser(b))
+	r := NewLengthDelimitedFrameReader(io.NopCloser(b))
 	buf := make([]byte, 40)
 	if n, err := r.Read(buf); err != nil && n != 4 && bytes.Equal(buf, []byte{0x01, 0x02, 0x03, 0x04}) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
@@ -104,7 +103,7 @@ func TestReadInvalidFrame(t *testing.T) {
 		0x01, 0x02,
 	}
 	b := bytes.NewBuffer(data)
-	r := NewLengthDelimitedFrameReader(ioutil.NopCloser(b))
+	r := NewLengthDelimitedFrameReader(io.NopCloser(b))
 	buf := make([]byte, 1)
 	if n, err := r.Read(buf); err != io.ErrShortBuffer && n != 1 && bytes.Equal(buf, []byte{0x01}) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
@@ -122,7 +121,7 @@ func TestReadInvalidFrame(t *testing.T) {
 
 func TestJSONFrameReader(t *testing.T) {
 	b := bytes.NewBufferString("{\"test\":true}\n1\n[\"a\"]")
-	r := NewJSONFramedReader(ioutil.NopCloser(b))
+	r := NewJSONFramedReader(io.NopCloser(b))
 	buf := make([]byte, 20)
 	if n, err := r.Read(buf); err != nil || n != 13 || string(buf[:n]) != `{"test":true}` {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
@@ -140,7 +139,7 @@ func TestJSONFrameReader(t *testing.T) {
 
 func TestJSONFrameReaderShortBuffer(t *testing.T) {
 	b := bytes.NewBufferString("{\"test\":true}\n1\n[\"a\"]")
-	r := NewJSONFramedReader(ioutil.NopCloser(b))
+	r := NewJSONFramedReader(io.NopCloser(b))
 	buf := make([]byte, 3)
 
 	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `{"t` {

@@ -18,7 +18,7 @@ package winuserspace
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -168,7 +168,7 @@ func testEchoTCP(t *testing.T, address string, port int) {
 		t.Fatalf("error connecting to server: %v", err)
 	}
 	defer res.Body.Close()
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Errorf("error reading data: %v %v", err, string(data))
 	}

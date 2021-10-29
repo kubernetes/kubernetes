@@ -35,7 +35,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -349,7 +348,7 @@ func contactSingle(e string, state *State) {
 	}
 	defer resp.Body.Close()
 
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		state.Logf("Warning: unable to read response from '%v': '%v'", e, err)
 		return

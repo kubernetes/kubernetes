@@ -19,7 +19,6 @@ package cert
 import (
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -66,13 +65,13 @@ func WriteCert(certPath string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(certPath, data, os.FileMode(0644))
+	return os.WriteFile(certPath, data, os.FileMode(0644))
 }
 
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func NewPool(filename string) (*x509.CertPool, error) {
-	pemBlock, err := ioutil.ReadFile(filename)
+	pemBlock, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func NewPoolFromBytes(pemBlock []byte) (*x509.CertPool, error) {
 // CertsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func CertsFromFile(file string) ([]*x509.Certificate, error) {
-	pemBlock, err := ioutil.ReadFile(file)
+	pemBlock, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

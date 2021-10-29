@@ -18,7 +18,6 @@ package nosnatproxy
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -80,7 +79,7 @@ func checknosnat(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(500)
 		fmt.Fprintf(w, "error querying %q, err: %v", url, err)
 	} else {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			w.WriteHeader(500)
 			fmt.Fprintf(w, "error reading body of response from %q, err: %v", url, err)

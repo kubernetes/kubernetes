@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"regexp"
@@ -94,7 +93,7 @@ func tryValidateEC2UUID() bool {
 	asset_tag := "/sys/devices/virtual/dmi/id/board_asset_tag"
 
 	if _, err := os.Stat(hypervisor_uuid); err == nil {
-		b, err := ioutil.ReadFile(hypervisor_uuid)
+		b, err := os.ReadFile(hypervisor_uuid)
 		if err != nil {
 			klog.Errorf("error checking if this is an EC2 instance: %v", err)
 		} else if strings.HasPrefix(string(b), "EC2") || strings.HasPrefix(string(b), "ec2") {
@@ -104,7 +103,7 @@ func tryValidateEC2UUID() bool {
 	}
 
 	if _, err := os.Stat(product_uuid); err == nil {
-		b, err := ioutil.ReadFile(product_uuid)
+		b, err := os.ReadFile(product_uuid)
 		if err != nil {
 			klog.Errorf("error checking if this is an EC2 instance: %v", err)
 		} else if strings.HasPrefix(string(b), "EC2") || strings.HasPrefix(string(b), "ec2") {
@@ -114,7 +113,7 @@ func tryValidateEC2UUID() bool {
 	}
 
 	if _, err := os.Stat(asset_tag); err == nil {
-		b, err := ioutil.ReadFile(asset_tag)
+		b, err := os.ReadFile(asset_tag)
 		s := strings.TrimSpace(string(b))
 		if err != nil {
 			klog.Errorf("error checking if this is an EC2 instance: %v", err)

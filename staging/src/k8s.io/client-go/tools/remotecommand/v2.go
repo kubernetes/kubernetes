@@ -19,7 +19,6 @@ package remotecommand
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 
@@ -126,7 +125,7 @@ func (p *streamProtocolV2) copyStdin() {
 
 			// this "copy" doesn't actually read anything - it's just here to wait for
 			// the server to close remoteStdin.
-			if _, err := io.Copy(ioutil.Discard, p.remoteStdin); err != nil {
+			if _, err := io.Copy(io.Discard, p.remoteStdin); err != nil {
 				runtime.HandleError(err)
 			}
 		}()
@@ -145,7 +144,7 @@ func (p *streamProtocolV2) copyStdout(wg *sync.WaitGroup) {
 		// make sure, packet in queue can be consumed.
 		// block in queue may lead to deadlock in conn.server
 		// issue: https://github.com/kubernetes/kubernetes/issues/96339
-		defer io.Copy(ioutil.Discard, p.remoteStdout)
+		defer io.Copy(io.Discard, p.remoteStdout)
 
 		if _, err := io.Copy(p.Stdout, p.remoteStdout); err != nil {
 			runtime.HandleError(err)
@@ -162,7 +161,7 @@ func (p *streamProtocolV2) copyStderr(wg *sync.WaitGroup) {
 	go func() {
 		defer runtime.HandleCrash()
 		defer wg.Done()
-		defer io.Copy(ioutil.Discard, p.remoteStderr)
+		defer io.Copy(io.Discard, p.remoteStderr)
 
 		if _, err := io.Copy(p.Stderr, p.remoteStderr); err != nil {
 			runtime.HandleError(err)

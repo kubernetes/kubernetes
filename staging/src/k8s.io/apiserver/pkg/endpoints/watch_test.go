@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -237,7 +236,7 @@ func TestWatchClientClose(t *testing.T) {
 	}
 
 	if response.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(response.Body)
+		b, _ := io.ReadAll(response.Body)
 		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
 	}
 
@@ -281,7 +280,7 @@ func TestWatchRead(t *testing.T) {
 		}
 
 		if response.StatusCode != http.StatusOK {
-			b, _ := ioutil.ReadAll(response.Body)
+			b, _ := io.ReadAll(response.Body)
 			t.Fatalf("Unexpected response for accept: %q: %#v\n%s", accept, response, string(b))
 		}
 		return response.Body, response.Header.Get("Content-Type")
@@ -921,7 +920,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 	wg.Add(1)
 	go func() {
 		defer response.Body.Close()
-		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
+		if _, err := io.Copy(io.Discard, response.Body); err != nil {
 			b.Error(err)
 		}
 		wg.Done()
@@ -961,7 +960,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	wg.Add(1)
 	go func() {
 		defer ws.Close()
-		if _, err := io.Copy(ioutil.Discard, ws); err != nil {
+		if _, err := io.Copy(io.Discard, ws); err != nil {
 			b.Error(err)
 		}
 		wg.Done()
@@ -1002,7 +1001,7 @@ func BenchmarkWatchProtobuf(b *testing.B) {
 		b.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(response.Body)
+		body, _ := io.ReadAll(response.Body)
 		b.Fatalf("Unexpected response %#v\n%s", response, body)
 	}
 
@@ -1010,7 +1009,7 @@ func BenchmarkWatchProtobuf(b *testing.B) {
 	wg.Add(1)
 	go func() {
 		defer response.Body.Close()
-		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
+		if _, err := io.Copy(io.Discard, response.Body); err != nil {
 			b.Error(err)
 		}
 		wg.Done()

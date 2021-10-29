@@ -19,7 +19,6 @@ package remotecommand
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -39,7 +38,7 @@ func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
 	go func() {
 		defer runtime.HandleCrash()
 
-		message, err := ioutil.ReadAll(errorStream)
+		message, err := io.ReadAll(errorStream)
 		switch {
 		case err != nil && err != io.EOF:
 			errorChan <- fmt.Errorf("error reading from error stream: %s", err)

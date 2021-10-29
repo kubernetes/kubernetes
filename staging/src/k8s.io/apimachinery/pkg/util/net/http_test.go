@@ -25,7 +25,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -429,7 +428,7 @@ func TestConnectWithRedirects(t *testing.T) {
 			resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rawResponse)), nil)
 			require.NoError(t, err, "unexpected request error")
 
-			result, err := ioutil.ReadAll(resp.Body)
+			result, err := io.ReadAll(resp.Body)
 			assert.NoError(t, err)
 			require.NoError(t, resp.Body.Close())
 			if test.expectedRedirects < len(test.redirects) {

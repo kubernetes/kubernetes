@@ -133,7 +133,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestDiffer(t *testing.T) {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
 
-	fcontent, err = ioutil.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+	fcontent, err = os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}

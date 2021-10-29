@@ -18,7 +18,6 @@ package converter
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -117,7 +116,7 @@ func doConversionV1(convertRequest *v1.ConversionRequest, convert convertFunc) *
 func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}

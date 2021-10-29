@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -51,7 +50,7 @@ var testRetryBackoff = wait.Backoff{
 }
 
 func TestV1NewFromConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +75,7 @@ func TestV1NewFromConfig(t *testing.T) {
 		{data.Key, clientKey},
 	}
 	for _, file := range files {
-		if err := ioutil.WriteFile(file.name, file.data, 0400); err != nil {
+		if err := os.WriteFile(file.name, file.data, 0400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,7 +178,7 @@ current-context: default
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		err := func() error {
-			tempfile, err := ioutil.TempFile("", "")
+			tempfile, err := os.CreateTemp("", "")
 			if err != nil {
 				return err
 			}
@@ -249,7 +248,7 @@ func NewV1TestServer(s V1Service, cert, key, caCert []byte) (*httptest.Server, e
 		}
 
 		var review authorizationv1.SubjectAccessReview
-		bodyData, _ := ioutil.ReadAll(r.Body)
+		bodyData, _ := io.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return
@@ -312,7 +311,7 @@ func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
 // newV1Authorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new WebhookAuthorizer from it.
 func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
-	tempfile, err := ioutil.TempFile("", "")
+	tempfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}

@@ -46,7 +46,7 @@ func checkAllProviders(e2eFile string) error {
 	regEndConformance := regexp.MustCompile(patternEndConformance)
 	regSkip := regexp.MustCompile(patternSkip)
 
-	fileInput, err := ioutil.ReadFile(e2eFile)
+	fileInput, err := os.ReadFile(e2eFile)
 	if err != nil {
 		return fmt.Errorf("Failed to read file %s: %w", e2eFile, err)
 	}

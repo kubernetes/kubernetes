@@ -407,7 +407,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		} else {
 			fs.Close()
 
-			// Chmod is needed because ioutil.WriteFile() ends up calling
+			// Chmod is needed because os.WriteFile() ends up calling
 			// open(2) to create the file, so the final mode used is "mode &
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.

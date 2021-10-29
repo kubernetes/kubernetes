@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"testing"
@@ -50,7 +49,7 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(bytes.NewReader(result)), nil
+	return io.NopCloser(bytes.NewReader(result)), nil
 }
 
 func testNodeV1beta1MetricsData() (*metricsv1beta1api.NodeMetricsList, *v1.NodeList) {

@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os/exec"
 	"strings"
 	"time"
@@ -458,7 +457,7 @@ func recordSystemCgroupProcesses() {
 		if IsCgroup2UnifiedMode() {
 			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
 		}
-		pids, err := ioutil.ReadFile(fmt.Sprintf(filePattern, cgroup))
+		pids, err := os.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
 			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
@@ -467,7 +466,7 @@ func recordSystemCgroupProcesses() {
 		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
-			cmd, err := ioutil.ReadFile(path)
+			cmd, err := os.ReadFile(path)
 			if err != nil {
 				framework.Logf("  ginkgo.Failed to read %s: %v", path, err)
 			} else {

@@ -19,7 +19,6 @@ package csi
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -1654,7 +1653,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			dir := filepath.Dir(tc.deviceMountPath)
 			if tc.jsonFile != "" {
 				dataPath := filepath.Join(dir, volDataFileName)
-				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+				if err := os.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
 					t.Fatalf("error creating %s: %s", dataPath, err)
 				}
 			}

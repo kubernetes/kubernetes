@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -103,7 +102,7 @@ func TestModifyClusterServerAndTLS(t *testing.T) {
 }
 
 func (test createClusterTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

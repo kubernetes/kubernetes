@@ -19,7 +19,7 @@ package discovery
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -54,7 +54,7 @@ func init() {
 func decodeResponse(t *testing.T, resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	t.Log(string(data))
 	if err != nil {
 		return err

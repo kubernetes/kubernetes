@@ -78,7 +78,7 @@ func (R *numaPodResources) String() string {
 }
 
 func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
-	nodeCPUList, err := ioutil.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
+	nodeCPUList, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
 			return nil, err
 		}
 
-		content, err := ioutil.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
+		content, err := os.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
 		if err != nil {
 			return nil, err
 		}

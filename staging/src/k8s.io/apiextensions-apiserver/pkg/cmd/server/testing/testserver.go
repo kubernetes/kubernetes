@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -102,7 +101,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "apiextensions-apiserver")
+	result.TmpDir, err = os.MkdirTemp("", "apiextensions-apiserver")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}

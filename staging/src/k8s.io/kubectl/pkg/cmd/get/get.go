@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
@@ -880,7 +879,7 @@ func CompGetContainers(f cmdutil.Factory, cmd *cobra.Command, podName string, to
 // which begin with `toComplete`.
 func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := NewGetOptions("kubectl", streams)
 
 	// Get the list of names of the specified resource

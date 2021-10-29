@@ -17,7 +17,6 @@ limitations under the License.
 package fixtures
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -39,7 +38,7 @@ import (
 // StartDefaultServer starts a test server.
 func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
-	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+	fakeKubeConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		return nil, nil, nil, err
 	}

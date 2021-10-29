@@ -18,7 +18,6 @@ package create
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -43,7 +42,7 @@ func TestCreatePriorityClass(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+				Body:       io.NopCloser(&bytes.Buffer{}),
 			}, nil
 		}),
 	}

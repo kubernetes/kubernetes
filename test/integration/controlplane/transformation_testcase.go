@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -173,14 +172,14 @@ func (e *transformTest) getEncryptionOptions() []string {
 }
 
 func (e *transformTest) createEncryptionConfig() (string, error) {
-	tempDir, err := ioutil.TempDir("", "secrets-encryption-test")
+	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 
 	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
 
-	if err := ioutil.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
+	if err := os.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
 		return "", fmt.Errorf("error while writing encryption config: %v", err)
 	}

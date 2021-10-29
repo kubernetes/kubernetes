@@ -20,7 +20,7 @@ limitations under the License.
 package pidlimit
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"syscall"
 	"time"
@@ -33,7 +33,7 @@ import (
 func Stats() (*statsapi.RlimitStats, error) {
 	rlimit := &statsapi.RlimitStats{}
 
-	if content, err := ioutil.ReadFile("/proc/sys/kernel/pid_max"); err == nil {
+	if content, err := os.ReadFile("/proc/sys/kernel/pid_max"); err == nil {
 		if maxPid, err := strconv.ParseInt(string(content[:len(content)-1]), 10, 64); err == nil {
 			rlimit.MaxPID = &maxPid
 		}

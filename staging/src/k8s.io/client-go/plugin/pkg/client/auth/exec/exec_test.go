@@ -27,7 +27,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -1112,7 +1112,7 @@ func TestRoundTripper(t *testing.T) {
 	}
 	a.environ = environ
 	a.now = now
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	tc := &transport.Config{}
 	if err := a.UpdateTransportConfig(tc); err != nil {
@@ -1268,7 +1268,7 @@ func TestTLSCredentials(t *testing.T) {
 		return []string{"TEST_OUTPUT=" + string(data)}
 	}
 	a.now = func() time.Time { return now }
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	// We're not interested in server's cert, this test is about client cert.
 	tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true}}
@@ -1351,7 +1351,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 	}
 	a.environ = environ
 	a.now = now
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)

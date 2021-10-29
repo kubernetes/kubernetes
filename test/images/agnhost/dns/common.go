@@ -18,7 +18,6 @@ package dns
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -66,7 +65,7 @@ func printHostsFile(cmd *cobra.Command, args []string) {
 }
 
 func readFile(fileName string) string {
-	fileData, err := ioutil.ReadFile(fileName)
+	fileData, err := os.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}

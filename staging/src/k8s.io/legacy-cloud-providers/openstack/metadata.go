@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -118,7 +117,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 		dev = strings.TrimSpace(string(out))
 	}
 
-	mntdir, err := ioutil.TempDir("", "configdrive")
+	mntdir, err := os.MkdirTemp("", "configdrive")
 	if err != nil {
 		return nil, err
 	}

@@ -292,7 +292,7 @@ func TestMakePayload(t *testing.T) {
 }
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "configmap_volume_test.")
+	tempDir, err := os.MkdirTemp("/tmp", "configmap_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -703,7 +703,7 @@ func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *t
 		if _, err := os.Stat(configMapDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find configMap data on disk: %v", configMapDataHostPath)
 		} else {
-			actualValue, err := ioutil.ReadFile(configMapDataHostPath)
+			actualValue, err := os.ReadFile(configMapDataHostPath)
 			if err != nil {
 				t.Fatalf("Couldn't read configMap data from: %v", configMapDataHostPath)
 			}

@@ -17,7 +17,6 @@ limitations under the License.
 package auditproxy
 
 import (
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -57,7 +56,7 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Printf("could not read request body: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)

@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,7 +32,7 @@ import (
 
 func TestLoadInitConfigurationFromFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}
@@ -84,7 +83,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			err := os.WriteFile(cfgPath, rt.fileContents, 0644)
 			if err != nil {
 				t.Errorf("Couldn't create file: %v", err)
 				return

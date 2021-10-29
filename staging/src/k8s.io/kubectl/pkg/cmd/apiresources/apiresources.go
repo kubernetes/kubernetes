@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -282,7 +281,7 @@ func (s sortableResource) compareValues(i, j int) (string, string) {
 // CompGetResourceList returns the list of api resources which begin with `toComplete`.
 func CompGetResourceList(f cmdutil.Factory, cmd *cobra.Command, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := NewAPIResourceOptions(streams)
 
 	// Get the list of resources

@@ -19,7 +19,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,7 +69,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	}
 	buf.Write(data)
 
-	err = ioutil.WriteFile(cfgPath, buf.Bytes(), 0644)
+	err = os.WriteFile(cfgPath, buf.Bytes(), 0644)
 	return cfgPath, err
 }
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -134,7 +133,7 @@ func TestSaveVolumeData(t *testing.T) {
 		}
 
 		// validate content
-		data, err := ioutil.ReadFile(file)
+		data, err := os.ReadFile(file)
 		if !tc.shouldFail && err != nil {
 			t.Errorf("failed to read data file: %v", err)
 		}

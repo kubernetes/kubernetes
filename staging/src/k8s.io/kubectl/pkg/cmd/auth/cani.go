@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -150,7 +149,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		}
 	} else {
 		if o.Quiet {
-			o.Out = ioutil.Discard
+			o.Out = io.Discard
 		}
 
 		switch len(args) {

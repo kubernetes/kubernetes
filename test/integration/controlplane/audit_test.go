@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -232,7 +231,7 @@ func runTestWithVersion(t *testing.T, version string) {
 
 	// prepare audit policy file
 	auditPolicy := strings.Replace(auditPolicyPattern, "{version}", version, 1)
-	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
+	policyFile, err := os.CreateTemp("", "audit-policy.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
@@ -245,7 +244,7 @@ func runTestWithVersion(t *testing.T, version string) {
 	}
 
 	// prepare audit log file
-	logFile, err := ioutil.TempFile("", "audit.log")
+	logFile, err := os.CreateTemp("", "audit.log")
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}

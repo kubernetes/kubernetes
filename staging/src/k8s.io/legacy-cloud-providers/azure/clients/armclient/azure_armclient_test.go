@@ -22,7 +22,6 @@ package armclient
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -258,7 +257,7 @@ func TestGetResource(t *testing.T) {
 
 	ctx := context.Background()
 	response, rerr := armClient.GetResource(ctx, testResourceID, "data")
-	byteResponseBody, _ := ioutil.ReadAll(response.Body)
+	byteResponseBody, _ := io.ReadAll(response.Body)
 	stringResponseBody := string(byteResponseBody)
 	assert.Nil(t, rerr)
 	assert.Equal(t, "{data: testPIP}", stringResponseBody)
@@ -291,7 +290,7 @@ func TestGetResourceWithDecorators(t *testing.T) {
 
 	ctx := context.Background()
 	response, rerr := armClient.GetResourceWithDecorators(ctx, testResourceID, decorators)
-	byteResponseBody, _ := ioutil.ReadAll(response.Body)
+	byteResponseBody, _ := io.ReadAll(response.Body)
 	stringResponseBody := string(byteResponseBody)
 	assert.Nil(t, rerr)
 	assert.Equal(t, "{data: testPIP}", stringResponseBody)

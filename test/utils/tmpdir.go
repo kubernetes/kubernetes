@@ -17,8 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"io/ioutil"
-
 	"k8s.io/klog/v2"
 )
 
@@ -26,7 +24,7 @@ func MakeTempDirOrDie(prefix string, baseDir string) string {
 	if baseDir == "" {
 		baseDir = "/tmp"
 	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
+	tempDir, err := os.MkdirTemp(baseDir, prefix)
 	if err != nil {
 		klog.Fatalf("Can't make a temp rootdir: %v", err)
 	}

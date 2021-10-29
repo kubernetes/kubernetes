@@ -18,7 +18,6 @@ package certificates
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -234,9 +233,9 @@ func TestCertificates(t *testing.T) {
 				actions = append(actions, req.Method+" "+req.URL.Path)
 				switch p, m := req.URL.Path, req.Method; {
 				case tc.nov1 && strings.HasPrefix(p, "/apis/certificates.k8s.io/v1/"):
-					return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(bytes.NewBuffer([]byte{}))}, nil
+					return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(bytes.NewBuffer([]byte{}))}, nil
 				case tc.nov1beta1 && strings.HasPrefix(p, "/apis/certificates.k8s.io/v1beta1/"):
-					return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(bytes.NewBuffer([]byte{}))}, nil
+					return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(bytes.NewBuffer([]byte{}))}, nil
 
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/missing" && m == http.MethodGet:
 					return &http.Response{StatusCode: http.StatusNotFound}, nil

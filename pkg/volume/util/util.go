@@ -19,7 +19,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -193,7 +192,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
-	podDef, err := ioutil.ReadFile(filePath)
+	podDef, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
 	}

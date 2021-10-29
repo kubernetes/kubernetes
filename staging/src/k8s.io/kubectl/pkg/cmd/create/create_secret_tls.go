@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -251,7 +250,7 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 
 // readFile just reads a file into a byte array.
 func readFile(file string) ([]byte, error) {
-	b, err := ioutil.ReadFile(file)
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return []byte{}, fmt.Errorf("Cannot read file %v, %v", file, err)
 	}

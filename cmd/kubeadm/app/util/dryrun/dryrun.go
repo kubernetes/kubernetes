@@ -19,7 +19,7 @@ package dryrun
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -61,7 +61,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 			continue
 		}
 
-		fileBytes, err := ioutil.ReadFile(file.RealPath)
+		fileBytes, err := os.ReadFile(file.RealPath)
 		if err != nil {
 			errs = append(errs, err)
 			continue

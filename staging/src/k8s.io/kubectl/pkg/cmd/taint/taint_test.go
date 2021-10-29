@@ -17,7 +17,6 @@ limitations under the License.
 package taint
 
 import (
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -263,7 +262,7 @@ func TestTaint(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 					case m.isFor("PATCH", "/nodes/node-name"):
 						tainted = true
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
@@ -289,7 +288,7 @@ func TestTaint(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					case m.isFor("PUT", "/nodes/node-name"):
 						tainted = true
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}

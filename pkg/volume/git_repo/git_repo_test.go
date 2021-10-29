@@ -18,7 +18,6 @@ package git_repo
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,7 +35,7 @@ import (
 )
 
 func newTestHost(t *testing.T) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "git_repo_test.")
+	tempDir, err := os.MkdirTemp("/tmp", "git_repo_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}

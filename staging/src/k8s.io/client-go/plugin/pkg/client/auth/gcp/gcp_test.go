@@ -18,7 +18,6 @@ package gcp
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -160,7 +159,7 @@ func Test_tokenSource_cmdCannotBeUsedWithScopes(t *testing.T) {
 
 func Test_tokenSource_applicationDefaultCredentials_fails(t *testing.T) {
 	// try to use empty ADC file
-	fakeTokenFile, err := ioutil.TempFile("", "adctoken")
+	fakeTokenFile, err := os.CreateTemp("", "adctoken")
 	if err != nil {
 		t.Fatalf("failed to create fake token file: +%v", err)
 	}
@@ -175,13 +174,13 @@ func Test_tokenSource_applicationDefaultCredentials_fails(t *testing.T) {
 }
 
 func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
-	fakeTokenFile, err := ioutil.TempFile("", "adctoken")
+	fakeTokenFile, err := os.CreateTemp("", "adctoken")
 	if err != nil {
 		t.Fatalf("failed to create fake token file: +%v", err)
 	}
 	fakeTokenFile.Close()
 	defer os.Remove(fakeTokenFile.Name())
-	if err := ioutil.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0600); err != nil {
+	if err := os.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0600); err != nil {
 		t.Fatalf("failed to write to fake token file: %+v", err)
 	}
 

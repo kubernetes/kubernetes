@@ -18,7 +18,7 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -188,7 +188,7 @@ func TestNewWithDelegate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		if http.StatusOK != resp.StatusCode {
 			t.Logf("got %d", resp.StatusCode)
 			t.Log(string(data))
@@ -228,7 +228,7 @@ func checkPath(url string, expectedStatusCode int, expectedBody string, t *testi
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -251,7 +251,7 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}

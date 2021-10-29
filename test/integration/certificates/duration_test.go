@@ -23,7 +23,6 @@ import (
 	"crypto/rand"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -99,7 +98,7 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 	caPublicKeyFile := path.Join(s.TmpDir, "test-ca-public-key")
-	if err := ioutil.WriteFile(caPublicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCert.Raw}), os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(caPublicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCert.Raw}), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
 	caPrivateKeyBytes, err := keyutil.MarshalPrivateKeyToPEM(caPrivateKey)
@@ -107,7 +106,7 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 	caPrivateKeyFile := path.Join(s.TmpDir, "test-ca-private-key")
-	if err := ioutil.WriteFile(caPrivateKeyFile, caPrivateKeyBytes, os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(caPrivateKeyFile, caPrivateKeyBytes, os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
 

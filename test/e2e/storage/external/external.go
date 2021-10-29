@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
@@ -182,7 +181,7 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("missing file name")
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +338,7 @@ func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

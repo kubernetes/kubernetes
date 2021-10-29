@@ -142,7 +142,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				if err := os.MkdirAll(volumePath, 0750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
+				return os.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -156,7 +156,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				if err := os.MkdirAll(subPath, 0750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
+				return os.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")

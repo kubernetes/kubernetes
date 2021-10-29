@@ -18,7 +18,6 @@ package auth
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -36,13 +35,13 @@ import (
 )
 
 func TestDynamicClientBuilder(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("/tmp", "key")
+	tmpfile, err := os.CreateTemp("/tmp", "key")
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(tmpfile.Name())
 
-	if err = ioutil.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = os.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", tmpfile.Name(), err)
 	}
 

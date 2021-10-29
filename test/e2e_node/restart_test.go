@@ -22,7 +22,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os/exec"
 	"strings"
 	"time"
@@ -86,7 +85,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
-					bytes, err := ioutil.ReadFile("/etc/os-release")
+					bytes, err := os.ReadFile("/etc/os-release")
 					if err != nil {
 						if strings.Contains(string(bytes), "ubuntu") {
 							ginkgo.Skip("Test fails with in-tree docker + ubuntu. Skipping test.")

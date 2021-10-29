@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -636,7 +635,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 }
 
 func bootstrapTestDir(t *testing.T) string {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 
 	if err != nil {
 		t.Fatal(err)
@@ -651,7 +650,7 @@ func bootstrapTestDir(t *testing.T) string {
 
 	// Write the certificate files to disk or fail
 	for fileName, fileData := range files {
-		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -660,7 +659,7 @@ func bootstrapTestDir(t *testing.T) string {
 }
 
 func newKubeConfigFile(config v1.Config) (string, error) {
-	configFile, err := ioutil.TempFile("", "")
+	configFile, err := os.CreateTemp("", "")
 
 	if err != nil {
 		return "", fmt.Errorf("unable to create the Kubernetes client config file: %v", err)

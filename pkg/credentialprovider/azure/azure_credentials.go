@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -150,7 +149,7 @@ func parseConfig(configReader io.Reader) (*auth.AzureAuthConfig, error) {
 	}
 
 	limitedReader := &io.LimitedReader{R: configReader, N: maxReadLength}
-	configContents, err := ioutil.ReadAll(limitedReader)
+	configContents, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

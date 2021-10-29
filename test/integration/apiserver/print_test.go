@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -162,7 +161,7 @@ func TestServerSidePrint(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	cacheDir, err := os.MkdirTemp(os.TempDir(), "test-integration-apiserver-print")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

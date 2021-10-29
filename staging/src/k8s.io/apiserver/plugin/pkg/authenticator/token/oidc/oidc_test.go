@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -76,7 +75,7 @@ func loadECDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm
 }
 
 func loadKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm, unmarshal func([]byte) (interface{}, error)) *jose.JSONWebKey {
-	data, err := ioutil.ReadFile(filepath)
+	data, err := os.ReadFile(filepath)
 	if err != nil {
 		t.Fatalf("load file: %v", err)
 	}
@@ -207,7 +206,7 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 // PEM-encoded format.  Returns the name of the temporary file used.  The caller
 // is responsible for cleaning the file up.
 func writeTempCert(t *testing.T, cert []byte) string {
-	tempFile, err := ioutil.TempFile("", "ca.crt")
+	tempFile, err := os.CreateTemp("", "ca.crt")
 	if err != nil {
 		t.Fatalf("could not open temp file: %v", err)
 	}

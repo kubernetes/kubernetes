@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -124,7 +123,7 @@ func TestEmptyList(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	decodedData := map[string]interface{}{}
 	if err := json.Unmarshal(data, &decodedData); err != nil {
 		t.Logf("body: %s", string(data))
@@ -203,7 +202,7 @@ func TestStatus(t *testing.T) {
 			t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
 		}
 		defer resp.Body.Close()
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		decodedData := map[string]interface{}{}
 		if err := json.Unmarshal(data, &decodedData); err != nil {
 			t.Logf("body: %s", string(data))
@@ -459,7 +458,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -507,7 +506,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -534,7 +533,7 @@ func TestAccept(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -551,7 +550,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/yaml" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -569,7 +568,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}

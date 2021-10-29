@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -151,7 +150,7 @@ func (onewayRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return &http.Response{
 		Status:     "200 OK",
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(&bytes.Buffer{}),
+		Body:       io.NopCloser(&bytes.Buffer{}),
 		Request:    req,
 	}, nil
 }
