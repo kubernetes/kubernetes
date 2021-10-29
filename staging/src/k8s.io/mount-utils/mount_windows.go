@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -339,6 +340,6 @@ func getAllParentLinks(path string) ([]string, error) {
 // isMountFastPath is a method of detecting a mount that really fast.
 // It should return a true and no-error ONLY when it is an actual mount point.
 // In cases, where it is not guaranteed or cannot be determined, it should return an error.
-func isMountFastPath(path string) (bool, error) {
-	return false, fmt.Errorf("isMountFastPath is supported only on Linux")
+func isMountFastPath(_ string) (bool, error) {
+	return false, errors.New("isMountFastPath on this platform is not supported")
 }

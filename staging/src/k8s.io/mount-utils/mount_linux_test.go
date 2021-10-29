@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"syscall"
 	"testing"
 )
 
@@ -558,7 +557,6 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 		// returns the path to be tested for.
 		// returns an error if something went wrong during prepare.
 		prepare     func(*testing.T) (string, error)
-		openat2Mock func(int, string, *unix.OpenHow) (fd int, err error)
 	}{
 		"path is not absolute": {
 			expectedErr:        errPathNotAbsolute,
@@ -568,6 +566,7 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 			},
 		},
 		"path is a symlink": {
+			expectedErr:        unix.ELOOP,
 			expectedMountPoint: false,
 			prepare: func(t *testing.T) (string, error) {
 				tmpDir, err := os.MkdirTemp("", "symlink")
@@ -588,7 +587,7 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 				if err != nil {
 					return "", err
 				}
-				return tmpDir, nil
+				return symlink, nil
 			},
 		},
 		"path is a mount point": {
@@ -641,26 +640,15 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 			expectedErr:        os.ErrNotExist,
 			expectedMountPoint: false,
 			prepare: func(t *testing.T) (string, error) {
-
-				f, err := os.MkdirTemp("", "unexisting")
-				if err != nil {
-					return "", err
-				}
-				err = os.Remove(f)
-				if err != nil {
-					return "", err
-				}
-				// guaranteed to not exist at this point.
-				return filepath.Join(f, "random"), nil
+				return "/random-path/which/does-not/exist", nil
 			},
 		},
 	}
 
-	hasOpenAt2Support := isOpenAt2Supported()
-	if !hasOpenAt2Support {
+	var openAt2Func func(int, string, *unix.OpenHow) (fd int, err error) = nil
+	if !isOpenAt2Supported() {
 		t.Logf("openat2 is not supported, will use mock function openAt2Mock")
-	} else {
-		t.Log("openat2 is supported, will use openat2 syscall.")
+		openAt2Func = openAt2Mock
 	}
 	for name, test := range tests {
 		path, err := test.prepare(t)
@@ -671,11 +659,7 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 
 		// let's not use mock if openat2 is supported on a CI.
 		var isMountPoint bool
-		if hasOpenAt2Support {
-			isMountPoint, err = isMountPointUsingOpenAt2(path, nil)
-		} else {
-			isMountPoint, err = isMountPointUsingOpenAt2(path, openAt2Mock)
-		}
+		isMountPoint, err = isMountPointUsingOpenAt2(path, openAt2Func)
 
 		if isMountPoint != test.expectedMountPoint {
 			t.Errorf("test (%s) has a mis-match for expected mount point (%t) and got (%t)",
@@ -705,19 +689,19 @@ func openAt2Mock(dirfd int, path string, how *unix.OpenHow) (int, error) {
 		path = filepath.Join(fName, path)
 	}
 
-	// case 0: magic links. use heurestics.
+	// case 0: magic links. use heuristic.
 	// Return error fast and do not deal with file descriptor.
 	if path == "/proc/1/exe" {
 		return -1, unix.ELOOP
 	}
 
-	fd, err := syscall.Open(path, int(how.Flags), unix.O_RDONLY)
+	fd, err := unix.Open(path, int(how.Flags), unix.O_RDONLY)
 	if err != nil {
 		return -1, err
 	}
 
 	// detect if symlink or not.
-	fInfo, err := os.Stat(path)
+	fInfo, err := os.Lstat(path)
 	if err != nil {
 		_ = unix.Close(fd)
 		return -1, err
@@ -726,21 +710,23 @@ func openAt2Mock(dirfd int, path string, how *unix.OpenHow) (int, error) {
 
 	// detect if mount-point or not.
 	isMntPoint := false
-	procFile, err := ioutil.ReadFile(procMountsPath)
+	procFile, err := os.ReadFile(procMountsPath)
 	if err != nil {
+		// close here since in error conditions openat2 will close the fd.
 		_ = unix.Close(fd)
 		return -1, err
 	}
 	mps, err := parseProcMounts(procFile)
 	if err != nil {
+		// close here since in error conditions openat2 will close the fd.
 		_ = unix.Close(fd)
 		return -1, err
 	}
 
 	for _, mp := range mps {
 		if isMountPointMatch(mp, path) {
-			// close here since in error conditions openat2 will close the fd.
 			isMntPoint = true
+			break
 		}
 	}
 
@@ -753,6 +739,7 @@ func openAt2Mock(dirfd int, path string, how *unix.OpenHow) (int, error) {
 	}
 
 	if isSymLink {
+		// close here since in error conditions openat2 will close the fd.
 		_ = unix.Close(fd)
 		return -1, unix.ELOOP
 	}
@@ -765,7 +752,7 @@ func isOpenAt2Supported() bool {
 		Mode: unix.O_RDONLY,
 	})
 	if err == nil {
-		defer unix.Close(fd)
+		_ = unix.Close(fd)
 		return true
 	}
 	if err == unix.ENOSYS || err == unix.EPERM {

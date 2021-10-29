@@ -722,10 +722,7 @@ func isMountPointUsingOpenAt2(path string, openat2 func(int, string, *unix.OpenH
 		Resolve: unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS,
 	})
 	if err != nil {
-		if err == unix.ENOENT {
-			return false, os.NewSyscallError("openat2", os.ErrNotExist)
-		}
-		return false, err
+		return false, &os.SyscallError{Syscall: "openat2", Err: err}
 	}
 	defer unix.Close(dirfd)
 
@@ -742,17 +739,16 @@ func isMountPointUsingOpenAt2(path string, openat2 func(int, string, *unix.OpenH
 	})
 	switch err {
 	case nil: // definitely not a mount
-		defer unix.Close(fd)
+		err = unix.Close(fd)
+		if err != nil {
+			return false, &os.SyscallError{Syscall: "openat2", Err: err}
+		}
 		return false, nil
 	case unix.EXDEV: // definitely a mount
 		// this is because for an absolute path, if we have RESOLVE_NO_XDEV, the only way to get
 		// this error is when a path is on a mount-point.
 		return true, nil
-	case unix.ENOENT:
-		// Failed to detect if the path is mount, because a mounted path can be overshadowed
-		// by another mount, and still present in mountinfo.
-		return false, os.NewSyscallError("openat2", os.ErrNotExist)
 	}
 	// not sure
-	return false, os.NewSyscallError("openat2", err)
+	return false, &os.SyscallError{Syscall: "openat2", Err: err}
 }
