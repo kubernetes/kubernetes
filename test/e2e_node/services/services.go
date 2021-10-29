@@ -18,7 +18,6 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -167,7 +166,7 @@ func (e *E2EServices) collectLogFiles() {
 			if err != nil {
 				klog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
-				if err = ioutil.WriteFile(targetLink, out, 0644); err != nil {
+				if err = os.WriteFile(targetLink, out, 0644); err != nil {
 					klog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}

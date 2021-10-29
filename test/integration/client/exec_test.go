@@ -23,7 +23,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -700,7 +699,7 @@ type execPlugin struct {
 
 func newExecPlugin(t *testing.T) *execPlugin {
 	t.Helper()
-	outputFile, err := ioutil.TempFile("", "kubernetes-client-exec-test-plugin-output-file-*")
+	outputFile, err := os.CreateTemp("", "kubernetes-client-exec-test-plugin-output-file-*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -806,7 +805,7 @@ func TestExecPluginRotationViaInformer(t *testing.T) {
 }
 
 func startTestServer(t *testing.T) (result *kubeapiservertesting.TestServer, clientAuthorizedToken string, clientCertFileName string, clientKeyFileName string) {
-	certDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-cert-dir-*")
+	certDir, err := os.MkdirTemp("", "kubernetes-client-exec-test-cert-dir-*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -837,7 +836,7 @@ func startTestServer(t *testing.T) (result *kubeapiservertesting.TestServer, cli
 func writeTokenFile(t *testing.T, goodToken string) string {
 	t.Helper()
 
-	tokenFile, err := ioutil.TempFile("", "kubernetes-client-exec-test-token-file-*")
+	tokenFile, err := os.CreateTemp("", "kubernetes-client-exec-test-token-file-*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,7 +854,7 @@ func writeTokenFile(t *testing.T, goodToken string) string {
 
 func read(t *testing.T, fileName string) string {
 	t.Helper()
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	if err != nil {
 		t.Fatal(err)
 	}

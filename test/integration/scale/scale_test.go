@@ -19,7 +19,7 @@ package scale
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"path"
 	"strings"
 	"testing"
@@ -203,7 +203,7 @@ var (
 )
 
 func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstanceOptions, flags []string) (client kubernetes.Interface, tearDown func()) {
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
 	result := apitesting.StartTestServerOrDie(t, instanceOptions, flags, framework.SharedEtcd())
 	result.ClientConfig.AcceptContentTypes = ""

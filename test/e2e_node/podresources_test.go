@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -829,7 +828,7 @@ func requireLackOfSRIOVDevices() {
 }
 
 func getOnlineCPUs() (cpuset.CPUSet, error) {
-	onlineCPUList, err := ioutil.ReadFile("/sys/devices/system/cpu/online")
+	onlineCPUList, err := os.ReadFile("/sys/devices/system/cpu/online")
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}

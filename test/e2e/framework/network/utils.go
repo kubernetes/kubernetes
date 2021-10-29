@@ -21,7 +21,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -1005,7 +1005,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	ret.Code = resp.StatusCode
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ret.Status = HTTPError
 		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)

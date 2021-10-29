@@ -19,7 +19,6 @@ package services
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -327,7 +326,7 @@ func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path s
 		return err
 	}
 	// write the file
-	if err := ioutil.WriteFile(path, data, 0755); err != nil {
+	if err := os.WriteFile(path, data, 0755); err != nil {
 		return err
 	}
 	return nil
@@ -339,7 +338,7 @@ func createPodDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	path, err := ioutil.TempDir(cwd, "static-pods")
+	path, err := os.MkdirTemp(cwd, "static-pods")
 	if err != nil {
 		return "", fmt.Errorf("failed to create static pod directory: %v", err)
 	}
@@ -366,7 +365,7 @@ contexts:
   name: local-context
 current-context: local-context`, framework.TestContext.BearerToken, getAPIServerClientURL()))
 
-	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
+	if err := os.WriteFile(path, kubeconfig, 0666); err != nil {
 		return err
 	}
 	return nil

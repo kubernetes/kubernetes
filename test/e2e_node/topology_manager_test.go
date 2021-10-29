@@ -19,7 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -478,7 +478,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
 	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
 	if cmFile != "" {
-		data, err = ioutil.ReadFile(cmFile)
+		data, err = os.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}

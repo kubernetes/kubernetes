@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -118,7 +117,7 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 `
 
 func loadTestProfiles() error {
-	f, err := ioutil.TempFile("/tmp", "apparmor")
+	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
 		return fmt.Errorf("failed to open temp file: %v", err)
 	}

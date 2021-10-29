@@ -19,7 +19,7 @@ package auth
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -55,7 +55,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
-	tokenFile, err := ioutil.TempFile("", "kubeconfig")
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}

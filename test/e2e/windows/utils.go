@@ -19,8 +19,8 @@ package windows
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 // downloadFile saves a remote URL to a local temp file, and returns its path.
@@ -32,7 +32,7 @@ func downloadFile(url string) (string, error) {
 	}
 	defer response.Body.Close()
 
-	tempFile, err := ioutil.TempFile("", "")
+	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return "", fmt.Errorf("unable to create temp file: %w", err)
 	}

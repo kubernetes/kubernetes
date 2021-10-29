@@ -29,7 +29,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -122,7 +121,7 @@ func (r RootFileSource) ReadTestFile(filePath string) ([]byte, error) {
 	} else {
 		fullPath = filepath.Join(r.Root, filePath)
 	}
-	data, err := ioutil.ReadFile(fullPath)
+	data, err := os.ReadFile(fullPath)
 	if os.IsNotExist(err) {
 		// Not an error (yet), some other provider may have the file.
 		return nil, nil
