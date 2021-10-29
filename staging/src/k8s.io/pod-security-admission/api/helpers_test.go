@@ -53,3 +53,31 @@ func TestParseVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestParseLevel(t *testing.T) {
+	successes := map[string]Level{
+		"privileged": LevelPrivileged,
+		"baseline":   LevelBaseline,
+		"restricted": LevelRestricted,
+	}
+	for level, expected := range successes {
+		t.Run(level, func(t *testing.T) {
+			actual, err := ParseLevel(level)
+			require.NoError(t, err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+
+	failures := map[string]Level{
+		"privilegeds": LevelRestricted,
+		"baselines":   LevelRestricted,
+		"restricteds": LevelRestricted,
+	}
+	for level, expected := range failures {
+		t.Run(level, func(t *testing.T) {
+			actual, err := ParseLevel(level)
+			assert.Error(t, err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
