@@ -297,7 +297,10 @@ func (eic *execInContainer) Stop() {
 func (eic *execInContainer) Start() error {
 	data, err := eic.run()
 	if eic.writer != nil {
-		eic.writer.Write(data)
+		// only record the write error, do not cover the command run error
+		if p, err := eic.writer.Write(data); err != nil {
+			klog.ErrorS(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p)
+		}
 	}
 	return err
 }
