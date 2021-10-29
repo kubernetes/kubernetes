@@ -1542,21 +1542,24 @@
             }
           }
         ],
-        "setHostnameAsFQDN": true
+        "setHostnameAsFQDN": true,
+        "os": {
+          "name": "+\u0026ɃB沅零șPî壣"
+        }
       }
     }
   },
   "status": {
-    "replicas": 1205668420,
-    "fullyLabeledReplicas": -1754098513,
-    "readyReplicas": -877836536,
-    "availableReplicas": 138992869,
-    "observedGeneration": -7169014491472696647,
+    "replicas": 157451826,
+    "fullyLabeledReplicas": -1872689134,
+    "readyReplicas": 1791185938,
+    "availableReplicas": 1559072561,
+    "observedGeneration": 5029735218517286947,
     "conditions": [
       {
-        "type": "零șPî壣V礆á¤拈tY圻醆锛[",
-        "status": "嬜Š\u0026?鳢.ǀŭ瘢颦z疵",
-        "lastTransitionTime": "2455-07-16T22:37:15Z",
+        "type": "Y圻醆锛[M牍Ƃ氙吐ɝ鶼",
+        "status": "ŭ瘢颦z疵悡nȩ純z邜",
+        "lastTransitionTime": "2124-10-20T09:17:54Z",
         "reason": "491",
         "message": "492"
       }

@@ -696,6 +696,8 @@ spec:
   nodeName: "370"
   nodeSelector:
     "366": "367"
+  os:
+    name: 値å镮
   overhead:
     kƱ: "313"
   preemptionPolicy: ħ\
@@ -1008,45 +1010,45 @@ spec:
       volumePath: "79"
 status:
   conditions:
-  - lastProbeTime: "2761-08-29T15:09:53Z"
-    lastTransitionTime: "2608-03-08T03:06:33Z"
+  - lastProbeTime: "2964-11-28T11:39:16Z"
+    lastTransitionTime: "2684-04-17T20:01:15Z"
     message: "467"
     reason: "466"
-    status: '{煰'
-    type: ?ɣ蔫椁Ȕ蝬KȴǃmŁȒ|'从
+    status: 鮫ʌ槧ą°Z拕獘:p
+    type: 蝬KȴǃmŁȒ|'从LŸɬʥ
   containerStatuses:
   - containerID: "501"
     image: "499"
     imageID: "500"
     lastState:
       running:
-        startedAt: "2127-06-24T09:29:52Z"
+        startedAt: "2940-02-10T02:45:51Z"
       terminated:
         containerID: "498"
-        exitCode: 1574959758
-        finishedAt: "2299-04-20T19:57:50Z"
+        exitCode: 508776344
+        finishedAt: "2716-06-10T12:34:06Z"
         message: "497"
         reason: "496"
-        signal: 1657812021
-        startedAt: "2153-04-02T23:06:37Z"
+        signal: -419737006
+        startedAt: "2556-04-09T04:29:45Z"
       waiting:
         message: "495"
         reason: "494"
     name: "488"
-    ready: true
-    restartCount: 2015720150
-    started: false
+    ready: false
+    restartCount: 839330574
+    started: true
     state:
       running:
-        startedAt: "2760-10-14T11:51:24Z"
+        startedAt: "2514-10-23T19:30:50Z"
       terminated:
         containerID: "493"
-        exitCode: 165747350
-        finishedAt: "2699-11-10T05:45:30Z"
+        exitCode: -1915588568
+        finishedAt: "2539-08-23T00:33:24Z"
         message: "492"
         reason: "491"
-        signal: 470888375
-        startedAt: "2942-12-12T07:01:06Z"
+        signal: -748558554
+        startedAt: "2669-01-03T02:05:34Z"
       waiting:
         message: "490"
         reason: "489"
@@ -1056,33 +1058,33 @@ status:
     imageID: "514"
     lastState:
       running:
-        startedAt: "2100-10-03T01:21:07Z"
+        startedAt: "2873-08-04T14:47:20Z"
       terminated:
         containerID: "512"
-        exitCode: -1308926448
-        finishedAt: "2358-12-25T12:18:48Z"
+        exitCode: -1736264167
+        finishedAt: "2162-04-09T16:36:03Z"
         message: "511"
         reason: "510"
-        signal: 1208014329
-        startedAt: "2915-11-30T10:57:55Z"
+        signal: -61756682
+        startedAt: "2083-06-13T02:40:30Z"
       waiting:
         message: "509"
         reason: "508"
     name: "502"
     ready: true
-    restartCount: 1093414706
+    restartCount: -598136292
     started: true
     state:
       running:
-        startedAt: "2513-06-23T10:07:34Z"
+        startedAt: "2307-01-05T17:43:36Z"
       terminated:
         containerID: "507"
-        exitCode: -1155216843
-        finishedAt: "2685-03-12T10:07:19Z"
+        exitCode: 390203674
+        finishedAt: "2475-06-22T13:38:30Z"
         message: "506"
         reason: "505"
-        signal: 839330574
-        startedAt: "2296-08-29T04:36:22Z"
+        signal: -372320382
+        startedAt: "2843-07-14T02:23:26Z"
       waiting:
         message: "504"
         reason: "503"
@@ -1093,41 +1095,41 @@ status:
     imageID: "486"
     lastState:
       running:
-        startedAt: "2687-07-04T15:23:41Z"
+        startedAt: "2405-08-10T09:51:44Z"
       terminated:
         containerID: "484"
-        exitCode: 1892596557
-        finishedAt: "2719-07-17T22:00:10Z"
+        exitCode: 1690803571
+        finishedAt: "2056-06-22T17:22:55Z"
         message: "483"
         reason: "482"
-        signal: -1952419528
-        startedAt: "2135-06-21T01:04:43Z"
+        signal: 1574959758
+        startedAt: "2871-08-02T00:56:38Z"
       waiting:
         message: "481"
         reason: "480"
     name: "474"
-    ready: false
-    restartCount: -391574961
-    started: true
+    ready: true
+    restartCount: -560956057
+    started: false
     state:
       running:
-        startedAt: "2207-07-09T15:21:43Z"
+        startedAt: "2045-05-04T00:27:18Z"
       terminated:
         containerID: "479"
-        exitCode: 1874682186
-        finishedAt: "2465-03-18T23:55:27Z"
+        exitCode: 840157370
+        finishedAt: "2115-03-23T22:33:35Z"
         message: "478"
         reason: "477"
-        signal: -768346969
-        startedAt: "2757-03-25T09:04:49Z"
+        signal: 165747350
+        startedAt: "2362-01-25T20:42:09Z"
       waiting:
         message: "476"
         reason: "475"
   message: "468"
   nominatedNodeName: "470"
-  phase: VǢɾ纤ą
+  phase: ą¨?ɣ蔫椁
   podIP: "472"
   podIPs:
   - ip: "473"
-  qosClass: 澵貛香"砻B
+  qosClass: '!ɝ茀ǨĪ弊ʥ汹ȡWU=ȑ-A敲'
   reason: "469"

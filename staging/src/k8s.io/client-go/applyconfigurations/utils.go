@@ -661,6 +661,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodDNSConfigOptionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodIP"):
 		return &applyconfigurationscorev1.PodIPApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodOS"):
+		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):

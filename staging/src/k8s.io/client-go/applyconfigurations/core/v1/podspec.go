@@ -60,6 +60,7 @@ type PodSpecApplyConfiguration struct {
 	Overhead                      *corev1.ResourceList                         `json:"overhead,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty"`
 	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty"`
+	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with
@@ -396,5 +397,13 @@ func (b *PodSpecApplyConfiguration) WithTopologySpreadConstraints(values ...*Top
 // If called multiple times, the SetHostnameAsFQDN field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithSetHostnameAsFQDN(value bool) *PodSpecApplyConfiguration {
 	b.SetHostnameAsFQDN = &value
+	return b
+}
+
+// WithOS sets the OS field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the OS field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithOS(value *PodOSApplyConfiguration) *PodSpecApplyConfiguration {
+	b.OS = value
 	return b
 }
