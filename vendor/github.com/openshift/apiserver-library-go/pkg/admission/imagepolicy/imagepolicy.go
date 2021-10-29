@@ -488,8 +488,6 @@ var skipImageRewriteOnUpdate = map[metav1.GroupResource]struct{}{
 	{Group: "batch", Resource: "jobs"}: {},
 	// Build specs are immutable, they cannot be updated.
 	{Group: "build.openshift.io", Resource: "builds"}: {},
-	// TODO: remove when statefulsets allow spec.template updates in 3.7
-	{Group: "apps", Resource: "statefulsets"}: {},
 }
 
 // RewriteImagePullSpec applies to implicit rewrite attributes and local resources as well as if the policy requires it.
