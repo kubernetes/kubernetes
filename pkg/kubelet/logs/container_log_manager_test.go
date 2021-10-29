@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
