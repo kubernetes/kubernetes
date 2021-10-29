@@ -580,6 +580,8 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			registerMetrics.Do(func() {
 				legacyregistry.MustRegister(vec)
 			})
+			defer legacyregistry.Reset()
+
 			// Observe two metrics with same value for label1 but different value of label2.
 			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
 			vec.WithLabelValues("value1-0", "value2-1").Observe(2.5)
