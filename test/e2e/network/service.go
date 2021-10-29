@@ -1684,14 +1684,14 @@ var _ = common.SIGDescribe("Services", func() {
 			Image: t.Image,
 			Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: v1.ProtocolTCP}},
 			ReadinessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/false"},
 					},
 				},
 			},
 			Lifecycle: &v1.Lifecycle{
-				PreStop: &v1.Handler{
+				PreStop: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
 					},

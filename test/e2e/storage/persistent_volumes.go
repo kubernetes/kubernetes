@@ -341,7 +341,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				writeCmd += "&& sleep 10000"
 
 				probe := &v1.Probe{
-					Handler: v1.Handler{
+					ProbeHandler: v1.ProbeHandler{
 						Exec: &v1.ExecAction{
 							// Check that the last file got created
 							Command: []string{"test", "-f", getVolumeFile(numVols - 1)},

@@ -1746,25 +1746,6 @@ message HTTPHeader {
   optional string value = 2;
 }
 
-// Handler defines a specific action that should be taken
-// TODO: pass structured data to these actions, and document that data here.
-message Handler {
-  // One and only one of the following should be specified.
-  // Exec specifies the action to take.
-  // +optional
-  optional ExecAction exec = 1;
-
-  // HTTPGet specifies the http request to perform.
-  // +optional
-  optional HTTPGetAction httpGet = 2;
-
-  // TCPSocket specifies an action involving a TCP port.
-  // TCP hooks not yet supported
-  // TODO: implement a realistic TCP lifecycle hook
-  // +optional
-  optional TCPSocketAction tcpSocket = 3;
-}
-
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 message HostAlias {
@@ -1932,7 +1913,7 @@ message Lifecycle {
   // Other management of the container blocks until the hook completes.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler postStart = 1;
+  optional LifecycleHandler postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
   // API request or management event such as liveness/startup probe failure,
@@ -1945,7 +1926,28 @@ message Lifecycle {
   // or until the termination grace period is reached.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler preStop = 2;
+  optional LifecycleHandler preStop = 2;
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+message LifecycleHandler {
+  // One and only one of the following should be specified.
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // TCP hooks not yet supported
+  // TODO: implement a realistic TCP lifecycle hook
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -3928,7 +3930,7 @@ message PreferredSchedulingTerm {
 // alive or ready to receive traffic.
 message Probe {
   // The action taken to determine the health of a container
-  optional Handler handler = 1;
+  optional ProbeHandler handler = 1;
 
   // Number of seconds after the container has started before liveness probes are initiated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
@@ -3968,6 +3970,27 @@ message Probe {
   // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
+}
+
+// ProbeHandler defines a specific action that should be taken in a probe.
+// This type has a strong relationship to LifecycleHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+message ProbeHandler {
+  // One and only one of the following should be specified.
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // TCP hooks not yet supported
+  // TODO: implement a realistic TCP lifecycle hook
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 }
 
 // Represents a projected volume source
