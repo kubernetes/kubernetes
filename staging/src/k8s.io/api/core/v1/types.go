@@ -5919,6 +5919,7 @@ type Secret struct {
 	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 
 	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }

@@ -5105,6 +5105,7 @@ type Secret struct {
 	Data map[string][]byte `datapolicy:"password,security-key,token"`
 
 	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	Type SecretType
 }
