@@ -382,7 +382,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(ioStreams)
+	alpha := NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
