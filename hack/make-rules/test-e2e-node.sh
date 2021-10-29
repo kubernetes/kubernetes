@@ -98,6 +98,7 @@ if [ "${remote}" = true ] ; then
   fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
+  image_config_dir=${IMAGE_CONFIG_DIR:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
     image_project="${IMAGE_PROJECT:-"cos-cloud"}"
     gci_image=$(gcloud compute images list --project "${image_project}" \
@@ -172,7 +173,7 @@ if [ "${remote}" = true ] ; then
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
-    --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" \
+    --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --image-config-dir="${image_config_dir}" \
     --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
