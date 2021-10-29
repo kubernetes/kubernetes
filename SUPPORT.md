@@ -10,7 +10,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 
 * [Kubernetes on Stack Overflow](https://stackoverflow.com/questions/tagged/kubernetes)
 
-  * Here are some tips for [about how to ask good questions](https://stackoverflow.com/help/how-to-ask).
+  * Here are some tips  [about how to ask good questions](https://stackoverflow.com/help/how-to-ask).
   * Don't forget to check to see [what's on topic](http://stackoverflow.com/help/on-topic).
 
 ### Documentation
