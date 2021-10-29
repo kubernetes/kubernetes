@@ -19,7 +19,6 @@ package metrics
 import (
 	"fmt"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -37,7 +36,6 @@ const (
 	numIterations         = 100
 )
 
-var registerMetrics sync.Once
 
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
@@ -64,9 +62,7 @@ func TestSampler(t *testing.T) {
 	saw := gen.Generate(0, 1, []string{})
 	regs := gen.metrics()
 	for _, reg := range regs {
-		registerMetrics.Do(func() {
-			legacyregistry.MustRegister(reg)
-		})
+		legacyregistry.Register(reg)
 	}
 	// `dt` is the admitted cumulative difference in fake time
 	// since the start of the test.  "admitted" means this is

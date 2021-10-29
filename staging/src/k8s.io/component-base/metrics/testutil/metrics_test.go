@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var registerMetrics sync.Once
 
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
@@ -577,10 +575,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 				Buckets:   buckets,
 			}
 			vec := metrics.NewHistogramVec(HistogramOpts, labels)
-			registerMetrics.Do(func() {
-				legacyregistry.MustRegister(vec)
-			})
-			defer legacyregistry.Reset()
+			legacyregistry.Register(vec)
 
 			// Observe two metrics with same value for label1 but different value of label2.
 			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
