@@ -505,7 +505,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.It("execing into a container with a failing command", func() {
 				_, err := framework.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+    			framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
@@ -517,7 +519,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.It("running a failing command", func() {
 				_, err := framework.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+    			framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
@@ -526,7 +530,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+    			framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
@@ -537,7 +543,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+    			framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
