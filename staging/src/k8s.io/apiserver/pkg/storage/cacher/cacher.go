@@ -516,13 +516,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(err), nil
 	}
 
-	// With some events already sent, update resourceVersion so that
-	// events that were buffered and not yet processed won't be delivered
-	// to this watcher second time causing going back in time.
-	if len(initEvents) > 0 {
-		watchRV = initEvents[len(initEvents)-1].ResourceVersion
-	}
-
 	func() {
 		c.Lock()
 		defer c.Unlock()
@@ -537,7 +530,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.watcherIdx++
 	}()
 
-	go watcher.process(ctx, initEvents, watchRV)
+	go watcher.processEvents(ctx, initEvents, watchRV)
 	return watcher, nil
 }
 
@@ -1392,7 +1385,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) processEvents(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -1413,15 +1406,25 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}
+
 	objType := c.objectType.String()
 	if len(initEvents) > 0 {
 		initCounter.WithLabelValues(objType).Add(float64(len(initEvents)))
+		// With some events already sent, update resourceVersion
+		// so that events that were buffered and not yet processed
+		// won't be delivered to this watcher second time causing
+		// going back in time.
+		resourceVersion = initEvents[len(initEvents)-1].ResourceVersion
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", len(initEvents), objType, c.identifier, processingTime)
 	}
 
+	c.process(ctx, resourceVersion)
+}
+
+func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	// At this point we already start processing incoming watch events.
 	// However, the init event can still be processed because their serialization
 	// and sending to the client happens asynchrnously.
