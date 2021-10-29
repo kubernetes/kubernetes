@@ -295,6 +295,7 @@ function Set-EnvironmentVars {
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
     "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
+    "WINDOWS_ENABLE_HYPERV" = ${kube_env}['WINDOWS_ENABLE_HYPERV']
     "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
     "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
 
@@ -1384,6 +1385,24 @@ function Test-ContainersFeatureInstalled {
 function Install-ContainersFeature {
   Log-Output "Installing Windows 'Containers' feature"
   Install-WindowsFeature Containers
+}
+
+# Verifies if Hyper-V should be enabled in the node
+function Test-ShouldEnableHyperVFeature {
+  return "${env:WINDOWS_ENABLE_HYPERV}" -eq "true"
+}
+
+# Check if Hyper-V feature is enabled
+function Test-HyperVFeatureEnabled {
+  return ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled')
+}
+
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Enable-HyperVFeature {
+  Log-Output "Enabling Windows 'HyperV' feature"
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
 }
 
 function Test-DockerIsInstalled {
