@@ -18,6 +18,7 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -25,20 +26,24 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
+	"k8s.io/pod-security-admission/admission/api/load"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
+	"k8s.io/pod-security-admission/test"
 	"k8s.io/utils/pointer"
 )
 
@@ -194,12 +199,14 @@ func (t *testEvaluator) EvaluatePod(lv api.LevelVersion, meta *metav1.ObjectMeta
 	}
 }
 
-type testNamespaceGetter struct {
-	ns *corev1.Namespace
-}
+type testNamespaceGetter map[string]*corev1.Namespace
 
-func (t *testNamespaceGetter) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
-	return t.ns, nil
+func (t testNamespaceGetter) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
+	if ns, ok := t[name]; ok {
+		return ns.DeepCopy(), nil
+	} else {
+		return nil, apierrors.NewNotFound(corev1.Resource("namespaces"), name)
+	}
 }
 
 type testPodLister struct {
@@ -734,11 +741,10 @@ func TestValidatePodController(t *testing.T) {
 			evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
 			assert.NoError(t, err)
 			nsGetter := &testNamespaceGetter{
-				ns: &corev1.Namespace{
+				testNamespace: &corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      testName,
-						Namespace: testNamespace,
-						Labels:    nsLabels}},
+						Name:   testName,
+						Labels: nsLabels}},
 			}
 			PodSpecExtractor := &DefaultPodSpecExtractor{}
 			recorder := &FakeRecorder{}
@@ -778,6 +784,329 @@ func TestValidatePodController(t *testing.T) {
 				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeWarn})
 			}
 			recorder.ExpectEvaluations(t, expectedEvaluations)
+		})
+	}
+}
+
+func TestValidatePod(t *testing.T) {
+	const (
+		exemptNs        = "exempt-ns"
+		implicitNs      = "implicit-ns"
+		privilegedNs    = "privileged-ns"
+		baselineNs      = "baseline-ns"
+		baselineWarnNs  = "baseline-warn-ns"
+		baselineAuditNs = "baseline-audit-ns"
+		restrictedNs    = "restricted-ns"
+		invalidNs       = "invalid-ns"
+
+		exemptUser         = "exempt-user"
+		exemptRuntimeClass = "exempt-runtimeclass"
+	)
+
+	objMetadata := metav1.ObjectMeta{Name: "test-pod", Labels: map[string]string{"foo": "bar"}}
+
+	restrictedPod, err := test.GetMinimalValidPod(api.LevelRestricted, api.MajorMinorVersion(1, 23))
+	require.NoError(t, err)
+	restrictedPod.ObjectMeta = *objMetadata.DeepCopy()
+
+	baselinePod, err := test.GetMinimalValidPod(api.LevelBaseline, api.MajorMinorVersion(1, 23))
+	require.NoError(t, err)
+	baselinePod.ObjectMeta = *objMetadata.DeepCopy()
+
+	privilegedPod := *baselinePod.DeepCopy()
+	privilegedPod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+		Privileged: pointer.Bool(true),
+	}
+
+	exemptRCPod := *privilegedPod.DeepCopy()
+	exemptRCPod.Spec.RuntimeClassName = pointer.String(exemptRuntimeClass)
+
+	tolerantPod := *privilegedPod.DeepCopy()
+	tolerantPod.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
+	differentPrivilegedPod := *privilegedPod.DeepCopy()
+	differentPrivilegedPod.Spec.Containers[0].Image = "https://example.com/a-different-image"
+
+	differentRestrictedPod := *restrictedPod.DeepCopy()
+	differentRestrictedPod.Spec.Containers[0].Image = "https://example.com/a-different-image"
+
+	deployment := appsv1.Deployment{
+		ObjectMeta: *objMetadata.DeepCopy(),
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: *objMetadata.DeepCopy(),
+				Spec:       *restrictedPod.Spec.DeepCopy(),
+			},
+		},
+	}
+
+	makeNs := func(enforceLevel, warnLevel, auditLevel api.Level) *corev1.Namespace {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{},
+			},
+		}
+		if enforceLevel != "" {
+			ns.Labels[api.EnforceLevelLabel] = string(enforceLevel)
+		}
+		if warnLevel != "" {
+			ns.Labels[api.WarnLevelLabel] = string(warnLevel)
+		}
+		if auditLevel != "" {
+			ns.Labels[api.AuditLevelLabel] = string(auditLevel)
+		}
+		return ns
+	}
+	nsGetter := testNamespaceGetter{
+		exemptNs:        makeNs(api.LevelRestricted, api.LevelRestricted, api.LevelRestricted),
+		implicitNs:      makeNs("", "", ""),
+		privilegedNs:    makeNs(api.LevelPrivileged, api.LevelPrivileged, api.LevelPrivileged),
+		baselineNs:      makeNs(api.LevelBaseline, "", ""),
+		baselineWarnNs:  makeNs("", api.LevelBaseline, ""),
+		baselineAuditNs: makeNs("", "", api.LevelBaseline),
+		restrictedNs:    makeNs(api.LevelRestricted, api.LevelRestricted, api.LevelRestricted),
+		invalidNs:       makeNs("not-a-valid-level", "", ""),
+	}
+
+	config, err := load.LoadFromData(nil) // Start with the default config.
+	require.NoError(t, err, "loading default config")
+	config.Exemptions.Namespaces = []string{exemptNs}
+	config.Exemptions.RuntimeClasses = []string{exemptRuntimeClass}
+	config.Exemptions.Usernames = []string{exemptUser}
+
+	evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
+	assert.NoError(t, err)
+
+	testCases := []struct {
+		desc string
+
+		namespace    string
+		username     string
+		runtimeClass string
+
+		operation   admissionv1.Operation
+		obj         runtime.Object
+		objErr      error // Error to return instead of obj by attrs.GetObject()
+		oldObj      runtime.Object
+		oldObjErr   error // Error to return instead of oldObj by attrs.GetOldObject()
+		subresource string
+
+		expectAllowed               bool
+		expectReason                metav1.StatusReason
+		expectWarning               bool
+		expectedAuditAnnotationKeys []string
+	}{
+		{
+			desc:          "ignored subresource",
+			namespace:     restrictedNs,
+			obj:           privilegedPod.DeepCopy(),
+			subresource:   "status",
+			expectAllowed: true,
+		},
+		{
+			desc:                        "exempt namespace",
+			namespace:                   exemptNs,
+			obj:                         privilegedPod.DeepCopy(),
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"exempt"},
+		},
+		{
+			desc:                        "exempt user",
+			namespace:                   restrictedNs,
+			username:                    exemptUser,
+			obj:                         privilegedPod.DeepCopy(),
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"exempt"},
+		},
+		{
+			desc:                        "exempt runtimeClass",
+			namespace:                   restrictedNs,
+			obj:                         exemptRCPod.DeepCopy(),
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"exempt"},
+		},
+		{
+			desc:          "namespace not found",
+			namespace:     "missing-ns",
+			obj:           restrictedPod.DeepCopy(),
+			expectAllowed: false,
+			expectReason:  metav1.StatusReasonInternalError,
+		},
+		{
+			desc:          "short-circuit privileged:latest (implicit)",
+			namespace:     implicitNs,
+			obj:           privilegedPod.DeepCopy(),
+			expectAllowed: true,
+		},
+		{
+			desc:          "short-circuit privileged:latest (explicit)",
+			namespace:     privilegedNs,
+			obj:           privilegedPod.DeepCopy(),
+			expectAllowed: true,
+		},
+		{
+			desc:          "failed decode",
+			namespace:     baselineNs,
+			objErr:        fmt.Errorf("expected (failed decode)"),
+			expectAllowed: false,
+			expectReason:  metav1.StatusReasonBadRequest,
+		},
+		{
+			desc:          "invalid object",
+			namespace:     baselineNs,
+			obj:           deployment.DeepCopy(),
+			expectAllowed: false,
+			expectReason:  metav1.StatusReasonBadRequest,
+		},
+		{
+			desc:          "failed decode old object",
+			namespace:     baselineNs,
+			operation:     admissionv1.Update,
+			obj:           restrictedPod.DeepCopy(),
+			oldObjErr:     fmt.Errorf("expected (failed decode)"),
+			expectAllowed: false,
+			expectReason:  metav1.StatusReasonBadRequest,
+		},
+		{
+			desc:          "invalid old object",
+			namespace:     baselineNs,
+			operation:     admissionv1.Update,
+			obj:           restrictedPod.DeepCopy(),
+			oldObj:        deployment.DeepCopy(),
+			expectAllowed: false,
+			expectReason:  metav1.StatusReasonBadRequest,
+		},
+		{
+			desc:          "insignificant pod update",
+			namespace:     restrictedNs,
+			operation:     admissionv1.Update,
+			obj:           tolerantPod.DeepCopy(),
+			oldObj:        privilegedPod.DeepCopy(),
+			expectAllowed: true,
+		},
+		{
+			desc:                        "significant pod update - denied",
+			namespace:                   baselineNs,
+			operation:                   admissionv1.Update,
+			obj:                         differentPrivilegedPod.DeepCopy(),
+			oldObj:                      privilegedPod.DeepCopy(),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonForbidden,
+			expectedAuditAnnotationKeys: []string{"enforce-policy"},
+		},
+		{
+			desc:                        "significant pod update - allowed",
+			namespace:                   restrictedNs,
+			operation:                   admissionv1.Update,
+			obj:                         differentRestrictedPod.DeepCopy(),
+			oldObj:                      restrictedPod,
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"enforce-policy"},
+		},
+		{
+			desc:                        "invalid namespace labels",
+			namespace:                   invalidNs,
+			obj:                         baselinePod.DeepCopy(),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonForbidden,
+			expectedAuditAnnotationKeys: []string{"enforce-policy", "error"},
+		},
+		{
+			desc:                        "enforce deny",
+			namespace:                   baselineNs,
+			obj:                         privilegedPod.DeepCopy(),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonForbidden,
+			expectedAuditAnnotationKeys: []string{"enforce-policy"},
+		},
+		{
+			desc:                        "enforce allow",
+			namespace:                   baselineNs,
+			obj:                         baselinePod.DeepCopy(),
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"enforce-policy"},
+		},
+		{
+			desc:                        "warn deny",
+			namespace:                   baselineWarnNs,
+			obj:                         privilegedPod.DeepCopy(),
+			expectAllowed:               true,
+			expectWarning:               true,
+			expectedAuditAnnotationKeys: []string{"enforce-policy"},
+		},
+		{
+			desc:                        "audit deny",
+			namespace:                   baselineAuditNs,
+			obj:                         privilegedPod.DeepCopy(),
+			expectAllowed:               true,
+			expectedAuditAnnotationKeys: []string{"enforce-policy", "audit-violations"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if tc.obj != nil {
+				tc.obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(tc.namespace)
+			}
+			if tc.oldObj != nil {
+				tc.oldObj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(tc.namespace)
+			}
+			attrs := &testAttributes{
+				AttributesRecord: api.AttributesRecord{
+					Name:        "test-pod",
+					Namespace:   tc.namespace,
+					Kind:        schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
+					Resource:    schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+					Subresource: tc.subresource,
+					Operation:   admissionv1.Create,
+					Object:      tc.obj,
+					OldObject:   tc.oldObj,
+					Username:    "test-user",
+				},
+				objectErr:    tc.objErr,
+				oldObjectErr: tc.oldObjErr,
+			}
+			if tc.operation != "" {
+				attrs.Operation = tc.operation
+			}
+			if tc.username != "" {
+				attrs.Username = tc.username
+			}
+
+			a := &Admission{
+				PodLister:       &testPodLister{},
+				Evaluator:       evaluator,
+				Configuration:   config,
+				Metrics:         &FakeRecorder{},
+				NamespaceGetter: nsGetter,
+			}
+			require.NoError(t, a.CompleteConfiguration(), "CompleteConfiguration()")
+			require.NoError(t, a.ValidateConfiguration(), "ValidateConfiguration()")
+
+			response := a.Validate(context.TODO(), attrs)
+
+			if tc.expectAllowed {
+				assert.True(t, response.Allowed, "Allowed")
+				assert.Nil(t, response.Result)
+			} else {
+				assert.False(t, response.Allowed)
+				if assert.NotNil(t, response.Result, "Result") {
+					assert.Equal(t, tc.expectReason, response.Result.Reason, "Reason")
+				}
+			}
+
+			if tc.expectWarning {
+				assert.NotEmpty(t, response.Warnings, "Warnings")
+			} else {
+				assert.Empty(t, response.Warnings, "Warnings")
+			}
+
+			assert.Len(t, response.AuditAnnotations, len(tc.expectedAuditAnnotationKeys), "AuditAnnotations")
+			for _, key := range tc.expectedAuditAnnotationKeys {
+				assert.Contains(t, response.AuditAnnotations, key, "AuditAnnotations")
+			}
 		})
 	}
 }
@@ -860,5 +1189,28 @@ func TestPrioritizePods(t *testing.T) {
 	}
 	if len(prioritizedPods) != len(pods) {
 		assert.Fail(t, "Pod count is not the same after prioritization")
+	}
+}
+
+type testAttributes struct {
+	api.AttributesRecord
+
+	objectErr    error
+	oldObjectErr error
+}
+
+func (a *testAttributes) GetObject() (runtime.Object, error) {
+	if a.objectErr != nil {
+		return nil, a.objectErr
+	} else {
+		return a.AttributesRecord.GetObject()
+	}
+}
+
+func (a *testAttributes) GetOldObject() (runtime.Object, error) {
+	if a.oldObjectErr != nil {
+		return nil, a.oldObjectErr
+	} else {
+		return a.AttributesRecord.GetOldObject()
 	}
 }

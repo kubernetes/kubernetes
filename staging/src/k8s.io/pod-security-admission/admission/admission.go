@@ -149,7 +149,7 @@ func extractPodSpecFromTemplate(template *corev1.PodTemplateSpec) (*metav1.Objec
 	return &template.ObjectMeta, &template.Spec, nil
 }
 
-// CompleteConfiguration() sets up default or derived configuration.
+// CompleteConfiguration sets up default or derived configuration.
 func (a *Admission) CompleteConfiguration() error {
 	if a.Configuration != nil {
 		if p, err := admissionapi.ToPolicy(a.Configuration.Defaults); err != nil {
@@ -168,7 +168,7 @@ func (a *Admission) CompleteConfiguration() error {
 	return nil
 }
 
-// ValidateConfiguration() ensures all required fields are set with valid values.
+// ValidateConfiguration ensures all required fields are set with valid values.
 func (a *Admission) ValidateConfiguration() error {
 	if a.Configuration == nil {
 		return fmt.Errorf("configuration required")
@@ -675,6 +675,7 @@ func internalErrorResponse(msg string) *admissionv1.AdmissionResponse {
 // Relevant mutable pod fields as of 1.21 are image and seccomp annotations:
 // * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
+	// TODO: invert this logic to only allow specific update types.
 	if pod.Annotations[corev1.SeccompPodAnnotationKey] != oldPod.Annotations[corev1.SeccompPodAnnotationKey] {
 		return true
 	}
