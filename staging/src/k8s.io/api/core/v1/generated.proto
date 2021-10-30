@@ -4087,7 +4087,7 @@ message Probe {
   optional int32 periodSeconds = 4;
 
   // Minimum consecutive successes for the probe to be considered successful after having failed.
-  // Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+  // Defaults to 1. Minimum value is 1.
   // +optional
   optional int32 successThreshold = 5;
 

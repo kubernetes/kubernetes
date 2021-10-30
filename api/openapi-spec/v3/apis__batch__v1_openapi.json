@@ -3040,7 +3040,7 @@
             "type": "integer"
           },
           "successThreshold": {
-            "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+            "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Minimum value is 1.",
             "format": "int32",
             "type": "integer"
           },

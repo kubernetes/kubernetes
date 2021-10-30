@@ -2108,7 +2108,6 @@ type Probe struct {
 	// +optional
 	PeriodSeconds int32
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Must be 1 for liveness and startup.
 	// +optional
 	SuccessThreshold int32
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
