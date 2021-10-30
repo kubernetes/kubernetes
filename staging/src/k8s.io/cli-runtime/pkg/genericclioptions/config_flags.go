@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/homedir"
 )
 
@@ -263,10 +264,15 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 		return nil, err
 	}
 
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
-	config.Burst = f.discoveryBurst
+	// We don't rate limit discovery by default, preferring to defer to APF.
+	// https://github.com/kubernetes/enhancements/tree/11a976c/keps/sig-api-machinery/1040-priority-and-fairness
+	config.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+
+	// If a discovery burst rate was explicitly supplied we honor it.
+	if f.discoveryBurst != 0 {
+		config.RateLimiter = nil
+		config.Burst = f.discoveryBurst
+	}
 
 	cacheDir := defaultCacheDir
 
@@ -278,6 +284,7 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
+	// TODO(negz): Should the discovery cache time be configurable?
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
@@ -413,10 +420,6 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		ImpersonateGroup: &impersonateGroup,
 
 		usePersistentConfig: usePersistentConfig,
-		// The more groups you have, the more discovery requests you need to make.
-		// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-		// double it just so we don't end up here again for a while.  This config is only used for discovery.
-		discoveryBurst: 100,
 	}
 }
 
