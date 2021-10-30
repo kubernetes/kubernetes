@@ -399,7 +399,11 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	if err != nil {
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		a.Metrics.RecordError(true, attrs)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()),
+		}
+		return response
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
@@ -410,13 +414,21 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode object")
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": "failed to decode object",
+		}
+		return response
 	}
 	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to extract pod template")
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": "failed to extract pod template",
+		}
+		return response
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
