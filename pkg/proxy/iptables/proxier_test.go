@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
@@ -709,6 +711,414 @@ func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
 	t.Errorf("%v", msg)
 }
 
+// findAllMatches takes an array of lines and a pattern with one parenthesized group, and
+// returns a sorted array of all of the unique matches of the parenthesized group.
+func findAllMatches(lines []string, pattern string) []string {
+	regex := regexp.MustCompile(pattern)
+	allMatches := sets.NewString()
+	for _, line := range lines {
+		match := regex.FindStringSubmatch(line)
+		if len(match) == 2 {
+			allMatches.Insert(match[1])
+		}
+	}
+	return allMatches.List()
+}
+
+// moveMatchingLines moves lines that match pattern from input to output
+func moveMatchingLines(pattern string, input, output []string) ([]string, []string) {
+	var newIn []string
+	regex := regexp.MustCompile(pattern)
+	for _, line := range input {
+		if regex.FindString(line) != "" {
+			output = append(output, line)
+		} else {
+			newIn = append(newIn, line)
+		}
+	}
+	return newIn, output
+}
+
+// sortIPTablesRules sorts `iptables-restore` output so as to not depend on the order that
+// Services get processed in, while preserving the relative ordering of related rules.
+func sortIPTablesRules(ruleData string) (string, error) {
+	tables := strings.Split(strings.TrimPrefix(ruleData, "\n"), "COMMIT\n")
+	if len(tables) != 3 || tables[2] != "" {
+		return "", fmt.Errorf("wrong number of tables (%d) in ruleData\n%s", len(tables)-1, ruleData)
+	}
+	tables = tables[:2]
+	var output []string
+
+	for _, table := range tables {
+		lines := strings.Split(strings.Trim(table, "\n"), "\n")
+
+		// Move "*TABLENAME" line
+		lines, output = moveMatchingLines(`^\*`, lines, output)
+
+		// findAllMatches() returns a sorted list of unique matches. So for
+		// each of the following, we find all the matches for the regex, then
+		// for each unique match (in sorted order), move all of the lines that
+		// contain that match.
+
+		// Move and sort ":CHAINNAME" lines
+		for _, chainName := range findAllMatches(lines, `^(:[^ ]*) `) {
+			lines, output = moveMatchingLines(chainName, lines, output)
+		}
+
+		// Move KUBE-NODEPORTS rules for each service, sorted by service name
+		for _, nextNodePortService := range findAllMatches(lines, `-A KUBE-NODEPORTS.*--comment "?([^ ]*)`) {
+			lines, output = moveMatchingLines(fmt.Sprintf(`^-A KUBE-NODEPORTS.*%s`, nextNodePortService), lines, output)
+		}
+
+		// Move KUBE-SERVICES rules for each service, sorted by service name
+		for _, nextService := range findAllMatches(lines, `-A KUBE-SERVICES.*--comment "?([^ ]*)`) {
+			lines, output = moveMatchingLines(fmt.Sprintf(`^-A KUBE-SERVICES.*%s`, nextService), lines, output)
+		}
+
+		// Move remaining chains, sorted by chain name
+		for _, nextChain := range findAllMatches(lines, `(-A KUBE-[^ ]* )`) {
+			lines, output = moveMatchingLines(nextChain, lines, output)
+		}
+
+		// There should not be anything left, but if there is, just move it over now
+		// and it will show up in the diff later.
+		_, output = moveMatchingLines(".", lines, output)
+
+		// The "COMMIT" line got eaten by strings.Split() above, so put it back
+		output = append(output, "COMMIT")
+	}
+
+	// Input ended with a "\n", so make sure the output does too
+	output = append(output, "")
+
+	return strings.Join(output, "\n"), nil
+}
+
+// assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
+// expected, ignoring irrelevant ordering differences.
+func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
+	expected, err := sortIPTablesRules(expected)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	result, err = sortIPTablesRules(result)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	assert.Equal(t, expected, result)
+}
+
+func Test_sortIPTablesRules(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		input  string
+		output string
+		error  string
+	}{
+		{
+			name: "basic test using each match type",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
+:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
+:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
+:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.4:80
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+			output: `
+*filter
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
+:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
+:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.4:80
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
+COMMIT
+`,
+		},
+		{
+			name: "not enough tables",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: "wrong number of tables (1)",
+		},
+		{
+			name: "too many tables",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*mangle
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: "wrong number of tables (3)",
+		},
+		{
+			name: "correctly match same service name in different styles of comments",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" svc2 line 1
+-A KUBE-SERVICES -m comment --comment ns2/svc2 svc2 line 2
+-A KUBE-SERVICES -m comment --comment "ns2/svc2 blah" svc2 line 3
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" svc1 line 1
+-A KUBE-SERVICES -m comment --comment ns1/svc1 svc1 line 2
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 blah" svc1 line 3
+-A KUBE-SERVICES -m comment --comment ns4/svc4 svc4 line 1
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" svc4 line 2
+-A KUBE-SERVICES -m comment --comment "ns4/svc4 blah" svc4 line 3
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" svc3 line 1
+-A KUBE-SERVICES -m comment --comment "ns3/svc3 blah" svc3 line 2
+-A KUBE-SERVICES -m comment --comment ns3/svc3 svc3 line 3
+COMMIT
+`,
+			output: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" svc1 line 1
+-A KUBE-SERVICES -m comment --comment ns1/svc1 svc1 line 2
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 blah" svc1 line 3
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" svc2 line 1
+-A KUBE-SERVICES -m comment --comment ns2/svc2 svc2 line 2
+-A KUBE-SERVICES -m comment --comment "ns2/svc2 blah" svc2 line 3
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" svc3 line 1
+-A KUBE-SERVICES -m comment --comment "ns3/svc3 blah" svc3 line 2
+-A KUBE-SERVICES -m comment --comment ns3/svc3 svc3 line 3
+-A KUBE-SERVICES -m comment --comment ns4/svc4 svc4 line 1
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" svc4 line 2
+-A KUBE-SERVICES -m comment --comment "ns4/svc4 blah" svc4 line 3
+COMMIT
+`,
+		},
+		{
+			name: "unexpected junk lines are preserved",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-AAAAA - [0:0]
+:KUBE-ZZZZZ - [0:0]
+:WHY-IS-THIS-CHAIN-HERE - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" svc2 line 1
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-ZZZZZ -m comment --comment "mystery chain number 1"
+-A KUBE-SERVICES -m comment --comment ns2/svc2 svc2 line 2
+-A WHY-IS-THIS-CHAIN-HERE -j ACCEPT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2 blah" svc2 line 3
+-A KUBE-AAAAA -m comment --comment "mystery chain number 2"
+COMMIT
+`,
+			output: `
+*filter
+COMMIT
+*nat
+:KUBE-AAAAA - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SERVICES - [0:0]
+:KUBE-ZZZZZ - [0:0]
+:WHY-IS-THIS-CHAIN-HERE - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" svc2 line 1
+-A KUBE-SERVICES -m comment --comment ns2/svc2 svc2 line 2
+-A KUBE-SERVICES -m comment --comment "ns2/svc2 blah" svc2 line 3
+-A KUBE-AAAAA -m comment --comment "mystery chain number 2"
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-ZZZZZ -m comment --comment "mystery chain number 1"
+-A WHY-IS-THIS-CHAIN-HERE -j ACCEPT
+COMMIT
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := sortIPTablesRules(tc.input)
+			if err == nil {
+				if tc.error != "" {
+					t.Errorf("unexpectedly did not get error")
+				} else {
+					assert.Equal(t, strings.TrimPrefix(tc.output, "\n"), out)
+				}
+			} else {
+				if tc.error == "" {
+					t.Errorf("got unexpected error: %v", err)
+				} else if !strings.HasPrefix(err.Error(), tc.error) {
+					t.Errorf("got wrong error: %v (expected %q)", err, tc.error)
+				}
+			}
+		})
+	}
+}
+
 // TestOverallIPTablesRulesWithMultipleServices creates 4 types of services: ClusterIP,
 // LoadBalancer, ExternalIP and NodePort and verifies if the NAT table rules created
 // are exactly the same as what is expected. This test provides an overall view of how
@@ -829,7 +1239,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	expected := `*filter
+	expected := `
+*filter
 :KUBE-SERVICES - [0:0]
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
@@ -874,8 +1285,8 @@ COMMIT
 -A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
 -A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
--A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
@@ -900,14 +1311,7 @@ COMMIT
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
-	// Adding logic to split and sort the strings because
-	// depending on the creation order of services, the user-chains get jumbled.
-	expectedSlice := strings.Split(strings.TrimSuffix(expected, "\n"), "\n")
-	sort.Strings(expectedSlice)
-	originalSlice := strings.Split(strings.TrimSuffix(fp.iptablesData.String(), "\n"), "\n")
-	sort.Strings(originalSlice)
-
-	assert.Equal(t, expectedSlice, originalSlice)
+	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
 
 	nNatRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
 	if err != nil {
