@@ -123,13 +123,12 @@ func TestTimeouts(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 			var (
-				service         Service
-				err             error
-				data            = []byte("test data")
-				kubeAPIServerWG sync.WaitGroup
-				kmsPluginWG     sync.WaitGroup
-				testCompletedWG sync.WaitGroup
-				socketName      = newEndpoint()
+				service                   Service
+				err                       error
+				data                      = []byte("test data")
+				testCompletedWG           sync.WaitGroup
+				socketName                = newEndpoint()
+				kubeAPIErrCh, pluginErrCh = make(chan error, 1), make(chan error, 1)
 			)
 
 			testCompletedWG.Add(1)
@@ -137,40 +136,45 @@ func TestTimeouts(t *testing.T) {
 
 			ctx := testContext(t)
 
-			kubeAPIServerWG.Add(1)
 			go func() {
 				// Simulating late start of kube-apiserver - plugin is up before kube-apiserver, if requested by the testcase.
 				time.Sleep(tt.kubeAPIServerDelay)
 
 				service, err = NewGRPCService(ctx, socketName.endpoint, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					kubeAPIErrCh <- fmt.Errorf("failed to create envelope service, error: %v", err)
+					return
 				}
+				kubeAPIErrCh <- nil
+
 				defer destroyService(service)
-				kubeAPIServerWG.Done()
 				// Keeping kube-apiserver up to process requests.
 				testCompletedWG.Wait()
 			}()
 
-			kmsPluginWG.Add(1)
 			go func() {
 				// Simulating delayed start of kms-plugin, kube-apiserver is up before the plugin, if requested by the testcase.
 				time.Sleep(tt.pluginDelay)
 
 				f, err := mock.NewBase64Plugin(socketName.path)
 				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
+					pluginErrCh <- fmt.Errorf("failed to construct test KMS provider server, error: %v", err)
+					return
 				}
 				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
+					pluginErrCh <- fmt.Errorf("Failed to start test KMS provider server, error: %v", err)
+					return
 				}
+				pluginErrCh <- nil
+
 				defer f.CleanUp()
-				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
 			}()
 
-			kubeAPIServerWG.Wait()
+			if err := <-kubeAPIErrCh; err != nil {
+				t.Fatalf("Expected envelop service to be ready, but got: %v", err)
+			}
 			_, err = service.Encrypt(data)
 
 			if err == nil && tt.wantErr != "" {
@@ -181,8 +185,10 @@ func TestTimeouts(t *testing.T) {
 				t.Fatalf("got %q, want nil", err.Error())
 			}
 
-			// Collecting kms-plugin - allowing plugin to clean-up.
-			kmsPluginWG.Wait()
+			if err := <-pluginErrCh; err != nil {
+				t.Fatalf("Expected kms plugin to be ready, but got: %v", err)
+			}
+
 		})
 	}
 }
