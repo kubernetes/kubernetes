@@ -19,7 +19,6 @@ package admission
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"reflect"
 	"sort"
 	"time"
@@ -233,13 +232,13 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 	}
 	obj, err := attrs.GetObject()
 	if err != nil {
-		klog.ErrorS(err, "failed to get object")
-		return internalErrorResponse("failed to get object")
+		klog.ErrorS(err, "failed to decode object")
+		return errorResponse(err, &apierrors.NewBadRequest("failed to decode object").ErrStatus)
 	}
 	namespace, ok := obj.(*corev1.Namespace)
 	if !ok {
 		klog.InfoS("failed to assert namespace type", "type", reflect.TypeOf(obj))
-		return badRequestResponse("failed to decode namespace")
+		return errorResponse(nil, &apierrors.NewBadRequest("failed to decode namespace").ErrStatus)
 	}
 
 	newPolicy, newErrs := a.PolicyToEvaluate(namespace.Labels)
@@ -257,12 +256,12 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
-			return badRequestResponse("failed to decode old object")
+			return errorResponse(err, &apierrors.NewBadRequest("failed to decode  old object").ErrStatus)
 		}
 		oldNamespace, ok := oldObj.(*corev1.Namespace)
 		if !ok {
 			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(oldObj))
-			return badRequestResponse("failed to decode old namespace")
+			return errorResponse(nil, &apierrors.NewBadRequest("failed to decode  old namespace").ErrStatus)
 		}
 		oldPolicy, oldErrs := a.PolicyToEvaluate(oldNamespace.Labels)
 
@@ -335,7 +334,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	if err != nil {
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		a.Metrics.RecordError(true, attrs)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+		return errorResponse(err, &apierrors.NewInternalError(fmt.Errorf("failed to lookup namespace %s", attrs.GetNamespace())).ErrStatus)
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
@@ -347,26 +346,26 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode object")
+		return errorResponse(err, &apierrors.NewBadRequest("failed to decode object").ErrStatus)
 	}
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode pod")
+		return errorResponse(nil, &apierrors.NewBadRequest("failed to decode pod").ErrStatus)
 	}
 	if attrs.GetOperation() == admissionv1.Update {
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
 			a.Metrics.RecordError(true, attrs)
-			return badRequestResponse("failed to decode old object")
+			return errorResponse(err, &apierrors.NewBadRequest("failed to decode old object").ErrStatus)
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
 			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
 			a.Metrics.RecordError(true, attrs)
-			return badRequestResponse("failed to decode old pod")
+			return errorResponse(nil, &apierrors.NewBadRequest("failed to decode old pod").ErrStatus)
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
@@ -401,7 +400,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		a.Metrics.RecordError(true, attrs)
 		response := allowedResponse()
 		response.AuditAnnotations = map[string]string{
-			"error": fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()),
+			"error": fmt.Sprintf("failed to lookup namespace %s: %v", attrs.GetNamespace(), err),
 		}
 		return response
 	}
@@ -416,7 +415,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		a.Metrics.RecordError(true, attrs)
 		response := allowedResponse()
 		response.AuditAnnotations = map[string]string{
-			"error": "failed to decode object",
+			"error": fmt.Sprintf("failed to decode object: %v", err),
 		}
 		return response
 	}
@@ -426,7 +425,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		a.Metrics.RecordError(true, attrs)
 		response := allowedResponse()
 		response.AuditAnnotations = map[string]string{
-			"error": "failed to extract pod template",
+			"error": fmt.Sprintf("failed to extract pod template: %v", err),
 		}
 		return response
 	}
@@ -464,8 +463,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 		result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec))
 		if !result.Allowed {
-			response = forbiddenResponse(fmt.Sprintf(
-				"pod violates PodSecurity %q: %s",
+			response = forbiddenResponse(attrs, fmt.Errorf(
+				"violates PodSecurity %q: %s",
 				nsPolicy.Enforce.String(),
 				result.ForbiddenDetail(),
 			))
@@ -611,76 +610,6 @@ func decoratePodWarnings(podWarningsToCount map[string]podCount, warnings []stri
 
 func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, field.ErrorList) {
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
-}
-
-var (
-	_sharedAllowedResponse                        = allowedResponse()
-	_sharedAllowedByUserExemptionResponse         = allowedByExemptResponse("user")
-	_sharedAllowedByNamespaceExemptionResponse    = allowedByExemptResponse("namespace")
-	_sharedAllowedByRuntimeClassExemptionResponse = allowedByExemptResponse("runtimeClass")
-)
-
-func sharedAllowedResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedResponse
-}
-
-func sharedAllowedByUserExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByUserExemptionResponse
-}
-
-func sharedAllowedByNamespaceExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByNamespaceExemptionResponse
-}
-
-func sharedAllowedByRuntimeClassExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByRuntimeClassExemptionResponse
-}
-
-// allowedResponse is the response used when the admission decision is allow.
-func allowedResponse() *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{Allowed: true}
-}
-
-func allowedByExemptResponse(exemptionReason string) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed:          true,
-		AuditAnnotations: map[string]string{api.ExemptionReasonAnnotationKey: exemptionReason},
-	}
-}
-
-func failureResponse(msg string, reason metav1.StatusReason, code int32) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Reason:  reason,
-			Message: msg,
-			Code:    code,
-		},
-	}
-}
-
-// forbiddenResponse is the response used when the admission decision is deny for policy violations.
-func forbiddenResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonForbidden, http.StatusForbidden)
-}
-
-// invalidResponse is the response used for namespace requests when namespace labels are invalid.
-func invalidResponse(attrs api.Attributes, fieldErrors field.ErrorList) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result:  &apierrors.NewInvalid(attrs.GetKind().GroupKind(), attrs.GetName(), fieldErrors).ErrStatus,
-	}
-}
-
-// badRequestResponse is the response used when a request cannot be processed.
-func badRequestResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonBadRequest, http.StatusBadRequest)
-}
-
-// internalErrorResponse is the response used for unexpected errors
-func internalErrorResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonInternalError, http.StatusInternalServerError)
 }
 
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.

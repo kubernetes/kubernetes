@@ -688,14 +688,14 @@ func TestValidatePodAndController(t *testing.T) {
 	type testCase struct {
 		desc string
 
-		namespace    string
-		username     string
-		runtimeClass string
+		namespace string
+		username  string
 
-		operation admissionv1.Operation
-		pod       *corev1.Pod
-		oldPod    *corev1.Pod
+		// pod and oldPod are used to populate obj and oldObj respectively, according to the test type (pod or deployment).
+		pod    *corev1.Pod
+		oldPod *corev1.Pod
 
+		operation   admissionv1.Operation
 		resource    schema.GroupVersionResource
 		kind        schema.GroupVersionKind
 		obj         runtime.Object
@@ -744,11 +744,12 @@ func TestValidatePodAndController(t *testing.T) {
 			expectedAuditAnnotationKeys: []string{"exempt"},
 		},
 		{
-			desc:          "namespace not found",
-			namespace:     "missing-ns",
-			pod:           restrictedPod.DeepCopy(),
-			expectAllowed: false,
-			expectReason:  metav1.StatusReasonInternalError,
+			desc:                        "namespace not found",
+			namespace:                   "missing-ns",
+			pod:                         restrictedPod.DeepCopy(),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonInternalError,
+			expectedAuditAnnotationKeys: []string{"error"},
 		},
 		{
 			desc:          "short-circuit privileged:latest (implicit)",
@@ -763,39 +764,43 @@ func TestValidatePodAndController(t *testing.T) {
 			expectAllowed: true,
 		},
 		{
-			desc:          "failed decode",
-			namespace:     baselineNs,
-			objErr:        fmt.Errorf("expected (failed decode)"),
-			expectAllowed: false,
-			expectReason:  metav1.StatusReasonBadRequest,
+			desc:                        "failed decode",
+			namespace:                   baselineNs,
+			objErr:                      fmt.Errorf("expected (failed decode)"),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonBadRequest,
+			expectedAuditAnnotationKeys: []string{"error"},
 		},
 		{
-			desc:          "invalid object",
-			namespace:     baselineNs,
-			operation:     admissionv1.Update,
-			obj:           &corev1.Namespace{},
-			expectAllowed: false,
-			expectReason:  metav1.StatusReasonBadRequest,
+			desc:                        "invalid object",
+			namespace:                   baselineNs,
+			operation:                   admissionv1.Update,
+			obj:                         &corev1.Namespace{},
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonBadRequest,
+			expectedAuditAnnotationKeys: []string{"error"},
 		},
 		{
-			desc:           "failed decode old object",
-			namespace:      baselineNs,
-			operation:      admissionv1.Update,
-			pod:            restrictedPod.DeepCopy(),
-			oldObjErr:      fmt.Errorf("expected (failed decode)"),
-			expectAllowed:  false,
-			expectReason:   metav1.StatusReasonBadRequest,
-			skipDeployment: true, // Updates aren't special cased for controller resources.
+			desc:                        "failed decode old object",
+			namespace:                   baselineNs,
+			operation:                   admissionv1.Update,
+			pod:                         restrictedPod.DeepCopy(),
+			oldObjErr:                   fmt.Errorf("expected (failed decode)"),
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonBadRequest,
+			expectedAuditAnnotationKeys: []string{"error"},
+			skipDeployment:              true, // Updates aren't special cased for controller resources.
 		},
 		{
-			desc:           "invalid old object",
-			namespace:      baselineNs,
-			operation:      admissionv1.Update,
-			pod:            restrictedPod.DeepCopy(),
-			oldObj:         &corev1.Namespace{},
-			expectAllowed:  false,
-			expectReason:   metav1.StatusReasonBadRequest,
-			skipDeployment: true, // Updates aren't special cased for controller resources.
+			desc:                        "invalid old object",
+			namespace:                   baselineNs,
+			operation:                   admissionv1.Update,
+			pod:                         restrictedPod.DeepCopy(),
+			oldObj:                      &corev1.Namespace{},
+			expectAllowed:               false,
+			expectReason:                metav1.StatusReasonBadRequest,
+			expectedAuditAnnotationKeys: []string{"error"},
+			skipDeployment:              true, // Updates aren't special cased for controller resources.
 		},
 		{
 			desc:           "insignificant update",
@@ -907,12 +912,8 @@ func TestValidatePodAndController(t *testing.T) {
 		deploymentTest.desc = "deployment:" + tc.desc
 		deploymentTest.resource = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		deploymentTest.kind = schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
-		deploymentTest.expectAllowed = true // Deployments policies are non-enforcing.
+		deploymentTest.expectAllowed = true // PodController validation is always non-enforcing.
 		deploymentTest.expectReason = ""
-		if tc.expectReason != "" && tc.expectReason != metav1.StatusReasonForbidden {
-			// Error case, expect an error annotation.
-			deploymentTest.expectedAuditAnnotationKeys = append(deploymentTest.expectedAuditAnnotationKeys, "error")
-		}
 
 		if tc.pod != nil {
 			podTest.obj = tc.pod
