@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,7 +131,7 @@ func (v *VersionFile) Exists() (bool, error) {
 
 // Read parses the version.txt file and returns it's contents.
 func (v *VersionFile) Read() (*EtcdVersionPair, error) {
-	data, err := ioutil.ReadFile(v.path)
+	data, err := os.ReadFile(v.path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version file %s: %v", v.path, err)
 	}
@@ -173,7 +172,7 @@ func (v *VersionFile) Write(vp *EtcdVersionPair) error {
 	// We do write + rename instead of just write to protect from version.txt
 	// corruption under full disk condition.
 	// See https://github.com/kubernetes/kubernetes/issues/98989.
-	err = ioutil.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
+	err = os.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
 	if err != nil {
 		return fmt.Errorf("failed to write new version file %s: %v", v.nextPath(), err)
 	}
