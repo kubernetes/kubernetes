@@ -186,7 +186,7 @@ func TestFIFOQueueWorkEstimate(t *testing.T) {
 	update := func(we *queueSum, req *request, multiplier int) {
 		we.InitialSeatsSum += multiplier * req.InitialSeats()
 		we.MaxSeatsSum += multiplier * req.MaxSeats()
-		we.TotalWorkSum += SeatSeconds(multiplier) * req.totalWork()
+		we.TotalWorkSum += fcrequest.SeatSeconds(multiplier) * req.totalWork()
 	}
 
 	assert := func(t *testing.T, want, got *queueSum) {
