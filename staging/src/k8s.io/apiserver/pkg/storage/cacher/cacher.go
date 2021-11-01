@@ -68,8 +68,8 @@ type Config struct {
 	// An underlying storage.Versioner.
 	Versioner storage.Versioner
 
-	// The Cache will be caching objects of a given Type and assumes that they
-	// are all stored under ResourcePrefix directory in the underlying database.
+	// ResourcePrefix directory stores the empty object, which stores an object of type Type, 
+	// created by NewFunc function in the underlying database.
 	ResourcePrefix string
 
 	// KeyFunc is used to get a key in the underlying storage for a given object.
@@ -230,6 +230,7 @@ type Cacher struct {
 	// See: https://golang.org/pkg/sync/atomic/ for more information
 	incomingHWM storage.HighWaterMark
 	// Incoming events that should be dispatched to watchers.
+	// The number of incoming watchevents are currently 100(refer line 349)
 	incoming chan watchCacheEvent
 
 	resourcePrefix string
@@ -263,9 +264,10 @@ type Cacher struct {
 	// indexedTrigger is used for optimizing amount of watchers that needs to process
 	// an incoming event.
 	indexedTrigger *indexedTriggerFunc
-	// watchers is mapping from the value of trigger function that a
-	// watcher is interested into the watchers
+	
 	watcherIdx int
+	// watchers is mapping from the value of two trigger functions, cacheWatcher and watchersMap,
+	// that a watcher is interested into the watchers
 	watchers   indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
