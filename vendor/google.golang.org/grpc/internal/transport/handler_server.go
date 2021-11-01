@@ -141,9 +141,8 @@ type serverHandlerTransport struct {
 	stats stats.Handler
 }
 
-func (ht *serverHandlerTransport) Close() error {
+func (ht *serverHandlerTransport) Close() {
 	ht.closeOnce.Do(ht.closeCloseChanOnce)
-	return nil
 }
 
 func (ht *serverHandlerTransport) closeCloseChanOnce() { close(ht.closedCh) }
