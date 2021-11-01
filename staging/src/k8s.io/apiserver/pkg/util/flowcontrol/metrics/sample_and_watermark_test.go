@@ -36,6 +36,24 @@ const (
 	numIterations         = 100
 )
 
+var (
+	t0      = time.Now()
+	clk     = testclock.NewFakePassiveClock(t0)
+	buckets = []float64{0, 1}
+	gen     = NewSampleAndWaterMarkHistogramsGenerator(clk, samplingPeriod,
+		&compbasemetrics.HistogramOpts{Name: samplesHistName, Buckets: buckets},
+		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
+		[]string{})
+	dt time.Duration
+)
+
+func init() {
+	regs := gen.metrics()
+	for _, reg := range regs {
+		legacyregistry.MustRegister(reg)
+	}
+}
+
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
    it, checking that the count in the sampling histogram is correct at
@@ -51,23 +69,12 @@ const (
    change, until it resumes net forward progress.
 */
 func TestSampler(t *testing.T) {
-	t0 := time.Now()
-	clk := testclock.NewFakePassiveClock(t0)
-	buckets := []float64{0, 1}
-	gen := NewSampleAndWaterMarkHistogramsGenerator(clk, samplingPeriod,
-		&compbasemetrics.HistogramOpts{Name: samplesHistName, Buckets: buckets},
-		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
-		[]string{})
 	saw := gen.Generate(0, 1, []string{})
 	regs := gen.metrics()
-	for _, reg := range regs {
-		legacyregistry.Register(reg)
-	}
 	// `dt` is the admitted cumulative difference in fake time
 	// since the start of the test.  "admitted" means this is
 	// never allowed to decrease, which matches the designed
 	// toleration for negative monotonic clock changes.
-	var dt time.Duration
 	// `t1` is the current fake time
 	t1 := t0.Add(dt)
 	klog.Infof("Expect about %v warnings about time going backwards; this is fake time deliberately misbehaving.", (numIterations*ddtOffsetCentiPeriods)/ddtRangeCentiPeriods)
