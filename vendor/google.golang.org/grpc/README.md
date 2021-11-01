@@ -136,6 +136,6 @@ errors.
 [Go module]: https://github.com/golang/go/wiki/Modules
 [gRPC]: https://grpc.io
 [Go gRPC docs]: https://grpc.io/docs/languages/go
-[Performance benchmark]: https://performance-dot-grpc-testing.appspot.com/explore?dashboard=5652536396611584&widget=490377658&container=1286539696
+[Performance benchmark]: https://performance-dot-grpc-testing.appspot.com/explore?dashboard=5180705743044608
 [quick start]: https://grpc.io/docs/languages/go/quickstart
 [go-releases]: https://golang.org/doc/devel/release.html

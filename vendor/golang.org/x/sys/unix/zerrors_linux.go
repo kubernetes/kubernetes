@@ -231,6 +231,8 @@ const (
 	BPF_PSEUDO_FUNC                             = 0x4
 	BPF_PSEUDO_KFUNC_CALL                       = 0x2
 	BPF_PSEUDO_MAP_FD                           = 0x1
+	BPF_PSEUDO_MAP_IDX                          = 0x5
+	BPF_PSEUDO_MAP_IDX_VALUE                    = 0x6
 	BPF_PSEUDO_MAP_VALUE                        = 0x2
 	BPF_RET                                     = 0x6
 	BPF_RSH                                     = 0x70
@@ -1635,11 +1637,12 @@ const (
 	NFNL_MSG_BATCH_END                          = 0x11
 	NFNL_NFA_NEST                               = 0x8000
 	NFNL_SUBSYS_ACCT                            = 0x7
-	NFNL_SUBSYS_COUNT                           = 0xc
+	NFNL_SUBSYS_COUNT                           = 0xd
 	NFNL_SUBSYS_CTHELPER                        = 0x9
 	NFNL_SUBSYS_CTNETLINK                       = 0x1
 	NFNL_SUBSYS_CTNETLINK_EXP                   = 0x2
 	NFNL_SUBSYS_CTNETLINK_TIMEOUT               = 0x8
+	NFNL_SUBSYS_HOOK                            = 0xc
 	NFNL_SUBSYS_IPSET                           = 0x6
 	NFNL_SUBSYS_NFTABLES                        = 0xa
 	NFNL_SUBSYS_NFT_COMPAT                      = 0xb
@@ -1929,6 +1932,12 @@ const (
 	PR_PAC_GET_ENABLED_KEYS                     = 0x3d
 	PR_PAC_RESET_KEYS                           = 0x36
 	PR_PAC_SET_ENABLED_KEYS                     = 0x3c
+	PR_SCHED_CORE                               = 0x3e
+	PR_SCHED_CORE_CREATE                        = 0x1
+	PR_SCHED_CORE_GET                           = 0x0
+	PR_SCHED_CORE_MAX                           = 0x4
+	PR_SCHED_CORE_SHARE_FROM                    = 0x3
+	PR_SCHED_CORE_SHARE_TO                      = 0x2
 	PR_SET_CHILD_SUBREAPER                      = 0x24
 	PR_SET_DUMPABLE                             = 0x4
 	PR_SET_ENDIAN                               = 0x14
@@ -2295,6 +2304,7 @@ const (
 	SECCOMP_MODE_DISABLED                       = 0x0
 	SECCOMP_MODE_FILTER                         = 0x2
 	SECCOMP_MODE_STRICT                         = 0x1
+	SECRETMEM_MAGIC                             = 0x5345434d
 	SECURITYFS_MAGIC                            = 0x73636673
 	SEEK_CUR                                    = 0x1
 	SEEK_DATA                                   = 0x3
