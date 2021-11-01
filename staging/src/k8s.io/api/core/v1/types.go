@@ -5992,6 +5992,15 @@ const (
 	// DockerConfigJsonKey is the key of the required data for SecretTypeDockerConfigJson secrets
 	DockerConfigJsonKey = ".dockerconfigjson"
 
+	// SecretTypeCRIConfigJson contains a dockercfg file that follows the same format rules as ~/.docker/config.json
+	//
+	// Required fields:
+	// - Secret.Data["criconfigjson"] - a serialized ~/.docker/config.json file
+	SecretTypeCRIConfigJson SecretType = "kubernetes.io/criconfigjson"
+
+	// CRIConfigJsonKey is the key of the required data for SecretTypeCRIConfigJson secrets
+	CRIConfigJsonKey = "criconfigjson"
+
 	// SecretTypeBasicAuth contains data needed for basic authentication.
 	//
 	// Required at least one of fields:
