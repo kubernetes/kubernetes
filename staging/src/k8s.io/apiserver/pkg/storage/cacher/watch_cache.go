@@ -223,6 +223,7 @@ func newWatchCache(
 }
 
 // Add takes runtime.Object as an argument.
+// Add is safe as long as there is at most one call to it in flight at any point in time.
 func (w *watchCache) Add(obj interface{}) error {
 	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
@@ -235,6 +236,7 @@ func (w *watchCache) Add(obj interface{}) error {
 }
 
 // Update takes runtime.Object as an argument.
+// Update is safe as long as there is at most one call to it in flight at any point in time.
 func (w *watchCache) Update(obj interface{}) error {
 	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
@@ -247,6 +249,7 @@ func (w *watchCache) Update(obj interface{}) error {
 }
 
 // Delete takes runtime.Object as an argument.
+// Delete is safe as long as there is at most one call to it in flight at any point in time.
 func (w *watchCache) Delete(obj interface{}) error {
 	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
@@ -294,8 +297,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 
 	if err := func() error {
-		// TODO: We should consider moving this lock below after the watchCacheEvent
-		// is created. In such situation, the only problematic scenario is Replace(
+		// TODO: In such situation, the only problematic scenario is Replace()
 		// happening after getting object from store and before acquiring a lock.
 		// Maybe introduce another lock for this purpose.
 		w.Lock()
@@ -334,10 +336,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 // Assumes that lock is already held for write.
 func (w *watchCache) updateCache(event *watchCacheEvent) {
 	w.resizeCacheLocked(event.RecordTime)
-	if w.isCacheFullLocked() {
-		// Cache is full - remove the oldest element.
-		w.startIndex++
-	}
+	
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
 }
@@ -410,12 +409,12 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	}
 }
 
-// List returns list of pointers to <storeElement> objects.
+// List returns list of pointers to `storeElement` objects.
 func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
-// waitUntilFreshAndBlock waits until cache is at least as fresh as given <resourceVersion>.
+// waitUntilFreshAndBlock waits until cache is at least as fresh as given `resourceVersion`.
 // NOTE: This function acquired lock and doesn't release it.
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
@@ -480,7 +479,7 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	return w.store.List(), w.resourceVersion, "", nil
 }
 
-// WaitUntilFreshAndGet returns a pointers to <storeElement> object.
+// WaitUntilFreshAndGet returns a pointers to `storeElement` object.
 func (w *watchCache) WaitUntilFreshAndGet(resourceVersion uint64, key string, trace *utiltrace.Trace) (interface{}, bool, uint64, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
@@ -496,7 +495,7 @@ func (w *watchCache) ListKeys() []string {
 }
 
 // Get takes runtime.Object as a parameter. However, it returns
-// pointer to <storeElement>.
+// pointer to `storeElement`.
 func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
@@ -510,7 +509,7 @@ func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
 	return w.store.Get(&storeElement{Key: key, Object: object})
 }
 
-// GetByKey returns pointer to <storeElement>.
+// GetByKey returns pointer to `storeElement`.
 func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
 	return w.store.GetByKey(key)
 }
