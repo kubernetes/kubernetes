@@ -286,7 +286,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 			return sharedAllowedResponse()
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			return sharedAllowedResponse()
+			return sharedAllowedByNamespaceExemptionResponse()
 		}
 		response := allowedResponse()
 		response.Warnings = a.EvaluatePodsInNamespace(ctx, namespace.Name, newPolicy.Enforce)
@@ -319,8 +319,12 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
-	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		return sharedAllowedResponse()
+	if a.exemptNamespace(attrs.GetNamespace()) {
+		return sharedAllowedByNamespaceExemptionResponse()
+	}
+
+	if a.exemptUser(attrs.GetUserName()) {
+		return sharedAllowedByUserExemptionResponse()
 	}
 
 	// short-circuit on privileged enforce+audit+warn namespaces
@@ -371,8 +375,12 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
-	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		return sharedAllowedResponse()
+	if a.exemptNamespace(attrs.GetNamespace()) {
+		return sharedAllowedByNamespaceExemptionResponse()
+	}
+
+	if a.exemptUser(attrs.GetUserName()) {
+		return sharedAllowedByUserExemptionResponse()
 	}
 
 	// short-circuit on privileged audit+warn namespaces
@@ -409,7 +417,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs api.Attributes, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
-		return sharedAllowedResponse()
+		return sharedAllowedByRuntimeClassExemptionResponse()
 	}
 
 	auditAnnotations := map[string]string{}
@@ -424,6 +432,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	response := allowedResponse()
 	if enforce {
+		auditAnnotations[api.EnforcedPolicyAnnotationKey] = nsPolicy.Enforce.String()
+
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(fmt.Sprintf(
 				"pod violates PodSecurity %q: %s",
@@ -438,7 +448,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
-		auditAnnotations["audit"] = fmt.Sprintf(
+		auditAnnotations[api.AuditViolationsAnnotationKey] = fmt.Sprintf(
 			"would violate PodSecurity %q: %s",
 			nsPolicy.Audit.String(),
 			result.ForbiddenDetail(),
@@ -565,15 +575,39 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
 }
 
-var _sharedAllowedResponse = allowedResponse()
+var (
+	_sharedAllowedResponse                        = allowedResponse()
+	_sharedAllowedByUserExemptionResponse         = allowedByExemptResponse("user")
+	_sharedAllowedByNamespaceExemptionResponse    = allowedByExemptResponse("namespace")
+	_sharedAllowedByRuntimeClassExemptionResponse = allowedByExemptResponse("runtimeClass")
+)
 
 func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 	return _sharedAllowedResponse
 }
 
+func sharedAllowedByUserExemptionResponse() *admissionv1.AdmissionResponse {
+	return _sharedAllowedByUserExemptionResponse
+}
+
+func sharedAllowedByNamespaceExemptionResponse() *admissionv1.AdmissionResponse {
+	return _sharedAllowedByNamespaceExemptionResponse
+}
+
+func sharedAllowedByRuntimeClassExemptionResponse() *admissionv1.AdmissionResponse {
+	return _sharedAllowedByRuntimeClassExemptionResponse
+}
+
 // allowedResponse is the response used when the admission decision is allow.
 func allowedResponse() *admissionv1.AdmissionResponse {
 	return &admissionv1.AdmissionResponse{Allowed: true}
+}
+
+func allowedByExemptResponse(exemptionReason string) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed:          true,
+		AuditAnnotations: map[string]string{api.ExemptionReasonAnnotationKey: exemptionReason},
+	}
 }
 
 func failureResponse(msg string, reason metav1.StatusReason, code int32) *admissionv1.AdmissionResponse {

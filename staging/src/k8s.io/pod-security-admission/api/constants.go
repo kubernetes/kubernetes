@@ -43,4 +43,8 @@ const (
 	AuditVersionLabel   = labelPrefix + "audit-version"
 	WarnLevelLabel      = labelPrefix + "warn"
 	WarnVersionLabel    = labelPrefix + "warn-version"
+
+	ExemptionReasonAnnotationKey = "exempt"
+	AuditViolationsAnnotationKey = "audit-violations"
+	EnforcedPolicyAnnotationKey  = "enforce-policy"
 )
