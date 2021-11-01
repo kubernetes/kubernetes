@@ -172,35 +172,10 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	}
 	out := make([]interface{}, 0, int(math.Max(float64(rLen), float64(lLen))))
 
-	// TODO: ordering is totally wrong.
-	// TODO: might as well make the map order work the same way.
+	lhsOrder := make([]fieldpath.PathElement, 0, lLen)
 
-	// This is a cheap hack to at least make the output order stable.
-	rhsOrder := make([]fieldpath.PathElement, 0, rLen)
-
-	// First, collect all RHS children.
-	observedRHS := fieldpath.MakePathElementValueMap(rLen)
-	if rhs != nil {
-		for i := 0; i < rhs.Length(); i++ {
-			child := rhs.At(i)
-			pe, err := listItemToPathElement(w.allocator, w.schema, t, i, child)
-			if err != nil {
-				errs = append(errs, errorf("rhs: element %v: %v", i, err.Error())...)
-				// If we can't construct the path element, we can't
-				// even report errors deeper in the schema, so bail on
-				// this element.
-				continue
-			}
-			if _, ok := observedRHS.Get(pe); ok {
-				errs = append(errs, errorf("rhs: duplicate entries for key %v", pe.String())...)
-			}
-			observedRHS.Insert(pe, child)
-			rhsOrder = append(rhsOrder, pe)
-		}
-	}
-
-	// Then merge with LHS children.
-	observedLHS := fieldpath.MakePathElementSet(lLen)
+	// First, collect all LHS children.
+	observedLHS := fieldpath.MakePathElementValueMap(lLen)
 	if lhs != nil {
 		for i := 0; i < lhs.Length(); i++ {
 			child := lhs.At(i)
@@ -212,15 +187,36 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 				// this element.
 				continue
 			}
-			if observedLHS.Has(pe) {
+			if _, ok := observedLHS.Get(pe); ok {
 				errs = append(errs, errorf("lhs: duplicate entries for key %v", pe.String())...)
+			}
+			observedLHS.Insert(pe, child)
+			lhsOrder = append(lhsOrder, pe)
+		}
+	}
+
+	// Then merge with RHS children.
+	observedRHS := fieldpath.MakePathElementSet(rLen)
+	if rhs != nil {
+		for i := 0; i < rhs.Length(); i++ {
+			child := rhs.At(i)
+			pe, err := listItemToPathElement(w.allocator, w.schema, t, i, child)
+			if err != nil {
+				errs = append(errs, errorf("rhs: element %v: %v", i, err.Error())...)
+				// If we can't construct the path element, we can't
+				// even report errors deeper in the schema, so bail on
+				// this element.
 				continue
 			}
-			observedLHS.Insert(pe)
+			if observedRHS.Has(pe) {
+				errs = append(errs, errorf("rhs: duplicate entries for key %v", pe.String())...)
+				continue
+			}
+			observedRHS.Insert(pe)
 			w2 := w.prepareDescent(pe, t.ElementType)
-			w2.lhs = value.Value(child)
-			if rchild, ok := observedRHS.Get(pe); ok {
-				w2.rhs = rchild
+			w2.rhs = child
+			if lchild, ok := observedLHS.Get(pe); ok {
+				w2.lhs = lchild
 			}
 			errs = append(errs, w2.merge(pe.String)...)
 			if w2.out != nil {
@@ -230,13 +226,13 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 		}
 	}
 
-	for _, pe := range rhsOrder {
-		if observedLHS.Has(pe) {
+	for _, pe := range lhsOrder {
+		if observedRHS.Has(pe) {
 			continue
 		}
-		value, _ := observedRHS.Get(pe)
+		value, _ := observedLHS.Get(pe)
 		w2 := w.prepareDescent(pe, t.ElementType)
-		w2.rhs = value
+		w2.lhs = value
 		errs = append(errs, w2.merge(pe.String)...)
 		if w2.out != nil {
 			out = append(out, *w2.out)
