@@ -361,6 +361,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
+					defer newF.Close()
 					f.Close()
 					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
 						klog.ErrorS(err, "Failed to remove file watch", "path", f.Name())
