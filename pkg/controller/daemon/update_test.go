@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -633,5 +634,75 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				t.Errorf("expected numEmpty to be %d, was %d", c.emptyNodes, emptyNodes)
 			}
 		})
+	}
+}
+
+func TestControlledHistories(t *testing.T) {
+	ds1 := newDaemonSet("ds1")
+	crOfDs1 := newControllerRevision(ds1.GetName()+"-x1", ds1.GetNamespace(), ds1.Spec.Template.Labels,
+		[]metav1.OwnerReference{*metav1.NewControllerRef(ds1, controllerKind)})
+	orphanCrInSameNsWithDs1 := newControllerRevision(ds1.GetName()+"-x2", ds1.GetNamespace(), ds1.Spec.Template.Labels, nil)
+	orphanCrNotInSameNsWithDs1 := newControllerRevision(ds1.GetName()+"-x3", ds1.GetNamespace()+"-other", ds1.Spec.Template.Labels, nil)
+	cases := []struct {
+		name                      string
+		manager                   *daemonSetsController
+		historyCRAll              []*apps.ControllerRevision
+		expectControllerRevisions []*apps.ControllerRevision
+	}{
+		{
+			name: "controller revision in the same namespace",
+			manager: func() *daemonSetsController {
+				manager, _, _, err := newTestController(ds1, crOfDs1, orphanCrInSameNsWithDs1)
+				if err != nil {
+					t.Fatalf("error creating DaemonSets controller: %v", err)
+				}
+				manager.dsStore.Add(ds1)
+				return manager
+			}(),
+			historyCRAll:              []*apps.ControllerRevision{crOfDs1, orphanCrInSameNsWithDs1},
+			expectControllerRevisions: []*apps.ControllerRevision{crOfDs1, orphanCrInSameNsWithDs1},
+		},
+		{
+			name: "Skip adopting the controller revision in namespace other than the one in which DS lives",
+			manager: func() *daemonSetsController {
+				manager, _, _, err := newTestController(ds1, orphanCrNotInSameNsWithDs1)
+				if err != nil {
+					t.Fatalf("error creating DaemonSets controller: %v", err)
+				}
+				manager.dsStore.Add(ds1)
+				return manager
+			}(),
+			historyCRAll:              []*apps.ControllerRevision{orphanCrNotInSameNsWithDs1},
+			expectControllerRevisions: []*apps.ControllerRevision{},
+		},
+	}
+	for _, c := range cases {
+		for _, h := range c.historyCRAll {
+			c.manager.historyStore.Add(h)
+		}
+		crList, err := c.manager.controlledHistories(context.TODO(), ds1)
+		if err != nil {
+			t.Fatalf("Test case: %s. Unexpected error: %v", c.name, err)
+		}
+		if len(crList) != len(c.expectControllerRevisions) {
+			t.Errorf("Test case: %s, expect controllerrevision count %d but got:%d",
+				c.name, len(c.expectControllerRevisions), len(crList))
+		} else {
+			// check controller revisions match
+			for _, cr := range crList {
+				found := false
+				for _, expectCr := range c.expectControllerRevisions {
+					if reflect.DeepEqual(cr, expectCr) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Test case: %s, controllerrevision %v not expected",
+						c.name, cr)
+				}
+			}
+			t.Logf("Test case: %s done", c.name)
+		}
 	}
 }

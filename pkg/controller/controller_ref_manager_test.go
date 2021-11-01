@@ -68,19 +68,24 @@ func TestClaimPods(t *testing.T) {
 		patches int
 	}
 	var tests = []test{
-		{
-			name: "Claim pods with correct label",
-			manager: NewPodControllerRefManager(&FakePodControl{},
-				&v1.ReplicationController{},
-				productionLabelSelector,
-				controllerKind,
-				func(ctx context.Context) error { return nil }),
-			pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", testLabel, nil)},
-			claimed: []*v1.Pod{newPod("pod1", productionLabel, nil)},
-			patches: 1,
-		},
 		func() test {
 			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
+			return test{
+				name: "Claim pods with correct label",
+				manager: NewPodControllerRefManager(&FakePodControl{},
+					&controller,
+					productionLabelSelector,
+					controllerKind,
+					func(ctx context.Context) error { return nil }),
+				pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", testLabel, nil)},
+				claimed: []*v1.Pod{newPod("pod1", productionLabel, nil)},
+				patches: 1,
+			}
+		}(),
+		func() test {
+			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
 			controller.UID = types.UID(controllerUID)
 			now := metav1.Now()
 			controller.DeletionTimestamp = &now
@@ -97,6 +102,7 @@ func TestClaimPods(t *testing.T) {
 		}(),
 		func() test {
 			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
 			controller.UID = types.UID(controllerUID)
 			now := metav1.Now()
 			controller.DeletionTimestamp = &now
@@ -115,7 +121,9 @@ func TestClaimPods(t *testing.T) {
 			controller := v1.ReplicationController{}
 			controller2 := v1.ReplicationController{}
 			controller.UID = types.UID(controllerUID)
+			controller.Namespace = metav1.NamespaceDefault
 			controller2.UID = types.UID("AAAAA")
+			controller2.Namespace = metav1.NamespaceDefault
 			return test{
 				name: "Controller can not claim pods owned by another controller",
 				manager: NewPodControllerRefManager(&FakePodControl{},
@@ -129,6 +137,7 @@ func TestClaimPods(t *testing.T) {
 		}(),
 		func() test {
 			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
 			controller.UID = types.UID(controllerUID)
 			return test{
 				name: "Controller releases claimed pods when selector doesn't match",
@@ -144,6 +153,7 @@ func TestClaimPods(t *testing.T) {
 		}(),
 		func() test {
 			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
 			controller.UID = types.UID(controllerUID)
 			podToDelete1 := newPod("pod1", productionLabel, &controller)
 			podToDelete2 := newPod("pod2", productionLabel, nil)
@@ -164,6 +174,7 @@ func TestClaimPods(t *testing.T) {
 		}(),
 		func() test {
 			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
 			controller.UID = types.UID(controllerUID)
 			return test{
 				name: "Controller claims or release pods according to selector with finalizers",
@@ -176,6 +187,25 @@ func TestClaimPods(t *testing.T) {
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller), newPod("pod3", productionLabel, nil)},
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod3", productionLabel, nil)},
 				patches: 2,
+			}
+		}(),
+		func() test {
+			controller := v1.ReplicationController{}
+			controller.Namespace = metav1.NamespaceDefault
+			controller.UID = types.UID(controllerUID)
+			pod1 := newPod("pod1", productionLabel, nil)
+			pod2 := newPod("pod2", productionLabel, nil)
+			pod2.Namespace = "fakens"
+			return test{
+				name: "Controller does not claim pods of different namespace",
+				manager: NewPodControllerRefManager(&FakePodControl{},
+					&controller,
+					productionLabelSelector,
+					controllerKind,
+					func(ctx context.Context) error { return nil }),
+				pods:    []*v1.Pod{pod1, pod2},
+				claimed: []*v1.Pod{pod1},
+				patches: 1,
 			}
 		}(),
 	}
