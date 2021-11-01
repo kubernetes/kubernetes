@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -151,37 +152,55 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 			if !ok {
 				framework.Failf("Expected zone to be specified for %s node", nodeName)
 			}
-			execPod := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", func(pod *v1.Pod) {
-				pod.Spec.NodeName = nodeName
-			})
-			framework.Logf("Ensuring that requests from %s pod on %s node stay in %s zone", execPod.Name, nodeName, fromZone)
+			ginkgo.By("creating a client pod for probing the service from " + fromZone)
+			podName := "curl-from-" + fromZone
+			clientPod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "serve-hostname")
+			nodeSelection := e2epod.NodeSelection{Name: nodeName}
+			e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+			cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
+			clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+			clientPod.Spec.Containers[0].Name = clientPod.Name
+			f.PodClient().CreateSync(clientPod)
 
-			cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:80/", svc.Name)
-			consecutiveRequests := 0
-			var stdout string
-			if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			framework.Logf("Ensuring that requests from %s pod on %s node stay in %s zone", clientPod.Name, nodeName, fromZone)
+
+			var logs string
+			if pollErr := wait.Poll(5*time.Second, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 				var err error
-				stdout, err = framework.RunHostCmd(f.Namespace.Name, execPod.Name, cmd)
-				if err != nil {
-					framework.Logf("unexpected error running %s from %s", cmd, execPod.Name)
+				logs, err = e2epod.GetPodLogs(c, f.Namespace.Name, clientPod.Name, clientPod.Name)
+				framework.ExpectNoError(err)
+				framework.Logf("Pod client logs: %s", logs)
+
+				logLines := strings.Split(logs, "\n")
+				if len(logLines) < 6 {
+					framework.Logf("only %d log lines, waiting for at least 6", len(logLines))
 					return false, nil
 				}
-				destZone, ok := podsByZone[stdout]
-				if !ok {
-					framework.Logf("could not determine dest zone from output: %s", stdout)
-					return false, nil
+
+				consecutiveSameZone := 0
+
+				for i := len(logLines) - 1; i > 0; i-- {
+					if logLines[i] == "" || strings.HasPrefix(logLines[i], "Date:") {
+						continue
+					}
+					destZone, ok := podsByZone[logLines[i]]
+					if !ok {
+						framework.Logf("could not determine dest zone from log line: %s", logLines[i])
+						return false, nil
+					}
+					if fromZone != destZone {
+						framework.Logf("expected request from %s to stay in %s zone, delivered to %s zone", clientPod.Name, fromZone, destZone)
+						return false, nil
+					}
+					consecutiveSameZone++
+					if consecutiveSameZone >= 5 {
+						return true, nil
+					}
 				}
-				if fromZone != destZone {
-					framework.Logf("expected request from %s to stay in %s zone, delivered to %s zone", execPod.Name, fromZone, destZone)
-					return false, nil
-				}
-				consecutiveRequests++
-				if consecutiveRequests < 5 {
-					return false, nil
-				}
-				return true, nil
+
+				return false, nil
 			}); pollErr != nil {
-				framework.Failf("expected 5 consecutive requests from %s to stay in %s zone %v within %v, stdout: %v", execPod.Name, fromZone, e2eservice.KubeProxyLagTimeout, stdout)
+				framework.Failf("expected 5 consecutive requests from %s to stay in zone %s within %v, stdout: %v", clientPod.Name, fromZone, e2eservice.KubeProxyLagTimeout, logs)
 			}
 		}
 	})
