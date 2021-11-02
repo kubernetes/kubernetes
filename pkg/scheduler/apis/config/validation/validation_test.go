@@ -198,20 +198,8 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
-	badRemovedPlugins1 := validConfig.DeepCopy()
-	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
-
-	badRemovedPlugins3 := validConfig.DeepCopy()
-	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-
 	goodRemovedPlugins2 := validConfig.DeepCopy()
 	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
-
-	deprecatedPluginsConfig := validConfig.DeepCopy()
-	deprecatedPluginsConfig.Profiles[0].PluginConfig = append(deprecatedPluginsConfig.Profiles[0].PluginConfig, config.PluginConfig{
-		Name: "NodeResourcesLeastAllocated",
-		Args: &config.NodeResourcesLeastAllocatedArgs{},
-	})
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -290,22 +278,9 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
 		},
-		"bad-removed-plugins-1": {
-			expectedToFail: true,
-			config:         badRemovedPlugins1,
-		},
-		"bad-removed-plugins-3": {
-			expectedToFail: true,
-			config:         badRemovedPlugins3,
-		},
 		"good-removed-plugins-2": {
 			expectedToFail: false,
 			config:         goodRemovedPlugins2,
-		},
-		"bad-plugins-config": {
-			expectedToFail: true,
-			config:         deprecatedPluginsConfig,
-			errorString:    "profiles[0].pluginConfig[1]: Invalid value: \"NodeResourcesLeastAllocated\": was removed in version \"kubescheduler.config.k8s.io/v1beta2\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta2\")",
 		},
 	}
 
@@ -497,23 +472,8 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
-	badRemovedPlugins1 := validConfig.DeepCopy()
-	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
-
-	badRemovedPlugins2 := validConfig.DeepCopy()
-	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
-
-	badRemovedPlugins3 := validConfig.DeepCopy()
-	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-
 	goodRemovedPlugins2 := validConfig.DeepCopy()
 	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
-
-	deprecatedPluginsConfig := validConfig.DeepCopy()
-	deprecatedPluginsConfig.Profiles[0].PluginConfig = append(deprecatedPluginsConfig.Profiles[0].PluginConfig, config.PluginConfig{
-		Name: "NodeResourcesLeastAllocated",
-		Args: &config.NodeResourcesLeastAllocatedArgs{},
-	})
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -592,26 +552,9 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
 		},
-		"bad-removed-plugins-1": {
-			expectedToFail: true,
-			config:         badRemovedPlugins1,
-		},
-		"bad-removed-plugins-2": {
-			expectedToFail: true,
-			config:         badRemovedPlugins2,
-		},
-		"bad-removed-plugins-3": {
-			expectedToFail: true,
-			config:         badRemovedPlugins3,
-		},
 		"good-removed-plugins-2": {
 			expectedToFail: false,
 			config:         goodRemovedPlugins2,
-		},
-		"bad-plugins-config": {
-			expectedToFail: true,
-			config:         deprecatedPluginsConfig,
-			errorString:    "profiles[0].pluginConfig[1]: Invalid value: \"NodeResourcesLeastAllocated\": was removed in version \"kubescheduler.config.k8s.io/v1beta2\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta3\")",
 		},
 	}
 

@@ -51,7 +51,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                LeastAllocatedName,
+			Name:                string(config.LeastAllocated),
 			scorer:              leastResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -59,7 +59,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                MostAllocatedName,
+			Name:                string(config.MostAllocated),
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -67,7 +67,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                RequestedToCapacityRatioName,
+			Name:                string(config.RequestedToCapacityRatio),
 			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -118,8 +118,8 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	}
 
 	strategy := args.ScoringStrategy.Type
-	scorePlugin, ok := nodeResourceStrategyTypeMap[strategy]
-	if !ok {
+	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
+	if !exists {
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
 	}
 
@@ -229,8 +229,8 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))
-		for _, r := range insufficientResources {
-			failureReasons = append(failureReasons, r.Reason)
+		for i := range insufficientResources {
+			failureReasons = append(failureReasons, insufficientResources[i].Reason)
 		}
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}
