@@ -508,7 +508,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	volumePluginName := unknownVolumePlugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
-	if err == nil && volumePlugin != nil {
+	if err == nil {
 		volumePluginName = volumePlugin.GetPluginName()
 	}
 
@@ -518,7 +518,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
 
-		if err != nil || volumePlugin == nil {
+		if err != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.FindPluginBySpec failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
