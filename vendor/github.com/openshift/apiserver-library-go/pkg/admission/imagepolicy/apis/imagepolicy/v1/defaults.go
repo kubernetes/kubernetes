@@ -25,6 +25,7 @@ func SetDefaults_ImagePolicyConfig(obj *ImagePolicyConfig) {
 		obj.ResolutionRules = []ImageResolutionPolicyRule{
 			{TargetResource: metav1.GroupResource{Group: "", Resource: "pods"}, LocalNames: true},
 			{TargetResource: metav1.GroupResource{Group: "", Resource: "replicationcontrollers"}, LocalNames: true},
+			{TargetResource: metav1.GroupResource{Group: "apps.openshift.io", Resource: "deploymentconfigs"}, LocalNames: true},
 			{TargetResource: metav1.GroupResource{Group: "apps", Resource: "daemonsets"}, LocalNames: true},
 			{TargetResource: metav1.GroupResource{Group: "apps", Resource: "deployments"}, LocalNames: true},
 			{TargetResource: metav1.GroupResource{Group: "apps", Resource: "statefulsets"}, LocalNames: true},
