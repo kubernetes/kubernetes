@@ -105,19 +105,20 @@ func balancedResourceScorer(resToWeightMap resourceToWeightMap) func(requested, 
 
 		for name, value := range requested {
 			fraction := float64(value) / float64(allocable[name])
+			weight := float64(resToWeightMap[name])
 			if fraction > 1 {
 				fraction = 1
 			}
-			totalFraction += fraction
+			totalFraction += weight * fraction
 			resourceToFractions = append(resourceToFractions, fraction)
-			totalWeight += float64(resToWeightMap[name])
-			resourceWeights = append(resourceWeights, float64(resToWeightMap[name]))
+			totalWeight += weight
+			resourceWeights = append(resourceWeights, weight)
 		}
 
 		std := 0.0
 
 		if len(resourceToFractions) > 1 {
-			mean := totalFraction / float64(len(resourceToFractions))
+			mean := totalFraction / totalWeight
 			var sum float64
 			for i, fraction := range resourceToFractions {
 				sum = sum + resourceWeights[i]*(fraction-mean)*(fraction-mean)
