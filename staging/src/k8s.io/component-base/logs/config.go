@@ -52,10 +52,12 @@ func init() {
 // List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
 var supportedLogsFlags = map[string]struct{}{
 	"v": {},
-	// TODO: support vmodule after 1.19 Alpha
 }
 
-// BindLoggingFlags binds the Options struct fields to a flagset
+// BindLoggingFlags binds the Options struct fields to a flagset.
+//
+// Programs using LoggingConfiguration must use SkipLoggingConfigurationFlags
+// when calling AddFlags to avoid the duplicate registration of flags.
 func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	// The help text is generated assuming that flags will eventually use
 	// hyphens, even if currently no normalization function is set for the
@@ -65,6 +67,10 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options
 	registry.LogRegistry.Freeze()
+
+	fs.DurationVar(&c.FlushFrequency, logFlushFreqFlagName, logFlushFreq, "Maximum number of seconds between log flushes")
+	fs.VarP(&c.Verbosity, "v", "v", "number for the log level verbosity")
+	fs.Var(&c.VModule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 	fs.BoolVar(&c.Sanitization, "experimental-logging-sanitization", c.Sanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 

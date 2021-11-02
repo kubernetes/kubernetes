@@ -41,13 +41,32 @@ const deprecated = "will be removed in a future release, see https://github.com/
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
-	logFlushFreq time.Duration
 	logrFlush    func()
+
+	// Periodic flushing gets configured either via the global flag
+	// in this file or via LoggingConfiguration.
+	logFlushFreq      time.Duration
+	logFlushFreqAdded bool
 )
 
 func init() {
 	klog.InitFlags(packageFlags)
 	packageFlags.DurationVar(&logFlushFreq, logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+}
+
+type addFlagsOptions struct {
+	skipLoggingConfigurationFlags bool
+}
+
+type Option func(*addFlagsOptions)
+
+// SkipLoggingConfigurationFlags must be used as option for AddFlags when
+// the program also uses a LoggingConfiguration struct for configuring
+// logging. Then only flags not covered by that get added.
+func SkipLoggingConfigurationFlags() Option {
+	return func(o *addFlagsOptions) {
+		o.skipLoggingConfigurationFlags = true
+	}
 }
 
 // AddFlags registers this package's flags on arbitrary FlagSets. This includes
@@ -57,22 +76,39 @@ func init() {
 // function on the flag set before calling AddFlags.
 //
 // May be called more than once.
-func AddFlags(fs *pflag.FlagSet) {
+func AddFlags(fs *pflag.FlagSet, opts ...Option) {
 	// Determine whether the flags are already present by looking up one
 	// which always should exist.
-	if f := fs.Lookup("v"); f != nil {
+	if fs.Lookup("logtostderr") != nil {
 		return
+	}
+
+	o := addFlagsOptions{}
+	for _, opt := range opts {
+		opt(&o)
 	}
 
 	// Add flags with pflag deprecation remark for some klog flags.
 	packageFlags.VisitAll(func(f *flag.Flag) {
 		pf := pflag.PFlagFromGoFlag(f)
 		switch f.Name {
-		case "v", logFlushFreqFlagName:
-			// unchanged
+		case "v":
+			// unchanged, potentially skip it
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		case logFlushFreqFlagName:
+			// unchanged, potentially skip it
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// pf.Usage += vmoduleUsage
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
 		default:
 			// deprecated, but not hidden
 			pf.Deprecated = deprecated
@@ -87,17 +123,34 @@ func AddFlags(fs *pflag.FlagSet) {
 // in flag.CommandLine) and commands that for historic reasons use Go
 // flag.Parse and cannot change to pflag because it would break their command
 // line interface.
-func AddGoFlags(fs *flag.FlagSet) {
+func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
+	o := addFlagsOptions{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	// Add flags with deprecation remark added to the usage text of
 	// some klog flags.
 	packageFlags.VisitAll(func(f *flag.Flag) {
 		usage := f.Usage
 		switch f.Name {
-		case "v", logFlushFreqFlagName:
+		case "v":
 			// unchanged
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		case logFlushFreqFlagName:
+			// unchanged
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// usage += vmoduleUsage
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
 		default:
 			usage += " (DEPRECATED: " + deprecated + ")"
 		}
@@ -120,8 +173,11 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	// The default klog flush interval is 5 seconds.
-	go wait.Forever(klog.Flush, logFlushFreq)
+	if logFlushFreqAdded {
+		// The flag from this file was activated, so use it now.
+		// Otherwise LoggingConfiguration.Apply will do this.
+		go wait.Forever(FlushLogs, logFlushFreq)
+	}
 }
 
 // FlushLogs flushes logs immediately. This should be called at the end of

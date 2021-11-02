@@ -53,10 +53,12 @@ kind: KubeletConfiguration
 kubeAPIBurst: 10
 kubeAPIQPS: 5
 logging:
+  flushFrequency: 5000000000
   format: text
   options:
     json:
       infoBufferSize: "0"
+  verbosity: 0
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110

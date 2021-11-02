@@ -17,14 +17,16 @@ limitations under the License.
 package logs
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
-	"k8s.io/klog/v2"
-
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/registry"
 	"k8s.io/component-base/logs/sanitization"
+	"k8s.io/klog/v2"
 )
 
 // Options has klog format parameters
@@ -51,7 +53,10 @@ func (o *Options) Validate() []error {
 	return nil
 }
 
-// AddFlags add logging-format flag
+// AddFlags add logging-format flag.
+//
+// Programs using LoggingConfiguration must use SkipLoggingConfigurationFlags
+// when calling AddFlags to avoid the duplicate registration of flags.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	BindLoggingFlags(&o.Config, fs)
 }
@@ -70,4 +75,11 @@ func (o *Options) Apply() {
 	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})
 	}
+	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
+		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))
+	}
+	if err := loggingFlags.Lookup("vmodule").Value.Set(o.Config.VModule.String()); err != nil {
+		panic(fmt.Errorf("internal error while setting klog vmodule: %v", err))
+	}
+	go wait.Forever(FlushLogs, o.Config.FlushFrequency)
 }
