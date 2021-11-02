@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -31,7 +30,7 @@ func main() {
 
 	if flag.NArg() > 0 {
 		for _, path := range flag.Args() {
-			sourceYaml, err := ioutil.ReadFile(path)
+			sourceYaml, err := os.ReadFile(path)
 			if err != nil {
 				panic(err)
 			}

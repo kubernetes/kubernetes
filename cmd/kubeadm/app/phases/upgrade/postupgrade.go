@@ -19,7 +19,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -255,12 +254,12 @@ func UpdateKubeletDynamicEnvFileWithURLScheme(dryRun bool) error {
 		return nil
 	}
 	klog.V(2).Infof("Ensuring that %q includes a CRI endpoint URL scheme", filePath)
-	bytes, err := ioutil.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
 	}
 	updated := updateKubeletDynamicEnvFileWithURLScheme(string(bytes))
-	if err := ioutil.WriteFile(filePath, []byte(updated), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
 		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
 	}
 	return nil

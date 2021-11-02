@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -741,7 +740,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
 	var CACertPool *x509.CertPool
 	if evc.Etcd.External.CAFile != "" {
-		CACert, err := ioutil.ReadFile(evc.Etcd.External.CAFile)
+		CACert, err := os.ReadFile(evc.Etcd.External.CAFile)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't load external etcd's server certificate %s", evc.Etcd.External.CAFile)
 		}

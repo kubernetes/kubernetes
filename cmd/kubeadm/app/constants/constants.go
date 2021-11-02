@@ -18,7 +18,6 @@ package constants
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -608,7 +607,7 @@ func CreateTempDirForKubeadm(kubernetesDir, dirName string) (string, error) {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
-	tempDir, err := ioutil.TempDir(tempDir, dirName)
+	tempDir, err := os.MkdirTemp(tempDir, dirName)
 	if err != nil {
 		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}

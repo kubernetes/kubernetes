@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -153,7 +152,7 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
 		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
 	}
-	if err := ioutil.WriteFile(kubeletEnvFilePath, b, 0644); err != nil {
+	if err := os.WriteFile(kubeletEnvFilePath, b, 0644); err != nil {
 		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
 	}
 	return nil

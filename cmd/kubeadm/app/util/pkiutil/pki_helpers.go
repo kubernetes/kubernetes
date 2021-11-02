@@ -27,7 +27,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"net"
@@ -217,7 +216,7 @@ func WriteCSR(csrDir, name string, csr *x509.CertificateRequest) error {
 		return errors.Wrapf(err, "failed to make directory %s", filepath.Dir(csrPath))
 	}
 
-	if err := ioutil.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
 		return errors.Wrapf(err, "unable to write CSR to file %s", csrPath)
 	}
 
@@ -550,7 +549,7 @@ func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 // CertificateRequestFromFile returns the CertificateRequest from a given PEM-encoded file.
 // Returns an error if the file could not be read or if the CSR could not be parsed.
 func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
-	pemBlock, err := ioutil.ReadFile(file)
+	pemBlock, err := os.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read file")
 	}

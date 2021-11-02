@@ -19,7 +19,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -406,7 +405,7 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 
 func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
-		tempDir, err := ioutil.TempDir("", "kubeproxy-config-change")
+		tempDir, err := os.MkdirTemp("", "kubeproxy-config-change")
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
 		}

@@ -17,7 +17,7 @@ limitations under the License.
 package strict
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -143,7 +143,7 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 
 	for _, test := range testFiles {
 		t.Run(test.fileName, func(t *testing.T) {
-			bytes, err := ioutil.ReadFile(filepath.Join(pathTestData, test.fileName))
+			bytes, err := os.ReadFile(filepath.Join(pathTestData, test.fileName))
 			if err != nil {
 				t.Fatalf("couldn't read test data: %v", err)
 			}

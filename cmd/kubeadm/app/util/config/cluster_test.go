@@ -19,7 +19,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -199,7 +198,7 @@ G+2/lm8TaVjoU7Fi5Ka5G5HY2GLaR7P+IxYcrMHCl62Y7Rqcrnc=
 }
 
 func TestGetNodeNameFromKubeletConfig(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -246,7 +245,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 		t.Run(rt.name, func(t2 *testing.T) {
 			if len(rt.pemContent) > 0 {
 				pemPath := filepath.Join(tmpdir, "kubelet.pem")
-				err := ioutil.WriteFile(pemPath, rt.pemContent, 0644)
+				err := os.WriteFile(pemPath, rt.pemContent, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create pem file: %v", err)
 					return
@@ -255,7 +254,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 			}
 
 			kubeconfigPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
-			err := ioutil.WriteFile(kubeconfigPath, rt.kubeconfigContent, 0644)
+			err := os.WriteFile(kubeconfigPath, rt.kubeconfigContent, 0644)
 			if err != nil {
 				t.Errorf("Couldn't create kubeconfig: %v", err)
 				return
@@ -278,7 +277,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 }
 
 func TestGetNodeRegistration(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -320,7 +319,7 @@ func TestGetNodeRegistration(t *testing.T) {
 		t.Run(rt.name, func(t2 *testing.T) {
 			cfgPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
 			if len(rt.fileContents) > 0 {
-				err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+				err := os.WriteFile(cfgPath, rt.fileContents, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create file")
 					return
@@ -491,7 +490,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 }
 
 func TestGetInitConfigurationFromCluster(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -680,7 +679,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			cfgPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
 			if len(rt.fileContents) > 0 {
-				err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+				err := os.WriteFile(cfgPath, rt.fileContents, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create file")
 					return

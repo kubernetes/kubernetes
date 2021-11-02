@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -643,13 +642,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				},
 			})
 
-			manifestsDir, err := ioutil.TempDir("", "GetAvailableUpgrades-test-manifests")
+			manifestsDir, err := os.MkdirTemp("", "GetAvailableUpgrades-test-manifests")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(manifestsDir)
 
-			if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+			if err = os.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
 				t.Fatalf("Unable to create test static pod manifest: %v", err)
 			}
 

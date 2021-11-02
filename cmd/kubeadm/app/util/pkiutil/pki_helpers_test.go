@@ -23,7 +23,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
@@ -176,7 +175,7 @@ func TestHasServerAuth(t *testing.T) {
 }
 
 func TestWriteCertAndKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -193,7 +192,7 @@ func TestWriteCertAndKey(t *testing.T) {
 }
 
 func TestWriteCert(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -210,7 +209,7 @@ func TestWriteCert(t *testing.T) {
 }
 
 func TestWriteCertBundle(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -225,7 +224,7 @@ func TestWriteCertBundle(t *testing.T) {
 }
 
 func TestWriteKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -241,7 +240,7 @@ func TestWriteKey(t *testing.T) {
 }
 
 func TestWritePublicKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -257,7 +256,7 @@ func TestWritePublicKey(t *testing.T) {
 }
 
 func TestCertOrKeyExist(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -306,7 +305,7 @@ func TestCertOrKeyExist(t *testing.T) {
 }
 
 func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -354,7 +353,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 }
 
 func TestTryLoadCertFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -402,7 +401,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 }
 
 func TestTryLoadCertChainFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -502,7 +501,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
-			tmpdir, err := ioutil.TempDir("", "")
+			tmpdir, err := os.MkdirTemp("", "")
 			if err != nil {
 				t.Fatalf("Couldn't create tmpdir")
 			}
@@ -849,7 +848,7 @@ func TestRemoveDuplicateAltNames(t *testing.T) {
 }
 
 func TestVerifyCertChain(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

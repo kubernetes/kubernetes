@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +31,7 @@ import (
 )
 
 func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

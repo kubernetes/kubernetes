@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -200,7 +199,7 @@ func TestNewCmdToken(t *testing.T) {
 	var buf, bufErr bytes.Buffer
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -268,7 +267,7 @@ func TestNewCmdToken(t *testing.T) {
 func TestGetClientset(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -304,7 +303,7 @@ func TestGetClientset(t *testing.T) {
 func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}

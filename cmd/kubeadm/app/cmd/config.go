@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 
@@ -246,7 +246,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				return errors.New("the --old-config flag is mandatory")
 			}
 
-			oldCfgBytes, err := ioutil.ReadFile(oldCfgPath)
+			oldCfgBytes, err := os.ReadFile(oldCfgPath)
 			if err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 			if newCfgPath == "" {
 				fmt.Fprint(out, string(outputBytes))
 			} else {
-				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
+				if err := os.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
 					return errors.Wrapf(err, "failed to write the new configuration to the file %q", newCfgPath)
 				}
 			}

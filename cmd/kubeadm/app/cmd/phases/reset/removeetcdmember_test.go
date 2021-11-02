@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -104,7 +103,7 @@ func TestGetEtcdDataDir(t *testing.T) {
 
 			manifestPath := filepath.Join(tmpdir, "etcd.yaml")
 			if test.writeManifest {
-				err := ioutil.WriteFile(manifestPath, []byte(test.podYaml), 0644)
+				err := os.WriteFile(manifestPath, []byte(test.podYaml), 0644)
 				if err != nil {
 					t.Fatalf(dedent.Dedent("failed to write pod manifest\n%s\n\tfatal error: %v"), name, err)
 				}
