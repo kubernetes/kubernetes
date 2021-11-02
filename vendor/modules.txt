@@ -299,6 +299,10 @@ github.com/go-errors/errors
 github.com/go-logr/logr
 # github.com/go-logr/zapr v1.2.0 => github.com/go-logr/zapr v1.2.0
 github.com/go-logr/zapr
+# github.com/go-ole/go-ole v1.2.6 => github.com/go-ole/go-ole v1.2.6
+## explicit
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
 # github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.5
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.5
@@ -2516,6 +2520,7 @@ sigs.k8s.io/yaml
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
 # github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
 # github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.0
+# github.com/go-ole/go-ole => github.com/go-ole/go-ole v1.2.6
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14

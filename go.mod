@@ -39,6 +39,7 @@ require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/go-ole/go-ole v1.2.6
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.0.4
 	github.com/gogo/protobuf v1.3.2
@@ -247,6 +248,7 @@ replace (
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
 	github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
 	github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.0
+	github.com/go-ole/go-ole => github.com/go-ole/go-ole v1.2.6
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
