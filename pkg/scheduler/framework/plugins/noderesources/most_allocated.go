@@ -74,10 +74,7 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Fea
 		return nil, err
 	}
 
-	resToWeightMap := make(resourceToWeightMap)
-	for _, resource := range (*args).Resources {
-		resToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
-	}
+	resToWeightMap := resourcesToWeightMap(args.Resources)
 
 	return &MostAllocated{
 		handle: h,
