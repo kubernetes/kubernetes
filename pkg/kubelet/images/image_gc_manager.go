@@ -146,6 +146,9 @@ type imageRecord struct {
 
 	// Size of the image in bytes.
 	size int64
+
+	// Pinned status of the image
+	pinned bool
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
@@ -257,6 +260,9 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 
 		klog.V(5).InfoS("Image ID has size", "imageID", image.ID, "size", image.Size)
 		im.imageRecords[image.ID].size = image.Size
+
+		klog.V(5).InfoS("Image ID is pinned", "imageID", image.ID, "pinned", image.Pinned)
+		im.imageRecords[image.ID].pinned = image.Pinned
 	}
 
 	// Remove old images from our records.
@@ -338,16 +344,6 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 
-	// Make the ListImages into a map to grab an image by ID
-	allImages, err := im.runtime.ListImages()
-	if err != nil {
-		return 0, err
-	}
-	imagesMap := make(map[string]container.Image, len(allImages))
-	for _, img := range allImages {
-		imagesMap[img.ID] = img
-	}
-
 	// Get all images in eviction order.
 	images := make([]evictionInfo, 0, len(im.imageRecords))
 	for image, record := range im.imageRecords {
@@ -356,7 +352,7 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 			continue
 		}
 		// Check if image is pinned, prevent garbage collection
-		if imagesMap[image].Pinned {
+		if record.pinned {
 			klog.V(5).InfoS("Image is pinned, skipping garbage collection", "imageID", image)
 			continue
 

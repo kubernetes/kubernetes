@@ -207,7 +207,10 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 }
 
 func TestDeletePinnedImage(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	mockCtrl := gomock.NewController(t)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
 	fakeRuntime.ImageList = []container.Image{
 		{
 			ID:     sandboxImage,
@@ -227,7 +230,10 @@ func TestDeletePinnedImage(t *testing.T) {
 }
 
 func TestDoNotDeletePinnedImage(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	mockCtrl := gomock.NewController(t)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
 	fakeRuntime.ImageList = []container.Image{
 		{
 			ID:     "1",
@@ -248,7 +254,10 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 }
 
 func TestDeleteUnPinnedImage(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	mockCtrl := gomock.NewController(t)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
 	fakeRuntime.ImageList = []container.Image{
 		{
 			ID:     "1",
@@ -269,7 +278,10 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 }
 
 func TestAllPinnedImages(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	mockCtrl := gomock.NewController(t)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
 	fakeRuntime.ImageList = []container.Image{
 		{
 			ID:     "1",
@@ -289,6 +301,7 @@ func TestAllPinnedImages(t *testing.T) {
 	assert.EqualValues(0, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 2)
 }
+
 func TestDetectImagesContainerStopped(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
