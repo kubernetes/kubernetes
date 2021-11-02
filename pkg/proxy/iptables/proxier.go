@@ -1387,12 +1387,6 @@ func (proxier *Proxier) syncProxyRules() {
 		// Now write loadbalancing & DNAT rules.
 		numReadyEndpoints := len(readyEndpointChains)
 		for i, endpointChain := range readyEndpointChains {
-			epIP := readyEndpoints[i].IP()
-			if epIP == "" {
-				// Error parsing this endpoint has been logged. Skip to next endpoint.
-				continue
-			}
-
 			// Balancing rules in the per-service chain.
 			args = append(args[:0], "-A", string(svcChain))
 			args = proxier.appendServiceCommentLocked(args, svcNameString)
@@ -1411,18 +1405,12 @@ func (proxier *Proxier) syncProxyRules() {
 		// Every endpoint gets a chain, regardless of its state. This is required later since we may
 		// want to jump to endpoint chains that are terminating.
 		for i, endpointChain := range endpointChains {
-			epIP := endpoints[i].IP()
-			if epIP == "" {
-				// Error parsing this endpoint has been logged. Skip to next endpoint.
-				continue
-			}
-
 			// Rules in the per-endpoint chain.
 			args = append(args[:0], "-A", string(endpointChain))
 			args = proxier.appendServiceCommentLocked(args, svcNameString)
 			// Handle traffic that loops back to the originator with SNAT.
 			utilproxy.WriteLine(proxier.natRules, append(args,
-				"-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(epIP)),
+				"-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(endpoints[i].IP())),
 				"-j", string(KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
