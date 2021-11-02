@@ -117,7 +117,7 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 // when this is called, so it effectively does a recursive rmdir instead of
 // RemoveAll to ensure it only removes directories and not regular files.
 func (kl *Kubelet) removeOrphanedPodVolumeDirs(uid types.UID) []error {
-	orphanVolumeErrors := []error{}
+	var orphanVolumeErrors []error
 
 	// If there are still volume directories, attempt to rmdir them
 	volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
@@ -179,8 +179,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		return err
 	}
 
-	orphanRemovalErrors := []error{}
-	orphanVolumeErrors := []error{}
+	var orphanRemovalErrors, orphanVolumeErrors []error
 
 	for _, uid := range found {
 		if allPods.Has(string(uid)) {
