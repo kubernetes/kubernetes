@@ -41,6 +41,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -219,6 +220,24 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 	}
 
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md#kubernetes-thresholds
+	ownerA := metav1.OwnerReference{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "myapp-123123",
+		UID:        types.UID("7610a7f4-8f80-4f88-95b5-6cefdd8e9dbd"),
+		Controller: pointer.Bool(true),
+	}
+	ownerB := metav1.OwnerReference{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "myapp-234234",
+		UID:        types.UID("7610a7f4-8f80-4f88-95b5-as765as76f55"),
+		Controller: pointer.Bool(true),
+	}
+
+	// number of warnings printed for the entire namespace
+	namespaceWarningCount := 1
+
 	podCount := 3000
 	objects := make([]runtime.Object, 0, podCount+1)
 	objects = append(objects, enforceNamespaceBaselineV1)
@@ -227,6 +246,14 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 		v1PodCopy.Name = fmt.Sprintf("pod%d", i)
 		v1PodCopy.UID = types.UID(fmt.Sprintf("pod%d", i))
 		v1PodCopy.Namespace = namespace
+		switch i % 3 {
+		case 0:
+			v1PodCopy.OwnerReferences = []metav1.OwnerReference{ownerA}
+		case 1:
+			v1PodCopy.OwnerReferences = []metav1.OwnerReference{ownerB}
+		default:
+			// no owner references
+		}
 		objects = append(objects, v1PodCopy)
 	}
 
@@ -264,8 +291,8 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 			b.Fatal(err)
 		}
 		// should either be a single aggregated warning, or a unique warning per pod
-		if dc.count != 1 && dc.count != podCount {
-			b.Fatalf("expected either 1 or %d warnings, got %d", podCount, dc.count)
+		if dc.count != (1+namespaceWarningCount) && dc.count != (podCount+namespaceWarningCount) {
+			b.Fatalf("expected either %d or %d warnings, got %d", 1+namespaceWarningCount, podCount+namespaceWarningCount, dc.count)
 		}
 		// warning should contain the runAsNonRoot issue
 		if e, a := "runAsNonRoot", dc.text; !strings.Contains(a, e) {
