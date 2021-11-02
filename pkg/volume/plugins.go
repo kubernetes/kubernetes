@@ -708,30 +708,26 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	defer pm.mutex.RUnlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matches := []VolumePlugin{}
+	var match VolumePlugin
 	if v, found := pm.plugins[name]; found {
-		matches = append(matches, v)
+		match = v
 	}
 
 	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
-		matches = append(matches, plugin)
+		if match != nil {
+			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
+		}
+		match = plugin
 	}
 
-	if len(matches) == 0 {
+	if match == nil {
 		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
-	}
-	if len(matches) > 1 {
-		matchedPluginNames := []string{}
-		for _, plugin := range matches {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-		}
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
 	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(matches[0].GetPluginName())
-	return matches[0], nil
+	pm.logDeprecation(match.GetPluginName())
+	return match, nil
 }
 
 // logDeprecation logs warning when a deprecated plugin is used.
