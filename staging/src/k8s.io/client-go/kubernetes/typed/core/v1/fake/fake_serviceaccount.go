@@ -109,7 +109,7 @@ func (c *FakeServiceAccounts) Update(ctx context.Context, serviceAccount *corev1
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
 func (c *FakeServiceAccounts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(serviceaccountsResource, c.ns, name), &corev1.ServiceAccount{})
+		Invokes(testing.NewDeleteActionWithOptions(serviceaccountsResource, c.ns, name, opts), &corev1.ServiceAccount{})
 
 	return err
 }

@@ -120,7 +120,7 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persisten
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
 func (c *FakePersistentVolumeClaims) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &corev1.PersistentVolumeClaim{})
+		Invokes(testing.NewDeleteActionWithOptions(persistentvolumeclaimsResource, c.ns, name, opts), &corev1.PersistentVolumeClaim{})
 
 	return err
 }

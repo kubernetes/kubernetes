@@ -108,7 +108,7 @@ func (c *FakeConfigMaps) Update(ctx context.Context, configMap *corev1.ConfigMap
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
 func (c *FakeConfigMaps) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &corev1.ConfigMap{})
+		Invokes(testing.NewDeleteActionWithOptions(configmapsResource, c.ns, name, opts), &corev1.ConfigMap{})
 
 	return err
 }

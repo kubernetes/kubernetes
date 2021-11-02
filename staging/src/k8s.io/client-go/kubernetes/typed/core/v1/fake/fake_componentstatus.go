@@ -102,7 +102,7 @@ func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *cor
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *FakeComponentStatuses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(componentstatusesResource, name), &corev1.ComponentStatus{})
+		Invokes(testing.NewRootDeleteActionWithOptions(componentstatusesResource, name, opts), &corev1.ComponentStatus{})
 	return err
 }
 

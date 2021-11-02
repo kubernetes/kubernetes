@@ -102,7 +102,7 @@ func (c *FakeIngressClasses) Update(ctx context.Context, ingressClass *networkin
 // Delete takes name of the ingressClass and deletes it. Returns an error if one occurs.
 func (c *FakeIngressClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(ingressclassesResource, name), &networkingv1.IngressClass{})
+		Invokes(testing.NewRootDeleteActionWithOptions(ingressclassesResource, name, opts), &networkingv1.IngressClass{})
 	return err
 }
 

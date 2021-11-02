@@ -113,7 +113,7 @@ func (c *FakeNamespaces) UpdateStatus(ctx context.Context, namespace *corev1.Nam
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
 func (c *FakeNamespaces) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &corev1.Namespace{})
+		Invokes(testing.NewRootDeleteActionWithOptions(namespacesResource, name, opts), &corev1.Namespace{})
 	return err
 }
 

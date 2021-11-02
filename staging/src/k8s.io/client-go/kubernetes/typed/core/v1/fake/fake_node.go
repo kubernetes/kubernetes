@@ -113,7 +113,7 @@ func (c *FakeNodes) UpdateStatus(ctx context.Context, node *corev1.Node, opts v1
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *FakeNodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(nodesResource, name), &corev1.Node{})
+		Invokes(testing.NewRootDeleteActionWithOptions(nodesResource, name, opts), &corev1.Node{})
 	return err
 }
 
