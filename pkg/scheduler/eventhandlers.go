@@ -375,8 +375,10 @@ func addAllEventHandlers(
 				case *v1.Pod:
 					return assignedPod(t)
 				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedPod(pod)
+					if _, ok := t.Obj.(*v1.Pod); ok {
+						// The carried object may be stale, so we don't use it to check if
+						// it's assigned or not. Attempting to cleanup anyways.
+						return true
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false
@@ -401,7 +403,9 @@ func addAllEventHandlers(
 					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return !assignedPod(pod) && responsibleForPod(pod, sched.Profiles)
+						// The carried object may be stale, so we don't use it to check if
+						// it's assigned or not.
+						return responsibleForPod(pod, sched.Profiles)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false
