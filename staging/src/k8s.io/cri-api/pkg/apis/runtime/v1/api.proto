@@ -1247,6 +1247,10 @@ message Image {
     string username = 6;
     // ImageSpec for image which includes annotations
     ImageSpec spec = 7;
+    // Recommendation on whether this image should be exempt from garbage collection.
+    // It must only be treated as a recommendation--the client can still request the image be deleted,
+    // and the runtime must oblige.
+    bool pinned = 8;
 }
 
 message ListImagesResponse {
