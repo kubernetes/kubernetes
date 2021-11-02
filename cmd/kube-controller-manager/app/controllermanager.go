@@ -129,6 +129,13 @@ controller, and serviceaccounts controller.`,
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
+
+			// Activate logging as soon as possible, after that
+			// show flags with the final logging configuration.
+			if err := s.Logs.ValidateAndApply(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 			cliflag.PrintFlags(cmd.Flags())
 
 			err := checkNonZeroInsecurePort(cmd.Flags())

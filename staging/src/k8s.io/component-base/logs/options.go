@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/v1alpha1"
@@ -43,9 +44,22 @@ func NewOptions() *Options {
 	return o
 }
 
-// Validate verifies if any unsupported flag is set
+// ValidateAndApply combines validation and application of the logging configuration.
+// This should be invoked as early as possible because then the rest of the program
+// startup (including validation of other options) will already run with the final
+// logging configuration.
+func (o *Options) ValidateAndApply() error {
+	errs := o.validate()
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	o.apply()
+	return nil
+}
+
+// validate verifies if any unsupported flag is set
 // for non-default logging format
-func (o *Options) Validate() []error {
+func (o *Options) validate() []error {
 	errs := ValidateLoggingConfiguration(&o.Config, nil)
 	if len(errs) != 0 {
 		return errs.ToAggregate().Errors()
@@ -61,8 +75,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	BindLoggingFlags(&o.Config, fs)
 }
 
-// Apply set klog logger from LogFormat type
-func (o *Options) Apply() {
+// apply set klog logger from LogFormat type
+func (o *Options) apply() {
 	// if log format not exists, use nil loggr
 	factory, _ := registry.LogRegistry.Get(o.Config.Format)
 	if factory == nil {

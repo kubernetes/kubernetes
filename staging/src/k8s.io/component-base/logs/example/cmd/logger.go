@@ -40,12 +40,10 @@ func NewLoggerCommand() *cobra.Command {
 	o := logs.NewOptions()
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
-			errs := o.Validate()
-			if len(errs) != 0 {
-				fmt.Fprintf(os.Stderr, "%v\n", errs)
+			if err := o.ValidateAndApply(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
-			o.Apply()
 			runLogger()
 		},
 	}

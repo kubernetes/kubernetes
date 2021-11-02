@@ -99,9 +99,10 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, o) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
 			}
-			errs := o.Validate()
-			if !assert.ElementsMatch(t, tc.errs, errs) {
-				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
+			err := o.ValidateAndApply()
+
+			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
+				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, err)
 
 			}
 		})

@@ -115,6 +115,12 @@ cluster's shared state through which all other components interact.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
+
+			// Activate logging as soon as possible, after that
+			// show flags with the final logging configuration.
+			if err := s.Logs.ValidateAndApply(); err != nil {
+				return err
+			}
 			cliflag.PrintFlags(fs)
 
 			err := checkNonZeroInsecurePort(fs)
@@ -265,8 +271,6 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 
 	s.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
-
-	s.Logs.Apply()
 
 	config := &controlplane.Config{
 		GenericConfig: genericConfig,
