@@ -128,11 +128,7 @@ type removedPlugins struct {
 var removedPluginsByVersion = []removedPlugins{
 	{
 		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
-		plugins: []string{
-			"NodeResourcesLeastAllocated",
-			"NodeResourcesMostAllocated",
-			"RequestedToCapacityRatio",
-		},
+		plugins:            []string{},
 	},
 	{
 		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
@@ -183,10 +179,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"NodeAffinity":                    ValidateNodeAffinityArgs,
 		"NodeResourcesBalancedAllocation": ValidateNodeResourcesBalancedAllocationArgs,
 		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
-		"NodeResourcesLeastAllocated":     ValidateNodeResourcesLeastAllocatedArgs,
-		"NodeResourcesMostAllocated":      ValidateNodeResourcesMostAllocatedArgs,
 		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
-		"RequestedToCapacityRatio":        ValidateRequestedToCapacityRatioArgs,
 		"VolumeBinding":                   ValidateVolumeBindingArgs,
 	}
 

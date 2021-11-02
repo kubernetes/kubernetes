@@ -113,44 +113,6 @@ type PodTopologySpreadArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RequestedToCapacityRatioArgs holds arguments used to configure RequestedToCapacityRatio plugin.
-type RequestedToCapacityRatioArgs struct {
-	metav1.TypeMeta
-
-	// Points defining priority function shape
-	Shape []UtilizationShapePoint
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Weights should be larger than 0.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
-type NodeResourcesLeastAllocatedArgs struct {
-	metav1.TypeMeta
-
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
-type NodeResourcesMostAllocatedArgs struct {
-	metav1.TypeMeta
-
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
 type NodeResourcesBalancedAllocationArgs struct {
 	metav1.TypeMeta

@@ -192,6 +192,7 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
       - k8s.io/kubernetes/pkg/scheduler/internal/queue
       - k8s.io/kubernetes/pkg/scheduler/listers
+      - k8s.io/kubernetes/pkg/scheduler/testing
       - k8s.io/kubernetes/pkg/scheduler/metrics
       - k8s.io/kubernetes/pkg/scheduler/nodeinfo
       - k8s.io/kubernetes/pkg/scheduler/util
