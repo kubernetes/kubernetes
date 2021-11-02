@@ -114,7 +114,7 @@ kube::golang::conformance_image_targets() {
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
-    cmd/kubectl
+    vendor/k8s.io/kubectl/cmd/kubectl
   )
   echo "${targets[@]}"
 }
@@ -258,7 +258,7 @@ kube::golang::setup_platforms
 # The set of client targets that we are building for all platforms
 # If you update this list, please also update build/BUILD.
 readonly KUBE_CLIENT_TARGETS=(
-  cmd/kubectl
+  vendor/k8s.io/kubectl/cmd/kubectl
   cmd/kubectl-convert
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
@@ -439,7 +439,7 @@ kube::golang::set_platform_envs() {
 
   # if CC is defined for platform then always enable it
   ccenv=$(echo "$platform" | awk -F/ '{print "KUBE_" toupper($1) "_" toupper($2) "_CC"}')
-  if [ -n "${!ccenv-}" ]; then 
+  if [ -n "${!ccenv-}" ]; then
     export CGO_ENABLED=1
     export CC="${!ccenv}"
   fi

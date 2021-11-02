@@ -300,7 +300,7 @@ setup() {
   kube::util::ensure-gnu-sed
 
   kube::log::status "Building kubectl"
-  make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kubectl-convert"
+  make -C "${KUBE_ROOT}" WHAT="vendor/k8s.io/kubectl/cmd/kubectl cmd/kubectl-convert"
 
   # Check kubectl
   kube::log::status "Running kubectl with no options"
