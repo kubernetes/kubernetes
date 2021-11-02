@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -63,13 +64,8 @@ type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
-	opts, err := options.NewOptions()
-	if err != nil {
-		klog.ErrorS(err, "Unable to initialize command options")
-		os.Exit(1)
-	}
+	opts := options.NewOptions()
 
-	namedFlagSets := opts.Flags()
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
 		Long: `The Kubernetes scheduler is a control plane process which assigns
@@ -81,9 +77,6 @@ kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := opts.Complete(&namedFlagSets); err != nil {
-				return err
-			}
 			return runCommand(cmd, opts, registryOptions...)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -96,15 +89,16 @@ for more information about scheduling and the kube-scheduler component.`,
 		},
 	}
 
+	nfs := opts.Flags
+	verflag.AddFlags(nfs.FlagSet("global"))
+	globalflag.AddGlobalFlags(nfs.FlagSet("global"), cmd.Name())
 	fs := cmd.Flags()
-	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
-	for _, f := range namedFlagSets.FlagSets {
+	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
+	cliflag.SetUsageAndHelpFunc(cmd, *nfs, cols)
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
@@ -284,6 +278,12 @@ func WithPlugin(name string, factory runtime.PluginFactory) Option {
 
 // Setup creates a completed config and a scheduler based on the command args and options
 func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions ...Option) (*schedulerserverconfig.CompletedConfig, *scheduler.Scheduler, error) {
+	if cfg, err := latest.Default(); err != nil {
+		return nil, nil, err
+	} else {
+		opts.ComponentConfig = cfg
+	}
+
 	if errs := opts.Validate(); len(errs) > 0 {
 		return nil, nil, utilerrors.NewAggregate(errs)
 	}
