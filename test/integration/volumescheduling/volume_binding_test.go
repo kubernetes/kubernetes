@@ -1004,7 +1004,7 @@ func TestCapacity(t *testing.T) {
 // on provision failure.
 func TestRescheduleProvisioning(t *testing.T) {
 	// Set feature gates
-	controllerCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 
 	testCtx := initTestAPIServer(t, "reschedule-volume-provision", nil)
 
@@ -1012,7 +1012,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 	ns := testCtx.ns.Name
 
 	defer func() {
-		close(controllerCh)
+		cancel()
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
 		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		testCtx.closeFn()
@@ -1051,9 +1051,9 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Start controller.
-	go ctrl.Run(controllerCh)
-	informerFactory.Start(controllerCh)
-	informerFactory.WaitForCacheSync(controllerCh)
+	go ctrl.Run(ctx)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	// Validate that the annotation is removed by controller for provision reschedule.
 	if err := waitForProvisionAnn(clientset, pvc, false); err != nil {
@@ -1062,18 +1062,18 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	textCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
-	clientset := textCtx.clientSet
-	ns := textCtx.ns.Name
+	testCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
+	clientset := testCtx.clientSet
+	ns := testCtx.ns.Name
 
-	ctrl, informerFactory, err := initPVController(t, textCtx, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(textCtx.ctx.Done())
+	go ctrl.Run(testCtx.ctx)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(textCtx.ctx.Done())
-	informerFactory.WaitForCacheSync(textCtx.ctx.Done())
+	informerFactory.Start(testCtx.ctx.Done())
+	informerFactory.WaitForCacheSync(testCtx.ctx.Done())
 
 	// Create shared objects
 	// Create nodes
@@ -1094,11 +1094,11 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   textCtx.ctx.Done(),
+		stop:   testCtx.ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			cleanupTest(t, textCtx)
+			cleanupTest(t, testCtx)
 		},
 	}
 }

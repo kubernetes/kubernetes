@@ -92,7 +92,7 @@ func startServiceController(ctx context.Context, controllerContext ControllerCon
 		klog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
-	go serviceController.Run(ctx.Done(), int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return nil, true, nil
 }
 
@@ -174,6 +174,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 
 func startNodeLifecycleController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
+		ctx,
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
@@ -193,7 +194,7 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, true, err
 	}
-	go lifecycleController.Run(ctx.Done())
+	go lifecycleController.Run(ctx)
 	return nil, true, nil
 }
 
@@ -212,7 +213,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(ctx.Done())
+	go cloudNodeLifecycleController.Run(ctx)
 	return nil, true, nil
 }
 
@@ -252,7 +253,7 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs)
-	go routeController.Run(ctx.Done(), controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
 	return nil, true, nil
 }
 
@@ -285,7 +286,7 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
 	}
-	go volumeController.Run(ctx.Done())
+	go volumeController.Run(ctx)
 	return nil, true, nil
 }
 
@@ -361,7 +362,7 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
-		go expandController.Run(ctx.Done())
+		go expandController.Run(ctx)
 		return nil, true, nil
 	}
 	return nil, false, nil
@@ -375,7 +376,7 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 	}
-	go ephemeralController.Run(int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), ctx.Done())
+	go ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs))
 	return nil, true, nil
 }
 
@@ -386,7 +387,7 @@ func startEndpointController(ctx context.Context, controllerCtx ControllerContex
 		controllerCtx.InformerFactory.Core().V1().Endpoints(),
 		controllerCtx.ClientBuilder.ClientOrDie("endpoint-controller"),
 		controllerCtx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
-	).Run(int(controllerCtx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Done())
+	).Run(ctx, int(controllerCtx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs))
 	return nil, true, nil
 }
 
@@ -402,11 +403,12 @@ func startReplicationController(ctx context.Context, controllerContext Controlle
 
 func startPodGCController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go podgc.NewPodGC(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		int(controllerContext.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
-	).Run(ctx.Done())
+	).Run(ctx)
 	return nil, true, nil
 }
 
@@ -438,7 +440,7 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, false, err
 	}
-	go resourceQuotaController.Run(int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), ctx.Done())
+	go resourceQuotaController.Run(ctx, int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs))
 
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
@@ -489,7 +491,7 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating ServiceAccount controller: %v", err)
 	}
-	go sac.Run(1, ctx.Done())
+	go sac.Run(ctx, 1)
 	return nil, true, nil
 }
 
@@ -497,7 +499,7 @@ func startTTLController(ctx context.Context, controllerContext ControllerContext
 	go ttlcontroller.NewTTLController(
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-controller"),
-	).Run(5, ctx.Done())
+	).Run(ctx, 5)
 	return nil, true, nil
 }
 
@@ -536,7 +538,7 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 
 	// Start the garbage collector.
 	workers := int(controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
-	go garbageCollector.Run(workers, ctx.Done())
+	go garbageCollector.Run(ctx, workers)
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
@@ -555,7 +557,7 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
 	}
-	go pvcProtectionController.Run(1, ctx.Done())
+	go pvcProtectionController.Run(ctx, 1)
 	return nil, true, nil
 }
 
@@ -564,7 +566,7 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.ClientBuilder.ClientOrDie("pv-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-	).Run(1, ctx.Done())
+	).Run(ctx, 1)
 	return nil, true, nil
 }
 
@@ -572,7 +574,7 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 	go ttlafterfinished.New(
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
-	).Run(int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Done())
+	).Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
 	return nil, true, nil
 }
 
@@ -674,6 +676,6 @@ func startStorageVersionGCController(ctx context.Context, controllerContext Cont
 		controllerContext.ClientBuilder.ClientOrDie("storage-version-garbage-collector"),
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Internal().V1alpha1().StorageVersions(),
-	).Run(ctx.Done())
+	).Run(ctx)
 	return nil, true, nil
 }

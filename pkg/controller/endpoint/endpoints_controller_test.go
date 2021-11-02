@@ -267,7 +267,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 80}}},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -291,7 +291,7 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -315,7 +315,7 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -331,7 +331,7 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 }
 
@@ -385,7 +385,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -428,7 +428,7 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -456,7 +456,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "UDP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -500,7 +500,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "SCTP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -541,7 +541,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -581,7 +581,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -621,7 +621,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -665,7 +665,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -708,7 +708,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -730,7 +730,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	})
-	endpoints.syncService("other/foo")
+	endpoints.syncService(context.TODO(), "other/foo")
 
 	expectedSubsets := []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{
@@ -778,7 +778,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	expectedSubsets := []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{
@@ -837,7 +837,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	serviceLabels[v1.IsHeadlessService] = ""
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -891,7 +891,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 			stopCh := make(chan struct{})
 			defer close(stopCh)
-			go endpoints.Run(1, stopCh)
+			go endpoints.Run(context.TODO(), 1)
 
 			// cache.WaitForNamedCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
 			// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
@@ -937,7 +937,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	}
 	originalService := service.DeepCopy()
 	endpoints.serviceStore.Add(service)
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -984,7 +984,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1023,7 +1023,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1062,7 +1062,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1091,7 +1091,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 		},
 	})
 	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1424,7 +1424,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1474,7 +1474,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1525,7 +1525,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1654,7 +1654,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(1, stopCh)
+			go endpoints.Run(context.TODO(), 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
@@ -1777,7 +1777,7 @@ func TestPodAddsBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(1, stopCh)
+			go endpoints.Run(context.TODO(), 1)
 
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -1899,7 +1899,7 @@ func TestPodDeleteBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(1, stopCh)
+			go endpoints.Run(context.TODO(), 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
@@ -1943,7 +1943,7 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	})
-	endpoints.syncService(ns + "/foo")
+	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
 }
@@ -2069,7 +2069,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 			c.endpointsStore.Add(endpoints)
 			client.CoreV1().Endpoints(ns).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 
-			c.syncService(fmt.Sprintf("%s/%s", ns, svc.Name))
+			c.syncService(context.TODO(), fmt.Sprintf("%s/%s", ns, svc.Name))
 
 			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), endpoints.Name, metav1.GetOptions{})
 			if err != nil {
@@ -2228,7 +2228,7 @@ func TestMultipleServiceChanges(t *testing.T) {
 	*controller = *newController(testServer.URL, 0*time.Second)
 	addPods(controller.podStore, ns, 1, 1, 0, ipv4only)
 
-	go func() { controller.Run(1, stopChan) }()
+	go func() { controller.Run(context.TODO(), 1) }()
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},

@@ -348,6 +348,8 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
 		for _, route := range testCase.initialRoutes {
 			fakeRoute := &fakecloud.Route{}
@@ -370,7 +372,7 @@ func TestReconcile(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
 		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 		rc.nodeListerSynced = alwaysReady
-		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
+		if err := rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}
 		for _, action := range testCase.clientset.Actions() {
@@ -409,7 +411,7 @@ func TestReconcile(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				if finalRoutes, err = routes.ListRoutes(context.TODO(), cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+				if finalRoutes, err = routes.ListRoutes(ctx, cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
 					break poll
 				}
 			case <-timeoutChan:

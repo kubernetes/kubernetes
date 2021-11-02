@@ -60,7 +60,7 @@ const (
 
 // ExpandController expands the pvs
 type ExpandController interface {
-	Run(stopCh <-chan struct{})
+	Run(ctx context.Context)
 }
 
 // CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
@@ -188,14 +188,14 @@ func (expc *expandController) enqueuePVC(obj interface{}) {
 	}
 }
 
-func (expc *expandController) processNextWorkItem() bool {
+func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 	key, shutdown := expc.queue.Get()
 	if shutdown {
 		return false
 	}
 	defer expc.queue.Done(key)
 
-	err := expc.syncHandler(key.(string))
+	err := expc.syncHandler(ctx, key.(string))
 	if err == nil {
 		expc.queue.Forget(key)
 		return true
@@ -209,7 +209,7 @@ func (expc *expandController) processNextWorkItem() bool {
 
 // syncHandler performs actual expansion of volume. If an error is returned
 // from this function - PVC will be requeued for resizing.
-func (expc *expandController) syncHandler(key string) error {
+func (expc *expandController) syncHandler(ctx context.Context, key string) error {
 	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -223,7 +223,7 @@ func (expc *expandController) syncHandler(key string) error {
 		return err
 	}
 
-	pv, err := expc.getPersistentVolume(pvc)
+	pv, err := expc.getPersistentVolume(ctx, pvc)
 	if err != nil {
 		klog.V(5).Infof("Error getting Persistent Volume for PVC %q (uid: %q) from informer : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
 		return err
@@ -320,32 +320,32 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 }
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
-func (expc *expandController) Run(stopCh <-chan struct{}) {
+func (expc *expandController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
 
 	klog.Infof("Starting expand controller")
 	defer klog.Infof("Shutting down expand controller")
 
-	if !cache.WaitForNamedCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced) {
+	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced, expc.pvSynced) {
 		return
 	}
 
 	for i := 0; i < defaultWorkerCount; i++ {
-		go wait.Until(expc.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, expc.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (expc *expandController) runWorker() {
-	for expc.processNextWorkItem() {
+func (expc *expandController) runWorker(ctx context.Context) {
+	for expc.processNextWorkItem(ctx) {
 	}
 }
 
-func (expc *expandController) getPersistentVolume(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+func (expc *expandController) getPersistentVolume(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
-	pv, err := expc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volumeName, metav1.GetOptions{})
+	pv, err := expc.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PV %q: %v", volumeName, err)

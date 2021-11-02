@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -652,7 +653,7 @@ func TestDisablingDynamicProvisioner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
 	}
-	retVal := ctrl.provisionClaim(nil)
+	retVal := ctrl.provisionClaim(context.TODO(), nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)
 	}

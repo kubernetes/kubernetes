@@ -408,9 +408,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	stop := func() {
-		close(stopCh)
+		cancel()
 		kubeAPIServerCloseFn()
 		apiServer.Close()
 	}
@@ -428,7 +428,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
-	go tokenController.Run(1, stopCh)
+	go tokenController.Run(1, ctx.Done())
 
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
@@ -439,9 +439,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
-	informers.Start(stopCh)
-	externalInformers.Start(stopCh)
-	go serviceAccountController.Run(5, stopCh)
+	informers.Start(ctx.Done())
+	externalInformers.Start(ctx.Done())
+	go serviceAccountController.Run(ctx, 5)
 
 	return rootClientset, clientConfig, stop, nil
 }

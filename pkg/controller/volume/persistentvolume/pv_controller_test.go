@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -341,10 +342,10 @@ func TestControllerSync(t *testing.T) {
 		}
 
 		// Start the controller
-		stopCh := make(chan struct{})
-		informers.Start(stopCh)
-		informers.WaitForCacheSync(stopCh)
-		go ctrl.Run(stopCh)
+		ctx, cancel := context.WithCancel(context.TODO())
+		informers.Start(ctx.Done())
+		informers.WaitForCacheSync(ctx.Done())
+		go ctrl.Run(ctx)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -369,7 +370,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to run test %s: %v", test.name, err)
 		}
-		close(stopCh)
+		cancel()
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 	}

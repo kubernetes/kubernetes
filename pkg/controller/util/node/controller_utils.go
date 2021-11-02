@@ -43,7 +43,7 @@ import (
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
+func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
 	var updateErrList []error
 
@@ -60,7 +60,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		// Set reason and message in the pod object.
-		if _, err := SetPodTerminationReason(kubeClient, pod, nodeName); err != nil {
+		if _, err := SetPodTerminationReason(ctx, kubeClient, pod, nodeName); err != nil {
 			if apierrors.IsConflict(err) {
 				updateErrList = append(updateErrList,
 					fmt.Errorf("update status failed for pod %q: %v", format.Pod(pod), err))
@@ -80,7 +80,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 
 		klog.V(2).InfoS("Starting deletion of pod", "pod", klog.KObj(pod))
 		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
+		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
 				// NotFound error means that pod was already deleted.
 				// There is nothing left to do with this pod.
@@ -100,7 +100,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 // SetPodTerminationReason attempts to set a reason and message in the
 // pod status, updates it in the apiserver, and returns an error if it
 // encounters one.
-func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
+func SetPodTerminationReason(ctx context.Context, kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
 	if pod.Status.Reason == nodepkg.NodeUnreachablePodReason {
 		return pod, nil
 	}
@@ -110,7 +110,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 
 	var updatedPod *v1.Pod
 	var err error
-	if updatedPod, err = kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if updatedPod, err = kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		return nil, err
 	}
 	return updatedPod, nil
@@ -118,7 +118,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
-func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
+func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
 	klog.V(2).InfoS("Update ready status of pods on node", "node", nodeName)
 
 	errMsg := []string{}
@@ -138,7 +138,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecor
 				}
 
 				klog.V(2).InfoS("Updating ready status of pod to false", "pod", pod.Name)
-				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
+				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						// NotFound error means that pod was already deleted.
@@ -190,13 +190,13 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 
 // SwapNodeControllerTaint returns true in case of success and false
 // otherwise.
-func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
+func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
 	for _, taintToAdd := range taintsToAdd {
 		now := metav1.Now()
 		taintToAdd.TimeAdded = &now
 	}
 
-	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
+	err := controller.AddOrUpdateTaintOnNode(ctx, kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
@@ -208,7 +208,7 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 	}
 	klog.V(4).InfoS("Added taint to node", "taint", taintsToAdd, "node", node.Name)
 
-	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
+	err = controller.RemoveTaintOffNode(ctx, kubeClient, node.Name, node, taintsToRemove...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(

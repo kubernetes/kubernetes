@@ -17,6 +17,7 @@ limitations under the License.
 package pvcprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -476,7 +477,7 @@ func TestPVCProtectionController(t *testing.T) {
 			}
 			if ctrl.queue.Len() > 0 {
 				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
-				ctrl.processNextWorkItem()
+				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
 				// There is still some work in the queue, process it now

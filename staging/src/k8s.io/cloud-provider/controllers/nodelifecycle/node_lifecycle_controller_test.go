@@ -504,6 +504,8 @@ func Test_NodesDeleted(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			clientset := fake.NewSimpleClientset(testcase.existingNode)
 			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
@@ -523,9 +525,9 @@ func Test_NodesDeleted(t *testing.T) {
 
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
-			cloudNodeLifecycleController.MonitorNodes()
+			cloudNodeLifecycleController.MonitorNodes(ctx)
 
-			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
+			updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, testcase.existingNode.Name, metav1.GetOptions{})
 			if testcase.expectedDeleted != apierrors.IsNotFound(err) {
 				t.Fatalf("unexpected error happens when getting the node: %v", err)
 			}
@@ -732,7 +734,7 @@ func Test_NodesShutdown(t *testing.T) {
 
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
-			cloudNodeLifecycleController.MonitorNodes()
+			cloudNodeLifecycleController.MonitorNodes(context.TODO())
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
 			if testcase.expectedDeleted != apierrors.IsNotFound(err) {

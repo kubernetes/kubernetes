@@ -141,6 +141,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
+				testCtx.Ctx,
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -167,7 +168,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testutils.SyncInformerFactory(testCtx)
 
 			// Run all controllers
-			go nc.Run(testCtx.Ctx.Done())
+			go nc.Run(testCtx.Ctx)
 			go testCtx.Scheduler.Run(testCtx.Ctx)
 
 			nodeRes := v1.ResourceList{

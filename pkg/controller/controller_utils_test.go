@@ -815,7 +815,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
+		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
 		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
@@ -990,7 +990,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
