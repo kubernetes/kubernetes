@@ -223,6 +223,10 @@ hard-codes the Kubernetes version in an image label. It's necessary to manually
 set this label to the new release tag. Prefix the commit summary with
 `UPSTREAM: <carry>: (squash)` and squash it before merging the rebase PR.
 
+This value, among other things, is used by ART to inject appropriate version of
+kubernetes during build process, so it always has to reflect correct level of
+kubernetes.
+
 ## Updating dependencies
 
 Once the commits are all picked from the previous rebase branch, and your PR
