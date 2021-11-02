@@ -3532,7 +3532,6 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -3548,8 +3547,6 @@ COMMIT
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -3636,7 +3633,6 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -3654,8 +3650,6 @@ COMMIT
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -4304,6 +4298,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 		terminatingFeatureGate bool
 		endpointslice          *discovery.EndpointSlice
 		expectedIPTables       string
+		noUsableEndpoints      bool
 	}{
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
@@ -4392,8 +4387,6 @@ COMMIT
 :KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 :KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -4406,8 +4399,6 @@ COMMIT
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
@@ -4416,10 +4407,6 @@ COMMIT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -4520,8 +4507,6 @@ COMMIT
 :KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 :KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -4534,8 +4519,6 @@ COMMIT
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
@@ -4544,10 +4527,6 @@ COMMIT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -4640,7 +4619,6 @@ COMMIT
 :KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 :KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -4651,17 +4629,12 @@ COMMIT
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -4757,10 +4730,6 @@ COMMIT
 :KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
-:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
-:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 :KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -4771,26 +4740,145 @@ COMMIT
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --rcheck --seconds 10800 --reap -j KUBE-SEP-XGJFVO3L2O5SRFNT
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-VLJB2F747S6W7EX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
--A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-VLJB2F747S6W7EX4 --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "ProxyTerminatingEndpoints enabled, terminating endpoints on remote node",
+			terminatingFeatureGate: true,
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						// this endpoint won't be used because it's not local,
+						// but it will prevent a REJECT rule from being created
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			expectedIPTables: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-FW-AQI2S6QIMU7PVVRP - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
+-A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "no usable endpoints on any node",
+			terminatingFeatureGate: true,
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						// Local but not ready or serving
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// Remote and not ready or serving
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			noUsableEndpoints: true,
+			expectedIPTables: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j REJECT
+-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 10.1.2.3/32 --dport 80 -j REJECT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `,
@@ -4816,7 +4904,12 @@ COMMIT
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesNotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+			if testcase.noUsableEndpoints {
+				// Deleting the EndpointSlice should have had no effect
+				assertIPTablesRulesEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+			} else {
+				assertIPTablesRulesNotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+			}
 		})
 	}
 }
