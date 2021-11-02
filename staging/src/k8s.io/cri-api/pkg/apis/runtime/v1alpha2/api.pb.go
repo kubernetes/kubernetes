@@ -6057,7 +6057,7 @@ type Image struct {
 	// ImageSpec for image which includes annotations
 	Spec *ImageSpec `protobuf:"bytes,7,opt,name=spec,proto3" json:"spec,omitempty"`
 	// Recommendation on whether this image should be exempt from garbage collection.
-	// It must only be treated as a recommendation--the client can still request the image be deleted,
+	// It must only be treated as a recommendation -- the client can still request that the image be deleted,
 	// and the runtime must oblige.
 	Pinned               bool     `protobuf:"varint,8,opt,name=pinned,proto3" json:"pinned,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`

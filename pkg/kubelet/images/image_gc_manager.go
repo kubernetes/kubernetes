@@ -338,12 +338,28 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 
+	// Make the ListImages into a map to grab an image by ID
+	allImages, err := im.runtime.ListImages()
+	if err != nil {
+		return 0, err
+	}
+	imagesMap := make(map[string]container.Image, len(allImages))
+	for _, img := range allImages {
+		imagesMap[img.ID] = img
+	}
+
 	// Get all images in eviction order.
 	images := make([]evictionInfo, 0, len(im.imageRecords))
 	for image, record := range im.imageRecords {
 		if isImageUsed(image, imagesInUse) {
 			klog.V(5).InfoS("Image ID is being used", "imageID", image)
 			continue
+		}
+		// Check if image is pinned, prevent garbage collection
+		if imagesMap[image].Pinned {
+			klog.V(5).InfoS("Image is pinned, skipping garbage collection", "imageID", image)
+			continue
+
 		}
 		images = append(images, evictionInfo{
 			id:          image,

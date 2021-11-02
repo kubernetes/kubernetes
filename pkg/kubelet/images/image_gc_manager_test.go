@@ -206,6 +206,89 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDeletePinnedImage(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:     sandboxImage,
+			Size:   1024,
+			Pinned: true,
+		},
+		{
+			ID:   sandboxImage,
+			Size: 1024,
+		},
+	}
+
+	err := manager.DeleteUnusedImages()
+	assert := assert.New(t)
+	assert.Len(fakeRuntime.ImageList, 2)
+	require.NoError(t, err)
+}
+
+func TestDoNotDeletePinnedImage(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:     "1",
+			Size:   1024,
+			Pinned: true,
+		},
+		{
+			ID:   "2",
+			Size: 1024,
+		},
+	}
+
+	spaceFreed, err := manager.freeSpace(4096, time.Now())
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(1024, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
+func TestDeleteUnPinnedImage(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:     "1",
+			Size:   1024,
+			Pinned: false,
+		},
+		{
+			ID:   "2",
+			Size: 1024,
+		},
+	}
+
+	spaceFreed, err := manager.freeSpace(2048, time.Now())
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(2048, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 0)
+}
+
+func TestAllPinnedImages(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:     "1",
+			Size:   1024,
+			Pinned: true,
+		},
+		{
+			ID:     "2",
+			Size:   1024,
+			Pinned: true,
+		},
+	}
+
+	spaceFreed, err := manager.freeSpace(2048, time.Now())
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(0, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 2)
+}
 func TestDetectImagesContainerStopped(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
