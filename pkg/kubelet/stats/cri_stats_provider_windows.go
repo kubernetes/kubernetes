@@ -31,9 +31,30 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
+type hcsShimInterface interface {
+	GetContainers(q hcsshim.ComputeSystemQuery) ([]hcsshim.ContainerProperties, error)
+	GetHNSEndpointByID(endpointID string) (*hcsshim.HNSEndpoint, error)
+	OpenContainer(id string) (hcsshim.Container, error)
+}
+
+type windowshim struct{}
+
+func (s windowshim) GetContainers(q hcsshim.ComputeSystemQuery) ([]hcsshim.ContainerProperties, error) {
+	return hcsshim.GetContainers(q)
+}
+
+func (s windowshim) GetHNSEndpointByID(endpointID string) (*hcsshim.HNSEndpoint, error) {
+	return hcsshim.GetHNSEndpointByID(endpointID)
+}
+
+func (s windowshim) OpenContainer(id string) (hcsshim.Container, error) {
+	return hcsshim.OpenContainer(id)
+}
+
 // listContainerNetworkStats returns the network stats of all the running containers.
 func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
-	containers, err := hcsshim.GetContainers(hcsshim.ComputeSystemQuery{
+	shim := newHcsShim(p)
+	containers, err := shim.GetContainers(hcsshim.ComputeSystemQuery{
 		Types: []string{"Container"},
 	})
 	if err != nil {
@@ -42,24 +63,34 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 
 	stats := make(map[string]*statsapi.NetworkStats)
 	for _, c := range containers {
-		cstats, err := fetchContainerStats(c)
+		cstats, err := fetchContainerStats(shim, c)
 		if err != nil {
 			klog.V(4).InfoS("Failed to fetch statistics for container, continue to get stats for other containers", "containerID", c.ID, "err", err)
 			continue
 		}
 		if len(cstats.Network) > 0 {
-			stats[c.ID] = hcsStatsToNetworkStats(cstats.Timestamp, cstats.Network)
+			stats[c.ID] = hcsStatsToNetworkStats(shim, cstats.Timestamp, cstats.Network)
 		}
 	}
 
 	return stats, nil
 }
 
-func fetchContainerStats(c hcsshim.ContainerProperties) (stats hcsshim.Statistics, err error) {
+func newHcsShim(p *criStatsProvider) hcsShimInterface {
+	var shim hcsShimInterface
+	if p.hcsshimInterface == nil {
+		shim = windowshim{}
+	} else {
+		shim = p.hcsshimInterface.(hcsShimInterface)
+	}
+	return shim
+}
+
+func fetchContainerStats(hcsshimInterface hcsShimInterface, c hcsshim.ContainerProperties) (stats hcsshim.Statistics, err error) {
 	var (
 		container hcsshim.Container
 	)
-	container, err = hcsshim.OpenContainer(c.ID)
+	container, err = hcsshimInterface.OpenContainer(c.ID)
 	if err != nil {
 		return
 	}
@@ -77,7 +108,7 @@ func fetchContainerStats(c hcsshim.ContainerProperties) (stats hcsshim.Statistic
 }
 
 // hcsStatsToNetworkStats converts hcsshim.Statistics.Network to statsapi.NetworkStats
-func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats) *statsapi.NetworkStats {
+func hcsStatsToNetworkStats(hcsshimInterface hcsShimInterface, timestamp time.Time, hcsStats []hcsshim.NetworkStats) *statsapi.NetworkStats {
 	result := &statsapi.NetworkStats{
 		Time:       metav1.NewTime(timestamp),
 		Interfaces: make([]statsapi.InterfaceStats, 0),
@@ -85,7 +116,7 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats
 
 	adapters := sets.NewString()
 	for _, stat := range hcsStats {
-		iStat, err := hcsStatsToInterfaceStats(stat)
+		iStat, err := hcsStatsToInterfaceStats(hcsshimInterface, stat)
 		if err != nil {
 			klog.InfoS("Failed to get HNS endpoint, continue to get stats for other endpoints", "endpointID", stat.EndpointId, "err", err)
 			continue
@@ -109,8 +140,8 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats
 }
 
 // hcsStatsToInterfaceStats converts hcsshim.NetworkStats to statsapi.InterfaceStats.
-func hcsStatsToInterfaceStats(stat hcsshim.NetworkStats) (*statsapi.InterfaceStats, error) {
-	endpoint, err := hcsshim.GetHNSEndpointByID(stat.EndpointId)
+func hcsStatsToInterfaceStats(hcsshimInterface hcsShimInterface, stat hcsshim.NetworkStats) (*statsapi.InterfaceStats, error) {
+	endpoint, err := hcsshimInterface.GetHNSEndpointByID(stat.EndpointId)
 	if err != nil {
 		return nil, err
 	}

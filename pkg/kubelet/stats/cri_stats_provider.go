@@ -67,6 +67,7 @@ type criStatsProvider struct {
 	imageService internalapi.ImageManagerService
 	// hostStatsProvider is used to get the status of the host filesystem consumed by pods.
 	hostStatsProvider HostStatsProvider
+	hcsshimInterface  interface{}
 
 	// cpuUsageCache caches the cpu usage for containers.
 	cpuUsageCache                  map[string]*cpuUsageRecord
