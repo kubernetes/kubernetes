@@ -133,6 +133,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	// hasCRDInformerSyncedSignal is closed when the CRD informer this server uses has been fully synchronized.
+	// It ensures that requests to potential custom resource endpoints while the server hasn't installed all known HTTP paths get a 503 error instead of a 404
+	hasCRDInformerSyncedSignal := make(chan struct{})
+	if err := genericServer.RegisterMuxAndDiscoveryCompleteSignal("CRDInformerHasNotSynced", hasCRDInformerSyncedSignal); err != nil {
+		return nil, err
+	}
+
 	s := &CustomResourceDefinitions{
 		GenericAPIServer: genericServer,
 	}
@@ -245,7 +252,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// but we won't go healthy until we can handle the ones already present.
 	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(context genericapiserver.PostStartHookContext) error {
 		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
+			if s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
+				close(hasCRDInformerSyncedSignal)
+				return true, nil
+			}
+			return false, nil
 		}, context.StopCh)
 	})
 
