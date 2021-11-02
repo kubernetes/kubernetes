@@ -806,17 +806,6 @@ func (HTTPHeader) SwaggerDoc() map[string]string {
 	return map_HTTPHeader
 }
 
-var map_Handler = map[string]string{
-	"":          "Handler defines a specific action that should be taken",
-	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
-	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
-}
-
-func (Handler) SwaggerDoc() map[string]string {
-	return map_Handler
-}
-
 var map_HostAlias = map[string]string{
 	"":          "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
 	"ip":        "IP address of the host file entry.",
@@ -894,6 +883,17 @@ var map_Lifecycle = map[string]string{
 
 func (Lifecycle) SwaggerDoc() map[string]string {
 	return map_Lifecycle
+}
+
+var map_LifecycleHandler = map[string]string{
+	"":          "LifecycleHandler defines a specific action that should be taken in a lifecycle hook.  This type has a strong relationship to ProbeHandler - overlapping fields should be identical.",
+	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the http request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+}
+
+func (LifecycleHandler) SwaggerDoc() map[string]string {
+	return map_LifecycleHandler
 }
 
 var map_LimitRange = map[string]string{
@@ -1511,8 +1511,8 @@ func (PodDNSConfigOption) SwaggerDoc() map[string]string {
 var map_PodExecOptions = map[string]string{
 	"":          "PodExecOptions is the query options to a Pod's remote exec call.",
 	"stdin":     "Redirect the standard input stream of the pod for this call. Defaults to false.",
-	"stdout":    "Redirect the standard output stream of the pod for this call. Defaults to true.",
-	"stderr":    "Redirect the standard error stream of the pod for this call. Defaults to true.",
+	"stdout":    "Redirect the standard output stream of the pod for this call.",
+	"stderr":    "Redirect the standard error stream of the pod for this call.",
 	"tty":       "TTY if true indicates that a tty will be allocated for the exec call. Defaults to false.",
 	"container": "Container in which to execute the command. Defaults to only container if there is only one container in the pod.",
 	"command":   "Command is the remote command to execute. argv array. Not executed within a shell.",
@@ -1558,6 +1558,15 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 	return map_PodLogOptions
 }
 
+var map_PodOS = map[string]string{
+	"":     "PodOS defines the OS parameters of a pod.",
+	"name": "Name is the name of the operating system. The currently supported values are linux and windows. Additional value may be defined in future and can be one of: https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration Clients should expect to handle additional values and treat unrecognized values in this field as os: null",
+}
+
+func (PodOS) SwaggerDoc() map[string]string {
+	return map_PodOS
+}
+
 var map_PodPortForwardOptions = map[string]string{
 	"":      "PodPortForwardOptions is the query options to a Pod's port forward call when using WebSockets. The `port` query parameter must specify the port or ports (comma separated) to forward over. Port forwarding over SPDY does not use these options. It requires the port to be passed in the `port` header as part of request.",
 	"ports": "List of ports to forward Required when using WebSockets",
@@ -1587,16 +1596,16 @@ func (PodReadinessGate) SwaggerDoc() map[string]string {
 
 var map_PodSecurityContext = map[string]string{
 	"":                    "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
-	"seLinuxOptions":      "The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.",
-	"windowsOptions":      "The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"runAsUser":           "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.",
-	"runAsGroup":          "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.",
+	"seLinuxOptions":      "The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
+	"windowsOptions":      "The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.",
+	"runAsUser":           "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
+	"runAsGroup":          "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
 	"runAsNonRoot":        "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"supplementalGroups":  "A list of groups applied to the first process run in each container, in addition to the container's primary GID.  If unspecified, no groups will be added to any container.",
+	"supplementalGroups":  "A list of groups applied to the first process run in each container, in addition to the container's primary GID.  If unspecified, no groups will be added to any container. Note that this field cannot be set when spec.os.name is windows.",
 	"fsGroup":             "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw ",
-	"sysctls":             "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch.",
-	"fsGroupChangePolicy": "fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are \"OnRootMismatch\" and \"Always\". If not specified, \"Always\" is used.",
-	"seccompProfile":      "The seccomp options to use by the containers in this pod.",
+	"sysctls":             "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.",
+	"fsGroupChangePolicy": "fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are \"OnRootMismatch\" and \"Always\". If not specified, \"Always\" is used. Note that this field cannot be set when spec.os.name is windows.",
+	"seccompProfile":      "The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (PodSecurityContext) SwaggerDoc() map[string]string {
@@ -1649,6 +1658,7 @@ var map_PodSpec = map[string]string{
 	"overhead":                      "Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.",
 	"topologySpreadConstraints":     "TopologySpreadConstraints describes how a group of pods ought to spread across topology domains. Scheduler will schedule pods in a way which abides by the constraints. All topologySpreadConstraints are ANDed.",
 	"setHostnameAsFQDN":             "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
+	"os":                            "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup This is an alpha field and requires the IdentifyPodOS feature",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1780,6 +1790,17 @@ var map_Probe = map[string]string{
 
 func (Probe) SwaggerDoc() map[string]string {
 	return map_Probe
+}
+
+var map_ProbeHandler = map[string]string{
+	"":          "ProbeHandler defines a specific action that should be taken in a probe. This type has a strong relationship to LifecycleHandler - overlapping fields should be identical.",
+	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the http request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+}
+
+func (ProbeHandler) SwaggerDoc() map[string]string {
+	return map_ProbeHandler
 }
 
 var map_ProjectedVolumeSource = map[string]string{
@@ -2056,7 +2077,7 @@ var map_Secret = map[string]string{
 	"immutable":  "Immutable, if set to true, ensures that data stored in the Secret cannot be updated (only object metadata can be modified). If not set to true, the field can be modified at any time. Defaulted to nil.",
 	"data":       "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
 	"stringData": "stringData allows specifying non-binary secret data in string form. It is provided as a write-only input field for convenience. All keys and values are merged into the data field on write, overwriting any existing values. The stringData field is never output when reading from the API.",
-	"type":       "Used to facilitate programmatic handling of secret data.",
+	"type":       "Used to facilitate programmatic handling of secret data. More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types",
 }
 
 func (Secret) SwaggerDoc() map[string]string {
@@ -2126,17 +2147,17 @@ func (SecretVolumeSource) SwaggerDoc() map[string]string {
 
 var map_SecurityContext = map[string]string{
 	"":                         "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
-	"capabilities":             "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.",
-	"privileged":               "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false.",
-	"seLinuxOptions":           "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"windowsOptions":           "The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"runAsUser":                "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"runAsGroup":               "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+	"capabilities":             "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows.",
+	"privileged":               "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.",
+	"seLinuxOptions":           "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
+	"windowsOptions":           "The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.",
+	"runAsUser":                "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
+	"runAsGroup":               "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
 	"runAsNonRoot":             "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-	"readOnlyRootFilesystem":   "Whether this container has a read-only root filesystem. Default is false.",
-	"allowPrivilegeEscalation": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN",
-	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled.",
-	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options.",
+	"readOnlyRootFilesystem":   "Whether this container has a read-only root filesystem. Default is false. Note that this field cannot be set when spec.os.name is windows.",
+	"allowPrivilegeEscalation": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.",
+	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.",
+	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -2472,7 +2493,7 @@ var map_VolumeSource = map[string]string{
 	"scaleIO":               "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"storageos":             "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
 	"csi":                   "CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).",
-	"ephemeral":             "Ephemeral represents a volume that is handled by a cluster storage driver. The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts, and deleted when the pod is removed.\n\nUse this if: a) the volume is only needed while the pod runs, b) features of normal volumes like restoring from snapshot or capacity\n   tracking are needed,\nc) the storage driver is specified through a storage class, and d) the storage driver supports dynamic volume provisioning through\n   a PersistentVolumeClaim (see EphemeralVolumeSource for more\n   information on the connection between this volume type\n   and PersistentVolumeClaim).\n\nUse PersistentVolumeClaim or one of the vendor-specific APIs for volumes that persist for longer than the lifecycle of an individual pod.\n\nUse CSI for light-weight local ephemeral volumes if the CSI driver is meant to be used that way - see the documentation of the driver for more information.\n\nA pod can use both types of ephemeral volumes and persistent volumes at the same time.\n\nThis is a beta feature and only available when the GenericEphemeralVolume feature gate is enabled.",
+	"ephemeral":             "Ephemeral represents a volume that is handled by a cluster storage driver. The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts, and deleted when the pod is removed.\n\nUse this if: a) the volume is only needed while the pod runs, b) features of normal volumes like restoring from snapshot or capacity\n   tracking are needed,\nc) the storage driver is specified through a storage class, and d) the storage driver supports dynamic volume provisioning through\n   a PersistentVolumeClaim (see EphemeralVolumeSource for more\n   information on the connection between this volume type\n   and PersistentVolumeClaim).\n\nUse PersistentVolumeClaim or one of the vendor-specific APIs for volumes that persist for longer than the lifecycle of an individual pod.\n\nUse CSI for light-weight local ephemeral volumes if the CSI driver is meant to be used that way - see the documentation of the driver for more information.\n\nA pod can use both types of ephemeral volumes and persistent volumes at the same time.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

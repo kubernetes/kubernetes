@@ -21,13 +21,13 @@ package v1
 // ProbeApplyConfiguration represents an declarative configuration of the Probe type for use
 // with apply.
 type ProbeApplyConfiguration struct {
-	HandlerApplyConfiguration     `json:",inline"`
-	InitialDelaySeconds           *int32 `json:"initialDelaySeconds,omitempty"`
-	TimeoutSeconds                *int32 `json:"timeoutSeconds,omitempty"`
-	PeriodSeconds                 *int32 `json:"periodSeconds,omitempty"`
-	SuccessThreshold              *int32 `json:"successThreshold,omitempty"`
-	FailureThreshold              *int32 `json:"failureThreshold,omitempty"`
-	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+	ProbeHandlerApplyConfiguration `json:",inline"`
+	InitialDelaySeconds            *int32 `json:"initialDelaySeconds,omitempty"`
+	TimeoutSeconds                 *int32 `json:"timeoutSeconds,omitempty"`
+	PeriodSeconds                  *int32 `json:"periodSeconds,omitempty"`
+	SuccessThreshold               *int32 `json:"successThreshold,omitempty"`
+	FailureThreshold               *int32 `json:"failureThreshold,omitempty"`
+	TerminationGracePeriodSeconds  *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 // ProbeApplyConfiguration constructs an declarative configuration of the Probe type for use with

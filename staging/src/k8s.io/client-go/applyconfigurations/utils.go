@@ -551,8 +551,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GlusterfsPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("GlusterfsVolumeSource"):
 		return &applyconfigurationscorev1.GlusterfsVolumeSourceApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("Handler"):
-		return &applyconfigurationscorev1.HandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostPathVolumeSource"):
@@ -569,6 +567,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.KeyToPathApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Lifecycle"):
 		return &applyconfigurationscorev1.LifecycleApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LifecycleHandler"):
+		return &applyconfigurationscorev1.LifecycleHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRange"):
 		return &applyconfigurationscorev1.LimitRangeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeItem"):
@@ -661,6 +661,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodDNSConfigOptionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodIP"):
 		return &applyconfigurationscorev1.PodIPApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodOS"):
+		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):
@@ -681,6 +683,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PreferredSchedulingTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Probe"):
 		return &applyconfigurationscorev1.ProbeApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ProbeHandler"):
+		return &applyconfigurationscorev1.ProbeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProjectedVolumeSource"):
 		return &applyconfigurationscorev1.ProjectedVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("QuobyteVolumeSource"):

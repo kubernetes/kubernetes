@@ -1708,3 +1708,85 @@ func TestDropDisabledPodAffinityTermFields(t *testing.T) {
 		})
 	}
 }
+
+func TestDropOSField(t *testing.T) {
+	podWithOSField := func() *api.Pod {
+		osField := api.PodOS{Name: "linux"}
+		return &api.Pod{
+			Spec: api.PodSpec{
+				OS: &osField,
+			},
+		}
+	}
+	podWithoutOSField := func() *api.Pod { return &api.Pod{} }
+	podInfo := []struct {
+		description   string
+		hasPodOSField bool
+		pod           func() *api.Pod
+	}{
+		{
+			description:   "has PodOS field",
+			hasPodOSField: true,
+			pod:           podWithOSField,
+		},
+		{
+			description:   "does not have PodOS field",
+			hasPodOSField: false,
+			pod:           podWithoutOSField,
+		},
+		{
+			description:   "is nil",
+			hasPodOSField: false,
+			pod:           func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasOsField, oldPod := oldPodInfo.hasPodOSField, oldPodInfo.pod()
+				newPodHasOSField, newPod := newPodInfo.hasPodOSField, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasOsField:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasOSField:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have OSfield
+						if !reflect.DeepEqual(newPod, podWithoutOSField()) {
+							t.Errorf("new pod has OS field: %v", cmp.Diff(newPod, podWithoutOSField()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

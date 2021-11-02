@@ -647,6 +647,72 @@ func TestValidateJobUpdate(t *testing.T) {
 				AllowMutableSchedulingDirectives: true,
 			},
 		},
+		"immutable annotations": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Annotations = map[string]string{"foo": "baz"}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"mutable annotations": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Annotations = map[string]string{"foo": "baz"}
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"immutable labels": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				newLabels := getValidGeneratedSelector().MatchLabels
+				newLabels["bar"] = "baz"
+				job.Spec.Template.Labels = newLabels
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"mutable labels": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				newLabels := getValidGeneratedSelector().MatchLabels
+				newLabels["bar"] = "baz"
+				job.Spec.Template.Labels = newLabels
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
@@ -692,9 +758,36 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Status: batch.JobStatus{
+					Active:    2,
+					Succeeded: 3,
+					Failed:    4,
+					Ready:     pointer.Int32(1),
+				},
+			},
+		},
+		"nil ready": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Status: batch.JobStatus{
 					Active:    1,
-					Succeeded: 1,
+					Succeeded: 2,
 					Failed:    3,
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Status: batch.JobStatus{
+					Active:    2,
+					Succeeded: 3,
+					Failed:    4,
 				},
 			},
 		},
@@ -720,12 +813,15 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				Status: batch.JobStatus{
 					Active:    -1,
 					Succeeded: -2,
-					Failed:    3,
+					Failed:    -3,
+					Ready:     pointer.Int32(-1),
 				},
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 				{Type: field.ErrorTypeInvalid, Field: "status.succeeded"},
+				{Type: field.ErrorTypeInvalid, Field: "status.failed"},
+				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 			},
 		},
 		"empty and duplicated uncounted pods": {

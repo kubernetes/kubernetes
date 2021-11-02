@@ -457,10 +457,12 @@ func TestValidateNamespace(t *testing.T) {
 				}
 			}
 
-			attrs := &AttributesRecord{
+			attrs := &api.AttributesRecord{
 				Object:      newObject,
 				OldObject:   oldObject,
+				Name:        newObject.Name,
 				Namespace:   newObject.Name,
+				Kind:        schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"},
 				Resource:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"},
 				Subresource: tc.subresource,
 				Operation:   operation,
@@ -506,7 +508,7 @@ func TestValidateNamespace(t *testing.T) {
 						RuntimeClasses: tc.exemptRuntimeClasses,
 					},
 				},
-				Metrics:       NewMockRecorder(),
+				Metrics:       &FakeRecorder{},
 				defaultPolicy: defaultPolicy,
 
 				namespacePodCheckTimeout: time.Second,
@@ -580,6 +582,7 @@ func TestValidatePodController(t *testing.T) {
 		api.WarnLevelLabel:    string(api.LevelBaseline),
 		api.AuditLevelLabel:   string(api.LevelBaseline),
 	}
+	nsLevelVersion := api.LevelVersion{api.LevelBaseline, api.LatestVersion()}
 
 	testCases := []struct {
 		desc                 string
@@ -592,6 +595,7 @@ func TestValidatePodController(t *testing.T) {
 		newObject runtime.Object
 		// for update
 		oldObject runtime.Object
+		gvk       schema.GroupVersionKind
 		gvr       schema.GroupVersionResource
 
 		expectWarnings         []string
@@ -602,50 +606,61 @@ func TestValidatePodController(t *testing.T) {
 			subresource: "status",
 			newObject:   &badDeploy,
 			oldObject:   &goodDeploy,
+			gvk:         schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 		},
 		{
-			desc:             "namespace in exemptNamespaces will be exempted",
-			newObject:        &badDeploy,
-			gvr:              schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			exemptNamespaces: []string{testNamespace},
+			desc:                   "namespace in exemptNamespaces will be exempted",
+			newObject:              &badDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptNamespaces:       []string{testNamespace},
+			expectAuditAnnotations: map[string]string{"exempt": "namespace"},
 		},
 		{
-			desc:                 "runtimeClass in exemptRuntimeClasses will be exempted",
-			newObject:            &badDeploy,
-			gvr:                  schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			exemptRuntimeClasses: []string{"containerd"},
+			desc:                   "runtimeClass in exemptRuntimeClasses will be exempted",
+			newObject:              &badDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptRuntimeClasses:   []string{"containerd"},
+			expectAuditAnnotations: map[string]string{"exempt": "runtimeClass"},
 		},
 		{
-			desc:        "user in exemptUsers will be exempted",
-			newObject:   &badDeploy,
-			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			exemptUsers: []string{"testuser"},
+			desc:                   "user in exemptUsers will be exempted",
+			newObject:              &badDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptUsers:            []string{"testuser"},
+			expectAuditAnnotations: map[string]string{"exempt": "user"},
 		},
 		{
 			desc:      "podMetadata == nil && podSpec == nil will skip verification",
 			newObject: &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo-rc"}},
+			gvk:       schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ReplicationController"},
 			gvr:       schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"},
 		},
 		{
 			desc:                   "good deploy creates and produce nothing",
 			newObject:              &goodDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			expectAuditAnnotations: map[string]string{},
 		},
 		{
 			desc:                   "bad deploy creates produce correct user-visible warnings and correct auditAnnotations",
 			newObject:              &badDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit-violations": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 		{
 			desc:                   "bad spec updates don't block on enforce failures and returns correct information",
 			newObject:              &badDeploy,
 			oldObject:              &goodDeploy,
+			gvk:                    schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit-violations": "would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 			expectWarnings:         []string{"would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 	}
@@ -657,9 +672,10 @@ func TestValidatePodController(t *testing.T) {
 				operation = admissionv1.Update
 			}
 
-			attrs := &AttributesRecord{
+			attrs := &api.AttributesRecord{
 				testName,
 				testNamespace,
+				tc.gvk,
 				tc.gvr,
 				tc.subresource,
 				operation,
@@ -685,6 +701,7 @@ func TestValidatePodController(t *testing.T) {
 						Labels:    nsLabels}},
 			}
 			PodSpecExtractor := &DefaultPodSpecExtractor{}
+			recorder := &FakeRecorder{}
 			a := &Admission{
 				PodLister:        podLister,
 				Evaluator:        evaluator,
@@ -696,7 +713,7 @@ func TestValidatePodController(t *testing.T) {
 						Usernames:      tc.exemptUsers,
 					},
 				},
-				Metrics:         NewMockRecorder(),
+				Metrics:         recorder,
 				defaultPolicy:   defaultPolicy,
 				NamespaceGetter: nsGetter,
 			}
@@ -712,16 +729,39 @@ func TestValidatePodController(t *testing.T) {
 			assert.Empty(t, resultError)
 			assert.Equal(t, tc.expectAuditAnnotations, result.AuditAnnotations, "unexpected AuditAnnotations")
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
+
+			expectedEvaluations := []EvaluationRecord{}
+			if _, ok := tc.expectAuditAnnotations["audit-violations"]; ok {
+				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeAudit})
+			}
+			if len(tc.expectWarnings) > 0 {
+				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeWarn})
+			}
+			recorder.ExpectEvaluations(t, expectedEvaluations)
 		})
 	}
 }
 
-type MockRecorder struct {
+type FakeRecorder struct {
+	evaluations []EvaluationRecord
 }
 
-func NewMockRecorder() *MockRecorder {
-	return &MockRecorder{}
+type EvaluationRecord struct {
+	ObjectName string
+	Decision   metrics.Decision
+	Policy     api.LevelVersion
+	Mode       metrics.Mode
 }
 
-func (r MockRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
+func (r *FakeRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
+	r.evaluations = append(r.evaluations, EvaluationRecord{attrs.GetName(), decision, policy, evalMode})
+}
+
+func (r *FakeRecorder) RecordExemption(api.Attributes)   {}
+func (r *FakeRecorder) RecordError(bool, api.Attributes) {}
+
+// ExpectEvaluation asserts that the evaluation was recorded, and clears the record.
+func (r *FakeRecorder) ExpectEvaluations(t *testing.T, expected []EvaluationRecord) {
+	t.Helper()
+	assert.ElementsMatch(t, expected, r.evaluations)
 }

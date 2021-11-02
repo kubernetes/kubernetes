@@ -1597,11 +1597,14 @@
                 }
               }
             ],
-            "setHostnameAsFQDN": true
+            "setHostnameAsFQDN": true,
+            "os": {
+              "name": "+\u0026ɃB沅零șPî壣"
+            }
           }
         },
-        "ttlSecondsAfterFinished": -1166275743,
-        "completionMode": "ĵ/Ş槀墺=Ĉ鳟/d\u0026蒡",
+        "ttlSecondsAfterFinished": -2008027992,
+        "completionMode": "蒡",
         "suspend": false
       }
     },

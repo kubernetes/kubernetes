@@ -225,7 +225,7 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
-	// The number of actively running pods.
+	// The number of pending and running pods.
 	// +optional
 	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
@@ -265,6 +265,13 @@ type JobStatus struct {
 	// remains null.
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
+
+	// The number of pods which have a Ready condition.
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (disabled by default).
+	// +optional
+	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
 
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't

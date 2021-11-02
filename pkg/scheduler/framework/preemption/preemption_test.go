@@ -31,6 +31,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -313,7 +313,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Interface:  fakePostPlugin,
 					State:      state,
 				}
-				got, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods

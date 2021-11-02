@@ -66,7 +66,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	}
 	interval := time.NewTicker(time.Millisecond * 500)
 	defer interval.Stop()
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	go func() {
 		time.Sleep(time.Minute * 2)
 		done <- true

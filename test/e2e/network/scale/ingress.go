@@ -463,7 +463,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deploymen
 							Image: imageutils.GetE2EImage(imageutils.EchoServer),
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							ReadinessProbe: &v1.Probe{
-								Handler: v1.Handler{
+								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
 										Port: intstr.FromInt(8080),
 										Path: "/healthz",

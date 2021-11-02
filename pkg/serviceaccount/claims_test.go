@@ -223,7 +223,9 @@ type claimTestCase struct {
 	name      string
 	getter    ServiceAccountTokenGetter
 	private   *privateClaims
-	expectErr bool
+	expiry    jwt.NumericDate
+	notBefore jwt.NumericDate
+	expectErr string
 }
 
 func TestValidatePrivateClaims(t *testing.T) {
@@ -265,40 +267,60 @@ func TestValidatePrivateClaims(t *testing.T) {
 
 	testcases := []claimTestCase{
 		{
+			name:      "good",
+			getter:    fakeGetter{serviceAccount, nil, nil},
+			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
+			expectErr: "",
+		},
+		{
+			name:      "expired",
+			getter:    fakeGetter{serviceAccount, nil, nil},
+			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
+			expiry:    jwt.NewNumericDate(now().Add(-1_000 * time.Hour)),
+			expectErr: "service account token has expired",
+		},
+		{
+			name:      "not yet valid",
+			getter:    fakeGetter{serviceAccount, nil, nil},
+			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
+			notBefore: jwt.NewNumericDate(now().Add(1_000 * time.Hour)),
+			expectErr: "service account token is not valid yet",
+		},
+		{
 			name:      "missing serviceaccount",
 			getter:    fakeGetter{nil, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: `serviceaccounts "saname" not found`,
 		},
 		{
 			name:      "missing secret",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Secret: &ref{Name: "secretname", UID: "secretuid"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: "service account token has been invalidated",
 		},
 		{
 			name:      "missing pod",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Pod: &ref{Name: "podname", UID: "poduid"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: "service account token has been invalidated",
 		},
 		{
 			name:      "different uid serviceaccount",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauidold"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: "service account UID (sauid) does not match claim (sauidold)",
 		},
 		{
 			name:      "different uid secret",
 			getter:    fakeGetter{serviceAccount, secret, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Secret: &ref{Name: "secretname", UID: "secretuidold"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: "secret UID (secretuid) does not match service account secret ref claim (secretuidold)",
 		},
 		{
 			name:      "different uid pod",
 			getter:    fakeGetter{serviceAccount, nil, pod},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Pod: &ref{Name: "podname", UID: "poduidold"}, Namespace: "ns"}},
-			expectErr: true,
+			expectErr: "pod UID (poduid) does not match service account pod ref claim (poduidold)",
 		},
 	}
 
@@ -312,24 +334,30 @@ func TestValidatePrivateClaims(t *testing.T) {
 		deletedPod.DeletionTimestamp = deletionTestCase.time
 		deletedSecret.DeletionTimestamp = deletionTestCase.time
 
+		var saDeletedErr, deletedErr string
+		if deletionTestCase.expectErr {
+			saDeletedErr = "service account ns/saname has been deleted"
+			deletedErr = "service account token has been invalidated"
+		}
+
 		testcases = append(testcases,
 			claimTestCase{
 				name:      deletionTestCase.name + " serviceaccount",
 				getter:    fakeGetter{deletedServiceAccount, nil, nil},
 				private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-				expectErr: deletionTestCase.expectErr,
+				expectErr: saDeletedErr,
 			},
 			claimTestCase{
 				name:      deletionTestCase.name + " secret",
 				getter:    fakeGetter{serviceAccount, deletedSecret, nil},
 				private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Secret: &ref{Name: "secretname", UID: "secretuid"}, Namespace: "ns"}},
-				expectErr: deletionTestCase.expectErr,
+				expectErr: deletedErr,
 			},
 			claimTestCase{
 				name:      deletionTestCase.name + " pod",
 				getter:    fakeGetter{serviceAccount, nil, deletedPod},
 				private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Pod: &ref{Name: "podname", UID: "poduid"}, Namespace: "ns"}},
-				expectErr: deletionTestCase.expectErr,
+				expectErr: deletedErr,
 			},
 		)
 	}
@@ -337,18 +365,28 @@ func TestValidatePrivateClaims(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			v := &validator{tc.getter}
-			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: jwt.NumericDate(nowUnix)}, tc.private)
-			if err != nil && !tc.expectErr {
-				t.Fatal(err)
+			expiry := jwt.NumericDate(nowUnix)
+			if tc.expiry != 0 {
+				expiry = tc.expiry
 			}
-			if err == nil && tc.expectErr {
-				t.Fatal("expected error, got none")
-			}
-			if err != nil {
-				return
+			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: expiry, NotBefore: tc.notBefore}, tc.private)
+			if len(tc.expectErr) > 0 {
+				if errStr := errString(err); tc.expectErr != errStr {
+					t.Fatalf("expected error %q but got %q", tc.expectErr, errStr)
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
 }
 
 type fakeGetter struct {

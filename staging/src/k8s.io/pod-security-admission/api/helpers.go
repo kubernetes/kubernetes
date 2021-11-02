@@ -21,8 +21,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
-	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/version"
 )
 
@@ -76,7 +77,11 @@ func GetAPIVersion() Version {
 	if err != nil {
 		return v
 	}
-	minor, err := strconv.Atoi(apiVersion.Minor)
+	// split the "normal" + and - for semver stuff to get the leading minor number
+	minorString := strings.FieldsFunc(apiVersion.Minor, func(r rune) bool {
+		return !unicode.IsDigit(r)
+	})[0]
+	minor, err := strconv.Atoi(minorString)
 	if err != nil {
 		return v
 	}
@@ -149,44 +154,44 @@ type Policy struct {
 // falling back to the provided defaults when a label is unspecified. A valid policy is always
 // returned, even when an error is returned. If labels cannot be parsed correctly, the values of
 // "restricted" and "latest" are used for level and version respectively.
-func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, error) {
+func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.ErrorList) {
 	var (
 		err  error
-		errs []error
+		errs field.ErrorList
 
 		p = defaults
 	)
 	if level, ok := labels[EnforceLevelLabel]; ok {
 		p.Enforce.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Enforce.Level")
+		errs = appendErr(errs, err, EnforceLevelLabel, level)
 	}
 	if version, ok := labels[EnforceVersionLabel]; ok {
 		p.Enforce.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Enforce.Version")
+		errs = appendErr(errs, err, EnforceVersionLabel, version)
 	}
 	if level, ok := labels[AuditLevelLabel]; ok {
 		p.Audit.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Audit.Level")
+		errs = appendErr(errs, err, AuditLevelLabel, level)
 		if err != nil {
 			p.Audit.Level = LevelPrivileged // Fail open for audit.
 		}
 	}
 	if version, ok := labels[AuditVersionLabel]; ok {
 		p.Audit.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Audit.Version")
+		errs = appendErr(errs, err, AuditVersionLabel, version)
 	}
 	if level, ok := labels[WarnLevelLabel]; ok {
 		p.Warn.Level, err = ParseLevel(level)
-		errs = appendErr(errs, err, "Warn.Level")
+		errs = appendErr(errs, err, WarnLevelLabel, level)
 		if err != nil {
 			p.Warn.Level = LevelPrivileged // Fail open for warn.
 		}
 	}
 	if version, ok := labels[WarnVersionLabel]; ok {
 		p.Warn.Version, err = ParseVersion(version)
-		errs = appendErr(errs, err, "Warn.Version")
+		errs = appendErr(errs, err, WarnVersionLabel, version)
 	}
-	return p, errors.NewAggregate(errs)
+	return p, errs
 }
 
 // CompareLevels returns an integer comparing two levels by strictness. The result will be 0 if
@@ -211,10 +216,12 @@ func CompareLevels(a, b Level) int {
 	return 0
 }
 
-// appendErr is a helper function to collect field-specific errors.
-func appendErr(errs []error, err error, field string) []error {
+var labelsPath = field.NewPath("metadata", "labels")
+
+// appendErr is a helper function to collect label-specific errors.
+func appendErr(errs field.ErrorList, err error, label, value string) field.ErrorList {
 	if err != nil {
-		return append(errs, fmt.Errorf("%s: %s", field, err.Error()))
+		return append(errs, field.Invalid(labelsPath.Key(label), value, err.Error()))
 	}
 	return errs
 }

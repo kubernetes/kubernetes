@@ -32,7 +32,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +41,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNodeShutdown]", func() {
+var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	ginkgo.Context("when gracefully shutting down", func() {
 
@@ -56,9 +55,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 		)
 
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown): true,
-			}
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
 		})

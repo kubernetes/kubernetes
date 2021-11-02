@@ -1527,7 +1527,10 @@
           }
         }
       ],
-      "setHostnameAsFQDN": false
+      "setHostnameAsFQDN": false,
+      "os": {
+        "name": "脡ǯ?b砸ƻ舁Ȁ贠ȇö匉"
+      }
     }
   }
 }

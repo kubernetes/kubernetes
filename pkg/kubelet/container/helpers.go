@@ -39,7 +39,7 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error)
+	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error)
 }
 
 // RuntimeHelper wraps kubelet to make container runtime

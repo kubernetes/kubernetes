@@ -18,24 +18,24 @@ limitations under the License.
 
 package v1
 
-// HandlerApplyConfiguration represents an declarative configuration of the Handler type for use
+// LifecycleHandlerApplyConfiguration represents an declarative configuration of the LifecycleHandler type for use
 // with apply.
-type HandlerApplyConfiguration struct {
+type LifecycleHandlerApplyConfiguration struct {
 	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
 	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
 }
 
-// HandlerApplyConfiguration constructs an declarative configuration of the Handler type for use with
+// LifecycleHandlerApplyConfiguration constructs an declarative configuration of the LifecycleHandler type for use with
 // apply.
-func Handler() *HandlerApplyConfiguration {
-	return &HandlerApplyConfiguration{}
+func LifecycleHandler() *LifecycleHandlerApplyConfiguration {
+	return &LifecycleHandlerApplyConfiguration{}
 }
 
 // WithExec sets the Exec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Exec field is set to the value of the last call.
-func (b *HandlerApplyConfiguration) WithExec(value *ExecActionApplyConfiguration) *HandlerApplyConfiguration {
+func (b *LifecycleHandlerApplyConfiguration) WithExec(value *ExecActionApplyConfiguration) *LifecycleHandlerApplyConfiguration {
 	b.Exec = value
 	return b
 }
@@ -43,7 +43,7 @@ func (b *HandlerApplyConfiguration) WithExec(value *ExecActionApplyConfiguration
 // WithHTTPGet sets the HTTPGet field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HTTPGet field is set to the value of the last call.
-func (b *HandlerApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfiguration) *HandlerApplyConfiguration {
+func (b *LifecycleHandlerApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfiguration) *LifecycleHandlerApplyConfiguration {
 	b.HTTPGet = value
 	return b
 }
@@ -51,7 +51,7 @@ func (b *HandlerApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfigu
 // WithTCPSocket sets the TCPSocket field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TCPSocket field is set to the value of the last call.
-func (b *HandlerApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfiguration) *HandlerApplyConfiguration {
+func (b *LifecycleHandlerApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfiguration) *LifecycleHandlerApplyConfiguration {
 	b.TCPSocket = value
 	return b
 }

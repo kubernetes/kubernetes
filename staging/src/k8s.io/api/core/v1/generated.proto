@@ -1746,25 +1746,6 @@ message HTTPHeader {
   optional string value = 2;
 }
 
-// Handler defines a specific action that should be taken
-// TODO: pass structured data to these actions, and document that data here.
-message Handler {
-  // One and only one of the following should be specified.
-  // Exec specifies the action to take.
-  // +optional
-  optional ExecAction exec = 1;
-
-  // HTTPGet specifies the http request to perform.
-  // +optional
-  optional HTTPGetAction httpGet = 2;
-
-  // TCPSocket specifies an action involving a TCP port.
-  // TCP hooks not yet supported
-  // TODO: implement a realistic TCP lifecycle hook
-  // +optional
-  optional TCPSocketAction tcpSocket = 3;
-}
-
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 message HostAlias {
@@ -1932,7 +1913,7 @@ message Lifecycle {
   // Other management of the container blocks until the hook completes.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler postStart = 1;
+  optional LifecycleHandler postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
   // API request or management event such as liveness/startup probe failure,
@@ -1945,7 +1926,28 @@ message Lifecycle {
   // or until the termination grace period is reached.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler preStop = 2;
+  optional LifecycleHandler preStop = 2;
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+message LifecycleHandler {
+  // One and only one of the following should be specified.
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // TCP hooks not yet supported
+  // TODO: implement a realistic TCP lifecycle hook
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -3181,12 +3183,10 @@ message PodExecOptions {
   optional bool stdin = 1;
 
   // Redirect the standard output stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stdout = 2;
 
   // Redirect the standard error stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stderr = 3;
 
@@ -3278,6 +3278,15 @@ message PodLogOptions {
   optional bool insecureSkipTLSVerifyBackend = 9;
 }
 
+// PodOS defines the OS parameters of a pod.
+message PodOS {
+  // Name is the name of the operating system. The currently supported values are linux and windows.
+  // Additional value may be defined in future and can be one of:
+  // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
+  // Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+  optional string name = 1;
+}
+
 // PodPortForwardOptions is the query options to a Pod's port forward call
 // when using WebSockets.
 // The `port` query parameter must specify the port or
@@ -3313,12 +3322,14 @@ message PodSecurityContext {
   // container.  May also be set in SecurityContext.  If set in
   // both SecurityContext and PodSecurityContext, the value specified in SecurityContext
   // takes precedence for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SELinuxOptions seLinuxOptions = 1;
 
   // The Windows specific settings applied to all containers.
   // If unspecified, the options within a container's SecurityContext will be used.
   // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is linux.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 8;
 
@@ -3327,6 +3338,7 @@ message PodSecurityContext {
   // May also be set in SecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence
   // for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsUser = 2;
 
@@ -3335,6 +3347,7 @@ message PodSecurityContext {
   // May also be set in SecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence
   // for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsGroup = 6;
 
@@ -3350,6 +3363,7 @@ message PodSecurityContext {
   // A list of groups applied to the first process run in each container, in addition
   // to the container's primary GID.  If unspecified, no groups will be added to
   // any container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   repeated int64 supplementalGroups = 4;
 
@@ -3362,11 +3376,13 @@ message PodSecurityContext {
   // 3. The permission bits are OR'd with rw-rw----
   //
   // If unset, the Kubelet will not modify the ownership and permissions of any volume.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 fsGroup = 5;
 
   // Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
   // sysctls (by the container runtime) might fail to launch.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   repeated Sysctl sysctls = 7;
 
@@ -3376,10 +3392,12 @@ message PodSecurityContext {
   // It will have no effect on ephemeral volume types such as: secret, configmaps
   // and emptydir.
   // Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional string fsGroupChangePolicy = 9;
 
   // The seccomp options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
 }
@@ -3650,6 +3668,37 @@ message PodSpec {
   // Default to false.
   // +optional
   optional bool setHostnameAsFQDN = 35;
+
+  // Specifies the OS of the containers in the pod.
+  // Some pod and container fields are restricted if this is set.
+  //
+  // If the OS field is set to linux, the following fields must be unset:
+  // -securityContext.windowsOptions
+  //
+  // If the OS field is set to windows, following fields must be unset:
+  // - spec.hostPID
+  // - spec.hostIPC
+  // - spec.securityContext.seLinuxOptions
+  // - spec.securityContext.seccompProfile
+  // - spec.securityContext.fsGroup
+  // - spec.securityContext.fsGroupChangePolicy
+  // - spec.securityContext.sysctls
+  // - spec.shareProcessNamespace
+  // - spec.securityContext.runAsUser
+  // - spec.securityContext.runAsGroup
+  // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.seLinuxOptions
+  // - spec.containers[*].securityContext.seccompProfile
+  // - spec.containers[*].securityContext.capabilities
+  // - spec.containers[*].securityContext.readOnlyRootFilesystem
+  // - spec.containers[*].securityContext.privileged
+  // - spec.containers[*].securityContext.allowPrivilegeEscalation
+  // - spec.containers[*].securityContext.procMount
+  // - spec.containers[*].securityContext.runAsUser
+  // - spec.containers[*].securityContext.runAsGroup
+  // +optional
+  // This is an alpha field and requires the IdentifyPodOS feature
+  optional PodOS os = 36;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -3881,7 +3930,7 @@ message PreferredSchedulingTerm {
 // alive or ready to receive traffic.
 message Probe {
   // The action taken to determine the health of a container
-  optional Handler handler = 1;
+  optional ProbeHandler handler = 1;
 
   // Number of seconds after the container has started before liveness probes are initiated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
@@ -3921,6 +3970,27 @@ message Probe {
   // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
+}
+
+// ProbeHandler defines a specific action that should be taken in a probe.
+// This type has a strong relationship to LifecycleHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+message ProbeHandler {
+  // One and only one of the following should be specified.
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // TCP hooks not yet supported
+  // TODO: implement a realistic TCP lifecycle hook
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 }
 
 // Represents a projected volume source
@@ -4484,6 +4554,7 @@ message Secret {
   map<string, string> stringData = 4;
 
   // Used to facilitate programmatic handling of secret data.
+  // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
   optional string type = 3;
 }
@@ -4607,12 +4678,14 @@ message SecretVolumeSource {
 message SecurityContext {
   // The capabilities to add/drop when running containers.
   // Defaults to the default set of capabilities granted by the container runtime.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional Capabilities capabilities = 1;
 
   // Run container in privileged mode.
   // Processes in privileged containers are essentially equivalent to root on the host.
   // Defaults to false.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool privileged = 2;
 
@@ -4620,12 +4693,14 @@ message SecurityContext {
   // If unspecified, the container runtime will allocate a random SELinux context for each
   // container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SELinuxOptions seLinuxOptions = 3;
 
   // The Windows specific settings applied to all containers.
   // If unspecified, the options from the PodSecurityContext will be used.
   // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is linux.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 10;
 
@@ -4633,6 +4708,7 @@ message SecurityContext {
   // Defaults to user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsUser = 4;
 
@@ -4640,6 +4716,7 @@ message SecurityContext {
   // Uses runtime default if unset.
   // May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsGroup = 8;
 
@@ -4654,6 +4731,7 @@ message SecurityContext {
 
   // Whether this container has a read-only root filesystem.
   // Default is false.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool readOnlyRootFilesystem = 6;
 
@@ -4663,6 +4741,7 @@ message SecurityContext {
   // AllowPrivilegeEscalation is true always when the container is:
   // 1) run as Privileged
   // 2) has CAP_SYS_ADMIN
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool allowPrivilegeEscalation = 7;
 
@@ -4670,12 +4749,14 @@ message SecurityContext {
   // The default is DefaultProcMount which uses the container runtime defaults for
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional string procMount = 9;
 
   // The seccomp options to use by this container. If seccomp options are
   // provided at both the pod & container level, the container options
   // override the pod options.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
 }
@@ -5581,9 +5662,6 @@ message VolumeSource {
   //
   // A pod can use both types of ephemeral volumes and
   // persistent volumes at the same time.
-  //
-  // This is a beta feature and only available when the GenericEphemeralVolume
-  // feature gate is enabled.
   //
   // +optional
   optional EphemeralVolumeSource ephemeral = 29;

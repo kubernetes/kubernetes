@@ -171,6 +171,7 @@ const (
 	// owner: @pohly
 	// alpha: v1.19
 	// beta: v1.21
+	// GA: v1.23
 	//
 	// Enables generic ephemeral inline volume support for pods
 	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
@@ -231,6 +232,12 @@ const (
 	// allow the Job controller to keep track of Pods that it didn't account for
 	// yet.
 	JobTrackingWithFinalizers featuregate.Feature = "JobTrackingWithFinalizers"
+
+	// owner: @alculquicondor
+	// alpha: v1.23
+	//
+	// Track the number of pods with Ready condition in the Job status.
+	JobReadyPods featuregate.Feature = "JobReadyPods"
 
 	// owner: @dashpole
 	// alpha: v1.13
@@ -683,6 +690,13 @@ const (
 	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
 	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 
+	// owner: @ravig
+	// alpha: v1.23
+	//
+	// IdentifyPodOS allows user to specify OS on which they'd like the Pod run. The user should still set the nodeSelector
+	// with appropriate `kubernetes.io/os` label for scheduler to identify appropriate node for the pod to run.
+	IdentifyPodOS featuregate.Feature = "IdentifyPodOS"
+
 	// owner: @gjkim42
 	// kep: http://kep.k8s.io/2595
 	// alpha: v1.22
@@ -820,7 +834,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.Beta},
+	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
 	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
@@ -829,6 +843,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	JobTrackingWithFinalizers:                      {Default: true, PreRelease: featuregate.Beta},
+	JobReadyPods:                                   {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
@@ -891,6 +906,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUManagerPolicyAlphaOptions:                   {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyBetaOptions:                    {Default: true, PreRelease: featuregate.Beta},
 	JobMutableNodeSchedulingDirectives:             {Default: true, PreRelease: featuregate.Beta},
+	IdentifyPodOS:                                  {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

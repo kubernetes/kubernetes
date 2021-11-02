@@ -25,9 +25,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -69,11 +69,10 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder                               SchedulerVolumeBinder
-	PVCLister                            corelisters.PersistentVolumeClaimLister
-	GenericEphemeralVolumeFeatureEnabled bool
-	scorer                               volumeCapacityScorer
-	fts                                  feature.Features
+	Binder    SchedulerVolumeBinder
+	PVCLister corelisters.PersistentVolumeClaimLister
+	scorer    volumeCapacityScorer
+	fts       feature.Features
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
@@ -127,13 +126,13 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 	hasPVC := false
 	for _, vol := range pod.Spec.Volumes {
 		var pvcName string
-		ephemeral := false
+		isEphemeral := false
 		switch {
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.Ephemeral != nil && pl.GenericEphemeralVolumeFeatureEnabled:
-			pvcName = pod.Name + "-" + vol.Name
-			ephemeral = true
+		case vol.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &vol)
+			isEphemeral = true
 		default:
 			// Volume is not using a PVC, ignore
 			continue
@@ -144,7 +143,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 			// The error usually has already enough context ("persistentvolumeclaim "myclaim" not found"),
 			// but we can do better for generic ephemeral inline volumes where that situation
 			// is normal directly after creating a pod.
-			if ephemeral && apierrors.IsNotFound(err) {
+			if isEphemeral && apierrors.IsNotFound(err) {
 				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
 			}
 			return hasPVC, err
@@ -158,8 +157,10 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 			return hasPVC, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
 		}
 
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return hasPVC, fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
+		if isEphemeral {
+			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+				return hasPVC, err
+			}
 		}
 	}
 	return hasPVC, nil
@@ -400,10 +401,9 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		scorer = buildScorerFunction(shape)
 	}
 	return &VolumeBinding{
-		Binder:                               binder,
-		PVCLister:                            pvcInformer.Lister(),
-		GenericEphemeralVolumeFeatureEnabled: fts.EnableGenericEphemeralVolume,
-		scorer:                               scorer,
-		fts:                                  fts,
+		Binder:    binder,
+		PVCLister: pvcInformer.Lister(),
+		scorer:    scorer,
+		fts:       fts,
 	}, nil
 }

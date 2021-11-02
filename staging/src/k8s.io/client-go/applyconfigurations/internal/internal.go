@@ -2671,6 +2671,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failed
       type:
         scalar: numeric
+    - name: ready
+      type:
+        scalar: numeric
     - name: startTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
@@ -4196,18 +4199,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.core.v1.Handler
-  map:
-    fields:
-    - name: exec
-      type:
-        namedType: io.k8s.api.core.v1.ExecAction
-    - name: httpGet
-      type:
-        namedType: io.k8s.api.core.v1.HTTPGetAction
-    - name: tcpSocket
-      type:
-        namedType: io.k8s.api.core.v1.TCPSocketAction
 - name: io.k8s.api.core.v1.HostAlias
   map:
     fields:
@@ -4333,10 +4324,22 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: postStart
       type:
-        namedType: io.k8s.api.core.v1.Handler
+        namedType: io.k8s.api.core.v1.LifecycleHandler
     - name: preStop
       type:
-        namedType: io.k8s.api.core.v1.Handler
+        namedType: io.k8s.api.core.v1.LifecycleHandler
+- name: io.k8s.api.core.v1.LifecycleHandler
+  map:
+    fields:
+    - name: exec
+      type:
+        namedType: io.k8s.api.core.v1.ExecAction
+    - name: httpGet
+      type:
+        namedType: io.k8s.api.core.v1.HTTPGetAction
+    - name: tcpSocket
+      type:
+        namedType: io.k8s.api.core.v1.TCPSocketAction
 - name: io.k8s.api.core.v1.LimitRange
   map:
     fields:
@@ -5223,6 +5226,13 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+- name: io.k8s.api.core.v1.PodOS
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.PodReadinessGate
   map:
     fields:
@@ -5351,6 +5361,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: os
+      type:
+        namedType: io.k8s.api.core.v1.PodOS
     - name: overhead
       type:
         map:

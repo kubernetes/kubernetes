@@ -49,11 +49,17 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/pointer"
 )
+
+// podUpdateBatchPeriod is the batch period to hold pod updates before syncing
+// a Job. It is used if the feature gate JobReadyPods is enabled.
+const podUpdateBatchPeriod = 500 * time.Millisecond
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
@@ -110,6 +116,8 @@ type Controller struct {
 	orphanQueue workqueue.RateLimitingInterface
 
 	recorder record.EventRecorder
+
+	podUpdateBatchPeriod time.Duration
 }
 
 // NewController creates a new Job controller that keeps the relevant pods
@@ -134,6 +142,9 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
 		orphanQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job_orphan_pod"),
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+	}
+	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
+		jm.podUpdateBatchPeriod = podUpdateBatchPeriod
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -249,7 +260,7 @@ func (jm *Controller) addPod(obj interface{}) {
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
-		jm.enqueueController(job, true)
+		jm.enqueueControllerPodUpdate(job, true)
 		return
 	}
 
@@ -258,7 +269,7 @@ func (jm *Controller) addPod(obj interface{}) {
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
 	for _, job := range jm.getPodJobs(pod) {
-		jm.enqueueController(job, true)
+		jm.enqueueControllerPodUpdate(job, true)
 	}
 }
 
@@ -303,7 +314,7 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 					jm.finalizerExpectations.finalizerRemovalObserved(key, string(curPod.UID))
 				}
 			}
-			jm.enqueueController(job, immediate)
+			jm.enqueueControllerPodUpdate(job, immediate)
 		}
 	}
 
@@ -319,7 +330,7 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 				jm.finalizerExpectations.finalizerRemovalObserved(key, string(curPod.UID))
 			}
 		}
-		jm.enqueueController(job, immediate)
+		jm.enqueueControllerPodUpdate(job, immediate)
 		return
 	}
 
@@ -328,7 +339,7 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, job := range jm.getPodJobs(curPod) {
-			jm.enqueueController(job, immediate)
+			jm.enqueueControllerPodUpdate(job, immediate)
 		}
 	}
 }
@@ -379,7 +390,7 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 		jm.finalizerExpectations.finalizerRemovalObserved(jobKey, string(pod.UID))
 	}
 
-	jm.enqueueController(job, true)
+	jm.enqueueControllerPodUpdate(job, true)
 }
 
 func (jm *Controller) updateJob(old, cur interface{}) {
@@ -415,13 +426,21 @@ func (jm *Controller) updateJob(old, cur interface{}) {
 // immediate tells the controller to update the status right away, and should
 // happen ONLY when there was a successful pod run.
 func (jm *Controller) enqueueController(obj interface{}, immediate bool) {
+	jm.enqueueControllerDelayed(obj, immediate, 0)
+}
+
+func (jm *Controller) enqueueControllerPodUpdate(obj interface{}, immediate bool) {
+	jm.enqueueControllerDelayed(obj, immediate, jm.podUpdateBatchPeriod)
+}
+
+func (jm *Controller) enqueueControllerDelayed(obj interface{}, immediate bool, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
-	backoff := time.Duration(0)
+	backoff := delay
 	if !immediate {
 		backoff = getBackoff(jm.queue, key)
 	}
@@ -670,6 +689,10 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
 	succeeded, failed := getStatus(&job, pods, uncounted, expectedRmFinalizers)
+	var ready *int32
+	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
+		ready = pointer.Int32(countReadyPods(activePods))
+	}
 	// Job first start. Set StartTime and start the ActiveDeadlineSeconds timer
 	// only if the job is not in the suspended state.
 	if job.Status.StartTime == nil && !jobSuspended(&job) {
@@ -777,18 +800,16 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		}
 	}
 
-	forget = false
 	// Check if the number of jobs succeeded increased since the last check. If yes "forget" should be true
 	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
 	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
 	// In this case, we should clear the backoff delay.
-	if job.Status.Succeeded < succeeded {
-		forget = true
-	}
+	forget = job.Status.Succeeded < succeeded
 
 	if uncounted != nil {
-		needsStatusUpdate := suspendCondChanged || active != job.Status.Active
+		needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
 		job.Status.Active = active
+		job.Status.Ready = ready
 		err = jm.trackJobStatusAndRemoveFinalizers(&job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate)
 		if err != nil {
 			return false, fmt.Errorf("tracking status: %w", err)
@@ -809,10 +830,11 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	}
 
 	// no need to update the job if the status hasn't changed since last time
-	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || suspendCondChanged || finishedCondition != nil {
+	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || !equalReady(job.Status.Ready, ready) || suspendCondChanged || finishedCondition != nil {
 		job.Status.Active = active
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
+		job.Status.Ready = ready
 		if isIndexedJob(&job) {
 			job.Status.CompletedIndexes = succeededIndexes.String()
 		}
@@ -1608,4 +1630,21 @@ func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded).Add(float64(diff))
 	diff = job.Status.Failed - oldCounters.Failed
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed).Add(float64(diff))
+}
+
+func countReadyPods(pods []*v1.Pod) int32 {
+	cnt := int32(0)
+	for _, p := range pods {
+		if podutil.IsPodReady(p) {
+			cnt++
+		}
+	}
+	return cnt
+}
+
+func equalReady(a, b *int32) bool {
+	if a != nil && b != nil {
+		return *a == *b
+	}
+	return a == b
 }

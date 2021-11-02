@@ -1544,35 +1544,39 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "os": {
+          "name": "脡ǯ?b砸ƻ舁Ȁ贠ȇö匉"
+        }
       }
     },
-    "ttlSecondsAfterFinished": -1284862566,
-    "completionMode": "",
-    "suspend": false
+    "ttlSecondsAfterFinished": -166315230,
+    "completionMode": "TaI楅©Ǫ壿/š^劶äɲ泒",
+    "suspend": true
   },
   "status": {
     "conditions": [
       {
-        "type": "ɓ为\\Ŧƺ猑\\#ȼ縤ɰTaI楅©",
-        "status": "翻颌徚J殦殐ƕ蟶ŃēÖ釐駆Ŕƿe魛ĩ",
-        "lastProbeTime": "2427-08-17T22:26:07Z",
-        "lastTransitionTime": "2012-08-22T05:26:31Z",
+        "type": "燬Ǻ媳ɦ:Ȱ掯鿊刞篍倧F*Ʊ巭銔0",
+        "status": "",
+        "lastProbeTime": "2534-12-23T07:02:01Z",
+        "lastTransitionTime": "2015-06-07T16:38:22Z",
         "reason": "493",
         "message": "494"
       }
     ],
-    "active": 543081713,
-    "succeeded": -377965530,
-    "failed": 77405208,
+    "active": -257419482,
+    "succeeded": -808276219,
+    "failed": -29650850,
     "completedIndexes": "495",
     "uncountedTerminatedPods": {
       "succeeded": [
-        "Ʊ巭銔07?为Èá網抒h"
+        "抒h莤W{ɳ謏Ɵȗń暸a"
       ],
       "failed": [
-        "W"
+        "ʖ臓祴ʬlǢǤųG3Ç"
       ]
-    }
+    },
+    "ready": 934248925
   }
 }

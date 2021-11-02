@@ -179,9 +179,6 @@ type VolumeSource struct {
 	// A pod can use both types of ephemeral volumes and
 	// persistent volumes at the same time.
 	//
-	// This is a beta feature and only available when the GenericEphemeralVolume
-	// feature gate is enabled.
-	//
 	// +optional
 	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
 }
@@ -2120,7 +2117,7 @@ type ExecAction struct {
 // alive or ready to receive traffic.
 type Probe struct {
 	// The action taken to determine the health of a container
-	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
+	ProbeHandler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
@@ -2384,9 +2381,30 @@ type Container struct {
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
 }
 
-// Handler defines a specific action that should be taken
+// ProbeHandler defines a specific action that should be taken in a probe.
+// This type has a strong relationship to LifecycleHandler - overlapping fields
+// should be identical.
 // TODO: pass structured data to these actions, and document that data here.
-type Handler struct {
+type ProbeHandler struct {
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	// +optional
+	Exec *ExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TCP hooks not yet supported
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
+// should be identical.
+// TODO: pass structured data to these actions, and document that data here.
+type LifecycleHandler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
 	// +optional
@@ -2410,7 +2428,7 @@ type Lifecycle struct {
 	// Other management of the container blocks until the hook completes.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
-	PostStart *Handler `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
+	PostStart *LifecycleHandler `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
@@ -2422,7 +2440,7 @@ type Lifecycle struct {
 	// or until the termination grace period is reached.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
-	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	PreStop *LifecycleHandler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
 type ConditionStatus string
@@ -3186,6 +3204,54 @@ type PodSpec struct {
 	// Default to false.
 	// +optional
 	SetHostnameAsFQDN *bool `json:"setHostnameAsFQDN,omitempty" protobuf:"varint,35,opt,name=setHostnameAsFQDN"`
+	// Specifies the OS of the containers in the pod.
+	// Some pod and container fields are restricted if this is set.
+	//
+	// If the OS field is set to linux, the following fields must be unset:
+	// -securityContext.windowsOptions
+	//
+	// If the OS field is set to windows, following fields must be unset:
+	// - spec.hostPID
+	// - spec.hostIPC
+	// - spec.securityContext.seLinuxOptions
+	// - spec.securityContext.seccompProfile
+	// - spec.securityContext.fsGroup
+	// - spec.securityContext.fsGroupChangePolicy
+	// - spec.securityContext.sysctls
+	// - spec.shareProcessNamespace
+	// - spec.securityContext.runAsUser
+	// - spec.securityContext.runAsGroup
+	// - spec.securityContext.supplementalGroups
+	// - spec.containers[*].securityContext.seLinuxOptions
+	// - spec.containers[*].securityContext.seccompProfile
+	// - spec.containers[*].securityContext.capabilities
+	// - spec.containers[*].securityContext.readOnlyRootFilesystem
+	// - spec.containers[*].securityContext.privileged
+	// - spec.containers[*].securityContext.allowPrivilegeEscalation
+	// - spec.containers[*].securityContext.procMount
+	// - spec.containers[*].securityContext.runAsUser
+	// - spec.containers[*].securityContext.runAsGroup
+	// +optional
+	// This is an alpha field and requires the IdentifyPodOS feature
+	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+}
+
+// OSName is the set of OS'es that can be used in OS.
+type OSName string
+
+// These are valid values for OSName
+const (
+	Linux   OSName = "linux"
+	Windows OSName = "windows"
+)
+
+// PodOS defines the OS parameters of a pod.
+type PodOS struct {
+	// Name is the name of the operating system. The currently supported values are linux and windows.
+	// Additional value may be defined in future and can be one of:
+	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
+	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+	Name OSName `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 type UnsatisfiableConstraintAction string
@@ -3293,11 +3359,13 @@ type PodSecurityContext struct {
 	// container.  May also be set in SecurityContext.  If set in
 	// both SecurityContext and PodSecurityContext, the value specified in SecurityContext
 	// takes precedence for that container.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
 	// The Windows specific settings applied to all containers.
 	// If unspecified, the options within a container's SecurityContext will be used.
 	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// Note that this field cannot be set when spec.os.name is linux.
 	// +optional
 	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
@@ -3305,6 +3373,7 @@ type PodSecurityContext struct {
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// for that container.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,2,opt,name=runAsUser"`
 	// The GID to run the entrypoint of the container process.
@@ -3312,6 +3381,7 @@ type PodSecurityContext struct {
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// for that container.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,6,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
@@ -3325,6 +3395,7 @@ type PodSecurityContext struct {
 	// A list of groups applied to the first process run in each container, in addition
 	// to the container's primary GID.  If unspecified, no groups will be added to
 	// any container.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
 	// A special supplemental group that applies to all containers in a pod.
@@ -3336,10 +3407,12 @@ type PodSecurityContext struct {
 	// 3. The permission bits are OR'd with rw-rw----
 	//
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
 	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
@@ -3348,9 +3421,11 @@ type PodSecurityContext struct {
 	// It will have no effect on ephemeral volume types such as: secret, configmaps
 	// and emptydir.
 	// Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy `json:"fsGroupChangePolicy,omitempty" protobuf:"bytes,9,opt,name=fsGroupChangePolicy"`
 	// The seccomp options to use by the containers in this pod.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
 }
@@ -5303,12 +5378,10 @@ type PodExecOptions struct {
 	Stdin bool `json:"stdin,omitempty" protobuf:"varint,1,opt,name=stdin"`
 
 	// Redirect the standard output stream of the pod for this call.
-	// Defaults to true.
 	// +optional
 	Stdout bool `json:"stdout,omitempty" protobuf:"varint,2,opt,name=stdout"`
 
 	// Redirect the standard error stream of the pod for this call.
-	// Defaults to true.
 	// +optional
 	Stderr bool `json:"stderr,omitempty" protobuf:"varint,3,opt,name=stderr"`
 
@@ -5867,6 +5940,7 @@ type Secret struct {
 	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 
 	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
@@ -6143,34 +6217,40 @@ type DownwardAPIProjection struct {
 type SecurityContext struct {
 	// The capabilities to add/drop when running containers.
 	// Defaults to the default set of capabilities granted by the container runtime.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	Capabilities *Capabilities `json:"capabilities,omitempty" protobuf:"bytes,1,opt,name=capabilities"`
 	// Run container in privileged mode.
 	// Processes in privileged containers are essentially equivalent to root on the host.
 	// Defaults to false.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	Privileged *bool `json:"privileged,omitempty" protobuf:"varint,2,opt,name=privileged"`
 	// The SELinux context to be applied to the container.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
 	// The Windows specific settings applied to all containers.
 	// If unspecified, the options from the PodSecurityContext will be used.
 	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// Note that this field cannot be set when spec.os.name is linux.
 	// +optional
 	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,4,opt,name=runAsUser"`
 	// The GID to run the entrypoint of the container process.
 	// Uses runtime default if unset.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,8,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
@@ -6183,6 +6263,7 @@ type SecurityContext struct {
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty" protobuf:"varint,5,opt,name=runAsNonRoot"`
 	// Whether this container has a read-only root filesystem.
 	// Default is false.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 	// AllowPrivilegeEscalation controls whether a process can gain more
@@ -6191,17 +6272,20 @@ type SecurityContext struct {
 	// AllowPrivilegeEscalation is true always when the container is:
 	// 1) run as Privileged
 	// 2) has CAP_SYS_ADMIN
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,7,opt,name=allowPrivilegeEscalation"`
 	// procMount denotes the type of proc mount to use for the containers.
 	// The default is DefaultProcMount which uses the container runtime defaults for
 	// readonly paths and masked paths.
 	// This requires the ProcMountType feature flag to be enabled.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
 	// The seccomp options to use by this container. If seccomp options are
 	// provided at both the pod & container level, the container options
 	// override the pod options.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 }

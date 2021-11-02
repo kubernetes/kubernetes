@@ -186,6 +186,9 @@ func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Active), fldPath.Child("active"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Succeeded), fldPath.Child("succeeded"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Failed), fldPath.Child("failed"))...)
+	if status.Ready != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.Ready), fldPath.Child("ready"))...)
+	}
 	if status.UncountedTerminatedPods != nil {
 		path := fldPath.Child("uncountedTerminatedPods")
 		seen := sets.NewString()
@@ -260,6 +263,8 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 		}
 		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector // +k8s:verify-mutation:reason=clone
 		oldTemplate.Spec.Tolerations = template.Spec.Tolerations   // +k8s:verify-mutation:reason=clone
+		oldTemplate.Annotations = template.Annotations             // +k8s:verify-mutation:reason=clone
+		oldTemplate.Labels = template.Labels                       // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
 	return allErrs

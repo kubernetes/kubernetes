@@ -193,17 +193,15 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ephemeral-volume-controller"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-				eventsRule(),
-			},
-		})
-	}
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ephemeral-volume-controller"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},

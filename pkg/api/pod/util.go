@@ -418,6 +418,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
 		// Allow pod spec with expanded DNS configuration
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		// Allow pod spec to use OS field
+		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
 	}
 
 	if oldPodSpec != nil {
@@ -432,6 +434,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		}
 		// if old spec has Windows Host Process fields set, we must allow it
 		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
+
+		// if old spec has OS field set, we must allow it
+		opts.AllowOSField = opts.AllowOSField || oldPodSpec.OS != nil
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
@@ -556,7 +561,6 @@ func dropDisabledFields(
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
-	dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
 		!podPriorityInUse(oldPodSpec) {
@@ -564,8 +568,22 @@ func dropDisabledFields(
 		// does not specify any values for these fields.
 		podSpec.PreemptionPolicy = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
+		podSpec.OS = nil
+	}
 
 	dropDisabledPodAffinityTermFields(podSpec, oldPodSpec)
+}
+
+// podOSInUse returns true if the pod spec is non-nil and has OS field set
+func podOSInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.OS != nil {
+		return true
+	}
+	return false
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related
@@ -601,16 +619,6 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			podSpec.Volumes[i].CSI = nil
-		}
-	}
-}
-
-// dropDisabledEphemeralVolumeSourceAlphaFields removes disabled alpha fields from []EphemeralVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a EphemeralVolumeSource
-func dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) && !ephemeralInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			podSpec.Volumes[i].Ephemeral = nil
 		}
 	}
 }
@@ -789,19 +797,6 @@ func csiInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.Volumes {
 		if podSpec.Volumes[i].CSI != nil {
-			return true
-		}
-	}
-	return false
-}
-
-// ephemeralInUse returns true if any pod's spec include inline CSI volumes.
-func ephemeralInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].Ephemeral != nil {
 			return true
 		}
 	}

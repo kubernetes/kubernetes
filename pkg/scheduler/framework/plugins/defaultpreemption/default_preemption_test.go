@@ -18,6 +18,8 @@ package defaultpreemption
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strings"
@@ -40,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -51,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -94,6 +96,45 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 }
 
 var nodeResourcesFitFunc = frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit)
+
+// TestPlugin returns Error status when trying to `AddPod` or `RemovePod` on the nodes which have the {k,v} label pair defined on the nodes.
+type TestPlugin struct {
+	name string
+}
+
+func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	return &TestPlugin{name: "test-plugin"}, nil
+}
+
+func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if nodeInfo.Node().GetLabels()["error"] == "true" {
+		return framework.AsStatus(fmt.Errorf("failed to add pod: %v", podToSchedule.Name))
+	}
+	return nil
+}
+
+func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if nodeInfo.Node().GetLabels()["error"] == "true" {
+		return framework.AsStatus(fmt.Errorf("failed to remove pod: %v", podToSchedule.Name))
+	}
+	return nil
+}
+
+func (pl *TestPlugin) Name() string {
+	return pl.name
+}
+
+func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+	return pl
+}
+
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
+	return nil
+}
+
+func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	return nil
+}
 
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
@@ -248,6 +289,39 @@ func TestPostFilter(t *testing.T) {
 			wantResult: nil,
 			wantStatus: framework.NewStatus(framework.Unschedulable, "0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
 		},
+		{
+			name: "only one node but failed with TestPlugin",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			// label the node with key as "error" so that the TestPlugin will fail with error.
+			nodes:                 []*v1.Node{st.MakeNode().Name("node1").Capacity(largeRes).Label("error", "true").Obj()},
+			filteredNodesStatuses: framework.NodeToStatusMap{"node1": framework.NewStatus(framework.Unschedulable)},
+			wantResult:            nil,
+			wantStatus:            framework.AsStatus(errors.New("running RemovePod on PreFilter plugin \"test-plugin\": failed to remove pod: p")),
+		},
+		{
+			name: "one failed with TestPlugin and the other pass",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Req(mediumRes).Obj(),
+			},
+			// even though node1 will fail with error but node2 will still be returned as a valid nominated node.
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(largeRes).Label("error", "true").Obj(),
+				st.MakeNode().Name("node2").Capacity(largeRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: &framework.PostFilterResult{
+				NominatedNodeName: "node2",
+			},
+			wantStatus: framework.NewStatus(framework.Success),
+		},
 	}
 
 	for _, tt := range tests {
@@ -268,6 +342,7 @@ func TestPostFilter(t *testing.T) {
 			registeredPlugins := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions("test-plugin", newTestPlugin, "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			var extenders []framework.Extender
@@ -299,8 +374,15 @@ func TestPostFilter(t *testing.T) {
 			}
 
 			gotResult, gotStatus := p.PostFilter(context.TODO(), state, tt.pod, tt.filteredNodesStatuses)
-			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
-				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			// As we cannot compare two errors directly due to miss the equal method for how to compare two errors, so just need to compare the reasons.
+			if gotStatus.Code() == framework.Error {
+				if diff := cmp.Diff(tt.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
+			} else {
+				if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
 			}
 			if diff := cmp.Diff(tt.wantResult, gotResult); diff != "" {
 				t.Errorf("Unexpected postFilterResult (-want, +got):\n%s", diff)
@@ -1054,7 +1136,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Interface:  pl,
 				}
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1290,7 +1372,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				Interface:  pl,
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _ := pe.DryRunPreemption(context.Background(), tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pe.DryRunPreemption(context.Background(), tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pe.SelectCandidate(candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return

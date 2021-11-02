@@ -21,8 +21,8 @@ package v1
 // LifecycleApplyConfiguration represents an declarative configuration of the Lifecycle type for use
 // with apply.
 type LifecycleApplyConfiguration struct {
-	PostStart *HandlerApplyConfiguration `json:"postStart,omitempty"`
-	PreStop   *HandlerApplyConfiguration `json:"preStop,omitempty"`
+	PostStart *LifecycleHandlerApplyConfiguration `json:"postStart,omitempty"`
+	PreStop   *LifecycleHandlerApplyConfiguration `json:"preStop,omitempty"`
 }
 
 // LifecycleApplyConfiguration constructs an declarative configuration of the Lifecycle type for use with
@@ -34,7 +34,7 @@ func Lifecycle() *LifecycleApplyConfiguration {
 // WithPostStart sets the PostStart field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PostStart field is set to the value of the last call.
-func (b *LifecycleApplyConfiguration) WithPostStart(value *HandlerApplyConfiguration) *LifecycleApplyConfiguration {
+func (b *LifecycleApplyConfiguration) WithPostStart(value *LifecycleHandlerApplyConfiguration) *LifecycleApplyConfiguration {
 	b.PostStart = value
 	return b
 }
@@ -42,7 +42,7 @@ func (b *LifecycleApplyConfiguration) WithPostStart(value *HandlerApplyConfigura
 // WithPreStop sets the PreStop field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PreStop field is set to the value of the last call.
-func (b *LifecycleApplyConfiguration) WithPreStop(value *HandlerApplyConfiguration) *LifecycleApplyConfiguration {
+func (b *LifecycleApplyConfiguration) WithPreStop(value *LifecycleHandlerApplyConfiguration) *LifecycleApplyConfiguration {
 	b.PreStop = value
 	return b
 }
