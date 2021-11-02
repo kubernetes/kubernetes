@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -31,6 +30,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/go-ole/go-ole"
+	"github.com/go-ole/go-ole/oleutil"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -242,15 +243,75 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 }
 
 func getSystemUUID() (string, error) {
-	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
+	obj, err := queryWMI("Win32_ComputerSystemProduct", "UUID")
 	if err != nil {
 		return "", err
 	}
-	fields := strings.Fields(string(result))
-	if len(fields) != 2 {
-		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
+
+	if len(obj) == 0 {
+		return "", fmt.Errorf("Could not get the System UUID.")
 	}
-	return fields[1], nil
+
+	return obj[0]["UUID"], nil
+}
+
+// queryWMI returns an array of items, each item containing the selected properties requested.
+func queryWMI(className string, selectedProperties ...string) ([]map[string]string, error) {
+	if err := ole.CoInitialize(0); err != nil {
+		oleerr := err.(*ole.OleError)
+
+		// S_OK: The COM library was initialized successfully on this thread.
+		// S_False (0x00000001): The COM library is already initialized on this thread.
+		// S_False is not defined in the ole library.
+		// See: https://docs.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-coinitializeex#return-value
+		if oleerr.Code() != ole.S_OK && oleerr.Code() != 0x00000001 {
+			return nil, err
+		}
+	} else {
+		defer ole.CoUninitialize()
+	}
+
+	swbemLocator, _ := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	defer swbemLocator.Release()
+
+	wmi, _ := swbemLocator.QueryInterface(ole.IID_IDispatch)
+	defer wmi.Release()
+
+	serviceRaw, _ := oleutil.CallMethod(wmi, "ConnectServer")
+	service := serviceRaw.ToIDispatch()
+	defer service.Release()
+
+	query := fmt.Sprintf("Select %s from %s", strings.Join(selectedProperties, ","), className)
+	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", query)
+	if err != nil {
+		return nil, err
+	}
+	result := resultRaw.ToIDispatch()
+	defer result.Release()
+
+	countVar, err := oleutil.GetProperty(result, "Count")
+	count := int(countVar.Val)
+
+	values := make([]map[string]string, count)
+	for i := 0; i < count; i++ {
+		values[i] = make(map[string]string)
+		itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+		if err != nil {
+			return nil, err
+		}
+		item := itemRaw.ToIDispatch()
+		defer item.Release()
+
+		for _, prop := range selectedProperties {
+			val, err := oleutil.GetProperty(item, prop)
+			if err != nil {
+				return nil, err
+			}
+			values[i][prop] = val.ToString()
+		}
+	}
+
+	return values, nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
