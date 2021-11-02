@@ -24,9 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/uuid"
-
 	"github.com/stretchr/testify/assert"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -36,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/metrics"
@@ -438,7 +437,44 @@ func TestValidateNamespace(t *testing.T) {
 				`pod1 (and 3 other pods): message`,
 			},
 		},
-		// TODO: test for prioritizing evaluating pods from unique controllers
+		{
+			name:                 "prioritized pods",
+			exemptRuntimeClasses: []string{"runtimeclass1"},
+			newLabels:            map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted)},
+			oldLabels:            map[string]string{api.EnforceLevelLabel: string(api.LevelBaseline)},
+			pods: []*corev1.Pod{
+				// ensure exempt pods don't use up the limit of evaluated pods
+				{ObjectMeta: metav1.ObjectMeta{Name: "exemptpod1", Annotations: map[string]string{"error": "message1"}}, Spec: corev1.PodSpec{RuntimeClassName: pointer.String("runtimeclass1")}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "exemptpod2", Annotations: map[string]string{"error": "message1"}}, Spec: corev1.PodSpec{RuntimeClassName: pointer.String("runtimeclass1")}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "exemptpod3", Annotations: map[string]string{"error": "message1"}}, Spec: corev1.PodSpec{RuntimeClassName: pointer.String("runtimeclass1")}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "exemptpod4", Annotations: map[string]string{"error": "message1"}}, Spec: corev1.PodSpec{RuntimeClassName: pointer.String("runtimeclass1")}},
+				// ensure replicas from the same controller don't use up limit of evaluated pods
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset1pod1", Annotations: map[string]string{"error": "replicaset1error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("1"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset1pod2", Annotations: map[string]string{"error": "replicaset1error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("1"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset1pod3", Annotations: map[string]string{"error": "replicaset1error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("1"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset1pod4", Annotations: map[string]string{"error": "replicaset1error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("1"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset2pod1", Annotations: map[string]string{"error": "replicaset2error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("2"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset2pod2", Annotations: map[string]string{"error": "replicaset2error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("2"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset2pod3", Annotations: map[string]string{"error": "replicaset2error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("2"), Controller: pointer.Bool(true)}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "replicaset2pod4", Annotations: map[string]string{"error": "replicaset2error"}, OwnerReferences: []metav1.OwnerReference{{UID: types.UID("2"), Controller: pointer.Bool(true)}}}},
+				// ensure unique pods are prioritized before additional replicas
+				{ObjectMeta: metav1.ObjectMeta{Name: "uniquepod1", Annotations: map[string]string{"error": "uniquemessage1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "uniquepod2", Annotations: map[string]string{"error": "uniquemessage2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "uniquepod3", Annotations: map[string]string{"error": "uniquemessage3"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "uniquepod4", Annotations: map[string]string{"error": "uniquemessage4"}}},
+			},
+			expectAllowed:  true,
+			expectListPods: true,
+			expectEvaluate: api.LevelVersion{Level: api.LevelRestricted, Version: api.LatestVersion()},
+			expectWarnings: []string{
+				`new PodSecurity enforce level only checked against the first 4 of 12 existing pods`,
+				`existing pods in namespace "test" violate the new PodSecurity enforce level "restricted:latest"`,
+				`replicaset1pod1: replicaset1error`,
+				`replicaset2pod1: replicaset2error`,
+				`uniquepod1: uniquemessage1`,
+				`uniquepod2: uniquemessage2`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -540,7 +576,7 @@ func TestValidateNamespace(t *testing.T) {
 				t.Errorf("expected to evaluate %v, got %v", tc.expectEvaluate, evaluator.lv)
 			}
 			if !reflect.DeepEqual(result.Warnings, tc.expectWarnings) {
-				t.Errorf("expected warnings:\n%v\ngot\n%v", tc.expectWarnings, result.Warnings)
+				t.Errorf("expected warnings:\n%v\ngot\n%v", strings.Join(tc.expectWarnings, "\n"), strings.Join(result.Warnings, "\n"))
 			}
 		})
 	}
@@ -770,7 +806,7 @@ func (r *FakeRecorder) ExpectEvaluations(t *testing.T, expected []EvaluationReco
 	assert.ElementsMatch(t, expected, r.evaluations)
 }
 
-func TestPrioritisePods(t *testing.T) {
+func TestPrioritizePods(t *testing.T) {
 	isController := true
 	sampleOwnerReferences := []struct {
 		ownerRefs []metav1.OwnerReference
@@ -813,16 +849,16 @@ func TestPrioritisePods(t *testing.T) {
 		}
 	}
 	a := &Admission{}
-	prioritisedPods := a.prioritisePods(pods)
+	prioritizedPods := a.prioritizePods(pods)
 	controllerRef := make(map[types.UID]bool)
 
 	for i := 0; i < len(sampleOwnerReferences); i++ {
-		if controllerRef[metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID] {
-			assert.Fail(t, "Pods are not prioritised based on uniqueness of the controller")
+		if controllerRef[metav1.GetControllerOfNoCopy(prioritizedPods[i]).UID] {
+			assert.Fail(t, "Pods are not prioritized based on uniqueness of the controller")
 		}
-		controllerRef[metav1.GetControllerOfNoCopy(prioritisedPods[i]).UID] = true
+		controllerRef[metav1.GetControllerOfNoCopy(prioritizedPods[i]).UID] = true
 	}
-	if len(prioritisedPods) != len(pods) {
+	if len(prioritizedPods) != len(pods) {
 		assert.Fail(t, "Pod count is not the same after prioritization")
 	}
 }

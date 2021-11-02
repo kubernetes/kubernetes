@@ -24,8 +24,6 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -36,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/admission/api/validation"
@@ -524,23 +523,16 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 
 		podWarnings        []string
 		podWarningsToCount = make(map[string]podCount)
-		prioritisedPods    = a.prioritisePods(pods)
+		prioritizedPods    = a.prioritizePods(pods)
 	)
 
-	totalPods := len(pods)
-	if len(pods) > a.namespaceMaxPodsToCheck {
-		prioritisedPods = prioritisedPods[0:a.namespaceMaxPodsToCheck]
+	totalPods := len(prioritizedPods)
+	if len(prioritizedPods) > a.namespaceMaxPodsToCheck {
+		prioritizedPods = prioritizedPods[0:a.namespaceMaxPodsToCheck]
 	}
 
-	checkedPods := len(pods)
-	for i, pod := range prioritisedPods {
-		checkedPods = i + 1
-
-		// short-circuit on exempt runtimeclass
-		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
-			continue
-		}
-
+	checkedPods := len(prioritizedPods)
+	for i, pod := range prioritizedPods {
 		r := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(enforce, &pod.ObjectMeta, &pod.Spec))
 		if !r.Allowed {
 			warning := r.ForbiddenReason()
@@ -555,6 +547,7 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 			podWarningsToCount[warning] = c
 		}
 		if err := ctx.Err(); err != nil { // deadline exceeded or context was cancelled
+			checkedPods = i + 1
 			break
 		}
 	}
@@ -738,26 +731,33 @@ func (a *Admission) exemptRuntimeClass(runtimeClass *string) bool {
 	return containsString(*runtimeClass, a.Configuration.Exemptions.RuntimeClasses)
 }
 
-// Filter and prioritise pods based on runtimeclass and uniqueness of the controller respectively for evaluation
-func (a *Admission) prioritisePods(pods []*corev1.Pod) []*corev1.Pod {
-	var replicatedPods []*corev1.Pod
-	var prioritisedPods []*corev1.Pod
+// Filter and prioritize pods based on runtimeclass and uniqueness of the controller respectively for evaluation.
+// The input slice is modified in place and should not be reused.
+func (a *Admission) prioritizePods(pods []*corev1.Pod) []*corev1.Pod {
+	// accumulate the list of prioritized pods in-place to avoid double-allocating
+	prioritizedPods := pods[:0]
+	// accumulate any additional replicated pods after the first one encountered for a given controller uid
+	var duplicateReplicatedPods []*corev1.Pod
 	evaluatedControllers := make(map[types.UID]bool)
 	for _, pod := range pods {
+		// short-circuit on exempt runtimeclass
+		if a.exemptRuntimeClass(pod.Spec.RuntimeClassName) {
+			continue
+		}
 		// short-circuit if pod from the same controller is evaluated
 		podOwnerControllerRef := metav1.GetControllerOfNoCopy(pod)
 		if podOwnerControllerRef == nil {
-			prioritisedPods = append(prioritisedPods, pod)
+			prioritizedPods = append(prioritizedPods, pod)
 			continue
 		}
 		if evaluatedControllers[podOwnerControllerRef.UID] {
-			replicatedPods = append(replicatedPods, pod)
+			duplicateReplicatedPods = append(duplicateReplicatedPods, pod)
 			continue
 		}
-		prioritisedPods = append(prioritisedPods, pod)
+		prioritizedPods = append(prioritizedPods, pod)
 		evaluatedControllers[podOwnerControllerRef.UID] = true
 	}
-	return append(prioritisedPods, replicatedPods...)
+	return append(prioritizedPods, duplicateReplicatedPods...)
 }
 
 func containsString(needle string, haystack []string) bool {
