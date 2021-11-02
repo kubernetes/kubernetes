@@ -19,5 +19,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=pod-security.admission.config.k8s.io
 
-// Package v1alpha1 contains PodSecurity admission configuration file types
-package v1alpha1
+// Package v1beta1 contains PodSecurity admission configuration file types
+package v1beta1
