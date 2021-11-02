@@ -27,38 +27,25 @@ import (
 )
 
 var (
-	_sharedAllowedResponse                        = allowedResponse()
-	_sharedAllowedByUserExemptionResponse         = allowedByExemptResponse("user")
-	_sharedAllowedByNamespaceExemptionResponse    = allowedByExemptResponse("namespace")
-	_sharedAllowedByRuntimeClassExemptionResponse = allowedByExemptResponse("runtimeClass")
+	sharedAllowedResponse                        = allowedResponse()
+	sharedAllowedPrivilegedResponse              = allowedResponse()
+	sharedAllowedByUserExemptionResponse         = allowedResponse()
+	sharedAllowedByNamespaceExemptionResponse    = allowedResponse()
+	sharedAllowedByRuntimeClassExemptionResponse = allowedResponse()
 )
 
-func sharedAllowedResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedResponse
-}
-
-func sharedAllowedByUserExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByUserExemptionResponse
-}
-
-func sharedAllowedByNamespaceExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByNamespaceExemptionResponse
-}
-
-func sharedAllowedByRuntimeClassExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByRuntimeClassExemptionResponse
+func init() {
+	sharedAllowedPrivilegedResponse.AuditAnnotations = map[string]string{
+		api.EnforcedPolicyAnnotationKey: api.LevelVersion{Level: api.LevelPrivileged, Version: api.LatestVersion()}.String(),
+	}
+	sharedAllowedByUserExemptionResponse.AuditAnnotations = map[string]string{api.ExemptionReasonAnnotationKey: "user"}
+	sharedAllowedByNamespaceExemptionResponse.AuditAnnotations = map[string]string{api.ExemptionReasonAnnotationKey: "namespace"}
+	sharedAllowedByRuntimeClassExemptionResponse.AuditAnnotations = map[string]string{api.ExemptionReasonAnnotationKey: "runtimeClass"}
 }
 
 // allowedResponse is the response used when the admission decision is allow.
 func allowedResponse() *admissionv1.AdmissionResponse {
 	return &admissionv1.AdmissionResponse{Allowed: true}
-}
-
-func allowedByExemptResponse(exemptionReason string) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed:          true,
-		AuditAnnotations: map[string]string{api.ExemptionReasonAnnotationKey: exemptionReason},
-	}
 }
 
 // forbiddenResponse is the response used when the admission decision is deny for policy violations.

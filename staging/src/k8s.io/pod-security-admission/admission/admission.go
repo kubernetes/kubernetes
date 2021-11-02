@@ -228,7 +228,7 @@ func (a *Admission) Validate(ctx context.Context, attrs api.Attributes) *admissi
 func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	obj, err := attrs.GetObject()
 	if err != nil {
@@ -249,7 +249,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		if len(newErrs) > 0 {
 			return invalidResponse(attrs, newErrs)
 		}
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 
 	case admissionv1.Update:
 		// if update, check if policy labels changed
@@ -276,24 +276,24 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		// * if the new enforce is the same version and level was relaxed
 		// * for exempt namespaces
 		if newPolicy.Enforce == oldPolicy.Enforce {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if newPolicy.Enforce.Level == api.LevelPrivileged {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if newPolicy.Enforce.Version == oldPolicy.Enforce.Version &&
 			api.CompareLevels(newPolicy.Enforce.Level, oldPolicy.Enforce.Level) < 1 {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			return sharedAllowedByNamespaceExemptionResponse()
+			return sharedAllowedByNamespaceExemptionResponse
 		}
 		response := allowedResponse()
 		response.Warnings = a.EvaluatePodsInNamespace(ctx, namespace.Name, newPolicy.Enforce)
 		return response
 
 	default:
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 }
 
@@ -316,17 +316,17 @@ var ignoredPodSubresources = map[string]bool{
 func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByNamespaceExemptionResponse()
+		return sharedAllowedByNamespaceExemptionResponse
 	}
 
 	if a.exemptUser(attrs.GetUserName()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByUserExemptionResponse()
+		return sharedAllowedByUserExemptionResponse
 	}
 
 	// short-circuit on privileged enforce+audit+warn namespaces
@@ -339,7 +339,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
-		return sharedAllowedResponse()
+		return sharedAllowedPrivilegedResponse
 	}
 
 	obj, err := attrs.GetObject()
@@ -369,7 +369,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), &pod.ObjectMeta, &pod.Spec, attrs, true)
@@ -380,17 +380,17 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByNamespaceExemptionResponse()
+		return sharedAllowedByNamespaceExemptionResponse
 	}
 
 	if a.exemptUser(attrs.GetUserName()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByUserExemptionResponse()
+		return sharedAllowedByUserExemptionResponse
 	}
 
 	// short-circuit on privileged audit+warn namespaces
@@ -406,7 +406,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 
 	obj, err := attrs.GetObject()
@@ -431,7 +431,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), podMetadata, podSpec, attrs, false)
 }
@@ -443,7 +443,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByRuntimeClassExemptionResponse()
+		return sharedAllowedByRuntimeClassExemptionResponse
 	}
 
 	auditAnnotations := map[string]string{}
