@@ -457,7 +457,7 @@ func TestValidateNamespace(t *testing.T) {
 				}
 			}
 
-			attrs := &AttributesRecord{
+			attrs := &api.AttributesRecord{
 				Object:      newObject,
 				OldObject:   oldObject,
 				Name:        newObject.Name,
@@ -508,7 +508,7 @@ func TestValidateNamespace(t *testing.T) {
 						RuntimeClasses: tc.exemptRuntimeClasses,
 					},
 				},
-				Metrics:       NewMockRecorder(),
+				Metrics:       &FakeRecorder{},
 				defaultPolicy: defaultPolicy,
 
 				namespacePodCheckTimeout: time.Second,
@@ -582,6 +582,7 @@ func TestValidatePodController(t *testing.T) {
 		api.WarnLevelLabel:    string(api.LevelBaseline),
 		api.AuditLevelLabel:   string(api.LevelBaseline),
 	}
+	nsLevelVersion := api.LevelVersion{api.LevelBaseline, api.LatestVersion()}
 
 	testCases := []struct {
 		desc                 string
@@ -671,7 +672,7 @@ func TestValidatePodController(t *testing.T) {
 				operation = admissionv1.Update
 			}
 
-			attrs := &AttributesRecord{
+			attrs := &api.AttributesRecord{
 				testName,
 				testNamespace,
 				tc.gvk,
@@ -700,6 +701,7 @@ func TestValidatePodController(t *testing.T) {
 						Labels:    nsLabels}},
 			}
 			PodSpecExtractor := &DefaultPodSpecExtractor{}
+			recorder := &FakeRecorder{}
 			a := &Admission{
 				PodLister:        podLister,
 				Evaluator:        evaluator,
@@ -711,7 +713,7 @@ func TestValidatePodController(t *testing.T) {
 						Usernames:      tc.exemptUsers,
 					},
 				},
-				Metrics:         NewMockRecorder(),
+				Metrics:         recorder,
 				defaultPolicy:   defaultPolicy,
 				NamespaceGetter: nsGetter,
 			}
@@ -727,16 +729,39 @@ func TestValidatePodController(t *testing.T) {
 			assert.Empty(t, resultError)
 			assert.Equal(t, tc.expectAuditAnnotations, result.AuditAnnotations, "unexpected AuditAnnotations")
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
+
+			expectedEvaluations := []EvaluationRecord{}
+			if _, ok := tc.expectAuditAnnotations["audit-violations"]; ok {
+				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeAudit})
+			}
+			if len(tc.expectWarnings) > 0 {
+				expectedEvaluations = append(expectedEvaluations, EvaluationRecord{testName, metrics.DecisionDeny, nsLevelVersion, metrics.ModeWarn})
+			}
+			recorder.ExpectEvaluations(t, expectedEvaluations)
 		})
 	}
 }
 
-type MockRecorder struct {
+type FakeRecorder struct {
+	evaluations []EvaluationRecord
 }
 
-func NewMockRecorder() *MockRecorder {
-	return &MockRecorder{}
+type EvaluationRecord struct {
+	ObjectName string
+	Decision   metrics.Decision
+	Policy     api.LevelVersion
+	Mode       metrics.Mode
 }
 
-func (r MockRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
+func (r *FakeRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
+	r.evaluations = append(r.evaluations, EvaluationRecord{attrs.GetName(), decision, policy, evalMode})
+}
+
+func (r *FakeRecorder) RecordExemption(api.Attributes)   {}
+func (r *FakeRecorder) RecordError(bool, api.Attributes) {}
+
+// ExpectEvaluation asserts that the evaluation was recorded, and clears the record.
+func (r *FakeRecorder) ExpectEvaluations(t *testing.T, expected []EvaluationRecord) {
+	t.Helper()
+	assert.ElementsMatch(t, expected, r.evaluations)
 }
