@@ -61,6 +61,69 @@
   - 4.096
   - 8.192
   - 16.384
+- name: controller_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission controller latency histogram in seconds, identified by name and
+    broken out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: step_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission sub-step latency histogram in seconds, broken out for each operation
+    and API resource and step type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: webhook_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook latency histogram in seconds, identified by name and broken
+    out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: apiserver_current_inflight_requests
+  help: Maximal number of currently used inflight request limit of this apiserver
+    per request kind in last second.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - request_kind
 - name: apiserver_request_duration_seconds
   help: Response latency distribution in seconds for each verb, dry run value, group,
     version, resource, subresource, scope and component.
@@ -139,6 +202,27 @@
   - resource
   - subresource
   - version
+- name: apiserver_response_sizes
+  help: Response size distribution in bytes for each group, version, verb, resource,
+    subresource, scope and component.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 1000
+  - 10000
+  - 100000
+  - 1e+06
+  - 1e+07
+  - 1e+08
+  - 1e+09
 - name: apiserver_storage_objects
   help: Number of stored objects at the time of last check split by kind.
   type: Gauge

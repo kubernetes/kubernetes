@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -45,8 +44,6 @@ const (
 )
 
 var (
-	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
-	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5}
 	latencySummaryMaxAge = 5 * time.Hour
 
 	// Metrics provides access to all admission metrics.
@@ -126,19 +123,68 @@ type AdmissionMetrics struct {
 func newAdmissionMetrics() *AdmissionMetrics {
 	// Admission metrics for a step of the admission flow. The entire admission flow is broken down into a series of steps
 	// Each step is identified by a distinct type label value.
-	step := newMetricSet("step",
-		[]string{"type", "operation", "rejected"},
-		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
+	// Use buckets ranging from 5 ms to 2.5 seconds.
+	step := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "step_admission_duration_seconds",
+				Help:           "Admission sub-step latency histogram in seconds, broken out for each operation and API resource and step type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"type", "operation", "rejected"},
+		),
+
+		latenciesSummary: metrics.NewSummaryVec(
+			&metrics.SummaryOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "step_admission_duration_seconds_summary",
+				Help:           "Admission sub-step latency summary in seconds, broken out for each operation and API resource and step type (validate or admit).",
+				MaxAge:         latencySummaryMaxAge,
+				StabilityLevel: metrics.ALPHA,
+			},
+			[]string{"type", "operation", "rejected"},
+		),
+	}
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
-	controller := newMetricSet("controller",
-		[]string{"name", "type", "operation", "rejected"},
-		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
+	// Use buckets ranging from 5 ms to 2.5 seconds.
+	controller := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "controller_admission_duration_seconds",
+				Help:           "Admission controller latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"name", "type", "operation", "rejected"},
+		),
+
+		latenciesSummary: nil,
+	}
 
 	// Admission webhook metrics. Each webhook is identified by name.
-	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "rejected"},
-		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
+	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
+	webhook := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "webhook_admission_duration_seconds",
+				Help:           "Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"name", "type", "operation", "rejected"},
+		),
+
+		latenciesSummary: nil,
+	}
 
 	webhookRejection := metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -207,39 +253,6 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, st
 type metricSet struct {
 	latencies        *metrics.HistogramVec
 	latenciesSummary *metrics.SummaryVec
-}
-
-func newMetricSet(name string, labels []string, helpTemplate string, hasSummary bool) *metricSet {
-	var summary *metrics.SummaryVec
-	if hasSummary {
-		summary = metrics.NewSummaryVec(
-			&metrics.SummaryOpts{
-				Namespace:      namespace,
-				Subsystem:      subsystem,
-				Name:           fmt.Sprintf("%s_admission_duration_seconds_summary", name),
-				Help:           fmt.Sprintf(helpTemplate, "latency summary in seconds"),
-				MaxAge:         latencySummaryMaxAge,
-				StabilityLevel: metrics.ALPHA,
-			},
-			labels,
-		)
-	}
-
-	return &metricSet{
-		latencies: metrics.NewHistogramVec(
-			&metrics.HistogramOpts{
-				Namespace:      namespace,
-				Subsystem:      subsystem,
-				Name:           fmt.Sprintf("%s_admission_duration_seconds", name),
-				Help:           fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
-				Buckets:        latencyBuckets,
-				StabilityLevel: metrics.ALPHA,
-			},
-			labels,
-		),
-
-		latenciesSummary: summary,
-	}
 }
 
 // MustRegister registers all the prometheus metrics in the metricSet.
