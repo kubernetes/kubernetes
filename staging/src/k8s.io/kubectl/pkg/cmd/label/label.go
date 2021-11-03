@@ -44,6 +44,12 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+const (
+	MsgNotLabeled = "not labeled"
+	MsgLabeled    = "labeled"
+	MsgUnLabeled  = "unlabeled"
+)
+
 // LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
 	// Filename options
@@ -390,9 +396,12 @@ func (o *LabelOptions) RunLabel() error {
 }
 
 func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
-	msg := "not labeled"
+	msg := MsgNotLabeled
 	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = "labeled"
+		msg = MsgLabeled
+		if len(newObj) < len(oldObj) {
+			msg = MsgUnLabeled
+		}
 	}
 	return msg
 }
