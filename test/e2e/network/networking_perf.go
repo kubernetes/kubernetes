@@ -68,38 +68,16 @@ func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6
 	if isIPV6 {
 		args = append(args, "-V")
 	}
-	deploymentSpec := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "iperf2-server-deployment",
-			Labels: labels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &one,
-					Containers: []v1.Container{
-						{
-							Name:    "iperf2-server",
-							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-							Command: []string{"iperf"},
-							Args:    args,
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: iperf2Port,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
-				},
-			},
+	deploymentSpec := e2edeployment.NewDeployment(
+		"iperf2-server-deployment", replicas, labels, "iperf2-server",
+		imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
+	deploymentSpec.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	deploymentSpec.Spec.Template.Spec.Containers[0].Command = []string{"iperf"}
+	deploymentSpec.Spec.Template.Spec.Containers[0].Args = args
+	deploymentSpec.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{
+		{
+			ContainerPort: iperf2Port,
+			Protocol:      v1.ProtocolTCP,
 		},
 	}
 
