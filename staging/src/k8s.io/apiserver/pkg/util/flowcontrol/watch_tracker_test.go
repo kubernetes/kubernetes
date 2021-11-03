@@ -91,6 +91,11 @@ func TestRegisterWatch(t *testing.T) {
 			request:  httpRequest("GET", "/apis/group/v1/namespaces/foo/pods", "watch=true&fieldSelector=metadata.name=mypod"),
 			expected: newWatchIdentifier("group", "pods", "foo", "mypod"),
 		},
+		{
+			name:     "watch indexed object",
+			request:  httpRequest("GET", "/apis/group/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName="),
+			expected: newWatchIdentifier("group", "pods", "foo", ""),
+		},
 	}
 
 	requestInfoFactory := &request.RequestInfoFactory{
@@ -101,6 +106,7 @@ func TestRegisterWatch(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			watchTracker := &watchTracker{
+				indexes:    getBuiltinIndexes(),
 				watchCount: make(map[watchIdentifier]int),
 			}
 
@@ -265,7 +271,7 @@ func TestGetInterestedWatchCountWithIndex(t *testing.T) {
 		httpRequest("GET", "api/v1/pods", "watch=true"),
 		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true"),
 		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=metadata.name=mypod"),
-		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName"),
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName="),
 		// The watches below will be ignored due to index.
 		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName=node1"),
 		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName=node2"),

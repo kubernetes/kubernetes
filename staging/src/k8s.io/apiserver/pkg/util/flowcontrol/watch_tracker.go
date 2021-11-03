@@ -175,7 +175,7 @@ func (w *watchTracker) updateIndexLocked(identifier *watchIdentifier, index *ind
 		// This seem to be true in almost all production clusters, which makes
 		// it a reasonable first step simplification to unblock progres on it.
 		if index.value == unsetValue || index.value == "" {
-			w.watchCount[*identifier]++
+			w.watchCount[*identifier] += incr
 		}
 	}
 }
