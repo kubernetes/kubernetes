@@ -885,15 +885,6 @@ function construct-windows-kubelet-flags {
   # Configure kubelet to run as a windows service.
   flags+=" --windows-service=true"
 
-  # TODO(mtaufen): Configure logging for kubelet running as a service. I haven't
-  # been able to figure out how to direct stdout/stderr into log files when
-  # configuring it to run via sc.exe, so we just manually override logging
-  # config here.
-  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kubelet.log"
-  # klog sets this to true internally, so need to override to false so we
-  # actually log to the file
-  flags+=" --logtostderr=false"
-
   # Configure the file path for host dns configuration
   flags+=" --resolv-conf=${WINDOWS_CNI_DIR}\hostdns.conf"
 
@@ -930,16 +921,6 @@ function construct-windows-kubeproxy-flags {
 
   # Configure kube-proxy to run as a windows service.
   flags+=" --windows-service=true"
-
-  # TODO(mtaufen): Configure logging for kube-proxy running as a service.
-  # I haven't been able to figure out how to direct stdout/stderr into log
-  # files when configuring it to run via sc.exe, so we just manually
-  # override logging config here.
-  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kube-proxy.log"
-
-  # klog sets this to true internally, so need to override to false
-  # so we actually log to the file
-  flags+=" --logtostderr=false"
 
   # Enabling Windows DSR mode unlocks newer network features and reduces
   # port usage for services.
