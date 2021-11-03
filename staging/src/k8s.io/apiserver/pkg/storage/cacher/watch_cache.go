@@ -336,7 +336,10 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 // Assumes that lock is already held for write.
 func (w *watchCache) updateCache(event *watchCacheEvent) {
 	w.resizeCacheLocked(event.RecordTime)
-	
+	if w.isCacheFullLocked() {
+		// Cache is full - remove the oldest element.
+		w.startIndex++
+	}
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
 }
