@@ -49,6 +49,7 @@ extra_envs=${EXTRA_ENVS:-}
 runtime_config=${RUNTIME_CONFIG:-}
 ssh_user=${SSH_USER:-"${USER}"}
 ssh_key=${SSH_KEY:-}
+kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -164,6 +165,8 @@ if [ "${remote}" = true ] ; then
   echo "Ginkgo Flags: ${ginkgoflags}"
   echo "Instance Metadata: ${metadata}"
   echo "Image Config File: ${image_config_file}"
+  echo "Kubelet Config File: ${kubelet_config_file}"
+
   # Invoke the runner
   go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
     --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
@@ -174,7 +177,7 @@ if [ "${remote}" = true ] ; then
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --image-config-dir="${image_config_dir}" \
-    --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
+    --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
@@ -210,6 +213,7 @@ else
     --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     ${test_args}" --runtime-config="${runtime_config}" \
+    --kubelet-config-file="${kubelet_config_file}" \
     --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi
