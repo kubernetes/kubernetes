@@ -16,6 +16,9 @@ spec:
     spec:
       serviceAccountName: pod-security-webhook
       priorityClassName: system-cluster-critical
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
       volumes:
         - name: config
           configMap:
