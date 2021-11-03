@@ -25,7 +25,7 @@ spec:
             secretName: pod-security-webhook
       containers:
         - name: pod-security-webhook
-          image: k8s.gcr.io/sig-auth/pod-security-webhook:v1.22-alpha.0
+          image: k8s.gcr.io/sig-auth/pod-security-webhook:v1.23-beta.0
           terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - containerPort: 8443
