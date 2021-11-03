@@ -211,7 +211,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		l.testCase.TestEphemeral()
 	})
 
-	ginkgo.It("should support two pods which share the same volume", func() {
+	ginkgo.It("should support two pods which have the same volume definition", func() {
 		init()
 		defer cleanup()
 
@@ -237,7 +237,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			// data written in one pod is really not
 			// visible in the other.
 			if pattern.VolMode != v1.PersistentVolumeBlock && !readOnly && !shared {
-				ginkgo.By("writing data in one pod and checking for it in the second")
+				ginkgo.By("writing data in one pod and checking the second does not see it (it should get its own volume)")
 				e2evolume.VerifyExecInPodSucceed(f, pod, "touch /mnt/test-0/hello-world")
 				e2evolume.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
