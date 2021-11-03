@@ -45,13 +45,6 @@ const (
 	LiteralStyle
 )
 
-// ParsedValue represents a top-level object representing either a template or instance value.
-type ParsedValue struct {
-	ID    int64
-	Value *MapValue
-	Meta  SourceMetadata
-}
-
 // NewEmptyDynValue returns the zero-valued DynValue.
 func NewEmptyDynValue() *DynValue {
 	// note: 0 is not a valid parse node identifier.
@@ -158,10 +151,6 @@ func exprValue(value interface{}) (ref.Val, *DeclType, error) {
 		return types.String(v), StringType, nil
 	case uint64:
 		return types.Uint(v), UintType, nil
-	case PlainTextValue:
-		return types.String(string(v)), PlainTextType, nil
-	case *MultilineStringValue:
-		return types.String(v.Value), StringType, nil
 	case time.Duration:
 		return types.Duration{Duration: v}, DurationType, nil
 	case time.Time:

@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // NewListType returns a parameterized list type with a specified element type.
@@ -92,7 +93,7 @@ func newSimpleType(name string, exprType *exprpb.Type, zeroVal ref.Val) *DeclTyp
 	}
 }
 
-// DeclType represents the universal type descriptor for Policy Templates.
+// DeclType represents the universal type descriptor for OpenAPIv3 types.
 type DeclType struct {
 	fmt.Stringer
 
@@ -304,7 +305,7 @@ func (f *DeclField) EnumValues() []ref.Val {
 
 // NewRuleTypes returns an Open API Schema-based type-system which is CEL compatible.
 func NewRuleTypes(kind string,
-	schema *OpenAPISchema,
+	schema *schema.Structural,
 	res Resolver) (*RuleTypes, error) {
 	// Note, if the schema indicates that it's actually based on another proto
 	// then prefer the proto definition. For expressions in the proto, a new field
@@ -325,13 +326,13 @@ func NewRuleTypes(kind string,
 // type-system.
 type RuleTypes struct {
 	ref.TypeProvider
-	Schema              *OpenAPISchema
+	Schema              *schema.Structural
 	ruleSchemaDeclTypes *schemaTypeProvider
 	typeAdapter         ref.TypeAdapter
 	resolver            Resolver
 }
 
-// EnvOptions returns a set of cel.EnvOption values which includes the Template's declaration set
+// EnvOptions returns a set of cel.EnvOption values which includes the declaration set
 // as well as a custom ref.TypeProvider.
 //
 // Note, the standard declaration set includes 'rule' which is defined as the top-level rule-schema
@@ -358,7 +359,7 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 		tpType, found := tp.FindType(name)
 		if found && !proto.Equal(tpType, declType.ExprType()) {
 			return nil, fmt.Errorf(
-				"type %s definition differs between CEL environment and template", name)
+				"type %s definition differs between CEL environment and rule", name)
 		}
 	}
 	return []cel.EnvOption{
@@ -370,7 +371,7 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 	}, nil
 }
 
-// FindType attempts to resolve the typeName provided from the template's rule-schema, or if not
+// FindType attempts to resolve the typeName provided from the rule's rule-schema, or if not
 // from the embedded ref.TypeProvider.
 //
 // FindType overrides the default type-finding behavior of the embedded TypeProvider.
@@ -425,25 +426,10 @@ func (rt *RuleTypes) FindFieldType(typeName, fieldName string) (*ref.FieldType, 
 	return nil, false
 }
 
-// ConvertToRule transforms an untyped DynValue into a typed object.
-//
-// Conversion is done deeply and will traverse the object graph represented by the dyn value.
-func (rt *RuleTypes) ConvertToRule(dyn *DynValue) Rule {
-	ruleSchemaType := rt.ruleSchemaDeclTypes.root
-	// TODO: handle conversions to protobuf types.
-	dyn = rt.convertToCustomType(dyn, ruleSchemaType)
-	return &CustomRule{DynValue: dyn}
-}
-
 // NativeToValue is an implementation of the ref.TypeAdapater interface which supports conversion
-// of policy template values to CEL ref.Val instances.
+// of rule values to CEL ref.Val instances.
 func (rt *RuleTypes) NativeToValue(val interface{}) ref.Val {
-	switch v := val.(type) {
-	case *CustomRule:
-		return v.ExprValue()
-	default:
-		return rt.typeAdapter.NativeToValue(val)
-	}
+	return rt.typeAdapter.NativeToValue(val)
 }
 
 // TypeNames returns the list of type names declared within the RuleTypes object.
@@ -499,8 +485,8 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 	}
 }
 
-func newSchemaTypeProvider(kind string, schema *OpenAPISchema) (*schemaTypeProvider, error) {
-	root := schema.DeclType().MaybeAssignTypeName(kind)
+func newSchemaTypeProvider(kind string, schema *schema.Structural) (*schemaTypeProvider, error) {
+	root := SchemaDeclType(schema).MaybeAssignTypeName(kind)
 	types := FieldTypeMap(kind, root)
 	return &schemaTypeProvider{
 		root:  root,
@@ -515,7 +501,7 @@ type schemaTypeProvider struct {
 
 var (
 	// AnyType is equivalent to the CEL 'protobuf.Any' type in that the value may have any of the
-	// types supported by CEL Policy Templates.
+	// types supported.
 	AnyType = newSimpleType("any", decls.Any, nil)
 
 	// BoolType is equivalent to the CEL 'bool' type.
@@ -530,6 +516,9 @@ var (
 	// DurationType is equivalent to the CEL 'duration' type.
 	DurationType = newSimpleType("duration", decls.Duration, types.Duration{Duration: time.Duration(0)})
 
+	// DateType is equivalent to the CEL 'date' type.
+	DateType = newSimpleType("date", decls.Timestamp, types.Timestamp{Time: time.Time{}})
+
 	// DynType is the equivalent of the CEL 'dyn' concept which indicates that the type will be
 	// determined at runtime rather than compile time.
 	DynType = newSimpleType("dyn", decls.Dyn, nil)
@@ -543,10 +532,6 @@ var (
 	// StringType is equivalent to the CEL 'string' type which is expected to be a UTF-8 string.
 	// StringType values may either be string literals or expression strings.
 	StringType = newSimpleType("string", decls.String, types.String(""))
-
-	// PlainTextType is equivalent to the CEL 'string' type, but which has been specifically
-	// designated as a string literal.
-	PlainTextType = newSimpleType("string_lit", decls.String, types.String(""))
 
 	// TimestampType corresponds to the well-known protobuf.Timestamp type supported within CEL.
 	TimestampType = newSimpleType("timestamp", decls.Timestamp, types.Timestamp{Time: time.Time{}})

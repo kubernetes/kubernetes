@@ -35,8 +35,6 @@ func TestConvertToType(t *testing.T) {
 		{float64(1.2), types.DoubleType},
 		{int64(-42), types.IntType},
 		{uint64(63), types.UintType},
-		{PlainTextValue("plain text"), types.StringType},
-		{&MultilineStringValue{Value: "multiline", Raw: "multi\nline"}, types.StringType},
 		{time.Duration(300), types.DurationType},
 		{time.Now().UTC(), types.TimestampType},
 		{types.NullValue, types.NullType},
@@ -63,8 +61,7 @@ func TestConvertToType(t *testing.T) {
 
 func TestEqual(t *testing.T) {
 	vals := []interface{}{
-		true, []byte("bytes"), float64(1.2), int64(-42), uint64(63), PlainTextValue("plain text"),
-		&MultilineStringValue{Value: "multiline", Raw: "multi\nline"}, time.Duration(300),
+		true, []byte("bytes"), float64(1.2), int64(-42), uint64(63), time.Duration(300),
 		time.Now().UTC(), types.NullValue, NewListValue(), NewMapValue(),
 		NewObjectValue(NewObjectType("TestObject", map[string]*DeclField{})),
 	}
@@ -327,7 +324,7 @@ func TestObjectValueEqual(t *testing.T) {
 	objType := NewObjectType("Notice", map[string]*DeclField{
 		"name":     &DeclField{Name: "name", Type: StringType},
 		"priority": &DeclField{Name: "priority", Type: IntType},
-		"message":  &DeclField{Name: "message", Type: PlainTextType, defaultValue: "<eom>"},
+		"message":  &DeclField{Name: "message", Type: StringType, defaultValue: "<eom>"},
 	})
 	name := NewField(1, "name")
 	name.Ref = testValue(t, 2, "alert")

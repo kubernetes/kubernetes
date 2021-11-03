@@ -18,43 +18,43 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 
 	"google.golang.org/protobuf/proto"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestSchemaDeclType(t *testing.T) {
 	ts := testSchema()
-	cust := ts.DeclType()
-	if cust.TypeName() != "CustomObject" {
-		t.Errorf("incorrect type name, got %v, wanted CustomObject", cust.TypeName())
+	cust := SchemaDeclType(ts)
+	if cust.TypeName() != "object" {
+		t.Errorf("incorrect type name, got %v, wanted object", cust.TypeName())
 	}
 	if len(cust.Fields) != 4 {
 		t.Errorf("incorrect number of fields, got %d, wanted 4", len(cust.Fields))
 	}
 	for _, f := range cust.Fields {
-		prop, found := ts.FindProperty(f.Name)
+		prop, found := ts.Properties[f.Name]
 		if !found {
 			t.Errorf("type field not found in schema, field: %s", f.Name)
 		}
 		fdv := f.DefaultValue()
-		if prop.DefaultValue != nil {
-			pdv := types.DefaultTypeAdapter.NativeToValue(prop.DefaultValue)
+		if prop.Default.Object != nil {
+			pdv := types.DefaultTypeAdapter.NativeToValue(prop.Default.Object)
 			if !reflect.DeepEqual(fdv, pdv) {
-				t.Errorf("field and schema do not agree on default value, field: %s", f.Name)
+				t.Errorf("field and schema do not agree on default value for field: %s, field value: %v, schema default: %v", f.Name, fdv, pdv)
 			}
 		}
-		if prop.Enum == nil && len(f.EnumValues()) != 0 {
+		if (prop.ValueValidation == nil || len(prop.ValueValidation.Enum) == 0) && len(f.EnumValues()) != 0 {
 			t.Errorf("field had more enum values than the property. field: %s", f.Name)
 		}
-		if prop.Enum != nil {
+		if prop.ValueValidation != nil {
 			fevs := f.EnumValues()
 			for _, fev := range fevs {
 				found := false
-				for _, pev := range prop.Enum {
-					pev = types.DefaultTypeAdapter.NativeToValue(pev)
-					if reflect.DeepEqual(fev, pev) {
+				for _, pev := range prop.ValueValidation.Enum {
+					celpev := types.DefaultTypeAdapter.NativeToValue(pev.Object)
+					if reflect.DeepEqual(fev, celpev) {
 						found = true
 						break
 					}
@@ -67,27 +67,28 @@ func TestSchemaDeclType(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range ts.Required {
-		df, found := cust.FindField(name)
-		if !found {
-			t.Errorf("custom type missing required field. field=%s", name)
-		}
-		if !df.Required {
-			t.Errorf("field marked as required in schema, but optional in type. field=%s", df.Name)
+	if ts.ValueValidation != nil {
+		for _, name := range ts.ValueValidation.Required {
+			df, found := cust.FindField(name)
+			if !found {
+				t.Errorf("custom type missing required field. field=%s", name)
+			}
+			if !df.Required {
+				t.Errorf("field marked as required in schema, but optional in type. field=%s", df.Name)
+			}
 		}
 	}
 }
 
 func TestSchemaDeclTypes(t *testing.T) {
 	ts := testSchema()
-	cust, typeMap := ts.DeclTypes("mock_template")
+	cust, typeMap := SchemaDeclTypes(ts, "CustomObject")
 	nested, _ := cust.FindField("nested")
 	metadata, _ := cust.FindField("metadata")
-	metadataElem := metadata.Type.ElemType
 	expectedObjTypeMap := map[string]*DeclType{
-		"CustomObject":                cust,
-		"CustomObject.nested":         nested.Type,
-		"CustomObject.metadata.@elem": metadataElem,
+		"CustomObject":          cust,
+		"CustomObject.nested":   nested.Type,
+		"CustomObject.metadata": metadata.Type,
 	}
 	objTypeMap := map[string]*DeclType{}
 	for name, t := range typeMap {
@@ -96,7 +97,7 @@ func TestSchemaDeclTypes(t *testing.T) {
 		}
 	}
 	if len(objTypeMap) != len(expectedObjTypeMap) {
-		t.Errorf("got different type set. got=%v, wanted=%v", typeMap, expectedObjTypeMap)
+		t.Errorf("got different type set. got=%v, wanted=%v", objTypeMap, expectedObjTypeMap)
 	}
 	for exp, expType := range expectedObjTypeMap {
 		actType, found := objTypeMap[exp]
@@ -108,17 +109,9 @@ func TestSchemaDeclTypes(t *testing.T) {
 			t.Errorf("incompatible CEL types. got=%v, wanted=%v", actType.ExprType(), expType.ExprType())
 		}
 	}
-
-	metaExprType := metadata.Type.ExprType()
-	expectedMetaExprType := decls.NewMapType(
-		decls.String,
-		decls.NewObjectType("CustomObject.metadata.@elem"))
-	if !proto.Equal(expectedMetaExprType, metaExprType) {
-		t.Errorf("got metadata CEL type %v, wanted %v", metaExprType, expectedMetaExprType)
-	}
 }
 
-func testSchema() *OpenAPISchema {
+func testSchema() *schema.Structural {
 	// Manual construction of a schema with the following definition:
 	//
 	// schema:
@@ -160,44 +153,86 @@ func testSchema() *OpenAPISchema {
 	//       format: int64
 	//       default: 1
 	//       enum: [1,2,3]
-	nameField := NewOpenAPISchema()
-	nameField.Type = "string"
-	valueField := NewOpenAPISchema()
-	valueField.Type = "integer"
-	valueField.Format = "int64"
-	valueField.DefaultValue = int64(1)
-	valueField.Enum = []interface{}{int64(1), int64(2), int64(3)}
-	nestedObjField := NewOpenAPISchema()
-	nestedObjField.Type = "object"
-	nestedObjField.Properties["subname"] = NewOpenAPISchema()
-	nestedObjField.Properties["subname"].Type = "string"
-	nestedObjField.Properties["flags"] = NewOpenAPISchema()
-	nestedObjField.Properties["flags"].Type = "object"
-	nestedObjField.Properties["flags"].AdditionalProperties = NewOpenAPISchema()
-	nestedObjField.Properties["flags"].AdditionalProperties.Type = "boolean"
-	nestedObjField.Properties["dates"] = NewOpenAPISchema()
-	nestedObjField.Properties["dates"].Type = "array"
-	nestedObjField.Properties["dates"].Items = NewOpenAPISchema()
-	nestedObjField.Properties["dates"].Items.Type = "string"
-	nestedObjField.Properties["dates"].Items.Format = "date-time"
-	metadataKeyValue := NewOpenAPISchema()
-	metadataKeyValue.Type = "object"
-	metadataKeyValue.Properties["key"] = NewOpenAPISchema()
-	metadataKeyValue.Properties["key"].Type = "string"
-	metadataKeyValue.Properties["values"] = NewOpenAPISchema()
-	metadataKeyValue.Properties["values"].Type = "array"
-	metadataKeyValue.Properties["values"].Items = NewOpenAPISchema()
-	metadataKeyValue.Properties["values"].Items.Type = "string"
-	metadataObjField := NewOpenAPISchema()
-	metadataObjField.Type = "object"
-	metadataObjField.AdditionalProperties = metadataKeyValue
-	ts := NewOpenAPISchema()
-	ts.Type = "object"
-	ts.Metadata["custom_type"] = "CustomObject"
-	ts.Required = []string{"name", "value"}
-	ts.Properties["name"] = nameField
-	ts.Properties["value"] = valueField
-	ts.Properties["nested"] = nestedObjField
-	ts.Properties["metadata"] = metadataObjField
+	ts := &schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"name": {
+				Generic: schema.Generic{
+					Type: "string",
+				},
+			},
+			"value": {
+				Generic: schema.Generic{
+					Type:    "integer",
+					Default: schema.JSON{Object: int64(1)},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "int64",
+					Enum:   []schema.JSON{{Object: int64(1)}, {Object: int64(2)}, {Object: int64(3)}},
+				},
+			},
+			"nested": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"subname": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+					"flags": {
+						Generic: schema.Generic{
+							Type: "object",
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "boolean",
+									},
+								},
+							},
+						},
+					},
+					"dates": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+							ValueValidation: &schema.ValueValidation{
+								Format: "date-time",
+							},
+						},
+					},
+				},
+			},
+			"metadata": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"name": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+					"value": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 	return ts
 }
