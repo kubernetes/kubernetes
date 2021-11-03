@@ -194,19 +194,8 @@ func Or(first BitMask, masks ...BitMask) BitMask {
 // IterateBitMasks iterates all possible masks from a list of bits,
 // issuing a callback on each mask.
 func IterateBitMasks(bits []int, callback func(BitMask)) {
-	var iterate func(bits, accum []int, size int)
-	iterate = func(bits, accum []int, size int) {
-		if len(accum) == size {
-			mask, _ := NewBitMask(accum...)
-			callback(mask)
-			return
-		}
-		for i := range bits {
-			iterate(bits[i+1:], append(accum, bits[i]), size)
-		}
-	}
-
-	for i := 1; i <= len(bits); i++ {
-		iterate(bits, []int{}, i)
+	for i := 1 ; i <= len(bits); i++ {
+		mask, _ := NewBitMask(bits[:i]...)
+		callback(mask)
 	}
 }
