@@ -102,14 +102,14 @@ func TestPodSecurityWebhook(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
-	// The webhook should pass tests even when PodSecurity is disabled.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSecurity, false)()
 
 	// Start test API server.
 	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--anonymous-auth=false",
 		"--allow-privileged=true",
+		// The webhook should pass tests even when PodSecurity is disabled.
+		"--disable-admission-plugins=PodSecurity",
 	}, framework.SharedEtcd())
 	t.Cleanup(testServer.TearDownFn)
 
