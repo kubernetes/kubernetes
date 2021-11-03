@@ -8,7 +8,7 @@ metadata:
 spec:
   ports:
     - port: 443
-      targetPort: 8443
+      targetPort: webhook
       protocol: TCP
       name: https
   selector:
