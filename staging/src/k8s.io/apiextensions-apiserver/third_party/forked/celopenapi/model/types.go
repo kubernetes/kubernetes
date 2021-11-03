@@ -16,7 +16,6 @@ package model
 
 import (
 	"fmt"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -28,6 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // NewListType returns a parameterized list type with a specified element type.
@@ -305,7 +305,7 @@ func (f *DeclField) EnumValues() []ref.Val {
 
 // NewRuleTypes returns an Open API Schema-based type-system which is CEL compatible.
 func NewRuleTypes(kind string,
-	schema *spec.Schema,
+	schema *schema.Structural,
 	res Resolver) (*RuleTypes, error) {
 	// Note, if the schema indicates that it's actually based on another proto
 	// then prefer the proto definition. For expressions in the proto, a new field
@@ -326,7 +326,7 @@ func NewRuleTypes(kind string,
 // type-system.
 type RuleTypes struct {
 	ref.TypeProvider
-	Schema              *spec.Schema
+	Schema              *schema.Structural
 	ruleSchemaDeclTypes *schemaTypeProvider
 	typeAdapter         ref.TypeAdapter
 	resolver            Resolver
@@ -486,7 +486,7 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 	}
 }
 
-func newSchemaTypeProvider(kind string, schema *spec.Schema) (*schemaTypeProvider, error) {
+func newSchemaTypeProvider(kind string, schema *schema.Structural) (*schemaTypeProvider, error) {
 	root := SchemaDeclType(schema).MaybeAssignTypeName(kind)
 	types := FieldTypeMap(kind, root)
 	return &schemaTypeProvider{

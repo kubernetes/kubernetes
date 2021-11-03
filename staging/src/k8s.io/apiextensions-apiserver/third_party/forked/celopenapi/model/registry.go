@@ -16,10 +16,10 @@ package model
 
 import (
 	"fmt"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sync"
 
 	"github.com/google/cel-go/cel"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // Resolver declares methods to find policy templates and related configuration objects.
@@ -37,7 +37,7 @@ type Resolver interface {
 	//
 	// Schema names start with a `#` sign as this method is only used to resolve references to
 	// relative schema elements within `$ref` schema nodes.
-	FindSchema(name string) (*spec.Schema, bool)
+	FindSchema(name string) (*schema.Structural, bool)
 
 	// FindType returns a DeclType instance corresponding to the given fully-qualified name, if
 	// present.
@@ -50,7 +50,7 @@ func NewRegistry(stdExprEnv *cel.Env) *Registry {
 	return &Registry{
 		envs:     map[string]*Env{},
 		exprEnvs: map[string]*cel.Env{"": stdExprEnv},
-		schemas: map[string]*spec.Schema{
+		schemas: map[string]*schema.Structural{
 			"#anySchema":      AnySchema,
 			"#envSchema":      envSchema,
 			"#instanceSchema": instanceSchema,
@@ -82,7 +82,7 @@ type Registry struct {
 	rwMux    sync.RWMutex
 	envs     map[string]*Env
 	exprEnvs map[string]*cel.Env
-	schemas  map[string]*spec.Schema
+	schemas  map[string]*schema.Structural
 	types    map[string]*DeclType
 }
 
@@ -103,7 +103,7 @@ func (r *Registry) FindExprEnv(name string) (*cel.Env, bool) {
 }
 
 // FindSchema implements the Resolver interface method.
-func (r *Registry) FindSchema(name string) (*spec.Schema, bool) {
+func (r *Registry) FindSchema(name string) (*schema.Structural, bool) {
 	r.rwMux.RLock()
 	defer r.rwMux.RUnlock()
 	schema, found := r.schemas[name]
@@ -153,7 +153,7 @@ func (r *Registry) SetEnv(name string, env *Env) error {
 // as a reusable schema unit within other OpenAPISchema instances.
 //
 // Name format: '#<simpleName>'.
-func (r *Registry) SetSchema(name string, schema *spec.Schema) error {
+func (r *Registry) SetSchema(name string, schema *schema.Structural) error {
 	r.rwMux.Lock()
 	defer r.rwMux.Unlock()
 	r.schemas[name] = schema

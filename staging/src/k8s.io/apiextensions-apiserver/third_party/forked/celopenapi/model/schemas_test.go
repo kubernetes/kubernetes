@@ -15,13 +15,13 @@
 package model
 
 import (
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"reflect"
 	"testing"
 
 	"github.com/google/cel-go/common/types"
 
 	"google.golang.org/protobuf/proto"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestSchemaDeclType(t *testing.T) {
@@ -39,22 +39,22 @@ func TestSchemaDeclType(t *testing.T) {
 			t.Errorf("type field not found in schema, field: %s", f.Name)
 		}
 		fdv := f.DefaultValue()
-		if prop.Default != nil {
-			pdv := types.DefaultTypeAdapter.NativeToValue(prop.Default)
+		if prop.Default.Object != nil {
+			pdv := types.DefaultTypeAdapter.NativeToValue(prop.Default.Object)
 			if !reflect.DeepEqual(fdv, pdv) {
-				t.Errorf("field and schema do not agree on default value, field: %s", f.Name)
+				t.Errorf("field and schema do not agree on default value for field: %s, field value: %v, schema default: %v", f.Name, fdv, pdv)
 			}
 		}
-		if prop.Enum == nil && len(f.EnumValues()) != 0 {
+		if (prop.ValueValidation == nil || len(prop.ValueValidation.Enum) == 0) && len(f.EnumValues()) != 0 {
 			t.Errorf("field had more enum values than the property. field: %s", f.Name)
 		}
-		if prop.Enum != nil {
+		if prop.ValueValidation != nil {
 			fevs := f.EnumValues()
 			for _, fev := range fevs {
 				found := false
-				for _, pev := range prop.Enum {
-					pev = types.DefaultTypeAdapter.NativeToValue(pev)
-					if reflect.DeepEqual(fev, pev) {
+				for _, pev := range prop.ValueValidation.Enum {
+					celpev := types.DefaultTypeAdapter.NativeToValue(pev.Object)
+					if reflect.DeepEqual(fev, celpev) {
 						found = true
 						break
 					}
@@ -67,13 +67,15 @@ func TestSchemaDeclType(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range ts.Required {
-		df, found := cust.FindField(name)
-		if !found {
-			t.Errorf("custom type missing required field. field=%s", name)
-		}
-		if !df.Required {
-			t.Errorf("field marked as required in schema, but optional in type. field=%s", df.Name)
+	if ts.ValueValidation != nil {
+		for _, name := range ts.ValueValidation.Required {
+			df, found := cust.FindField(name)
+			if !found {
+				t.Errorf("custom type missing required field. field=%s", name)
+			}
+			if !df.Required {
+				t.Errorf("field marked as required in schema, but optional in type. field=%s", df.Name)
+			}
 		}
 	}
 }
@@ -109,7 +111,7 @@ func TestSchemaDeclTypes(t *testing.T) {
 	}
 }
 
-func testSchema() *spec.Schema {
+func testSchema() *schema.Structural {
 	// Manual construction of a schema with the following definition:
 	//
 	// schema:
@@ -152,64 +154,80 @@ func testSchema() *spec.Schema {
 	//       default: 1
 	//       enum: [1,2,3]
 
-	ts := &spec.Schema{
-		SchemaProps: spec.SchemaProps{
-			Type:     []string{"object"},
-			Required: []string{"name", "value"},
-			Properties: map[string]spec.Schema{
-				"name": {
-					SchemaProps: spec.SchemaProps{
-						Type: []string{"string"},
-					},
+	ts := &schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"name": {
+				Generic: schema.Generic{
+					Type: "string",
 				},
-				"value": {
-					SchemaProps: spec.SchemaProps{
-						Type:    []string{"integer"},
-						Format:  "int64",
-						Default: int64(1),
-						Enum:    []interface{}{int64(1), int64(2), int64(3)},
-					},
+			},
+			"value": {
+				Generic: schema.Generic{
+					Type:    "integer",
+					Default: schema.JSON{Object: int64(1)},
 				},
-				"nested": {
-					SchemaProps: spec.SchemaProps{
-						Type: []string{"object"},
-						Properties: map[string]spec.Schema{
-							"subname": {
-								SchemaProps: spec.SchemaProps{
-									Type: []string{"string"},
-								},
-							},
-							"flags": {
-								SchemaProps: spec.SchemaProps{
-									Type: []string{"object"},
-									AdditionalProperties: &spec.SchemaOrBool{
-										Schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"boolean"}}},
+				ValueValidation: &schema.ValueValidation{
+					Format: "int64",
+					Enum:   []schema.JSON{{Object: int64(1)}, {Object: int64(2)}, {Object: int64(3)}},
+				},
+			},
+			"nested": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"subname": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+					"flags": {
+						Generic: schema.Generic{
+							Type: "object",
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "boolean",
 									},
-								},
-							},
-							"dates": {
-								SchemaProps: spec.SchemaProps{
-									Type:  []string{"array"},
-									Items: &spec.SchemaOrArray{Schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "date-time"}}},
 								},
 							},
 						},
 					},
-				},
-				"metadata": {
-					SchemaProps: spec.SchemaProps{
-						Type: []string{"object"},
-						Properties: map[string]spec.Schema{
-							"key": {
-								SchemaProps: spec.SchemaProps{
-									Type: []string{"string"},
-								},
+					"dates": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
 							},
-							"values": {
-								SchemaProps: spec.SchemaProps{
-									Type:  []string{"array"},
-									Items: &spec.SchemaOrArray{Schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}}}},
-								},
+							ValueValidation: &schema.ValueValidation{
+								Format: "date-time",
+							},
+						},
+					},
+				},
+			},
+			"metadata": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"name": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+					"value": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
 							},
 						},
 					},

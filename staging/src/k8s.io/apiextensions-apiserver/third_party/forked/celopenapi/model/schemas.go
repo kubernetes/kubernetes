@@ -15,58 +15,84 @@
 package model
 
 import (
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // SchemaDeclTypes constructs a top-down set of DeclType instances whose name is derived from the root
 // type name provided on the call, if not set to a custom type.
-func SchemaDeclTypes(s *spec.Schema, maybeRootType string) (*DeclType, map[string]*DeclType) {
+func SchemaDeclTypes(s *schema.Structural, maybeRootType string) (*DeclType, map[string]*DeclType) {
 	root := SchemaDeclType(s).MaybeAssignTypeName(maybeRootType)
 	types := FieldTypeMap(maybeRootType, root)
 	return root, types
 }
 
 // SchemaDeclType returns the CEL Policy Templates type name associated with the schema element.
-func SchemaDeclType(s *spec.Schema) *DeclType {
-	if len(s.Type) < 1 {
-		return NewObjectTypeRef("*error*")
+func SchemaDeclType(s *schema.Structural) *DeclType {
+	declType, found := openAPISchemaTypes[s.Type]
+	if !found {
+		return nil
 	}
-	for _, schemaType := range s.Type {
-		declType, found := openAPISchemaTypes[schemaType]
-		if !found {
-			continue
+	if s.XIntOrString {
+		return NewObjectType("intOrString", map[string]*DeclField{
+			"strVal": {Name: "strVal", Type: StringType},
+			"intVal": {Name: "intVal", Type: IntType},
+		})
+	}
+	if s.XEmbeddedResource {
+		return NewObjectType("embedded", map[string]*DeclField{
+			"kind":       {Name: "kind", Type: StringType},
+			"apiVersion": {Name: "apiVersion", Type: StringType},
+			"metadata": {Name: "metadata", Type: NewObjectType("metadata", map[string]*DeclField{
+				"name":         {Name: "name", Type: StringType},
+				"generateName": {Name: "generateName", Type: StringType, Required: false},
+			})},
+			"spec":   {Name: "spec", Type: DynType},
+			"status": {Name: "status", Type: DynType, Required: false},
+		})
+	}
+	if s.XPreserveUnknownFields {
+		return DynType
+	}
+	switch declType.TypeName() {
+	case ListType.TypeName():
+		return NewListType(SchemaDeclType(s.Items))
+	case MapType.TypeName():
+		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
+			return NewMapType(StringType, SchemaDeclType(s.AdditionalProperties.Structural))
 		}
-		switch declType.TypeName() {
-		case ListType.TypeName():
-			if s.Items.Len() == 1 {
-				return NewListType(SchemaDeclType(s.Items.Schema))
+		fields := make(map[string]*DeclField, len(s.Properties))
+
+		required := map[string]bool{}
+		if s.ValueValidation != nil {
+			for _, f := range s.ValueValidation.Required {
+				required[f] = true
 			}
-		case MapType.TypeName():
-			if s.AdditionalProperties != nil {
-				return NewMapType(StringType, SchemaDeclType(s.AdditionalProperties.Schema))
-			}
-			fields := make(map[string]*DeclField, len(s.Properties))
-			required := make(map[string]struct{}, len(s.Required))
-			for _, name := range s.Required {
-				required[name] = struct{}{}
-			}
-			for name, prop := range s.Properties {
-				_, isReq := required[name]
-				fields[name] = &DeclField{
-					Name:         name,
-					Required:     isReq,
-					Type:         SchemaDeclType(&prop),
-					defaultValue: prop.Default,
-					enumValues:   prop.Enum,
+		}
+		for name, prop := range s.Properties {
+			var enumValues []interface{}
+			if prop.ValueValidation != nil {
+				for _, e := range prop.ValueValidation.Enum {
+					enumValues = append(enumValues, e.Object)
 				}
 			}
-			return NewObjectType("object", fields)
-		case StringType.TypeName():
-			switch s.Format {
-			case "byte", "binary":
+			fields[Escape(name)] = &DeclField{
+				Name:         Escape(name),
+				Required:     required[name],
+				Type:         SchemaDeclType(&prop),
+				defaultValue: prop.Default.Object,
+				enumValues:   enumValues, // TODO: escape?
+			}
+		}
+		return NewObjectType("object", fields)
+	case StringType.TypeName():
+		if s.ValueValidation != nil {
+			switch s.ValueValidation.Format {
+			case "byte":
+				return StringType // OpenAPIv3 byte format represents base64 encoded string
+			case "binary":
 				return BytesType
 			case "google-duration":
 				return DurationType
@@ -78,27 +104,26 @@ func SchemaDeclType(s *spec.Schema) *DeclType {
 				return UintType
 			}
 		}
-		return declType
 	}
-	return NewObjectTypeRef("*error*")
+	return declType
 }
 
 var (
 	// SchemaDef defines an Open API Schema definition in terms of an Open API Schema.
-	schemaDef *spec.Schema
+	schemaDef *schema.Structural
 
 	// AnySchema indicates that the value may be of any type.
-	AnySchema *spec.Schema
+	AnySchema *schema.Structural
 
 	// EnvSchema defines the schema for CEL environments referenced within Policy Templates.
-	envSchema *spec.Schema
+	envSchema *schema.Structural
 
 	// InstanceSchema defines a basic schema for defining Policy Instances where the instance rule
 	// references a TemplateSchema derived from the Instance's template kind.
-	instanceSchema *spec.Schema
+	instanceSchema *schema.Structural
 
 	// TemplateSchema defines a schema for defining Policy Templates.
-	templateSchema *spec.Schema
+	templateSchema *schema.Structural
 
 	openAPISchemaTypes = map[string]*DeclType{
 		"boolean":         BoolType,
@@ -365,27 +390,27 @@ properties:
 )
 
 func init() {
-	AnySchema = &spec.Schema{}
+	AnySchema = &schema.Structural{}
 
-	instanceSchema = &spec.Schema{}
+	instanceSchema = &schema.Structural{}
 	in := strings.ReplaceAll(instanceSchemaYaml, "\t", "  ")
 	err := yaml.Unmarshal([]byte(in), instanceSchema)
 	if err != nil {
 		panic(err)
 	}
-	envSchema = &spec.Schema{}
+	envSchema = &schema.Structural{}
 	in = strings.ReplaceAll(envSchemaYaml, "\t", "  ")
 	err = yaml.Unmarshal([]byte(in), envSchema)
 	if err != nil {
 		panic(err)
 	}
-	schemaDef = &spec.Schema{}
+	schemaDef = &schema.Structural{}
 	in = strings.ReplaceAll(schemaDefYaml, "\t", "  ")
 	err = yaml.Unmarshal([]byte(in), schemaDef)
 	if err != nil {
 		panic(err)
 	}
-	templateSchema = &spec.Schema{}
+	templateSchema = &schema.Structural{}
 	in = strings.ReplaceAll(templateSchemaYaml, "\t", "  ")
 	err = yaml.Unmarshal([]byte(in), templateSchema)
 	if err != nil {
