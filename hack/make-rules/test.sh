@@ -37,7 +37,6 @@ kube::test::find_dirs() {
     find -L . -not \( \
         \( \
           -path './_artifacts/*' \
-          -o -path './bazel-*/*' \
           -o -path './_output/*' \
           -o -path './_gopath/*' \
           -o -path './cmd/kubeadm/test/*' \
