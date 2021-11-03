@@ -566,6 +566,43 @@ func moveMatchingLines(pattern string, input, output []string) ([]string, []stri
 	return newIn, output
 }
 
+// assertIPTablesRuleJumps asserts that every `-j` in the given rules jumps to a chain
+// that we created and added rules to
+func assertIPTablesRuleJumps(lines []string) error {
+	tableName := lines[0]
+
+	createdChains := sets.NewString(findAllMatches(lines, `^:([^ ]*)`)...)
+	filledChains := sets.NewString(findAllMatches(lines, `-A ([^ ]*)`)...)
+
+	jumpedChains := sets.NewString(findAllMatches(lines, `-j ([^ ]*)`)...)
+	// Ignore jumps to built-in chains
+	jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
+	// KubeMarkDropChain is created by kubelet, not kube-proxy
+	jumpedChains.Delete(string(KubeMarkDropChain))
+	// In some cases it's not a bug if we jump to a chain when that chain is empty
+	jumpedChains.Delete(string(kubeNodePortsChain))
+
+	missingChains := jumpedChains.Difference(createdChains)
+	missingChains = missingChains.Union(filledChains.Difference(createdChains))
+	if len(missingChains) > 0 {
+		return fmt.Errorf("some chains in %s are used but were not created: %v", tableName, missingChains.List())
+	}
+
+	emptyChains := jumpedChains.Difference(filledChains)
+	if len(emptyChains) > 0 {
+		return fmt.Errorf("some chains in %s are jumped to but have no rules: %v", tableName, emptyChains.List())
+	}
+
+	// FIXME: This currently fails
+	// extraChains := createdChains.Difference(jumpedChains)
+	// extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
+	// if len(extraChains) > 0 {
+	// 	return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
+	// }
+
+	return nil
+}
+
 // sortIPTablesRules sorts `iptables-restore` output so as to not depend on the order that
 // Services get processed in, while preserving the relative ordering of related rules.
 func sortIPTablesRules(ruleData string) (string, error) {
@@ -578,6 +615,11 @@ func sortIPTablesRules(ruleData string) (string, error) {
 
 	for _, table := range tables {
 		lines := strings.Split(strings.Trim(table, "\n"), "\n")
+
+		err := assertIPTablesRuleJumps(lines)
+		if err != nil {
+			return "", err
+		}
 
 		// Move "*TABLENAME" line
 		lines, output = moveMatchingLines(`^\*`, lines, output)
@@ -945,6 +987,45 @@ COMMIT
 -A WHY-IS-THIS-CHAIN-HERE -j ACCEPT
 COMMIT
 `,
+		},
+		{
+			name: "can't jump to chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in *nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't jump to chain that has no rules",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in *nat are jumped to but have no rules: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't add rules to a chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+COMMIT
+`,
+			error: "some chains in *nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
