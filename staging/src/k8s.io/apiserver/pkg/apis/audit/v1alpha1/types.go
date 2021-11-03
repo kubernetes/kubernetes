@@ -191,6 +191,15 @@ type Policy struct {
 	// be specified per rule in which case the union of both are omitted.
 	// +optional
 	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,3,rep,name=omitStages"`
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// This is used as a global default - a value of 'true' will omit the managed fileds,
+	// otherwise the managed fields will be included in the API audit log.
+	// Note that this can also be specified per rule in which case the value specified
+	// in a rule will override the global default.
+	// +optional
+	OmitManagedFields bool `json:"omitManagedFields,omitempty" protobuf:"varint,4,opt,name=omitManagedFields"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -254,6 +263,17 @@ type PolicyRule struct {
 	// An empty list means no restrictions will apply.
 	// +optional
 	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// - a value of 'true' will drop the managed fields from the API audit log
+	// - a value of 'false' indicates that the managed fileds should be included
+	//   in the API audit log
+	// Note that the value, if specified, in this rule will override the global default
+	// If a value is not specified then the global default specified in
+	// Policy.OmitManagedFields will stand.
+	// +optional
+	OmitManagedFields *bool `json:"omitManagedFields,omitempty" protobuf:"varint,9,opt,name=omitManagedFields"`
 }
 
 // GroupResources represents resource kinds in an API group.
