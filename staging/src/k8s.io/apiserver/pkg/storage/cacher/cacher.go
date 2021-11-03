@@ -271,7 +271,7 @@ type Cacher struct {
 	// watchers is mapping from both watcherIdx and value of trigger function that a watcher is interested in to the watchers,
 	// when triggerSupported is true by the indexedTrigger. 
 	// If triggerSupported is false, mapping exists between watcherIdx and the watcher that the index identifies.
-	watchers   indexedWatchers
+	watchers indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
 	// while dispatching event before shutting them down.
