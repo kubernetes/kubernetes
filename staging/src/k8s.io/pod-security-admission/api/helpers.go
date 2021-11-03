@@ -161,6 +161,9 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 
 		p = defaults
 	)
+	if len(labels) == 0 {
+		return p, nil
+	}
 	if level, ok := labels[EnforceLevelLabel]; ok {
 		p.Enforce.Level, err = ParseLevel(level)
 		errs = appendErr(errs, err, EnforceLevelLabel, level)

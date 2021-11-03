@@ -61,7 +61,7 @@ func TestFixtures(t *testing.T) {
 			failDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "fail")
 
 			// render the minimal valid pod fixture
-			validPod, err := getMinimalValidPod(level, api.MajorMinorVersion(1, version))
+			validPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
 			if err != nil {
 				t.Fatal(err)
 			}

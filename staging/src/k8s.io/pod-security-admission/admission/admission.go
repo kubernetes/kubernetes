@@ -19,7 +19,6 @@ package admission
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"reflect"
 	"sort"
 	"time"
@@ -149,7 +148,7 @@ func extractPodSpecFromTemplate(template *corev1.PodTemplateSpec) (*metav1.Objec
 	return &template.ObjectMeta, &template.Spec, nil
 }
 
-// CompleteConfiguration() sets up default or derived configuration.
+// CompleteConfiguration sets up default or derived configuration.
 func (a *Admission) CompleteConfiguration() error {
 	if a.Configuration != nil {
 		if p, err := admissionapi.ToPolicy(a.Configuration.Defaults); err != nil {
@@ -168,7 +167,7 @@ func (a *Admission) CompleteConfiguration() error {
 	return nil
 }
 
-// ValidateConfiguration() ensures all required fields are set with valid values.
+// ValidateConfiguration ensures all required fields are set with valid values.
 func (a *Admission) ValidateConfiguration() error {
 	if a.Configuration == nil {
 		return fmt.Errorf("configuration required")
@@ -229,17 +228,17 @@ func (a *Admission) Validate(ctx context.Context, attrs api.Attributes) *admissi
 func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	obj, err := attrs.GetObject()
 	if err != nil {
-		klog.ErrorS(err, "failed to get object")
-		return internalErrorResponse("failed to get object")
+		klog.ErrorS(err, "failed to decode object")
+		return errorResponse(err, &apierrors.NewBadRequest("failed to decode object").ErrStatus)
 	}
 	namespace, ok := obj.(*corev1.Namespace)
 	if !ok {
 		klog.InfoS("failed to assert namespace type", "type", reflect.TypeOf(obj))
-		return badRequestResponse("failed to decode namespace")
+		return errorResponse(nil, &apierrors.NewBadRequest("failed to decode namespace").ErrStatus)
 	}
 
 	newPolicy, newErrs := a.PolicyToEvaluate(namespace.Labels)
@@ -250,19 +249,19 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		if len(newErrs) > 0 {
 			return invalidResponse(attrs, newErrs)
 		}
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 
 	case admissionv1.Update:
 		// if update, check if policy labels changed
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
-			return badRequestResponse("failed to decode old object")
+			return errorResponse(err, &apierrors.NewBadRequest("failed to decode  old object").ErrStatus)
 		}
 		oldNamespace, ok := oldObj.(*corev1.Namespace)
 		if !ok {
 			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(oldObj))
-			return badRequestResponse("failed to decode old namespace")
+			return errorResponse(nil, &apierrors.NewBadRequest("failed to decode  old namespace").ErrStatus)
 		}
 		oldPolicy, oldErrs := a.PolicyToEvaluate(oldNamespace.Labels)
 
@@ -277,24 +276,24 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		// * if the new enforce is the same version and level was relaxed
 		// * for exempt namespaces
 		if newPolicy.Enforce == oldPolicy.Enforce {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if newPolicy.Enforce.Level == api.LevelPrivileged {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if newPolicy.Enforce.Version == oldPolicy.Enforce.Version &&
 			api.CompareLevels(newPolicy.Enforce.Level, oldPolicy.Enforce.Level) < 1 {
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			return sharedAllowedByNamespaceExemptionResponse()
+			return sharedAllowedByNamespaceExemptionResponse
 		}
 		response := allowedResponse()
 		response.Warnings = a.EvaluatePodsInNamespace(ctx, namespace.Name, newPolicy.Enforce)
 		return response
 
 	default:
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 }
 
@@ -317,17 +316,17 @@ var ignoredPodSubresources = map[string]bool{
 func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByNamespaceExemptionResponse()
+		return sharedAllowedByNamespaceExemptionResponse
 	}
 
 	if a.exemptUser(attrs.GetUserName()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByUserExemptionResponse()
+		return sharedAllowedByUserExemptionResponse
 	}
 
 	// short-circuit on privileged enforce+audit+warn namespaces
@@ -335,42 +334,42 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	if err != nil {
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		a.Metrics.RecordError(true, attrs)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+		return errorResponse(err, &apierrors.NewInternalError(fmt.Errorf("failed to lookup namespace %s", attrs.GetNamespace())).ErrStatus)
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
-		return sharedAllowedResponse()
+		return sharedAllowedPrivilegedResponse
 	}
 
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode object")
+		return errorResponse(err, &apierrors.NewBadRequest("failed to decode object").ErrStatus)
 	}
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode pod")
+		return errorResponse(nil, &apierrors.NewBadRequest("failed to decode pod").ErrStatus)
 	}
 	if attrs.GetOperation() == admissionv1.Update {
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
 			a.Metrics.RecordError(true, attrs)
-			return badRequestResponse("failed to decode old object")
+			return errorResponse(err, &apierrors.NewBadRequest("failed to decode old object").ErrStatus)
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
 			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
 			a.Metrics.RecordError(true, attrs)
-			return badRequestResponse("failed to decode old pod")
+			return errorResponse(nil, &apierrors.NewBadRequest("failed to decode old pod").ErrStatus)
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
-			return sharedAllowedResponse()
+			return sharedAllowedResponse
 		}
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), &pod.ObjectMeta, &pod.Spec, attrs, true)
@@ -381,17 +380,17 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByNamespaceExemptionResponse()
+		return sharedAllowedByNamespaceExemptionResponse
 	}
 
 	if a.exemptUser(attrs.GetUserName()) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByUserExemptionResponse()
+		return sharedAllowedByUserExemptionResponse
 	}
 
 	// short-circuit on privileged audit+warn namespaces
@@ -399,28 +398,40 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	if err != nil {
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		a.Metrics.RecordError(true, attrs)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": fmt.Sprintf("failed to lookup namespace %s: %v", attrs.GetNamespace(), err),
+		}
+		return response
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
 	if len(nsPolicyErrs) == 0 && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to decode object")
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": fmt.Sprintf("failed to decode object: %v", err),
+		}
+		return response
 	}
 	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
 		a.Metrics.RecordError(true, attrs)
-		return badRequestResponse("failed to extract pod template")
+		response := allowedResponse()
+		response.AuditAnnotations = map[string]string{
+			"error": fmt.Sprintf("failed to extract pod template: %v", err),
+		}
+		return response
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
-		return sharedAllowedResponse()
+		return sharedAllowedResponse
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErrs.ToAggregate(), podMetadata, podSpec, attrs, false)
 }
@@ -432,7 +443,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		a.Metrics.RecordExemption(attrs)
-		return sharedAllowedByRuntimeClassExemptionResponse()
+		return sharedAllowedByRuntimeClassExemptionResponse
 	}
 
 	auditAnnotations := map[string]string{}
@@ -452,8 +463,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 		result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec))
 		if !result.Allowed {
-			response = forbiddenResponse(fmt.Sprintf(
-				"pod violates PodSecurity %q: %s",
+			response = forbiddenResponse(attrs, fmt.Errorf(
+				"violates PodSecurity %q: %s",
 				nsPolicy.Enforce.String(),
 				result.ForbiddenDetail(),
 			))
@@ -601,80 +612,11 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
 }
 
-var (
-	_sharedAllowedResponse                        = allowedResponse()
-	_sharedAllowedByUserExemptionResponse         = allowedByExemptResponse("user")
-	_sharedAllowedByNamespaceExemptionResponse    = allowedByExemptResponse("namespace")
-	_sharedAllowedByRuntimeClassExemptionResponse = allowedByExemptResponse("runtimeClass")
-)
-
-func sharedAllowedResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedResponse
-}
-
-func sharedAllowedByUserExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByUserExemptionResponse
-}
-
-func sharedAllowedByNamespaceExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByNamespaceExemptionResponse
-}
-
-func sharedAllowedByRuntimeClassExemptionResponse() *admissionv1.AdmissionResponse {
-	return _sharedAllowedByRuntimeClassExemptionResponse
-}
-
-// allowedResponse is the response used when the admission decision is allow.
-func allowedResponse() *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{Allowed: true}
-}
-
-func allowedByExemptResponse(exemptionReason string) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed:          true,
-		AuditAnnotations: map[string]string{api.ExemptionReasonAnnotationKey: exemptionReason},
-	}
-}
-
-func failureResponse(msg string, reason metav1.StatusReason, code int32) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Reason:  reason,
-			Message: msg,
-			Code:    code,
-		},
-	}
-}
-
-// forbiddenResponse is the response used when the admission decision is deny for policy violations.
-func forbiddenResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonForbidden, http.StatusForbidden)
-}
-
-// invalidResponse is the response used for namespace requests when namespace labels are invalid.
-func invalidResponse(attrs api.Attributes, fieldErrors field.ErrorList) *admissionv1.AdmissionResponse {
-	return &admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result:  &apierrors.NewInvalid(attrs.GetKind().GroupKind(), attrs.GetName(), fieldErrors).ErrStatus,
-	}
-}
-
-// badRequestResponse is the response used when a request cannot be processed.
-func badRequestResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonBadRequest, http.StatusBadRequest)
-}
-
-// internalErrorResponse is the response used for unexpected errors
-func internalErrorResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusReasonInternalError, http.StatusInternalServerError)
-}
-
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.
 // Relevant mutable pod fields as of 1.21 are image and seccomp annotations:
 // * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
+	// TODO: invert this logic to only allow specific update types.
 	if pod.Annotations[corev1.SeccompPodAnnotationKey] != oldPod.Annotations[corev1.SeccompPodAnnotationKey] {
 		return true
 	}

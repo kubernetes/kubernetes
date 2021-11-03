@@ -296,7 +296,7 @@ func Run(t *testing.T, opts Options) {
 				}
 			}
 
-			minimalValidPod, err := getMinimalValidPod(level, version)
+			minimalValidPod, err := GetMinimalValidPod(level, version)
 			if err != nil {
 				t.Fatal(err)
 			}
