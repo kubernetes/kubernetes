@@ -225,12 +225,14 @@ type indexedTriggerFunc struct {
 // Cacher implements storage.Interface (although most of the calls are just
 // delegated to the underlying storage).
 type Cacher struct {
-	// HighWaterMarks for performance debugging.
+	// HighWaterMarks for performance debugging. It keeps track of the highest value of incoming channel length, so that
+	// in case we need to debug cases where the channel is getting backed up and events from it are not removed, 
+	// we have logs for occurrences of when the highest channel lengths were achieved.
 	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
+	// Note: The word "incoming" refers to the incoming 'watchEvent's channel length.
 	incomingHWM storage.HighWaterMark
 	// Incoming events that should be dispatched to watchers.
-	// The number of incoming watchevents are currently 100(refer line 349)
 	incoming chan watchCacheEvent
 
 	resourcePrefix string
@@ -266,8 +268,9 @@ type Cacher struct {
 	indexedTrigger *indexedTriggerFunc
 	
 	watcherIdx int
-	// watchers is mapping from the value of two trigger functions, cacheWatcher and watchersMap,
-	// that a watcher is interested into the watchers
+	// watchers is mapping from both watcherIdx and value of trigger function that a watcher is interested in to the watchers,
+	// when triggerSupported is true by the indexedTrigger. 
+	// If triggerSupported is false, mapping exists between watcherIdx and the watcher that the index identifies.
 	watchers   indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
