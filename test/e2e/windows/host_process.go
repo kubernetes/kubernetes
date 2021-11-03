@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -26,6 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -153,6 +155,233 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+	})
+
+	ginkgo.It("container command path validation", func() {
+		// The following test cases are broken into batches to speed up the test.
+		// Each batch will be scheduled as a single pod with a container for each test case.
+		// Pods will be scheduled sequentially since the start-up cost of containers is high
+		// on Windows and ginkgo may also schedule test cases in parallel.
+		tests := [][]struct {
+			command    []string
+			args       []string
+			workingDir string
+		}{
+			{
+				{
+					command: []string{"cmd.exe", "/c", "ver"},
+				},
+				{
+					command:    []string{"System32\\cmd.exe", "/c", "ver"},
+					workingDir: "c:\\Windows",
+				},
+				{
+					command:    []string{"System32\\cmd.exe", "/c", "ver"},
+					workingDir: "c:\\Windows\\",
+				},
+				{
+					command: []string{"%CONTAINER_SANDBOX_MOUNT_POINT%\\bin\\uname.exe", "-o"},
+				},
+			},
+			{
+				{
+					command: []string{"%CONTAINER_SANDBOX_MOUNT_POINT%/bin/uname.exe", "-o"},
+				},
+				{
+					command: []string{"%CONTAINER_SANDBOX_MOUNT_POINT%\\bin/uname.exe", "-o"},
+				},
+				{
+					command: []string{"bin/uname.exe", "-o"},
+				},
+				{
+					command:    []string{"bin/uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%",
+				},
+			},
+			{
+				{
+					command:    []string{"bin\\uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%",
+				},
+				{
+					command:    []string{"uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%/bin",
+				},
+				{
+					command:    []string{"uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%/bin/",
+				},
+				{
+					command:    []string{"uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%\\bin\\",
+				},
+			},
+			{
+				{
+					command: []string{"powershell", "cmd.exe", "/ver"},
+				},
+				{
+					command: []string{"powershell", "c:/Windows/System32/cmd.exe", "/c", "ver"},
+				},
+				{
+					command: []string{"powershell", "c:\\Windows\\System32/cmd.exe", "/c", "ver"},
+				},
+				{
+					command: []string{"powershell", "%CONTAINER_SANDBOX_MOUNT_POINT%\\bin\\uname.exe", "-o"},
+				},
+			},
+			{
+				{
+					command: []string{"powershell", "$env:CONTAINER_SANDBOX_MOUNT_POINT\\bin\\uname.exe", "-o"},
+				},
+				{
+					command: []string{"powershell", "%CONTAINER_SANDBOX_MOUNT_POINT%/bin/uname.exe", "-o"},
+				},
+				{
+					command: []string{"powershell", "$env:CONTAINER_SANDBOX_MOUNT_POINT/bin/uname.exe", "-o"},
+				},
+				{
+					command:    []string{"powershell", "bin/uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%",
+				},
+			},
+			{
+				{
+					command:    []string{"powershell", "bin/uname.exe", "-o"},
+					workingDir: "$env:CONTAINER_SANDBOX_MOUNT_POINT",
+				},
+				{
+					command:    []string{"powershell", "bin\\uname.exe", "-o"},
+					workingDir: "$env:CONTAINER_SANDBOX_MOUNT_POINT",
+				},
+				{
+					command:    []string{"powershell", ".\\uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%/bin",
+				},
+				{
+					command:    []string{"powershell", "./uname.exe", "-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%/bin",
+				},
+			},
+			{
+				{
+					command:    []string{"powershell", "./uname.exe", "-o"},
+					workingDir: "$env:CONTAINER_SANDBOX_MOUNT_POINT\\bin\\",
+				},
+				{
+					command: []string{"%CONTAINER_SANDBOX_MOUNT_POINT%\\bin\\uname.exe"},
+					args:    []string{"-o"},
+				},
+				{
+					command:    []string{"bin\\uname.exe"},
+					args:       []string{"-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%",
+				},
+				{
+					command:    []string{"uname.exe"},
+					args:       []string{"-o"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%\\bin",
+				},
+			},
+			{
+				{
+					command: []string{"cmd.exe"},
+					args:    []string{"/c", "dir", "%CONTAINER_SANDBOX_MOUNT_POINT%\\bin\\uname.exe"},
+				},
+				{
+					command:    []string{"cmd.exe"},
+					args:       []string{"/c", "dir", "bin\\uname.exe"},
+					workingDir: "%CONTAINER_SANDBOX_MOUNT_POINT%",
+				},
+				{
+					command: []string{"powershell"},
+					args:    []string{"Get-ChildItem", "-Path", "$env:CONTAINER_SANDBOX_MOUNT_POINT\\bin\\uname.exe"},
+				},
+				{
+					command:    []string{"powershell"},
+					args:       []string{"Get-ChildItem", "-Path", "bin\\uname.exe"},
+					workingDir: "$env:CONTAINER_SANDBOX_MOUNT_POINT",
+				},
+			},
+			{
+				{
+					command:    []string{"powershell"},
+					args:       []string{"Get-ChildItem", "-Path", "uname.exe"},
+					workingDir: "$env:CONTAINER_SANDBOX_MOUNT_POINT/bin",
+				},
+			},
+		}
+
+		for podIndex, testCaseBatch := range tests {
+			image := imageutils.GetConfig(imageutils.BusyBox)
+			podName := fmt.Sprintf("host-process-command-%d", podIndex)
+			containers := []v1.Container{}
+			for containerIndex, testCase := range testCaseBatch {
+				containerName := fmt.Sprintf("host-process-command-%d-%d", podIndex, containerIndex)
+				ginkgo.By(fmt.Sprintf("Adding a container '%s' to pod '%s' with command: %s, args: %s, workingDir: %s", containerName, podName, strings.Join(testCase.command, " "), strings.Join(testCase.args, " "), testCase.workingDir))
+
+				container := v1.Container{
+					Image:      image.GetE2EImage(),
+					Name:       containerName,
+					Command:    testCase.command,
+					Args:       testCase.args,
+					WorkingDir: testCase.workingDir,
+				}
+				containers = append(containers, container)
+			}
+
+			trueVar := true
+			user := "NT AUTHORITY\\Local Service"
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess:   &trueVar,
+							RunAsUserName: &user,
+						},
+					},
+					HostNetwork:   true,
+					Containers:    containers,
+					RestartPolicy: v1.RestartPolicyNever,
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "windows",
+					},
+				},
+			}
+			f.PodClient().Create(pod)
+
+			ginkgo.By(fmt.Sprintf("Waiting for pod '%s' to run", podName))
+			f.PodClient().WaitForFinish(podName, 3*time.Minute)
+
+			ginkgo.By("Then ensuring pod finished running successfully")
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+				context.TODO(),
+				podName,
+				metav1.GetOptions{})
+
+			framework.ExpectNoError(err, "Error retrieving pod")
+
+			if p.Status.Phase != v1.PodSucceeded {
+				framework.Logf("Getting pod events")
+				options := metav1.ListOptions{
+					FieldSelector: fields.Set{
+						"involvedObject.kind":      "Pod",
+						"involvedObject.name":      podName,
+						"involvedObject.namespace": f.Namespace.Name,
+					}.AsSelector().String(),
+				}
+				events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
+				framework.ExpectNoError(err, "Error getting events for failed pod")
+				for _, event := range events.Items {
+					framework.Logf("%s: %s", event.Reason, event.Message)
+				}
+				framework.Failf("Pod '%s' did failed.", p.Name)
+			}
+		}
+
 	})
 })
 
