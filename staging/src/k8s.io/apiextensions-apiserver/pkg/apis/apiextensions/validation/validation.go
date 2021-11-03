@@ -24,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -909,6 +910,32 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if len(schema.XValidations) > 0 {
+		if !opts.requireStructuralSchema {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations"), schema.XValidations, "x-kubernetes-validations is only supported in structural schema"))
+		} else {
+			structural, err := structuralschema.NewStructural(schema)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations"), schema.XValidations, "x-kubernetes-validations is only supported in structural schema: "+err.Error()))
+			} else {
+				compResults, err := cel.Compile(structural)
+				if err != nil {
+					allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
+				} else {
+					for _, cr := range compResults {
+						if cr.Error.Type != "" {
+							if cr.Error.Type == cel.ErrorTypeRequired {
+								allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(cr.RuleIndex).Child("rule"), cr.Error.Detail))
+							} else {
+								allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(cr.RuleIndex).Child("rule"), cr.Rule, cr.Error.Detail))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if opts.requireMapListKeysMapSetValidation {
 		allErrs = append(allErrs, validateMapListKeysMapSet(schema, fldPath)...)
 	}
@@ -1112,7 +1139,7 @@ func validateSimpleJSONPath(s string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example", "XPreserveUnknownFields"}
+var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example", "XPreserveUnknownFields", "XValidations"}
 
 func allowedAtRootSchema(field string) bool {
 	for _, v := range allowedFieldsAtRootSchema {

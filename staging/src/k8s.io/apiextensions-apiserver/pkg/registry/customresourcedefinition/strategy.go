@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -77,6 +79,8 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 			break
 		}
 	}
+
+	dropDisabledFields(crd, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -105,6 +109,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 			break
 		}
 	}
+
+	dropDisabledFields(newCRD, oldCRD)
 }
 
 // Validate validates a new CustomResourceDefinition.
@@ -221,4 +227,98 @@ func MatchCustomResourceDefinition(label labels.Selector, field fields.Selector)
 // CustomResourceDefinitionToSelectableFields returns a field set that represents the object.
 func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourceDefinition) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
+}
+
+// dropDisabledFields drops disabled fields that are not used if their associated feature gates
+// are not enabled.
+func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) && !xValidationsInUse(oldCRD) {
+		if newCRD.Spec.Validation != nil {
+			dropXValidationsField(newCRD.Spec.Validation.OpenAPIV3Schema)
+		}
+		for _, v := range newCRD.Spec.Versions {
+			if v.Schema != nil {
+				dropXValidationsField(v.Schema.OpenAPIV3Schema)
+			}
+		}
+	}
+}
+
+// dropXValidationsField drops field XValidations from CRD schema
+func dropXValidationsField(schema *apiextensions.JSONSchemaProps) {
+	if schema == nil {
+		return
+	}
+	schema.XValidations = nil
+	if schema.AdditionalProperties != nil {
+		dropXValidationsField(schema.AdditionalProperties.Schema)
+	}
+	for def, jsonSchema := range schema.Properties {
+		dropXValidationsField(&jsonSchema)
+		schema.Properties[def] = jsonSchema
+	}
+	if schema.Items != nil {
+		dropXValidationsField(schema.Items.Schema)
+		for i, jsonSchema := range schema.Items.JSONSchemas {
+			dropXValidationsField(&jsonSchema)
+			schema.Items.JSONSchemas[i] = jsonSchema
+		}
+	}
+	for def, jsonSchemaPropsOrStringArray := range schema.Dependencies {
+		dropXValidationsField(jsonSchemaPropsOrStringArray.Schema)
+		schema.Dependencies[def] = jsonSchemaPropsOrStringArray
+	}
+}
+
+// xValidationsInUse returns true if fields XValidations are set
+func xValidationsInUse(crd *apiextensions.CustomResourceDefinition) bool {
+	if crd == nil {
+		return false
+	}
+	if crd.Spec.Validation != nil {
+		if checkValidations(crd.Spec.Validation.OpenAPIV3Schema) {
+			return true
+		}
+	}
+	for _, v := range crd.Spec.Versions {
+		if v.Schema != nil {
+			if checkValidations(v.Schema.OpenAPIV3Schema) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkValidations returns true if XValidations are set under any field
+func checkValidations(schema *apiextensions.JSONSchemaProps) bool {
+	if len(schema.XValidations) > 0 {
+		return true
+	}
+	if schema.AdditionalProperties != nil {
+		if checkValidations(schema.AdditionalProperties.Schema) {
+			return true
+		}
+	}
+	for _, jsonSchema := range schema.Properties {
+		if checkValidations(&jsonSchema) {
+			return true
+		}
+	}
+	if schema.Items != nil {
+		if checkValidations(schema.Items.Schema) {
+			return true
+		}
+		for _, jsonSchema := range schema.Items.JSONSchemas {
+			if checkValidations(&jsonSchema) {
+				return true
+			}
+		}
+	}
+	for _, jsonSchemaPropsOrStringArray := range schema.Dependencies {
+		if checkValidations(jsonSchemaPropsOrStringArray.Schema) {
+			return true
+		}
+	}
+	return false
 }

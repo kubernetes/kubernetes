@@ -17,13 +17,18 @@ limitations under the License.
 package customresourcedefinition
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -184,6 +189,391 @@ func TestValidateAPIApproval(t *testing.T) {
 				actual = validation.ValidateCustomResourceDefinitionUpdate(crd, oldCRD)
 			}
 			test.validateError(t, actual)
+		})
+	}
+}
+
+// TestDropDisabledFields tests if the drop functionality is working fine or not with feature gate switch
+func TestDropDisabledFields(t *testing.T) {
+	testCases := []struct {
+		name               string
+		enableXValidations bool
+		crd                *apiextensions.CustomResourceDefinition
+		oldCRD             *apiextensions.CustomResourceDefinition
+		expectedCRD        *apiextensions.CustomResourceDefinition
+	}{
+		{
+			name:               "FG disable, no XValidations, no update",
+			enableXValidations: false,
+			crd:                &apiextensions.CustomResourceDefinition{},
+			oldCRD:             nil,
+			expectedCRD:        &apiextensions.CustomResourceDefinition{},
+		},
+		{
+			name:               "FG disable, irrespective of the current value, no update",
+			enableXValidations: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{},
+				},
+			},
+			oldCRD: nil,
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{},
+				},
+			},
+		},
+		{
+			name:               "FG disable, irrespective of the current value, drop",
+			enableXValidations: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:    "isTest == true",
+											Message: "isTest should be true.",
+										},
+									},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: nil,
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "FG disable, oldCRD field set, no drop",
+			enableXValidations: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:    "isTest == true",
+											Message: "isTest should be true.",
+										},
+									},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:    "isTest == true",
+											Message: "isTest should be true.",
+										},
+									},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "FG disable, oldCRD field nil, drop",
+			enableXValidations: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "FG enabled, update",
+			enableXValidations: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "old data",
+									Message: "old data",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "FG enabled, oldSS field set to nil, update",
+			enableXValidations: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceValidationExpressions, tc.enableXValidations)()
+			old := tc.oldCRD.DeepCopy()
+
+			dropDisabledFields(tc.crd, tc.oldCRD)
+
+			// old obj should never be changed
+			if !reflect.DeepEqual(tc.oldCRD, old) {
+				t.Fatalf("old ds changed: %v", diff.ObjectReflectDiff(tc.oldCRD, old))
+			}
+
+			if !reflect.DeepEqual(tc.crd, tc.expectedCRD) {
+				t.Fatalf("unexpected ds spec: %v", diff.ObjectReflectDiff(tc.expectedCRD, tc.crd))
+			}
 		})
 	}
 }

@@ -161,6 +161,30 @@ type JSONSchemaProps struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string `json:"x-kubernetes-map-type,omitempty" protobuf:"bytes,43,opt,name=xKubernetesMapType"`
+
+	// x-kubernetes-validations describes a list of validation rules for expression validation.
+	// This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.
+	XValidations ValidationRules `json:"x-kubernetes-validations,omitempty" protobuf:"bytes,44,rep,name=xKubernetesValidations"`
+}
+
+// ValidationRules describe a list of validation rules for expression validation
+//  +listType=map
+//  +listMapKey=rule
+type ValidationRules []ValidationRule
+
+// ValidationRule is used for expression validation.
+type ValidationRule struct {
+	// Rule represents the validation rule which will be evaluated by CEL.
+	// ref: https://github.com/google/cel-spec
+	// The validator will be scoped to the location of the x-kubernetes-validations extension in the schema
+	// and will use `self` to represent the scoped field name.
+	// If an object property collides with a [RESERVED keyword](https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax), it will be escaped by prepending a _ prefix.
+	// To prevent this from causing a subsequent collision, all properties with a _ prefix will always be prefixed by __ (generally, N+1 the existing number of _s).
+	// e.g. rule against field "_pre": {"rule": "__pre > 0"}
+	Rule string `json:"rule" protobuf:"bytes,1,opt,name=rule"`
+	// Message represents the message displayed when validation failed.
+	// e.g. "must be a URL with the host matching spec.host"
+	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }
 
 // JSON represents any valid JSON value.
