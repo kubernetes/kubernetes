@@ -320,8 +320,7 @@ func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
 }
 
 func (o *CreateIngressOptions) buildTLSRules() []networkingv1.IngressTLS {
-	var hostAlreadyPresent map[string]struct{}
-	hostAlreadyPresent = make(map[string]struct{})
+	hostAlreadyPresent := make(map[string]struct{})
 
 	ingressTLSs := []networkingv1.IngressTLS{}
 	var secret string
