@@ -552,7 +552,6 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("pvc-protection-controller"),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
@@ -565,7 +564,6 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 	go pvprotection.NewPVProtectionController(
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.ClientBuilder.ClientOrDie("pv-protection-controller"),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	).Run(ctx, 1)
 	return nil, true, nil
 }

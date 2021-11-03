@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,17 +47,13 @@ type Controller struct {
 	pvListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
-
-	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
-	storageObjectInUseProtectionEnabled bool
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
+func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
-		client:                              cl,
-		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
-		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
+		client: cl,
+		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -158,10 +154,6 @@ func (c *Controller) processPV(ctx context.Context, pvName string) error {
 }
 
 func (c *Controller) addFinalizer(ctx context.Context, pv *v1.PersistentVolume) error {
-	// Skip adding Finalizer in case the StorageObjectInUseProtection feature is not enabled
-	if !c.storageObjectInUseProtectionEnabled {
-		return nil
-	}
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(ctx, pvClone, metav1.UpdateOptions{})
