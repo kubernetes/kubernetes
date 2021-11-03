@@ -62,7 +62,7 @@ func (desc podDesc) CpuRequestQty() resource.Quantity {
 func (desc podDesc) CpuRequestExclusive() int {
 	if (desc.cpuRequest % 1000) != 0 {
 		// exclusive cpus are request only if the quantity is integral;
-		// hence, explicitely rule out non-integral requests
+		// hence, explicitly rule out non-integral requests
 		return 0
 	}
 	return desc.cpuRequest / 1000
@@ -208,11 +208,11 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, podReq.cntName)
 		}
 		if podReq.RequiresCPU() {
-			if isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != int(podReq.cpuRequest) {
-				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
-			}
-			if !isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != 0 {
-				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
+			if exclusiveCpus := podReq.CpuRequestExclusive(); exclusiveCpus != len(cntInfo.CpuIds) {
+				if exclusiveCpus == 0 {
+					return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
+				}
+				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, exclusiveCpus, cntInfo.CpuIds)
 			}
 		}
 		if podReq.RequiresDevices() {
@@ -892,8 +892,4 @@ func getKubeVirtDevicePluginPod() *v1.Pod {
 	}
 
 	return p
-}
-
-func isIntegral(cpuRequest int) bool {
-	return (cpuRequest % 1000) == 0
 }
