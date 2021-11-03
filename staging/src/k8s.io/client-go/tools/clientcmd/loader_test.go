@@ -123,7 +123,7 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 }
 
 func TestToleratingMissingFiles(t *testing.T) {
-	envVarvalue := "bogus"
+	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
 		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
 		WarnIfAllMissing: true,
@@ -144,15 +144,15 @@ func TestToleratingMissingFiles(t *testing.T) {
 
 	klog.Flush()
 
-	expectedLog := fmt.Sprintf("Config not found: %s", envVarvalue)
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
 	if !strings.Contains(buffer.String(), expectedLog) {
 		t.Fatalf("expected log: \"%s\"", expectedLog)
 	}
 }
 
 func TestWarningMissingFiles(t *testing.T) {
-	envVarvalue := "bogus"
-	os.Setenv(RecommendedConfigPathEnvVar, envVarvalue)
+	envVarValue := "bogus"
+	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
 	loadingRules := NewDefaultClientConfigLoadingRules()
 
 	buffer := &bytes.Buffer{}
@@ -170,7 +170,7 @@ func TestWarningMissingFiles(t *testing.T) {
 
 	klog.Flush()
 
-	expectedLog := fmt.Sprintf("Config not found: %s", envVarvalue)
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
 	if !strings.Contains(buffer.String(), expectedLog) {
 		t.Fatalf("expected log: \"%s\"", expectedLog)
 	}
