@@ -63,6 +63,9 @@ type Preferences struct {
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
+	// AlternativeServers are the comma separated list of addresses of the kubernetes cluster (https://hostname:port).
+	// +optional
+	AlternativeServers string `json:"alternative-servers,omitempty"`
 	// TLSServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
 	// +optional
 	TLSServerName string `json:"tls-server-name,omitempty"`

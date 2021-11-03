@@ -20,6 +20,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
@@ -139,6 +141,24 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			return nil, err
 		}
 		conf.Wrap(provider.WrapTransport)
+	}
+	if len(c.AlternativeHosts) > 0 {
+		hosts := strings.Split(c.AlternativeHosts, ",")
+		altServices := make([]string, len(hosts))
+		for i, h := range hosts {
+			u, err := url.Parse(h)
+			if err != nil {
+				return nil, err
+			}
+			altServices[i] = u.Host
+		}
+		fn := func(rt http.RoundTripper) http.RoundTripper {
+			return transport.NewAlternativeServiceRoundTripperWithOptions(rt, transport.WithAlternativeServices(altServices))
+		}
+		conf.Wrap(fn)
+	} else {
+		// TODO feature gate or opt-in??
+		conf.Wrap(transport.NewAlternativeServiceRoundTripper)
 	}
 	return conf, nil
 }

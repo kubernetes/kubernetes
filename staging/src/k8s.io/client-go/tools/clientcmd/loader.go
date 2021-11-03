@@ -247,6 +247,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 			errlist = append(errlist, err)
 		}
 	}
+
 	return config, utilerrors.NewAggregate(errlist)
 }
 

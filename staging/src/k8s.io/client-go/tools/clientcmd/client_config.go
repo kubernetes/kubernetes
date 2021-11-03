@@ -157,6 +157,10 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if configClusterInfo.AlternativeServers != "" {
+		clientConfig.AlternativeHosts = configClusterInfo.AlternativeServers
+	}
+
 	if configClusterInfo.ProxyURL != "" {
 		u, err := parseProxyURL(configClusterInfo.ProxyURL)
 		if err != nil {
@@ -206,7 +210,6 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		}
 		mergo.Merge(clientConfig, serverAuthPartialConfig, mergo.WithOverride)
 	}
-
 	return clientConfig, nil
 }
 

@@ -36,23 +36,24 @@ import (
 )
 
 const (
-	flagClusterName      = "cluster"
-	flagAuthInfoName     = "user"
-	flagContext          = "context"
-	flagNamespace        = "namespace"
-	flagAPIServer        = "server"
-	flagTLSServerName    = "tls-server-name"
-	flagInsecure         = "insecure-skip-tls-verify"
-	flagCertFile         = "client-certificate"
-	flagKeyFile          = "client-key"
-	flagCAFile           = "certificate-authority"
-	flagBearerToken      = "token"
-	flagImpersonate      = "as"
-	flagImpersonateGroup = "as-group"
-	flagUsername         = "username"
-	flagPassword         = "password"
-	flagTimeout          = "request-timeout"
-	flagCacheDir         = "cache-dir"
+	flagClusterName           = "cluster"
+	flagAuthInfoName          = "user"
+	flagContext               = "context"
+	flagNamespace             = "namespace"
+	flagAPIServer             = "server"
+	flagAlternativeAPIServers = "alternative-servers"
+	flagTLSServerName         = "tls-server-name"
+	flagInsecure              = "insecure-skip-tls-verify"
+	flagCertFile              = "client-certificate"
+	flagKeyFile               = "client-key"
+	flagCAFile                = "certificate-authority"
+	flagBearerToken           = "token"
+	flagImpersonate           = "as"
+	flagImpersonateGroup      = "as-group"
+	flagUsername              = "username"
+	flagPassword              = "password"
+	flagTimeout               = "request-timeout"
+	flagCacheDir              = "cache-dir"
 )
 
 var (
@@ -82,22 +83,23 @@ type ConfigFlags struct {
 	KubeConfig *string
 
 	// config flags
-	ClusterName      *string
-	AuthInfoName     *string
-	Context          *string
-	Namespace        *string
-	APIServer        *string
-	TLSServerName    *string
-	Insecure         *bool
-	CertFile         *string
-	KeyFile          *string
-	CAFile           *string
-	BearerToken      *string
-	Impersonate      *string
-	ImpersonateGroup *[]string
-	Username         *string
-	Password         *string
-	Timeout          *string
+	ClusterName           *string
+	AuthInfoName          *string
+	Context               *string
+	Namespace             *string
+	APIServer             *string
+	AlternativeAPIServers *string
+	TLSServerName         *string
+	Insecure              *bool
+	CertFile              *string
+	KeyFile               *string
+	CAFile                *string
+	BearerToken           *string
+	Impersonate           *string
+	ImpersonateGroup      *[]string
+	Username              *string
+	Password              *string
+	Timeout               *string
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
 	WrapConfigFn func(*rest.Config) *rest.Config
@@ -185,6 +187,10 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.APIServer != nil {
 		overrides.ClusterInfo.Server = *f.APIServer
 	}
+	if f.AlternativeAPIServers != nil {
+		overrides.ClusterInfo.AlternativeServers = *f.AlternativeAPIServers
+	}
+
 	if f.TLSServerName != nil {
 		overrides.ClusterInfo.TLSServerName = *f.TLSServerName
 	}
@@ -361,6 +367,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.APIServer != nil {
 		flags.StringVarP(f.APIServer, flagAPIServer, "s", *f.APIServer, "The address and port of the Kubernetes API server")
 	}
+	if f.AlternativeAPIServers != nil {
+		flags.StringVarP(f.AlternativeAPIServers, flagAlternativeAPIServers, "a", *f.AlternativeAPIServers, "The comma separated list of addresses and ports of the Kubernetes API servers")
+	}
 	if f.TLSServerName != nil {
 		flags.StringVar(f.TLSServerName, flagTLSServerName, *f.TLSServerName, "Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used")
 	}
@@ -398,19 +407,20 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Timeout:    stringptr("0"),
 		KubeConfig: stringptr(""),
 
-		CacheDir:         stringptr(defaultCacheDir),
-		ClusterName:      stringptr(""),
-		AuthInfoName:     stringptr(""),
-		Context:          stringptr(""),
-		Namespace:        stringptr(""),
-		APIServer:        stringptr(""),
-		TLSServerName:    stringptr(""),
-		CertFile:         stringptr(""),
-		KeyFile:          stringptr(""),
-		CAFile:           stringptr(""),
-		BearerToken:      stringptr(""),
-		Impersonate:      stringptr(""),
-		ImpersonateGroup: &impersonateGroup,
+		CacheDir:              stringptr(defaultCacheDir),
+		ClusterName:           stringptr(""),
+		AuthInfoName:          stringptr(""),
+		Context:               stringptr(""),
+		Namespace:             stringptr(""),
+		APIServer:             stringptr(""),
+		AlternativeAPIServers: stringptr(""),
+		TLSServerName:         stringptr(""),
+		CertFile:              stringptr(""),
+		KeyFile:               stringptr(""),
+		CAFile:                stringptr(""),
+		BearerToken:           stringptr(""),
+		Impersonate:           stringptr(""),
+		ImpersonateGroup:      &impersonateGroup,
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.

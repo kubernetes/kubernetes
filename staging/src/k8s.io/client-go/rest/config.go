@@ -56,6 +56,9 @@ type Config struct {
 	// be appended to all request URIs used to access the apiserver. This allows a frontend
 	// proxy to easily relocate all of the apiserver endpoints.
 	Host string
+	// AlternativeHosts must be a comma separated list if hosts in the format host[:port]
+	// to the base of different apiservers. The client can use any of them to access the apiserver.
+	AlternativeHosts string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
 
@@ -604,9 +607,10 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 func AnonymousClientConfig(config *Config) *Config {
 	// copy only known safe fields
 	return &Config{
-		Host:          config.Host,
-		APIPath:       config.APIPath,
-		ContentConfig: config.ContentConfig,
+		Host:             config.Host,
+		AlternativeHosts: config.AlternativeHosts,
+		APIPath:          config.APIPath,
+		ContentConfig:    config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.Insecure,
 			ServerName: config.ServerName,
@@ -629,13 +633,14 @@ func AnonymousClientConfig(config *Config) *Config {
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
 	c := &Config{
-		Host:            config.Host,
-		APIPath:         config.APIPath,
-		ContentConfig:   config.ContentConfig,
-		Username:        config.Username,
-		Password:        config.Password,
-		BearerToken:     config.BearerToken,
-		BearerTokenFile: config.BearerTokenFile,
+		Host:             config.Host,
+		AlternativeHosts: config.AlternativeHosts,
+		APIPath:          config.APIPath,
+		ContentConfig:    config.ContentConfig,
+		Username:         config.Username,
+		Password:         config.Password,
+		BearerToken:      config.BearerToken,
+		BearerTokenFile:  config.BearerTokenFile,
 		Impersonate: ImpersonationConfig{
 			UserName: config.Impersonate.UserName,
 			UID:      config.Impersonate.UID,
