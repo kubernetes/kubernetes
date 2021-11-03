@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -544,4 +545,29 @@ func mountArgsContainOption(t *testing.T, mountArgs []string, option string) boo
 	}
 
 	return strings.Contains(mountArgs[optionsIndex], option)
+}
+
+func TestGetDeviceFromStat(t *testing.T) {
+	t.Run("expect no error when a path exists", func(t *testing.T) {
+		dir, err := ioutil.TempDir("/tmp", "get_device_from_stat")
+		if err != nil {
+			t.Errorf("Unable to create directory in temp folder %s", err.Error())
+			return
+		}
+		defer os.RemoveAll(dir)
+
+		_, err = GetDeviceFromStat(dir)
+
+		if err != nil {
+			t.Errorf("Unexpected error occurred while getting device %s", err.Error())
+			return
+		}
+	})
+
+	t.Run("expect os.ErrNotExist when a path does not exist", func(t *testing.T) {
+		_, err := GetDeviceFromStat("/some/path/does/not/exist")
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("unexpected not error:%s", err)
+		}
+	})
 }

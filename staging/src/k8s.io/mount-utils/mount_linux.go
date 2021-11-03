@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -48,6 +49,14 @@ const (
 	fsckErrorsUncorrected = 4
 	// Error thrown by exec cmd.Run() when process spawned by cmd.Start() completes before cmd.Wait() is called (see - k/k issue #103753)
 	errNoChildProcesses = "wait: no child processes"
+	// statCommand is a constant for statCommand
+	statCommand = `stat`
+	// statCommandArgs is the arguments that are given to the stat command. Returns device major, minor number.
+	statCommandArgs = `--format=%d`
+	// statTimeout is used to time out the stat command after 300 ms. This is randomly chosen; but
+	// has been kept less than the nfs Unmount Timeout (https://github.com/kubernetes/kubernetes/blob/4ad08fa5b611826505fa2892cdce463f12d32b35/pkg/volume/nfs/nfs.go#L67)
+	// It has been kept to 300ms because IsLikelyNotMountPoint is intended to be fast.
+	statTimeout = 300 * time.Millisecond
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -335,16 +344,17 @@ func (*Mounter) List() ([]MountPoint, error) {
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // is of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	stat, err := os.Stat(file)
+	device, err := GetDeviceFromStat(file)
 	if err != nil {
 		return true, err
 	}
-	rootStat, err := os.Stat(filepath.Dir(strings.TrimSuffix(file, "/")))
+	rootDevice, err := GetDeviceFromStat(filepath.Dir(strings.TrimSuffix(file, "/")))
 	if err != nil {
 		return true, err
 	}
+
 	// If the directory has a different device as parent, then it is a mountpoint.
-	if stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev {
+	if rootDevice != device {
 		return false, nil
 	}
 
@@ -666,4 +676,40 @@ func forceUmount(path string) error {
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
 	}
 	return nil
+}
+
+func GetDeviceFromStat(path string) (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), statTimeout)
+	defer cancel()
+
+	var out bytes.Buffer
+	cmd := exec.CommandContext(ctx, statCommand, statCommandArgs, path)
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		// use syscall as some of the distros may not have stat installed; in that case
+		// default to using a syscall. In these cases, stat will block NFS mount if a
+		// connection is lost.
+		device, err := getDeviceUsingSyscall(path)
+		if err != nil {
+			return 0, err
+		}
+		return device, nil
+	}
+
+	s := strings.TrimSpace(string(out.Bytes()))
+	device, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return device, nil
+}
+
+func getDeviceUsingSyscall(path string) (uint64, error) {
+	fInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return fInfo.Sys().(*syscall.Stat_t).Dev, nil
 }
