@@ -2730,6 +2730,81 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to delete Service %v in namespace %v", testService.ObjectMeta.Name, ns)
 		framework.Logf("Service %s deleted", testSvcName)
 	})
+
+	ginkgo.It("should delete a collection of services", func() {
+
+		ns := f.Namespace.Name
+		svcClient := f.ClientSet.CoreV1().Services(ns)
+		svcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
+		svcDynamicClient := f.DynamicClient.Resource(svcResource).Namespace(ns)
+
+		svcLabel := map[string]string{"e2e-test-service": "delete"}
+		deleteLabel := labels.SelectorFromSet(svcLabel).String()
+
+		ginkgo.By("creating a collection of services")
+
+		testServices := []struct {
+			name  string
+			label map[string]string
+			port  int
+		}{
+			{
+				name:  "e2e-svc-a-" + utilrand.String(5),
+				label: map[string]string{"e2e-test-service": "delete"},
+				port:  8001,
+			},
+			{
+				name:  "e2e-svc-b-" + utilrand.String(5),
+				label: map[string]string{"e2e-test-service": "delete"},
+				port:  8002,
+			},
+			{
+				name:  "e2e-svc-c-" + utilrand.String(5),
+				label: map[string]string{"e2e-test-service": "keep"},
+				port:  8003,
+			},
+		}
+
+		for _, testService := range testServices {
+			func() {
+				framework.Logf("Creating %s", testService.name)
+
+				svc := v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   testService.name,
+						Labels: testService.label,
+					},
+					Spec: v1.ServiceSpec{
+						Type: "ClusterIP",
+						Ports: []v1.ServicePort{{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       int32(testService.port),
+							TargetPort: intstr.FromInt(testService.port),
+						}},
+					},
+				}
+				_, err := svcClient.Create(context.TODO(), &svc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "failed to create Service")
+
+			}()
+		}
+
+		svcList, err := cs.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to list Services")
+		framework.ExpectEqual(len(svcList.Items), 3, "Required count of services out of sync")
+
+		ginkgo.By("deleting service collection")
+		err = svcDynamicClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: deleteLabel})
+		framework.ExpectNoError(err, "failed to delete service collection. %v", err)
+
+		svcList, err = cs.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to list Services")
+		framework.ExpectEqual(len(svcList.Items), 1, "Required count of services out of sync")
+
+		framework.Logf("Collection of services has been deleted")
+	})
+
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
