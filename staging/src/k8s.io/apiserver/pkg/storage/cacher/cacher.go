@@ -68,8 +68,8 @@ type Config struct {
 	// An underlying storage.Versioner.
 	Versioner storage.Versioner
 
-	// ResourcePrefix directory stores the empty object, which stores an object of type Type, 
-	// created by NewFunc function in the underlying database.
+	// ResourcePrefix directory stores the empty object created by NewFunc function 
+	// in the underlying database.
 	ResourcePrefix string
 
 	// KeyFunc is used to get a key in the underlying storage for a given object.
@@ -86,7 +86,7 @@ type Config struct {
 	// operation if no indexer found.
 	Indexers *cache.Indexers
 
-	// NewFunc is a function that creates new empty object storing a object of type Type.
+	// NewFunc is a function that creates a new empty object
 	NewFunc func() runtime.Object
 
 	// NewList is a function that creates new empty object storing a list of
