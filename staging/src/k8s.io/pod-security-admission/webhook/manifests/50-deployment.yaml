@@ -16,6 +16,9 @@ spec:
     spec:
       serviceAccountName: pod-security-webhook
       priorityClassName: system-cluster-critical
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
       volumes:
         - name: config
           configMap:
@@ -25,10 +28,14 @@ spec:
             secretName: pod-security-webhook
       containers:
         - name: pod-security-webhook
-          image: k8s.gcr.io/sig-auth/pod-security-webhook:v1.22-alpha.0
+          image: k8s.gcr.io/sig-auth/pod-security-webhook:v1.23-beta.0
           terminationMessagePolicy: FallbackToLogsOnError
           ports:
-            - containerPort: 8443
+            - name: webhook
+              # A port > 1024 avoids needing low port bind privileges.
+              # Using the same port as the kubelet is likely to already be permitted in apiserver -> node firewall rules.
+              # The pod has its own IP and doesn't run with hostNetwork, so there's no port conflict with the kubelet.
+              containerPort: 10250
           args:
             [
               "--config",
@@ -38,7 +45,7 @@ spec:
               "--tls-private-key-file",
               "/etc/pki/tls.key",
               "--secure-port",
-              "8443",
+              "10250",
             ]
           resources:
             requests:
