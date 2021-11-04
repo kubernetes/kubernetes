@@ -44,16 +44,25 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "schedule_attempts_total",
 			Help:           "Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 
 	e2eSchedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
+			Subsystem:         SchedulerSubsystem,
+			Name:              "e2e_scheduling_duration_seconds",
+			DeprecatedVersion: "1.23.0",
+			Help:              "E2e scheduling latency in seconds (scheduling algorithm + binding). This metric is replaced by scheduling_attempt_duration_seconds.",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+		}, []string{"result", "profile"})
+	schedulingLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "e2e_scheduling_duration_seconds",
-			Help:           "E2e scheduling latency in seconds (scheduling algorithm + binding)",
+			Name:           "scheduling_attempt_duration_seconds",
+			Help:           "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
@@ -71,21 +80,21 @@ var (
 			Help:      "Number of selected preemption victims",
 			// we think #victims>50 is pretty rare, therefore [50, +Inf) is considered a single bucket.
 			Buckets:        metrics.LinearBuckets(5, 5, 10),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		})
 	PreemptionAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "preemption_attempts_total",
 			Help:           "Total preemption attempts in the cluster till now",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		})
 	pendingPods = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pending_pods",
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
 	SchedulerGoroutines = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -167,6 +176,7 @@ var (
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		e2eSchedulingLatency,
+		schedulingLatency,
 		SchedulingAlgorithmLatency,
 		PreemptionVictims,
 		PreemptionAttempts,
