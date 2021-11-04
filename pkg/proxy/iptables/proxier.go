@@ -164,7 +164,8 @@ func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	return e.Endpoint == o.Endpoint &&
 		e.IsLocal == o.IsLocal &&
 		e.protocol == o.protocol &&
-		e.chainName == o.chainName
+		e.chainName == o.chainName &&
+		e.Ready == o.Ready
 }
 
 // Returns the endpoint chain name for a given endpointsInfo.

@@ -121,7 +121,9 @@ func (info *BaseEndpointInfo) Port() (int, error) {
 
 // Equal is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
-	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
+	return info.String() == other.String() &&
+		info.GetIsLocal() == other.GetIsLocal() &&
+		info.IsReady() == other.IsReady()
 }
 
 // GetNodeName returns the NodeName for this endpoint.
@@ -536,13 +538,22 @@ func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.
 // detectStaleConnections modifies <staleEndpoints> and <staleServices> with detected stale connections. <staleServiceNames>
 // is used to store stale udp service in order to clear udp conntrack later.
 func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, staleEndpoints *[]ServiceEndpoint, staleServiceNames *[]ServicePortName) {
+	// Detect stale endpoints: an endpoint can have stale conntrack entries if it was receiving traffic
+	// and then goes unready or changes its IP address.
 	for svcPortName, epList := range oldEndpointsMap {
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
 		}
 
 		for _, ep := range epList {
+			// if the old endpoint wasn't ready is not possible to have stale entries
+			// since there was no traffic sent to it.
+			if !ep.IsReady() {
+				continue
+			}
 			stale := true
+			// Check if the endpoint has changed, including if it went from ready to not ready.
+			// If it did change stale entries for the old endpoint has to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
 				if newEndpointsMap[svcPortName][i].Equal(ep) {
 					stale = false
@@ -556,13 +567,29 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 		}
 	}
 
+	// Detect stale services
+	// For udp service, if its backend changes from 0 to non-0 ready endpoints.
+	// There may exist a conntrack entry that could blackhole traffic to the service.
 	for svcPortName, epList := range newEndpointsMap {
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
 		}
 
-		// For udp service, if its backend changes from 0 to non-0. There may exist a conntrack entry that could blackhole traffic to the service.
-		if len(epList) > 0 && len(oldEndpointsMap[svcPortName]) == 0 {
+		epReady := 0
+		for _, ep := range epList {
+			if ep.IsReady() {
+				epReady++
+			}
+		}
+
+		oldEpReady := 0
+		for _, ep := range oldEndpointsMap[svcPortName] {
+			if ep.IsReady() {
+				oldEpReady++
+			}
+		}
+
+		if epReady > 0 && oldEpReady == 0 {
 			*staleServiceNames = append(*staleServiceNames, svcPortName)
 		}
 	}
