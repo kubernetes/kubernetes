@@ -71,14 +71,15 @@ func (f AttrFunc) WithFieldMutation(fieldMutator FieldMutationFunc) AttrFunc {
 
 // SelectionPredicate is used to represent the way to select objects from api storage.
 type SelectionPredicate struct {
-	Label               labels.Selector
-	Field               fields.Selector
-	GetAttrs            AttrFunc
-	IndexLabels         []string
-	IndexFields         []string
-	Limit               int64
-	Continue            string
-	AllowWatchBookmarks bool
+	Label                labels.Selector
+	Field                fields.Selector
+	GetAttrs             AttrFunc
+	IndexLabels          []string
+	IndexFields          []string
+	Limit                int64
+	Continue             string
+	AllowWatchBookmarks  bool
+	ConsistentWatchCache bool
 }
 
 // Matches returns true if the given object's labels and fields (as
