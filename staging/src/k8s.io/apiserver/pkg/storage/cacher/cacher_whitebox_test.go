@@ -73,7 +73,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "", 0)
 	go w.processEvents(context.Background(), initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
@@ -193,7 +193,7 @@ TestCase:
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
 
-		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "", 0)
 		go w.processEvents(context.Background(), testCase.events, 0)
 
 		ch := w.ResultChan()
@@ -530,7 +530,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// timeout to zero and run the Stop goroutine concurrently.
 	// May sure that the watch will not be blocked on Stop.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "", 0)
 		go w.Stop()
 		select {
 		case <-done:
@@ -542,7 +542,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	deadline := time.Now().Add(time.Hour)
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "")
+		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "", 0)
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, _ := context.WithDeadline(context.Background(), deadline)
 		go w.processEvents(ctx, nil, 0)
@@ -601,7 +601,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	forget := func() {}
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
-		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType, "")
+		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType, "", 0)
 	}
 
 	clock := testingclock.NewFakeClock(time.Now())
@@ -1415,3 +1415,83 @@ func TestCachingObjects(t *testing.T) {
 	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
 	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
 }
+
+func TestCacheWatcherBookmarkAfterResourceVersion(t *testing.T) {
+	var w *cacheWatcher
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func() {
+		// forget() has to stop the watcher, as only stopping the watcher
+		// triggers stopping the process() goroutine
+		w.stopThreadUnsafe()
+	}
+	w = newCacheWatcher(1, filter, forget, testVersioner{}, time.Now(), true, objectType, "", 3)
+	go w.process(context.Background(), 0)
+
+	// case 1: a bookmark with rv < than expected is dropped
+	w.nonblockingAdd(&watchCacheEvent{ResourceVersion: 1, Type: watch.Bookmark, Object: &v1.Pod{}})
+	select {
+	case ev := <-w.result:
+		t.Fatalf("unexpected event received = %v", ev)
+	case <-time.NewTimer(400 * time.Millisecond).C:
+		break
+	}
+
+	// case 2: other watch type events always pass-through
+	w.nonblockingAdd(&watchCacheEvent{ResourceVersion: 2, Type: watch.Added, Object: &v1.Pod{}})
+	select {
+	case <-w.result:
+		break
+	case <-time.NewTimer(400 * time.Millisecond).C:
+		t.Fatal("didn't receive event")
+	}
+
+	// case 3: a bookmark that matches the expected rv passes-through
+	w.nonblockingAdd(&watchCacheEvent{ResourceVersion: 3, Type: watch.Bookmark, Object: &v1.Pod{}})
+	select {
+	case <-w.result:
+		break
+	case <-time.NewTimer(400 * time.Millisecond).C:
+		t.Fatal("didn't receive event")
+	}
+
+	w.Stop()
+}
+
+func TestCacheWatcherBookmarkAfterResourceVersionNextBookmarkTime(t *testing.T) {
+	var w *cacheWatcher
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func() {
+		// forget() has to stop the watcher, as only stopping the watcher
+		// triggers stopping the process() goroutine
+		w.stopThreadUnsafe()
+	}
+	//initEvents := []*watchCacheEvent{}
+	clock := testingclock.NewFakeClock(time.Now())
+	w = newCacheWatcher(1, filter, forget, testVersioner{}, clock.Now(), true, objectType, "", 3)
+	go w.process(context.Background(), 0)
+
+	// case 1: watcher with bookmarkAfterResourceVersion always qualifies for a bookmark event
+	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
+	watchers.addWatcher(w)
+
+	if len(watchers.watchersBuckets) != 1 {
+		t.Errorf("unexpected bucket size: %#v", watchers.watchersBuckets)
+	}
+	watchers1 := watchers.popExpiredWatchers()
+	if len(watchers1) != 1 {
+		t.Errorf("unexpected bucket size: %#v", watchers1)
+	}
+
+	// case 2: checks if adding the same watcher has the same effect as case 1
+	//         popExpiredWatchers advances the startBucketID, thus we need to advance the close
+	clock.Step(1 * time.Second)
+	watchers.addWatcher(w)
+	watchers2 := watchers.popExpiredWatchers()
+	if len(watchers2) != 1 {
+		t.Errorf("unexpected bucket size: %v", watchers1)
+	}
+	w.Stop()
+}
+
+	//initEvents := []*watchCacheEvent{}
+	go w.process(context.Background(), 0)
