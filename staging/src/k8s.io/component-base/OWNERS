@@ -15,7 +15,3 @@ emeritus_reviewers:
 - dixudx
 - rosti
 - stewart-yu
-labels:
-- sig/architecture
-- sig/cluster-lifecycle
-- sig/api-machinery
