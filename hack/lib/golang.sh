@@ -336,6 +336,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-proxy
   kubeadm
   kubectl
+  kubemark
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
