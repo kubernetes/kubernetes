@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -51,13 +52,17 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      string
-	startTime      time.Time
+	// mutex is used when accessing addedInfo
+	// It can be modified by other goroutine when logging happens (in case of request timeout)
+	mutex     sync.Mutex
+	addedInfo string
+	startTime time.Time
 
 	captureErrorOutput bool
 
-	req *http.Request
-	w   http.ResponseWriter
+	req       *http.Request
+	userAgent string
+	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
 }
@@ -107,6 +112,7 @@ func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
 	return &respLogger{
 		startTime:         time.Now(),
 		req:               req,
+		userAgent:         req.UserAgent(),
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
@@ -152,6 +158,8 @@ func StatusIsNot(statuses ...int) StacktracePred {
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
 }
 
@@ -162,7 +170,7 @@ func (rl *respLogger) LogArgs() []interface{} {
 			"verb", rl.req.Method,
 			"URI", rl.req.RequestURI,
 			"latency", latency,
-			"userAgent", rl.req.UserAgent(),
+			"userAgent", rl.userAgent,
 			"srcIP", rl.req.RemoteAddr,
 			"hijacked", true,
 		}
@@ -171,10 +179,17 @@ func (rl *respLogger) LogArgs() []interface{} {
 		"verb", rl.req.Method,
 		"URI", rl.req.RequestURI,
 		"latency", latency,
-		"userAgent", rl.req.UserAgent(),
+		// We can't get UserAgent from rl.req.UserAgent() here as it accesses headers map,
+		// which can be modified in another goroutine when apiserver request times out.
+		// For example authentication filter modifies request's headers,
+		// This can cause apiserver to crash with unrecoverable fatal error.
+		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
+		"userAgent", rl.userAgent,
 		"srcIP", rl.req.RemoteAddr,
 		"resp", rl.status,
 	}
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 	if len(rl.statusStack) > 0 {
 		args = append(args, "statusStack", rl.statusStack)
 	}
