@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/controller/util/patch"
 
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
@@ -533,7 +533,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
 		ownerUIDs := append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)
-		p, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes(item.identity.UID, ownerUIDs)
+		p, err := c.GenerateDeleteOwnerRefStrategicMergeBytes(item.identity.UID, ownerUIDs)
 		if err != nil {
 			return err
 		}
@@ -616,7 +616,7 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 		go func(dependent *node) {
 			defer wg.Done()
 			// the dependent.identity.UID is used as precondition
-			p, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes(dependent.identity.UID, []types.UID{owner.UID})
+			p, err := c.GenerateDeleteOwnerRefStrategicMergeBytes(dependent.identity.UID, []types.UID{owner.UID})
 			if err != nil {
 				errCh <- fmt.Errorf("orphaning %s failed, %v", dependent.identity, err)
 				return

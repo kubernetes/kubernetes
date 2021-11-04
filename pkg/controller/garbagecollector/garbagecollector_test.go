@@ -60,7 +60,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller/util/patch"
+	c "k8s.io/kubernetes/pkg/controller"
 )
 
 type testRESTMapper struct {
@@ -595,7 +595,7 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 			},
 		},
 	}
-	p, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes("100", []types.UID{"2", "3"})
+	p, err := c.GenerateDeleteOwnerRefStrategicMergeBytes("100", []types.UID{"2", "3"})
 	if err != nil {
 		t.Fatal(err)
 	}
