@@ -66,6 +66,16 @@ func TestCleanVerb(t *testing.T) {
 			expectedVerb: "LIST",
 		},
 		{
+			desc:        "GET isn't be transformed to WATCH if we have the right query param on the request",
+			initialVerb: "GET",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "GET",
+		},
+		{
 			desc:          "LIST is transformed to WATCH for the old pattern watch",
 			initialVerb:   "LIST",
 			suggestedVerb: "WATCH",
