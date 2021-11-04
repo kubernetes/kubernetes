@@ -147,7 +147,7 @@ func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.Cluster
 	}
 
 	if !hasCertificateKey {
-		// checks if the certificates that must be equal across controlplane instances are provided
+		// checks if the certificates are provided and are still valid, not expired yet.
 		if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
 			return err
 		}
