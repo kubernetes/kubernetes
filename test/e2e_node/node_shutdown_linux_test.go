@@ -46,10 +46,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 	ginkgo.Context("when gracefully shutting down", func() {
 
 		const (
-			nodeShutdownReason                  = "Terminated"
 			pollInterval                        = 1 * time.Second
-			podStatusUpdateTimeout              = 5 * time.Second
-			nodeStatusUpdateTimeout             = 10 * time.Second
+			podStatusUpdateTimeout              = 30 * time.Second
+			nodeStatusUpdateTimeout             = 30 * time.Second
 			nodeShutdownGracePeriod             = 20 * time.Second
 			nodeShutdownGracePeriodCriticalPods = 10 * time.Second
 		)
@@ -117,13 +116,13 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 				for _, pod := range list.Items {
 					if kubelettypes.IsCriticalPod(&pod) {
-						if pod.Status.Phase != v1.PodRunning {
-							framework.Logf("Expecting critcal pod to be running, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+						if isPodShutdown(&pod) {
+							framework.Logf("Expecting critcal pod to be running, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 							return fmt.Errorf("critical pod should not be shutdown, phase: %s", pod.Status.Phase)
 						}
 					} else {
-						if pod.Status.Phase != v1.PodFailed || pod.Status.Reason != nodeShutdownReason {
-							framework.Logf("Expecting non-critcal pod to be shutdown, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+						if !isPodShutdown(&pod) {
+							framework.Logf("Expecting non-critcal pod to be shutdown, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 							return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 						}
 					}
@@ -143,8 +142,8 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
-					if pod.Status.Phase != v1.PodFailed || pod.Status.Reason != nodeShutdownReason {
-						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+					if !isPodShutdown(&pod) {
+						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 					}
 				}
@@ -191,6 +190,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			ginkgo.By("Restart Dbus")
 			err = restartDbus()
 			framework.ExpectNoError(err)
+
+			// Wait a few seconds to ensure dbus is restarted...
+			time.Sleep(5 * time.Second)
 
 			ginkgo.By("Emitting Shutdown signal")
 			err = emitSignalPrepareForShutdown(true)
@@ -306,4 +308,25 @@ func restoreDbusConfig() error {
 		return err
 	}
 	return systemctlDaemonReload()
+}
+
+const (
+	// https://github.com/kubernetes/kubernetes/blob/1dd781ddcad454cc381806fbc6bd5eba8fa368d7/pkg/kubelet/nodeshutdown/nodeshutdown_manager_linux.go#L43-L44
+	podShutdownReason  = "Terminated"
+	podShutdownMessage = "Pod was terminated in response to imminent node shutdown."
+)
+
+func isPodShutdown(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+
+	hasContainersNotReadyCondition := false
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == v1.ContainersReady && cond.Status == v1.ConditionFalse {
+			hasContainersNotReadyCondition = true
+		}
+	}
+
+	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition
 }
