@@ -587,7 +587,6 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			if diff := cmp.Diff(tt.wantVec, histogramVec); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
-			registry.Reset()
 		})
 	}
 }
