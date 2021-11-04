@@ -108,7 +108,7 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 		return false, nil
 	}
 
-	if m.Controller.GetNamespace() != obj.GetNamespace() {
+	if len(m.Controller.GetNamespace()) > 0 && m.Controller.GetNamespace() != obj.GetNamespace() {
 		// Ignore if namespace not match
 		return false, nil
 	}
