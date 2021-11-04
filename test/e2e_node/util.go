@@ -75,6 +75,9 @@ const (
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 	kubeletReadOnlyPort        = "10255"
 	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
+	// state files
+	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
+	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
 func getNodeSummary() (*stats.Summary, error) {
@@ -158,56 +161,65 @@ func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 // Returns true on success.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *kubeletconfig.KubeletConfiguration)) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
+
 	ginkgo.BeforeEach(func() {
 		oldCfg, err := getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
+
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
 		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
 			return
 		}
 
-		// Update the Kubelet configuration.
-		ginkgo.By("Stopping the kubelet")
-		startKubelet := stopKubelet()
-
-		// wait until the kubelet health check will fail
-		gomega.Eventually(func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-		ginkgo.By("Starting the kubelet")
-		startKubelet()
-
-		// wait until the kubelet health check will succeed
-		gomega.Eventually(func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+		updateKubeletConfig(f, newCfg, true)
 	})
+
 	ginkgo.AfterEach(func() {
 		if oldCfg != nil {
 			// Update the Kubelet configuration.
-			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-
-			ginkgo.By("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+			updateKubeletConfig(f, oldCfg, true)
 		}
 	})
+}
+
+func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
+	// Update the Kubelet configuration.
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
+	if deleteStateFiles {
+		deleteStateFile(cpuManagerStateFile)
+		deleteStateFile(memoryManagerStateFile)
+	}
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+
+	// Wait for the Kubelet to be ready.
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
+}
+
+func deleteStateFile(stateFileName string) {
+	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", stateFileName)).Run()
+	framework.ExpectNoError(err, "failed to delete the state file")
 }
 
 // Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.

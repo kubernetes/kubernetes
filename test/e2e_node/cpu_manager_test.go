@@ -38,10 +38,8 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 )
 
 // Helper for makeCPUManagerPod().
@@ -186,60 +184,15 @@ func getCoreSiblingList(cpuRes int64) string {
 	return string(out)
 }
 
-func deleteStateFile() {
-	err := exec.Command("/bin/sh", "-c", "rm -f /var/lib/kubelet/cpu_manager_state").Run()
-	framework.ExpectNoError(err, "error deleting state file")
-}
-
-func setOldKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration) {
-	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-	// Delete the CPU Manager state file so that the old Kubelet configuration
-	// can take effect
-	deleteStateFile()
-
-	if oldCfg != nil {
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-	}
-
-	ginkgo.By("Starting the kubelet")
-	startKubelet()
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
-}
-
 type cpuManagerKubeletArguments struct {
 	policyName              string
-	cleanStateFile          bool
 	enableCPUManager        bool
 	enableCPUManagerOptions bool
 	reservedSystemCPUs      cpuset.CPUSet
 	options                 map[string]string
 }
 
-func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Disable CPU Manager in Kubelet.
-	oldCfg = configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
-		enableCPUManager: false,
-	})
-
-	return oldCfg
-}
-
-func configureCPUManagerInKubelet(f *framework.Framework, kubeletArguments *cpuManagerKubeletArguments) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Enable CPU Manager in Kubelet with static policy.
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-
+func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
@@ -274,44 +227,6 @@ func configureCPUManagerInKubelet(f *framework.Framework, kubeletArguments *cpuM
 			newCfg.KubeReserved["cpu"] = "200m"
 		}
 	}
-
-	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-	// After graduation of the CPU Manager feature to Beta, the CPU Manager
-	// "none" policy is ON by default. But when we set the CPU Manager policy to
-	// "static" in this test and the Kubelet is restarted so that "static"
-	// policy can take effect, there will always be a conflict with the state
-	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
-	// be "none" whereas we are trying to restart Kubelet with "static"
-	// policy). Therefore, we delete the state file so that we can proceed
-	// with the tests.
-	// Only delete the state file at the begin of the tests.
-	if kubeletArguments.cleanStateFile {
-		deleteStateFile()
-	}
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-	ginkgo.By("Starting the kubelet")
-	startKubelet()
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
 }
@@ -615,6 +530,12 @@ func runCPUManagerTests(f *framework.Framework) {
 	var ctnAttrs []ctnAttribute
 	var pod *v1.Pod
 
+	ginkgo.BeforeEach(func() {
+		var err error
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+	})
+
 	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
@@ -624,12 +545,12 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 
 		// Enable CPU Manager in the kubelet.
-		oldCfg = configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
+		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 			policyName:         string(cpumanager.PolicyStatic),
 			enableCPUManager:   true,
 			reservedSystemCPUs: cpuset.CPUSet{},
-			cleanStateFile:     true,
 		})
+		updateKubeletConfig(f, newCfg, true)
 
 		ginkgo.By("running a non-Gu pod")
 		runNonGuPodTest(f, cpuCap)
@@ -689,18 +610,24 @@ func runCPUManagerTests(f *framework.Framework) {
 			pod.Spec.Containers[0].Name, pod.Name)
 
 		ginkgo.By("disable cpu manager in kubelet")
-		disableCPUManagerInKubelet(f)
+		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   false,
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
+		updateKubeletConfig(f, newCfg, false)
 
 		ginkgo.By("by deleting the pod and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		ginkgo.By("enable cpu manager in kubelet without delete state file")
-		configureCPUManagerInKubelet(f, &cpuManagerKubeletArguments{
+		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 			policyName:         string(cpumanager.PolicyStatic),
 			enableCPUManager:   true,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
+		updateKubeletConfig(f, newCfg, false)
 
 		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
@@ -729,15 +656,16 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpuPolicyOptions := map[string]string{
 			cpumanager.FullPCPUsOnlyOption: "true",
 		}
-		oldCfg = configureCPUManagerInKubelet(f,
+		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
 				enableCPUManager:        true,
-				cleanStateFile:          true,
 				reservedSystemCPUs:      cpuset.NewCPUSet(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
-			})
+			},
+		)
+		updateKubeletConfig(f, newCfg, true)
 
 		// the order between negative and positive doesn't really matter
 		runSMTAlignmentNegativeTests(f)
@@ -745,7 +673,7 @@ func runCPUManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.AfterEach(func() {
-		setOldKubeletConfig(oldCfg)
+		updateKubeletConfig(f, oldCfg, true)
 	})
 }
 

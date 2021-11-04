@@ -110,7 +110,6 @@ func readDaemonSetV1OrDie(objBytes []byte) *appsv1.DaemonSet {
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	ginkgo.Context("DevicePlugin", func() {
-		ginkgo.By("Enabling support for Kubelet Plugins Watcher")
 		ginkgo.It("[Flaky] Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)

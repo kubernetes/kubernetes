@@ -41,9 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -51,11 +49,10 @@ import (
 )
 
 const (
-	evictionHardMemory     = "memory.available"
-	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
-	resourceMemory         = "memory"
-	staticPolicy           = "Static"
-	nonePolicy             = "None"
+	evictionHardMemory = "memory.available"
+	resourceMemory     = "memory"
+	staticPolicy       = "Static"
+	nonePolicy         = "None"
 )
 
 // Helper for makeMemoryManagerPod().
@@ -138,11 +135,6 @@ func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []mem
 	return pod
 }
 
-func deleteMemoryManagerStateFile() {
-	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", memoryManagerStateFile)).Run()
-	framework.ExpectNoError(err, "failed to delete the state file")
-}
-
 func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
 	if _, err := os.Stat(memoryManagerStateFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("the memory manager state file %s does not exist", memoryManagerStateFile)
@@ -187,76 +179,44 @@ type kubeletParams struct {
 	evictionHard         map[string]string
 }
 
-func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params *kubeletParams) *kubeletconfig.KubeletConfiguration {
-	newCfg := oldCfg.DeepCopy()
-
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = map[string]bool{}
+func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.KubeletConfiguration, params *kubeletParams) {
+	if initialCfg.FeatureGates == nil {
+		initialCfg.FeatureGates = map[string]bool{}
 	}
 
-	newCfg.MemoryManagerPolicy = params.memoryManagerPolicy
+	initialCfg.MemoryManagerPolicy = params.memoryManagerPolicy
 
 	// update system-reserved
-	if newCfg.SystemReserved == nil {
-		newCfg.SystemReserved = map[string]string{}
+	if initialCfg.SystemReserved == nil {
+		initialCfg.SystemReserved = map[string]string{}
 	}
 	for resourceName, value := range params.systemReserved {
-		newCfg.SystemReserved[resourceName] = value
+		initialCfg.SystemReserved[resourceName] = value
 	}
 
 	// update kube-reserved
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
+	if initialCfg.KubeReserved == nil {
+		initialCfg.KubeReserved = map[string]string{}
 	}
 	for resourceName, value := range params.kubeReserved {
-		newCfg.KubeReserved[resourceName] = value
+		initialCfg.KubeReserved[resourceName] = value
 	}
 
 	// update hard eviction threshold
-	if newCfg.EvictionHard == nil {
-		newCfg.EvictionHard = map[string]string{}
+	if initialCfg.EvictionHard == nil {
+		initialCfg.EvictionHard = map[string]string{}
 	}
 	for resourceName, value := range params.evictionHard {
-		newCfg.EvictionHard[resourceName] = value
+		initialCfg.EvictionHard[resourceName] = value
 	}
 
 	// update reserved memory
-	if newCfg.ReservedMemory == nil {
-		newCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
+	if initialCfg.ReservedMemory == nil {
+		initialCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
 	for _, memoryReservation := range params.systemReservedMemory {
-		newCfg.ReservedMemory = append(newCfg.ReservedMemory, memoryReservation)
+		initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
 	}
-
-	return newCfg
-}
-
-func updateKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
-	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
-	deleteMemoryManagerStateFile()
-
-	ginkgo.By("Starting the kubelet")
-	startKubelet()
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 func getAllNUMANodes() []int {
@@ -288,8 +248,6 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		ctnParams, initCtnParams []memoryManagerCtnAttributes
 		is2MiHugepagesSupported  *bool
 		isMultiNUMASupported     *bool
-		kubeParams               *kubeletParams
-		oldCfg                   *kubeletconfig.KubeletConfiguration
 		testPod                  *v1.Pod
 	)
 
@@ -364,7 +322,6 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 	// dynamically update the kubelet configuration
 	ginkgo.JustBeforeEach(func() {
-		var err error
 		hugepagesCount := 8
 
 		// allocate hugepages
@@ -373,22 +330,9 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			gomega.Eventually(func() error {
 				return configureHugePages(hugepagesSize2M, hugepagesCount)
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
-		}
 
-		// get the old kubelet config
-		if oldCfg == nil {
-			gomega.Eventually(func() error {
-				oldCfg, err = e2enodekubelet.GetCurrentKubeletConfigFromFile()
-				return err
-			}, 5*time.Minute, 15*time.Second).Should(gomega.BeNil())
-		}
+			restartKubelet(true)
 
-		// update the kubelet config with new parameters
-		newCfg := getUpdatedKubeletConfig(oldCfg, kubeParams)
-		updateKubeletConfig(f, newCfg)
-
-		// request hugepages resources under the container
-		if *is2MiHugepagesSupported {
 			ginkgo.By("Waiting for hugepages resource to become available on the local node")
 			waitingForHugepages(hugepagesCount)
 
@@ -414,24 +358,18 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			gomega.Eventually(func() error {
 				return configureHugePages(hugepagesSize2M, 0)
 			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
-		}
 
-		// update the kubelet config with old parameters
-		if oldCfg != nil {
-			updateKubeletConfig(f, oldCfg)
-		}
+			restartKubelet(true)
 
-		if *is2MiHugepagesSupported {
 			waitingForHugepages(0)
 		}
 	})
 
 	ginkgo.Context("with static policy", func() {
-		ginkgo.BeforeEach(func() {
-			// override kubelet configuration parameters
-			tmpParams := *defaultKubeParams
-			tmpParams.memoryManagerPolicy = staticPolicy
-			kubeParams = &tmpParams
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			kubeParams := *defaultKubeParams
+			kubeParams.memoryManagerPolicy = staticPolicy
+			updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
 		})
 
 		ginkgo.JustAfterEach(func() {
@@ -706,70 +644,75 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 	})
 
 	ginkgo.Context("with none policy", func() {
-		ginkgo.BeforeEach(func() {
-			tmpParams := *defaultKubeParams
-			tmpParams.memoryManagerPolicy = nonePolicy
-			kubeParams = &tmpParams
-
-			// override pod parameters
-			ctnParams = []memoryManagerCtnAttributes{
-				{
-					ctnName: "memory-manager-none",
-					cpus:    "100m",
-					memory:  "128Mi",
-				},
-			}
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			kubeParams := *defaultKubeParams
+			kubeParams.memoryManagerPolicy = nonePolicy
+			updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
 		})
 
-		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-		ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func() {
-			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
+		// empty context to configure same container parameters for all tests
+		ginkgo.Context("", func() {
+			ginkgo.BeforeEach(func() {
+				// override pod parameters
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "memory-manager-none",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+			})
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
-			defer conn.Close()
+			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+			ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func() {
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
 
-			resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-			framework.ExpectNoError(err)
+				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+				defer conn.Close()
 
-			gomega.Expect(resp.Memory).To(gomega.BeEmpty())
-		})
+				resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+				framework.ExpectNoError(err)
 
-		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-		ginkgo.It("should not report any memory data during request to pod resources List", func() {
-			testPod = f.PodClient().CreateSync(testPod)
+				gomega.Expect(resp.Memory).To(gomega.BeEmpty())
+			})
 
-			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
+			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+			ginkgo.It("should not report any memory data during request to pod resources List", func() {
+				testPod = f.PodClient().CreateSync(testPod)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
-			defer conn.Close()
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
 
-			resp, err := cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
-			framework.ExpectNoError(err)
+				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+				defer conn.Close()
 
-			for _, podResource := range resp.PodResources {
-				if podResource.Name != testPod.Name {
-					continue
+				resp, err := cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
+				framework.ExpectNoError(err)
+
+				for _, podResource := range resp.PodResources {
+					if podResource.Name != testPod.Name {
+						continue
+					}
+
+					for _, containerResource := range podResource.Containers {
+						gomega.Expect(containerResource.Memory).To(gomega.BeEmpty())
+					}
+				}
+			})
+
+			ginkgo.It("should succeed to start the pod", func() {
+				testPod = f.PodClient().CreateSync(testPod)
+
+				// it no taste to verify NUMA pinning when the node has only one NUMA node
+				if !*isMultiNUMASupported {
+					return
 				}
 
-				for _, containerResource := range podResource.Containers {
-					gomega.Expect(containerResource.Memory).To(gomega.BeEmpty())
-				}
-			}
-		})
-
-		ginkgo.It("should succeed to start the pod", func() {
-			testPod = f.PodClient().CreateSync(testPod)
-
-			// it no taste to verify NUMA pinning when the node has only one NUMA node
-			if !*isMultiNUMASupported {
-				return
-			}
-
-			verifyMemoryPinning(testPod, allNUMANodes)
+				verifyMemoryPinning(testPod, allNUMANodes)
+			})
 		})
 	})
 })
