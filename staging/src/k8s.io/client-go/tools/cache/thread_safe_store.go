@@ -71,11 +71,7 @@ type threadSafeMap struct {
 }
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	oldObject := c.items[key]
-	c.items[key] = obj
-	c.updateIndices(oldObject, obj, key)
+	c.Update(key, obj)
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
