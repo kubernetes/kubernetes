@@ -913,9 +913,9 @@ COMMIT
 	if err != nil {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
-	// 43 here is test specific and corresponds to one more than the number of -A lines after `*nat` in `expected`.
-	if nNatRules != 43.0 {
-		t.Fatalf("Wrong number of nat rules: expected 43 received %f", nNatRules)
+	// 42 here is test specific and corresponds to one more than the number of -A lines after `*nat` in `expected`.
+	if nNatRules != 42.0 {
+		t.Fatalf("Wrong number of nat rules: expected 42 received %f", nNatRules)
 	}
 }
 
@@ -3311,10 +3311,9 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-	// COMMIT
 
-	if nFilterRules != 7.0 {
-		t.Fatalf("Wrong number of filter rule: expected 7 received %f", nFilterRules)
+	if nFilterRules != 6.0 {
+		t.Fatalf("Wrong number of filter rule: expected 6 received %f", nFilterRules)
 	}
 
 	nNatRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
@@ -3322,14 +3321,13 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
 
-	// rules -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+	// -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 	// -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 	// -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 	// -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 	// -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-	// COMMIT
-	if nNatRules != 6.0 {
-		t.Fatalf("Wrong number of nat rules: expected 6 received %f", nNatRules)
+	if nNatRules != 5.0 {
+		t.Fatalf("Wrong number of nat rules: expected 5 received %f", nNatRules)
 	}
 
 	populateEndpointSlices(fp,
@@ -3358,9 +3356,8 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-	// COMMIT
-	if nFilterRules != 5.0 {
-		t.Fatalf("Wrong number of filter rule: expected 5 received %f", nFilterRules)
+	if nFilterRules != 4.0 {
+		t.Fatalf("Wrong number of filter rule: expected 4 received %f", nFilterRules)
 	}
 	nNatRules, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
 	if err != nil {
@@ -3381,9 +3378,8 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	// -A KUBE-SEP-OUFLBLJVR33W4FIZ -m comment --comment ns1/svc1:p80 -s 10.0.0.5/32 -j KUBE-MARK-MASQ
 	// -A KUBE-SEP-OUFLBLJVR33W4FIZ -m comment --comment ns1/svc1:p80 -m udp -p udp -j DNAT --to-destination 10.0.0.5:80
 	// -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-	// COMMIT
-	if nNatRules != 16.0 {
-		t.Fatalf("Wrong number of nat rules: expected 16 received %f", nNatRules)
+	if nNatRules != 15.0 {
+		t.Fatalf("Wrong number of nat rules: expected 15 received %f", nNatRules)
 	}
 }
 
