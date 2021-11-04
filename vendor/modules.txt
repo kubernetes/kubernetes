@@ -179,7 +179,8 @@ github.com/container-storage-interface/spec/lib/go/csi
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.2 => github.com/containerd/console v1.0.2
 github.com/containerd/console
-# github.com/containerd/containerd v1.4.9 => github.com/containerd/containerd v1.4.9
+# github.com/containerd/containerd v1.4.11 => github.com/containerd/containerd v1.4.11
+## explicit
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -2468,7 +2469,7 @@ sigs.k8s.io/yaml
 # github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
 # github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 # github.com/containerd/console => github.com/containerd/console v1.0.2
-# github.com/containerd/containerd => github.com/containerd/containerd v1.4.9
+# github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
 # github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 # github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 # github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
