@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +55,14 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		FieldSelector: r.FieldSelector,
 		Limit:         r.LimitChunks,
 	}
+
+	if len(r.Namespace) > 0 {
+		err := r.Client.Get().AbsPath("api", "v1", "namespaces", r.Namespace).Do(context.TODO()).Error()
+		if err != nil {
+			return err
+		}
+	}
+
 	return FollowContinue(&initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
 		list, err := helper.List(
 			r.Namespace,
