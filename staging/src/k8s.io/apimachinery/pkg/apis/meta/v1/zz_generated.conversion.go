@@ -426,6 +426,13 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 	} else {
 		out.Continue = ""
 	}
+	if values, ok := map[string][]string(*in)["consistentWatchCache"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_bool(&values, &out.ConsistentWatchCache, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConsistentWatchCache = false
+	}
 	return nil
 }
 

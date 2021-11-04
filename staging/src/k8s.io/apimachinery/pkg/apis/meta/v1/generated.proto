@@ -571,6 +571,8 @@ message ListOptions {
   // This field is not supported when watch is true. Clients may start a watch from the last
   // resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
+
+  optional bool consistentWatchCache = 11;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
