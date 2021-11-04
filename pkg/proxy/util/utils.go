@@ -481,18 +481,6 @@ func WriteLine(buf *bytes.Buffer, words ...string) {
 	}
 }
 
-// WriteRuleLine prepends the strings "-A" and chainName to the buffer and calls
-// WriteLine to join all the words into the buffer and terminate with newline.
-func WriteRuleLine(buf *bytes.Buffer, chainName string, words ...string) {
-	if len(words) == 0 {
-		return
-	}
-	buf.WriteString("-A ")
-	buf.WriteString(chainName)
-	buf.WriteByte(' ')
-	WriteLine(buf, words...)
-}
-
 // WriteBytesLine write bytes to buffer, terminate with newline
 func WriteBytesLine(buf *bytes.Buffer, bytes []byte) {
 	buf.Write(bytes)
