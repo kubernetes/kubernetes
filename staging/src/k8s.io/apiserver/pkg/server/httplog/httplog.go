@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -54,13 +55,17 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      strings.Builder
-	startTime      time.Time
+	// mutex is used when accessing addedInfo
+	// It can be modified by other goroutine when logging happens (in case of request timeout)
+	mutex     sync.Mutex
+	addedInfo strings.Builder
+	startTime time.Time
 
 	captureErrorOutput bool
 
-	req *http.Request
-	w   http.ResponseWriter
+	req       *http.Request
+	userAgent string
+	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
 }
@@ -121,6 +126,7 @@ func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime 
 	return &respLogger{
 		startTime:         startTime,
 		req:               req,
+		userAgent:         req.UserAgent(),
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
@@ -171,6 +177,8 @@ func StatusIsNot(statuses ...int) StacktracePred {
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 	rl.addedInfo.WriteString("\n")
 	rl.addedInfo.WriteString(fmt.Sprintf(format, data...))
 }
@@ -200,10 +208,18 @@ func (rl *respLogger) Log() {
 		"verb", verb,
 		"URI", rl.req.RequestURI,
 		"latency", latency,
-		"userAgent", rl.req.UserAgent(),
+		// We can't get UserAgent from rl.req.UserAgent() here as it accesses headers map,
+		// which can be modified in another goroutine when apiserver request times out.
+		// For example authentication filter modifies request's headers,
+		// This can cause apiserver to crash with unrecoverable fatal error.
+		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
+		"userAgent", rl.userAgent,
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
 	}
+	// Lock for accessing addedInfo
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 
 	if rl.hijacked {
 		keysAndValues = append(keysAndValues, "hijacked", true)
