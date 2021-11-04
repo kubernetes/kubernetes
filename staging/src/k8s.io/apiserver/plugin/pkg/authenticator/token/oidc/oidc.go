@@ -42,14 +42,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	oidc "github.com/coreos/go-oidc"
-	"k8s.io/klog/v2"
+	"github.com/coreos/go-oidc"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -70,7 +70,7 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 	IssuerURL string
 
-	// Optional KeySet to allow for synchronous initlization instead of fetching from the remote issuer.
+	// Optional KeySet to allow for synchronous initialization instead of fetching from the remote issuer.
 	KeySet oidc.KeySet
 
 	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
@@ -81,8 +81,11 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 	ClientID string
 
-	// PEM encoded root certificate contents of the provider.
+	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
 	CAContentProvider CAContentProvider
+
+	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
+	Client *http.Client
 
 	// UsernameClaim is the JWT field to use as the user's username.
 	UsernameClaim string
@@ -262,25 +265,33 @@ func New(opts Options) (*Authenticator, error) {
 		}
 	}
 
-	var roots *x509.CertPool
-	if opts.CAContentProvider != nil {
-		// TODO(enj): make this reload CA data dynamically
-		roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
-		if err != nil {
-			return nil, fmt.Errorf("Failed to read the CA contents: %v", err)
-		}
-	} else {
-		klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
+	if opts.Client != nil && opts.CAContentProvider != nil {
+		return nil, fmt.Errorf("oidc: Client and CAContentProvider are mutually exclusive")
 	}
 
-	// Copied from http.DefaultTransport.
-	tr := net.SetTransportDefaults(&http.Transport{
-		// According to golang's doc, if RootCAs is nil,
-		// TLS uses the host's root CA set.
-		TLSClientConfig: &tls.Config{RootCAs: roots},
-	})
+	client := opts.Client
 
-	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
+	if client == nil {
+		var roots *x509.CertPool
+		if opts.CAContentProvider != nil {
+			// TODO(enj): make this reload CA data dynamically
+			roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
+			if err != nil {
+				return nil, fmt.Errorf("Failed to read the CA contents: %v", err)
+			}
+		} else {
+			klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
+		}
+
+		// Copied from http.DefaultTransport.
+		tr := net.SetTransportDefaults(&http.Transport{
+			// According to golang's doc, if RootCAs is nil,
+			// TLS uses the host's root CA set.
+			TLSClientConfig: &tls.Config{RootCAs: roots},
+		})
+
+		client = &http.Client{Transport: tr, Timeout: 30 * time.Second}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = oidc.ClientContext(ctx, client)
@@ -534,7 +545,7 @@ func (r *claimResolver) resolve(endpoint endpoint, allClaims claims) error {
 	}
 	value, ok := distClaims[r.claim]
 	if !ok {
-		return fmt.Errorf("jwt returned by distributed claim endpoint %s did not contain claim: %v", endpoint, r.claim)
+		return fmt.Errorf("jwt returned by distributed claim endpoint %q did not contain claim: %v", endpoint.URL, r.claim)
 	}
 	allClaims[r.claim] = value
 	return nil
