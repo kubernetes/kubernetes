@@ -93,6 +93,7 @@ var _ registry.LogFormatFactory = Factory{}
 
 func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 	if options.JSON.SplitStream {
+		// stdout for info messages, stderr for errors.
 		infoStream := zapcore.Lock(os.Stdout)
 		size := options.JSON.InfoBufferSize.Value()
 		if size > 0 {
@@ -107,7 +108,9 @@ func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 		}
 		return NewJSONLogger(infoStream, zapcore.Lock(os.Stderr))
 	}
-	out := zapcore.Lock(os.Stdout)
+	// The default is to write to stderr (same as in klog's text output,
+	// doesn't get mixed with normal program output).
+	out := zapcore.Lock(os.Stderr)
 	return NewJSONLogger(out, out)
 }
 

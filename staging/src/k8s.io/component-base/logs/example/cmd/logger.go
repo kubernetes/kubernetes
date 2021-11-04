@@ -54,6 +54,8 @@ func NewLoggerCommand() *cobra.Command {
 }
 
 func runLogger() {
+	fmt.Println("This is normal output via stdout.")
+	fmt.Fprintln(os.Stderr, "This is other output via stderr.")
 	klog.Infof("Log using Infof, key: %s", "value")
 	klog.InfoS("Log using InfoS", "key", "value")
 	err := errors.New("fail")
