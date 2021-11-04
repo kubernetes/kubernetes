@@ -434,10 +434,6 @@ oom_score = -999
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
   conf_template = "${cni_template_path}"
-[plugins."io.containerd.grpc.v1.cri".containerd]
-  default_runtime_name = "runc"
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-  runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
@@ -446,12 +442,22 @@ EOF
     gke-setup-gcfs
     cat >> "${config_path}" <<EOF
 [plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "runc"
   snapshotter = "gcfs"
   disable_snapshot_annotations = false
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
 [proxy_plugins]
   [proxy_plugins.gcfs]
     type = "snapshot"
     address = "/run/containerd-gcfs-grpc/containerd-gcfs-grpc.sock"
+EOF
+  else
+  cat >> "${config_path}" <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "runc"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
 EOF
   fi
 
