@@ -40,7 +40,7 @@ func AddGlobalFlags(fs *pflag.FlagSet) {
 	addCadvisorFlags(fs)
 	addCredentialProviderFlags(fs)
 	verflag.AddFlags(fs)
-	logs.AddFlags(fs)
+	logs.AddFlags(fs, logs.SkipLoggingConfigurationFlags())
 }
 
 // normalize replaces underscores with hyphens

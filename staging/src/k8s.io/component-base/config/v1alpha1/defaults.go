@@ -122,4 +122,7 @@ func RecommendedLoggingConfiguration(obj *LoggingConfiguration) {
 		// by reflect.DeepEqual in some tests.
 		_ = obj.Options.JSON.InfoBufferSize.String()
 	}
+	if obj.FlushFrequency == 0 {
+		obj.FlushFrequency = 5 * time.Second
+	}
 }

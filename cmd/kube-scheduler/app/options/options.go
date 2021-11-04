@@ -231,7 +231,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
-	o.Logs.Apply()
 	return nil
 }
 
@@ -247,7 +246,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
-	errs = append(errs, o.Logs.Validate()...)
 
 	return errs
 }

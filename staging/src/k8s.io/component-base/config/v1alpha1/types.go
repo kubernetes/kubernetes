@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -88,6 +90,17 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string `json:"format,omitempty"`
+	// Maximum number of seconds between log flushes. Ignored if the
+	// selected logging backend writes log messages without buffering.
+	FlushFrequency time.Duration `json:"flushFrequency"`
+	// Verbosity is the threshold that determines which log messages are
+	// logged. Default is zero which logs only the most important
+	// messages. Higher values enable additional messages. Error messages
+	// are always logged.
+	Verbosity uint32 `json:"verbosity"`
+	// VModule overrides the verbosity threshold for individual files.
+	// Only supported for "text" log format.
+	VModule VModuleConfiguration `json:"vmodule,omitempty"`
 	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool `json:"sanitization,omitempty"`
@@ -112,4 +125,21 @@ type JSONOptions struct {
 	// [Experimental] InfoBufferSize sets the size of the info stream when
 	// using split streams. The default is zero, which disables buffering.
 	InfoBufferSize resource.QuantityValue `json:"infoBufferSize,omitempty"`
+}
+
+// VModuleConfiguration is a collection of individual file names or patterns
+// and the corresponding verbosity threshold.
+type VModuleConfiguration []VModuleItem
+
+// VModuleItem defines verbosity for one or more files which match a certain
+// glob pattern.
+type VModuleItem struct {
+	// FilePattern is a base file name (i.e. minus the ".go" suffix and
+	// directory) or a "glob" pattern for such a name. It must not contain
+	// comma and equal signs because those are separators for the
+	// corresponding klog command line argument.
+	FilePattern string `json:"filePattern"`
+	// Verbosity is the threshold for log messages emitted inside files
+	// that match the pattern.
+	Verbosity uint32 `json:"verbosity"`
 }

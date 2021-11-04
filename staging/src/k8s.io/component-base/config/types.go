@@ -17,6 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -86,6 +93,17 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string
+	// Maximum number of seconds between log flushes. Ignored if the
+	// selected logging backend writes log messages without buffering.
+	FlushFrequency time.Duration
+	// Verbosity is the threshold that determines which log messages are
+	// logged. Default is zero which logs only the most important
+	// messages. Higher values enable additional messages. Error messages
+	// are always logged.
+	Verbosity VerbosityLevel
+	// VModule overrides the verbosity threshold for individual files.
+	// Only supported for "text" log format.
+	VModule VModuleConfiguration
 	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool
@@ -110,4 +128,87 @@ type JSONOptions struct {
 	// [Experimental] InfoBufferSize sets the size of the info stream when
 	// using split streams. The default is zero, which disables buffering.
 	InfoBufferSize resource.QuantityValue
+}
+
+// VModuleConfiguration is a collection of individual file names or patterns
+// and the corresponding verbosity threshold.
+type VModuleConfiguration []VModuleItem
+
+var _ pflag.Value = &VModuleConfiguration{}
+
+// VModuleItem defines verbosity for one or more files which match a certain
+// glob pattern.
+type VModuleItem struct {
+	// FilePattern is a base file name (i.e. minus the ".go" suffix and
+	// directory) or a "glob" pattern for such a name. It must not contain
+	// comma and equal signs because those are separators for the
+	// corresponding klog command line argument.
+	FilePattern string
+	// Verbosity is the threshold for log messages emitted inside files
+	// that match the pattern.
+	Verbosity VerbosityLevel
+}
+
+// String returns the -vmodule parameter (comma-separated list of pattern=N).
+func (vmodule *VModuleConfiguration) String() string {
+	var patterns []string
+	for _, item := range *vmodule {
+		patterns = append(patterns, fmt.Sprintf("%s=%d", item.FilePattern, item.Verbosity))
+	}
+	return strings.Join(patterns, ",")
+}
+
+// Set parses the -vmodule parameter (comma-separated list of pattern=N).
+func (vmodule *VModuleConfiguration) Set(value string) error {
+	// This code mirrors https://github.com/kubernetes/klog/blob/9ad246211af1ed84621ee94a26fcce0038b69cd1/klog.go#L287-L313
+
+	for _, pat := range strings.Split(value, ",") {
+		if len(pat) == 0 {
+			// Empty strings such as from a trailing comma can be ignored.
+			continue
+		}
+		patLev := strings.Split(pat, "=")
+		if len(patLev) != 2 || len(patLev[0]) == 0 || len(patLev[1]) == 0 {
+			return fmt.Errorf("%q does not have the pattern=N format", pat)
+		}
+		pattern := patLev[0]
+		// 31 instead of 32 to ensure that it also fits into int32.
+		v, err := strconv.ParseUint(patLev[1], 10, 31)
+		if err != nil {
+			return fmt.Errorf("parsing verbosity in %q: %v", pat, err)
+		}
+		*vmodule = append(*vmodule, VModuleItem{FilePattern: pattern, Verbosity: VerbosityLevel(v)})
+	}
+	return nil
+}
+
+func (vmodule *VModuleConfiguration) Type() string {
+	return "pattern=N,..."
+}
+
+// VerbosityLevel represents a klog or logr verbosity threshold.
+type VerbosityLevel uint32
+
+var _ pflag.Value = new(VerbosityLevel)
+
+func (l *VerbosityLevel) String() string {
+	return strconv.FormatInt(int64(*l), 10)
+}
+
+func (l *VerbosityLevel) Get() interface{} {
+	return *l
+}
+
+func (l *VerbosityLevel) Set(value string) error {
+	// Limited to int32 for compatibility with klog.
+	v, err := strconv.ParseUint(value, 10, 31)
+	if err != nil {
+		return err
+	}
+	*l = VerbosityLevel(v)
+	return nil
+}
+
+func (l *VerbosityLevel) Type() string {
+	return "Level"
 }

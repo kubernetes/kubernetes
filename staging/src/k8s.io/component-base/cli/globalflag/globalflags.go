@@ -27,8 +27,12 @@ import (
 // AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
 // against the global flagsets from "flag" and "k8s.io/klog/v2".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
-func AddGlobalFlags(fs *pflag.FlagSet, name string) {
-	logs.AddFlags(fs)
+//
+// k8s.io/component-base/logs.SkipLoggingConfigurationFlags must be used as
+// option when the program also uses a LoggingConfiguration struct for
+// configuring logging. Then only flags not covered by that get added.
+func AddGlobalFlags(fs *pflag.FlagSet, name string, opts ...logs.Option) {
+	logs.AddFlags(fs, opts...)
 
 	fs.BoolP("help", "h", false, fmt.Sprintf("help for %s", name))
 }

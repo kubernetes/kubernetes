@@ -18,6 +18,8 @@ package logs
 
 import (
 	"fmt"
+	"math"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -40,6 +42,26 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 	_, err := registry.LogRegistry.Get(c.Format)
 	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
+	}
+
+	// The type in our struct is uint32, but klog only accepts positive int32.
+	if c.Verbosity > math.MaxInt32 {
+		errs = append(errs, field.Invalid(fldPath.Child("verbosity"), c.Verbosity, fmt.Sprintf("Must be <= %d", math.MaxInt32)))
+	}
+	vmoduleFldPath := fldPath.Child("vmodule")
+	if len(c.VModule) > 0 && c.Format != "" && c.Format != "text" {
+		errs = append(errs, field.Forbidden(vmoduleFldPath, "Only supported for text log format"))
+	}
+	for i, item := range c.VModule {
+		if item.FilePattern == "" {
+			errs = append(errs, field.Required(vmoduleFldPath.Index(i), "File pattern must not be empty"))
+		}
+		if strings.ContainsAny(item.FilePattern, "=,") {
+			errs = append(errs, field.Invalid(vmoduleFldPath.Index(i), item.FilePattern, "File pattern must not contain equal sign or comma"))
+		}
+		if item.Verbosity > math.MaxInt32 {
+			errs = append(errs, field.Invalid(vmoduleFldPath.Index(i), item.Verbosity, fmt.Sprintf("Must be <= %d", math.MaxInt32)))
+		}
 	}
 
 	// Currently nothing to validate for c.Options.

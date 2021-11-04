@@ -415,7 +415,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, s.Logs.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 
@@ -458,8 +457,6 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 	s.Metrics.Apply()
-
-	s.Logs.Apply()
 
 	return c, nil
 }

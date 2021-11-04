@@ -56,6 +56,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
@@ -114,6 +115,12 @@ cluster's shared state through which all other components interact.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
+
+			// Activate logging as soon as possible, after that
+			// show flags with the final logging configuration.
+			if err := s.Logs.ValidateAndApply(); err != nil {
+				return err
+			}
 			cliflag.PrintFlags(fs)
 
 			err := checkNonZeroInsecurePort(fs)
@@ -146,7 +153,7 @@ cluster's shared state through which all other components interact.`,
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
@@ -264,8 +271,6 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 
 	s.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
-
-	s.Logs.Apply()
 
 	config := &controlplane.Config{
 		GenericConfig: genericConfig,
