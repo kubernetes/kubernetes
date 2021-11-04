@@ -93,7 +93,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local debian_iptables_version=buster-v1.6.5
+  local debian_iptables_version=buster-v1.6.7
   local go_runner_version=v2.3.1-go1.15.15-buster.0
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
