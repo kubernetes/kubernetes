@@ -360,6 +360,8 @@ func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, work
 		hasNpdPod = true
 		break
 	}
-	framework.ExpectEqual(hasNpdPod, true)
+	if !hasNpdPod {
+		framework.Failf("No node-problem-detector pod is present in %+v", summary.Pods)
+	}
 	return
 }
