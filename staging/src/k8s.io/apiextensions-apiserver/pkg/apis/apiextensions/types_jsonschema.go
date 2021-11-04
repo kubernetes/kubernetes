@@ -139,9 +139,11 @@ type ValidationRule struct {
 	// ref: https://github.com/google/cel-spec
 	// The validator will be scoped to the location of the x-kubernetes-validations extension in the schema
 	// and will use `self` to represent the scoped field name.
-	// If an object property collides with a [RESERVED keyword](https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax), it will be escaped by prepending a _ prefix.
+	// If an object property collides with a [RESERVED keyword](https://github.com/google/cel-spec/blob/v0.6.0/doc/langdef.md#syntax), it will be escaped by prepending a _ prefix.
 	// To prevent this from causing a subsequent collision, all properties with a _ prefix will always be prefixed by __ (generally, N+1 the existing number of _s).
-	// e.g. rule against field "_pre": {"rule": "__pre > 0"}
+	// You should escape the property by prepending a _ prefix. e.g. rule against field "_pre": {"rule": "__pre > 0"}
+	// We will exclude self and reserved identifiers from the root bound variables without escaping.
+	// e.g. For a field named “self”, it can only be accessed via “self.self”
 	Rule string
 	// Message represents the message displayed when validation failed.
 	// e.g. "must be a URL with the host matching spec.host"

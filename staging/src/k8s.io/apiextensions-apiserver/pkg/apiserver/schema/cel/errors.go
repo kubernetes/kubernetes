@@ -16,10 +16,6 @@ limitations under the License.
 
 package cel
 
-import (
-	"fmt"
-)
-
 // Error is an implementation of the 'error' interface, which represents a
 // XValidation error.
 type Error struct {
@@ -31,7 +27,7 @@ var _ error = &Error{}
 
 // Error implements the error interface.
 func (v *Error) Error() string {
-	return fmt.Sprintf(v.Detail)
+	return v.Detail
 }
 
 // ErrorType is a machine readable value providing more detail about why

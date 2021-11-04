@@ -17,14 +17,13 @@ limitations under the License.
 package customresourcedefinition
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -203,14 +202,14 @@ func TestDropDisabledFields(t *testing.T) {
 		expectedCRD        *apiextensions.CustomResourceDefinition
 	}{
 		{
-			name:               "FG disable, no XValidations, no update",
+			name:               "For creation, FG disabled, no XValidations, no field drop",
 			enableXValidations: false,
 			crd:                &apiextensions.CustomResourceDefinition{},
 			oldCRD:             nil,
 			expectedCRD:        &apiextensions.CustomResourceDefinition{},
 		},
 		{
-			name:               "FG disable, irrespective of the current value, no update",
+			name:               "For creation, FG disabled, empty XValidations, no field drop",
 			enableXValidations: false,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -227,7 +226,7 @@ func TestDropDisabledFields(t *testing.T) {
 			},
 		},
 		{
-			name:               "FG disable, irrespective of the current value, drop",
+			name:               "For creation, FG disabled, set XValidations, drop XValidations",
 			enableXValidations: false,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -304,7 +303,102 @@ func TestDropDisabledFields(t *testing.T) {
 			},
 		},
 		{
-			name:               "FG disable, oldCRD field set, no drop",
+			name:               "For creation, FG enabled, set XValidations, update with XValidations",
+			enableXValidations: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:    "isTest == true",
+											Message: "isTest should be true.",
+										},
+									},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: nil,
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "openAPIV3Schema should contain more than 0 element.",
+								},
+							},
+							Dependencies: apiextensions.JSONSchemaDependencies{
+								"test": apiextensions.JSONSchemaPropsOrStringArray{
+									Schema: &apiextensions.JSONSchemaProps{
+										Type: "object",
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule:    "size(self) > 0",
+												Message: "size of scoped field should be greater than 0.",
+											},
+										},
+									},
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subRule": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:    "isTest == true",
+											Message: "isTest should be true.",
+										},
+									},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"isTest": {
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "For update, FG disabled, oldCRD XValidation in use, don't drop XValidations",
 			enableXValidations: false,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -421,7 +515,7 @@ func TestDropDisabledFields(t *testing.T) {
 			},
 		},
 		{
-			name:               "FG disable, oldCRD field nil, drop",
+			name:               "For update, FG disabled, oldCRD has no XValidations, drop XValidations",
 			enableXValidations: false,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -461,7 +555,7 @@ func TestDropDisabledFields(t *testing.T) {
 			},
 		},
 		{
-			name:               "FG enabled, update",
+			name:               "For update, FG enabled, oldCRD has XValidations, updated to newCRD",
 			enableXValidations: true,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -513,7 +607,7 @@ func TestDropDisabledFields(t *testing.T) {
 			},
 		},
 		{
-			name:               "FG enabled, oldSS field set to nil, update",
+			name:               "For update, FG enabled, oldCRD has no XValidations, updated to newCRD",
 			enableXValidations: true,
 			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
@@ -566,13 +660,13 @@ func TestDropDisabledFields(t *testing.T) {
 
 			dropDisabledFields(tc.crd, tc.oldCRD)
 
-			// old obj should never be changed
-			if !reflect.DeepEqual(tc.oldCRD, old) {
-				t.Fatalf("old ds changed: %v", diff.ObjectReflectDiff(tc.oldCRD, old))
+			// old crd should never be changed
+			if diff := cmp.Diff(tc.oldCRD, old); diff != "" {
+				t.Fatalf("old crd changed from %v to %v", tc.oldCRD, old)
 			}
 
-			if !reflect.DeepEqual(tc.crd, tc.expectedCRD) {
-				t.Fatalf("unexpected ds spec: %v", diff.ObjectReflectDiff(tc.expectedCRD, tc.crd))
+			if diff := cmp.Diff(tc.expectedCRD, tc.crd); diff != "" {
+				t.Fatalf("unexpected crd: %v", tc.crd)
 			}
 		})
 	}
