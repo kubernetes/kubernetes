@@ -388,6 +388,12 @@ func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 	return f
 }
 
+// WithWrapConfigFn allows providing a wrapper function for the client Config.
+func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Config) *ConfigFlags {
+	f.WrapConfigFn = wrapConfigFn
+	return f
+}
+
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}

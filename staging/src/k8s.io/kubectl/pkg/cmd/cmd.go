@@ -433,8 +433,12 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 		crt.ParseCommandHeaders(cmd, args)
 		return existingPreRunE(cmd, args)
 	}
+	wrapConfigFn := kubeConfigFlags.WrapConfigFn
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
 	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		if wrapConfigFn != nil {
+			c = wrapConfigFn(c)
+		}
 		c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 			// Must be separate RoundTripper; not "crt" closure.
 			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
