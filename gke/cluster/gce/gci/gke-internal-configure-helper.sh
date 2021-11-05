@@ -637,12 +637,12 @@ Type=simple
 LimitNOFILE=infinity
 # More aggressive Go garbage collection setting (go/fast/19).
 Environment=GOGC=10
-ExecStartPre=-/bin/umount ${gcfsd_mnt_dir}
+ExecStartPre=-/bin/umount -f ${gcfsd_mnt_dir}
 ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
 ExecStartPre=/bin/mkdir -p ${layer_cache_dir}
 ExecStartPre=/bin/mkdir -p $(dirname ${images_in_use_db_path})
 ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir} ${gcfs_cache_size_flag} ${gcfs_layer_caching_flag} --images_in_use_db_path=${images_in_use_db_path}
-ExecStop=/bin/umount ${gcfsd_mnt_dir}
+ExecStop=/bin/umount -f ${gcfsd_mnt_dir}
 RuntimeDirectory=gcfsd
 Restart=always
 RestartSec=10
