@@ -453,14 +453,6 @@ func registerGceHostIP(host string) error {
 
 // Run tests in archive against host
 func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFlagsStr string) *TestResult {
-	if err := registerGceHostIP(host); err != nil {
-		return &TestResult{
-			err:    err,
-			host:   host,
-			exitOk: false,
-		}
-	}
-
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
@@ -554,6 +546,14 @@ func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult 
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
+
+	if err = registerGceHostIP(host); err != nil {
+		return &TestResult{
+			err:    err,
+			host:   host,
+			exitOk: false,
+		}
+	}
 
 	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFileName, ginkgoFlagsStr)
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
