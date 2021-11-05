@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -50,12 +52,10 @@ import (
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -75,9 +75,6 @@ const (
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 	kubeletReadOnlyPort        = "10255"
 	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
-	// state files
-	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
-	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
 func getNodeSummary() (*stats.Summary, error) {
@@ -161,65 +158,28 @@ func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 // Returns true on success.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *kubeletconfig.KubeletConfiguration)) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
-
 	ginkgo.BeforeEach(func() {
-		oldCfg, err := getCurrentKubeletConfig()
+		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-
+		framework.ExpectEqual(configEnabled, true, "The Dynamic Kubelet Configuration feature is not enabled.\n"+
+			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
+			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
 		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
 			return
 		}
 
-		updateKubeletConfig(f, newCfg, true)
+		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
-
 	ginkgo.AfterEach(func() {
 		if oldCfg != nil {
-			// Update the Kubelet configuration.
-			updateKubeletConfig(f, oldCfg, true)
+			err := setKubeletConfiguration(f, oldCfg)
+			framework.ExpectNoError(err)
 		}
 	})
-}
-
-func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
-	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
-
-	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-	if deleteStateFiles {
-		deleteStateFile(cpuManagerStateFile)
-		deleteStateFile(memoryManagerStateFile)
-	}
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
-
-	ginkgo.By("Starting the kubelet")
-	startKubelet()
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
-}
-
-func deleteStateFile(stateFileName string) {
-	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", stateFileName)).Run()
-	framework.ExpectNoError(err, "failed to delete the state file")
 }
 
 // Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
@@ -230,47 +190,46 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	}
 	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 	return v, nil
 }
 
-// sets the current node's configSource, this should only be called from Serial tests
-func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) error {
-	// since this is a serial test, we just get the node, change the source, and then update it
-	// this prevents any issues with the patch API from affecting the test results
-	nodeclient := f.ClientSet.CoreV1().Nodes()
+// Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
+// with the new configuration. Returns an error if the configuration after waiting for restartGap
+// doesn't match what you attempted to set, or if the dynamic configuration feature is disabled.
+// You should only call this from serial tests.
+func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.KubeletConfiguration) error {
+	const (
+		restartGap   = 40 * time.Second
+		pollInterval = 5 * time.Second
+	)
 
-	// get the node
-	node, err := nodeclient.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
+	podPathList := filepath.SplitList(kubeCfg.StaticPodPath)
+	minusLastSegment := podPathList[:len(podPathList)-1]
+	kubeletConfigPathList := append(minusLastSegment, "kubelet-config")
+	kubeletConfigPath := filepath.Join(kubeletConfigPathList...)
 
-	// set new source
-	node.Spec.ConfigSource = source
+	ginkgo.By("Writing the new configuration to disk")
+	writeKubeletConfigFile(kubeCfg, kubeletConfigPath)
 
-	// update to the new source
-	_, err = nodeclient.Update(context.TODO(), node, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
+	ginkgo.By("Restarting the Kubelet")
+	restartKubelet(true)
+
+	// poll for new config, for a maximum wait of restartGap
+	gomega.Eventually(func() error {
+		newKubeCfg, err := getCurrentKubeletConfig()
+		if err != nil {
+			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
+		}
+		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
+			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
+		}
+		klog.Infof("new configuration has taken effect")
+		return nil
+	}, restartGap, pollInterval).Should(gomega.BeNil())
 
 	return nil
-}
-
-// constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
-func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
-	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
-	framework.ExpectNoError(err)
-
-	cmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
-		Data: map[string]string{
-			"kubelet": string(data),
-		},
-	}
-	return cmap
 }
 
 // listNamespaceEvents lists the events in the given namespace.
@@ -421,9 +380,8 @@ func stopKubelet() func() {
 	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
 
 	return func() {
-		// we should restart service, otherwise the transient service start will fail
-		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
-		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+		stdout, err := exec.Command("sudo", "systemctl", "start", kubeletServiceName).CombinedOutput()
+		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
 	}
 }
 
@@ -486,4 +444,22 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 	return func() {
 		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
 	}
+}
+
+// writeKubeletConfigFile writes the kubelet config file based on the args and returns the filename
+func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path string) error {
+	data, err := kubeletconfigcodec.EncodeKubeletConfig(internal, kubeletconfigv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return err
+	}
+	// create the directory, if it does not exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	// write the file
+	if err := ioutil.WriteFile(path, data, 0755); err != nil {
+		return err
+	}
+	return nil
 }
