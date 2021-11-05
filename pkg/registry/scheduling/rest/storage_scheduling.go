@@ -98,7 +98,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 							klog.Infof("going to retry, unable to create PriorityClass %s: %v", pc.Name, err)
 							return false, nil
 						}
-						return false, err
+						klog.Warningf("unknown error while creating PriorityClass %s: %v", pc.Name, err)
+						return false, nil
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
