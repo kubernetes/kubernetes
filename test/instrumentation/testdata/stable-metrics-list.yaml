@@ -1,23 +1,25 @@
-- name: pending_pods
-  subsystem: scheduler
-  help: Number of pending pods, by the queue type. 'active' means number of pods in
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
     of pods in unschedulableQ.
-  type: Gauge
-  stabilityLevel: STABLE
-  labels:
+  Labels:
   - queue
-- name: preemption_attempts_total
-  subsystem: scheduler
-  help: Total preemption attempts in the cluster till now
-  type: Counter
-  stabilityLevel: STABLE
-- name: preemption_victims
-  subsystem: scheduler
-  help: Number of selected preemption victims
-  type: Histogram
-  stabilityLevel: STABLE
-  buckets:
+  Name: pending_pods
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: scheduler
+  Type: Gauge
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Total preemption attempts in the cluster till now
+  Labels: []
+  Name: preemption_attempts_total
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: scheduler
+  Type: Counter
+- Buckets:
   - 5
   - 10
   - 15
@@ -28,24 +30,27 @@
   - 40
   - 45
   - 50
-- name: schedule_attempts_total
-  subsystem: scheduler
-  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
+  DeprecatedVersion: ""
+  Help: Number of selected preemption victims
+  Labels: []
+  Name: preemption_victims
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: scheduler
+  Type: Histogram
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Number of attempts to schedule pods, by the result. 'unschedulable' means
     a pod could not be scheduled, while 'error' means an internal scheduler problem.
-  type: Counter
-  stabilityLevel: STABLE
-  labels:
+  Labels:
   - profile
   - result
-- name: scheduling_attempt_duration_seconds
-  subsystem: scheduler
-  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
-  type: Histogram
-  stabilityLevel: STABLE
-  labels:
-  - profile
-  - result
-  buckets:
+  Name: schedule_attempts_total
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: scheduler
+  Type: Counter
+- Buckets:
   - 0.001
   - 0.002
   - 0.004
@@ -61,20 +66,16 @@
   - 4.096
   - 8.192
   - 16.384
-- name: apiserver_request_duration_seconds
-  help: Response latency distribution in seconds for each verb, dry run value, group,
-    version, resource, subresource, scope and component.
-  type: Histogram
-  stabilityLevel: STABLE
-  labels:
-  - component
-  - dry_run
-  - group
-  - resource
-  - scope
-  - subresource
-  - verb
-  - version
+  DeprecatedVersion: ""
+  Help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  Labels:
+  - profile
+  - result
+  Name: scheduling_attempt_duration_seconds
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: scheduler
+  Type: Histogram
 - Buckets:
   - 0.05
   - 0.1
