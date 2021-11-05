@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,6 +40,7 @@ import (
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -47,6 +49,9 @@ import (
 )
 
 var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = batchv1.SchemeGroupVersion.WithKind("CronJob")
+
 	nextScheduleDelta = 100 * time.Millisecond
 )
 
@@ -693,4 +698,25 @@ func isJobInActiveList(job *batchv1.Job, activeJobs []corev1.ObjectReference) bo
 		}
 	}
 	return false
+}
+
+// deleteJob reaps a job, deleting the job, the pods and the reference in the active list
+func deleteJob(cj *batchv1.CronJob, job *batchv1.Job, jc jobControlInterface, recorder record.EventRecorder) bool {
+	nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
+
+	// delete the job itself...
+	if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
+		recorder.Eventf(cj, corev1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
+		klog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
+		return false
+	}
+	// ... and its reference from active list
+	deleteFromActiveList(cj, job.ObjectMeta.UID)
+	recorder.Eventf(cj, corev1.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", job.Name)
+
+	return true
+}
+
+func getRef(object runtime.Object) (*corev1.ObjectReference, error) {
+	return ref.GetReference(scheme.Scheme, object)
 }
