@@ -61,15 +61,6 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
 
-			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
-			defer func() {
-				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
-
-				// Delete state file to allow repeated runs
-				deleteStateFile()
-			}()
-
 			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 			sd := setupSRIOVConfigOrFail(f, configMap)
 
@@ -166,15 +157,6 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
-
-			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
-			defer func() {
-				// restore kubelet config
-				setOldKubeletConfig(f, oldCfg)
-
-				// Delete state file to allow repeated runs
-				deleteStateFile()
-			}()
 
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)

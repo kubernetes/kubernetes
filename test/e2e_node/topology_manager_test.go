@@ -27,23 +27,22 @@ import (
 	"sync"
 	"time"
 
-	testutils "k8s.io/kubernetes/test/utils"
-
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -194,7 +193,7 @@ func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (in
 	return findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes)
 }
 
-func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy, scope string, configMap *v1.ConfigMap, numaNodes int) string {
+func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, policy, scope string, configMap *v1.ConfigMap, numaNodes int) (*kubeletconfig.KubeletConfiguration, string) {
 	// Configure Topology Manager in Kubelet with policy.
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
@@ -203,8 +202,6 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 
 	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
-
-	deleteStateFile()
 
 	// Set the Topology Manager policy
 	newCfg.TopologyManagerPolicy = policy
@@ -237,17 +234,7 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 	// Dump the config -- debug
 	framework.Logf("New kubelet config is %s", *newCfg)
 
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
-
-	return newCfg.ReservedSystemCPUs
+	return newCfg, newCfg.ReservedSystemCPUs
 }
 
 // getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
@@ -900,7 +887,8 @@ func runTopologyManagerTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-			configureTopologyManagerInKubelet(f, oldCfg, policy, scope, nil, 0)
+			newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, nil, 0)
+			updateKubeletConfig(f, newCfg, true)
 			// Run the tests
 			runTopologyManagerPolicySuiteTests(f)
 		}
@@ -923,7 +911,8 @@ func runTopologyManagerTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-			reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, scope, configMap, numaNodes)
+			newCfg, reservedSystemCPUs := configureTopologyManagerInKubelet(oldCfg, policy, scope, configMap, numaNodes)
+			updateKubeletConfig(f, newCfg, true)
 
 			runTopologyManagerNodeAlignmentSuiteTests(f, sd, reservedSystemCPUs, policy, numaNodes, coreCount)
 		}
@@ -940,14 +929,15 @@ func runTopologyManagerTests(f *framework.Framework) {
 		policy := topologymanager.PolicySingleNumaNode
 		scope := podScopeTopology
 
-		reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, scope, configMap, numaNodes)
+		newCfg, reservedSystemCPUs := configureTopologyManagerInKubelet(oldCfg, policy, scope, configMap, numaNodes)
+		updateKubeletConfig(f, newCfg, true)
 
 		runTMScopeResourceAlignmentTestSuite(f, configMap, reservedSystemCPUs, policy, numaNodes, coreCount)
 	})
 
 	ginkgo.AfterEach(func() {
 		// restore kubelet config
-		setOldKubeletConfig(f, oldCfg)
+		updateKubeletConfig(f, oldCfg, true)
 	})
 }
 
