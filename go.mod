@@ -248,8 +248,8 @@ replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
 	github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.0
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.6
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.15
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
@@ -452,7 +452,7 @@ replace (
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 	golang.org/x/term => golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
-	golang.org/x/text => golang.org/x/text v0.3.6
+	golang.org/x/text => golang.org/x/text v0.3.7
 	golang.org/x/time => golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	golang.org/x/tools => golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
@@ -516,7 +516,7 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.23
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25
 	sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
 	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.11
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.13

@@ -13,8 +13,8 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/go-openapi/jsonreference v0.19.6 // indirect
+	github.com/go-openapi/swag v0.19.15 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
@@ -51,7 +51,7 @@ require (
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.23
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0
 	sigs.k8s.io/yaml v1.2.0
 )

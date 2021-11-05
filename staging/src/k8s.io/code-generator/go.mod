@@ -7,8 +7,8 @@ go 1.16
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/go-openapi/jsonreference v0.19.6 // indirect
+	github.com/go-openapi/swag v0.19.15 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -17,6 +17,7 @@ require (
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d // indirect
 	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
