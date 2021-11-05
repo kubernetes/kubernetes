@@ -92,7 +92,9 @@ function setup-kube-apiserver-internal-address-redirect {
       exit 1
     fi
 
-    echo "$(hostname -i) ${KUBE_APISERVER_INTERNAL_ADDRESS}" >>/etc/hosts
+    local internal_ip=$(ifconfig eth0 | grep 'inet ' | awk '{print $2}')
+    echo "Master IPv4 internal IP is ${internal_ip}"
+    echo "${internal_ip} ${KUBE_APISERVER_INTERNAL_ADDRESS}" >>/etc/hosts
   fi
 }
 
