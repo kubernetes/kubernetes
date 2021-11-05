@@ -119,6 +119,8 @@ func (tst *tokenSourceTransport) CancelRequest(req *http.Request) {
 	tryCancelRequest(tst.ort, req)
 }
 
+func (tst *tokenSourceTransport) WrappedRoundTripper() http.RoundTripper { return tst.base }
+
 type fileTokenSource struct {
 	path   string
 	period time.Duration
