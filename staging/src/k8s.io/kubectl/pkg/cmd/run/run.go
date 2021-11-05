@@ -100,6 +100,8 @@ type RunObject struct {
 }
 
 type RunOptions struct {
+	cmdutil.OverrideOptions
+
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
@@ -122,7 +124,6 @@ type RunOptions struct {
 	Privileged     bool
 	Quiet          bool
 	TTY            bool
-	Overrides      string
 	fieldManager   string
 
 	Namespace        string
@@ -175,7 +176,6 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container.  If left empty, this value will not be specified by the client and defaulted by the server."))
 	cmd.Flags().Bool("rm", false, "If true, delete the pod after it exits.  Only valid when attaching to the container, e.g. with '--attach' or with '-i/--stdin'.")
-	cmd.Flags().StringVar(&opt.Overrides, "overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object.  Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec.")
 	cmd.Flags().MarkDeprecated("serviceaccount", "has no effect and will be removed in 1.24.")
@@ -197,6 +197,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
+	opt.AddOverrideFlags(cmd)
 }
 
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -321,7 +322,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	delete(params, "limits")
 
 	var createdObjects = []*RunObject{}
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.Overrides)
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.NewOverrider(&corev1.Pod{}))
 	if err != nil {
 		return err
 	}
@@ -586,7 +587,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, para
 		params["default-name"] = name
 	}
 
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, "")
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +603,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, para
 	return runObject, nil
 }
 
-func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides string) (*RunObject, error) {
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrider *cmdutil.Overrider) (*RunObject, error) {
 	err := generate.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
@@ -628,9 +629,8 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 
-	if len(overrides) > 0 {
-		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
-		obj, err = cmdutil.Merge(codec, obj, overrides)
+	if overrider != nil {
+		obj, err = overrider.Apply(obj)
 		if err != nil {
 			return nil, err
 		}

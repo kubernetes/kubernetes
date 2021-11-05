@@ -29,12 +29,14 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -464,7 +466,8 @@ type ValidateOptions struct {
 	EnableValidation bool
 }
 
-// Merge requires JSON serialization
+// Merge converts the passed in object to JSON, merges the fragment into it using an RFC7396 JSON Merge Patch,
+// and returns the resulting object
 // TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
 func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
 	// encode dst into versioned json and apply fragment directly too it
@@ -473,6 +476,46 @@ func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Ob
 		return nil, err
 	}
 	patched, err := jsonpatch.MergePatch(target, []byte(fragment))
+	if err != nil {
+		return nil, err
+	}
+	out, err := runtime.Decode(codec, patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StrategicMerge converts the passed in object to JSON, merges the fragment into it using a Strategic Merge Patch,
+// and returns the resulting object
+func StrategicMerge(codec runtime.Codec, dst runtime.Object, fragment string, dataStruct runtime.Object) (runtime.Object, error) {
+	target, err := runtime.Encode(codec, dst)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(target, []byte(fragment), dataStruct)
+	if err != nil {
+		return nil, err
+	}
+	out, err := runtime.Decode(codec, patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// JSONPatch converts the passed in object to JSON, performs an RFC6902 JSON Patch using operations specified in the
+// fragment, and returns the resulting object
+func JSONPatch(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
+	target, err := runtime.Encode(codec, dst)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := jsonpatch.DecodePatch([]byte(fragment))
+	if err != nil {
+		return nil, err
+	}
+	patched, err := patch.Apply(target)
 	if err != nil {
 		return nil, err
 	}
