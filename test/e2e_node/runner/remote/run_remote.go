@@ -232,9 +232,89 @@ func main() {
 		klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
 	}
 
+	var gceImages *internalImageConfig
+	if gceImages, err = prepareGceImages(); err != nil {
+		klog.Fatalf("While preparing GCE images: %v", err)
+	}
+
+	if *instanceNamePrefix == "" {
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
+	}
+
+	// Setup coloring
+	stat, _ := os.Stdout.Stat()
+	useColor := (stat.Mode() & os.ModeCharDevice) != 0
+	blue := ""
+	noColour := ""
+	if useColor {
+		blue = "\033[0;34m"
+		noColour = "\033[0m"
+	}
+
+	go arc.getArchive()
+	defer arc.deleteArchive()
+
+	results := make(chan *TestResult)
+	running := 0
+	if gceImages != nil {
+		for shortName := range gceImages.images {
+			imageConfig := gceImages.images[shortName]
+			fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
+			running++
+			go func(image *internalGCEImage, junitFileName string) {
+				results <- testImage(image, junitFileName)
+			}(&imageConfig, shortName)
+		}
+	}
+	if *hosts != "" {
+		for _, host := range strings.Split(*hosts, ",") {
+			fmt.Printf("Initializing e2e tests using host %s.\n", host)
+			running++
+			go func(host string, junitFileName string) {
+				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
+			}(host, host)
+		}
+	}
+
+	// Wait for all tests to complete and emit the results
+	errCount := 0
+	exitOk := true
+	for i := 0; i < running; i++ {
+		tr := <-results
+		host := tr.host
+		fmt.Println() // Print an empty line
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("%s>                              START TEST                                >%s\n", blue, noColour)
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("Start Test Suite on Host %s\n", host)
+		fmt.Printf("%s\n", tr.output)
+		if tr.err != nil {
+			errCount++
+			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
+		} else {
+			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
+		}
+		exitOk = exitOk && tr.exitOk
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Printf("%s<                              FINISH TEST                               <%s\n", blue, noColour)
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Println() // Print an empty line
+	}
+	// Set the exit code if there were failures
+	if !exitOk {
+		fmt.Printf("Failure: %d errors encountered.\n", errCount)
+		callGubernator(*gubernator)
+		arc.deleteArchive()
+		os.Exit(1)
+	}
+	callGubernator(*gubernator)
+}
+
+func prepareGceImages() (*internalImageConfig, error) {
 	gceImages := &internalImageConfig{
 		images: make(map[string]internalGCEImage),
 	}
+
 	// Parse images from given config file and convert them to internalGCEImage.
 	if *imageConfigFile != "" {
 		configPath := *imageConfigFile
@@ -244,14 +324,14 @@ func main() {
 
 		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			klog.Fatalf("Could not read image config file provided: %v", err)
+			return nil, fmt.Errorf("Could not read image config file provided: %v", err)
 		}
 		// Unmarshal the given image config file. All images for this test run will be organized into a map.
 		// shortName->GCEImage, e.g cos-stable->cos-stable-81-12871-103-0.
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
-			klog.Fatalf("Could not parse image config file: %v", err)
+			return nil, fmt.Errorf("Could not parse image config file: %v", err)
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
@@ -259,7 +339,7 @@ func main() {
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
 				image, err = getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					klog.Fatalf("Could not retrieve a image based on image regex %q and family %q: %v",
+					return nil, fmt.Errorf("Could not retrieve a image based on image regex %q and family %q: %v",
 						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
@@ -318,75 +398,8 @@ func main() {
 			klog.Fatal("Must specify --project flag to launch images into")
 		}
 	}
-	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
-	}
 
-	// Setup coloring
-	stat, _ := os.Stdout.Stat()
-	useColor := (stat.Mode() & os.ModeCharDevice) != 0
-	blue := ""
-	noColour := ""
-	if useColor {
-		blue = "\033[0;34m"
-		noColour = "\033[0m"
-	}
-
-	go arc.getArchive()
-	defer arc.deleteArchive()
-
-	results := make(chan *TestResult)
-	running := 0
-	for shortName := range gceImages.images {
-		imageConfig := gceImages.images[shortName]
-		fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
-		running++
-		go func(image *internalGCEImage, junitFileName string) {
-			results <- testImage(image, junitFileName)
-		}(&imageConfig, shortName)
-	}
-	if *hosts != "" {
-		for _, host := range strings.Split(*hosts, ",") {
-			fmt.Printf("Initializing e2e tests using host %s.\n", host)
-			running++
-			go func(host string, junitFileName string) {
-				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
-			}(host, host)
-		}
-	}
-
-	// Wait for all tests to complete and emit the results
-	errCount := 0
-	exitOk := true
-	for i := 0; i < running; i++ {
-		tr := <-results
-		host := tr.host
-		fmt.Println() // Print an empty line
-		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
-		fmt.Printf("%s>                              START TEST                                >%s\n", blue, noColour)
-		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
-		fmt.Printf("Start Test Suite on Host %s\n", host)
-		fmt.Printf("%s\n", tr.output)
-		if tr.err != nil {
-			errCount++
-			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
-		} else {
-			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
-		}
-		exitOk = exitOk && tr.exitOk
-		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
-		fmt.Printf("%s<                              FINISH TEST                               <%s\n", blue, noColour)
-		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
-		fmt.Println() // Print an empty line
-	}
-	// Set the exit code if there were failures
-	if !exitOk {
-		fmt.Printf("Failure: %d errors encountered.\n", errCount)
-		callGubernator(*gubernator)
-		arc.deleteArchive()
-		os.Exit(1)
-	}
-	callGubernator(*gubernator)
+	return gceImages, nil
 }
 
 func callGubernator(gubernator bool) {
