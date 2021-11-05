@@ -98,8 +98,6 @@ func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey, labelVal
 			}
 		}
 		newSelector.MatchExpressions = newMExps
-	} else {
-		newSelector.MatchExpressions = nil
 	}
 
 	return newSelector
