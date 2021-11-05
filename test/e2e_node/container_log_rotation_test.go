@@ -52,7 +52,6 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 				e2eskipper.Skipf("Skipping as kubelet config is unavailable")
 			}
 
-			// Should ideally be set to ~3 files and 40Ki of log length.
 			maxLogFiles = int(kubeletConfig.ContainerLogMaxFiles)
 			if maxLogFiles == 0 || kubeletConfig.ContainerLogMaxSize == "" {
 				e2eskipper.Skipf("Skipping ContainerLogRotation test as rotation is not configured")
@@ -74,8 +73,8 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 							Command: []string{
 								"sh",
 								"-c",
-								// ~12Kb/s. Exceeding 40Kb in 4 seconds. Log rotation period is 10 seconds.
-								"while true; do echo hello world; sleep 0.001; done;",
+								// ~480Kb/s. Log rotation period is 10 seconds.
+								"while true; do echo the quick brown fox jumped over the lonely wolf; sleep 0.0001; done;",
 							},
 						},
 					},

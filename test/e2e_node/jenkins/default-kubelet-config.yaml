@@ -25,3 +25,9 @@ evictionMinimumReclaim:
 
 serializeImagePulls: false
 
+# Node E2E Tests depend on log rotation, specifically: container_log_rotation_test.go
+# this is relatively safe to enable by default in E2Es. We
+containerLogMaxFiles: 3
+containerLogMaxSize: "10Mi"
+
+
