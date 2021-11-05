@@ -37,7 +37,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -169,15 +168,6 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	oldCfg, err = getCurrentKubeletConfig(ctx)
 	if err != nil {
 		return err
-	}
-
-	// Test needs to be updated to make it run properly on systemd.
-	// In its current state it will result in kubelet error since
-	// kubeReservedCgroup and systemReservedCgroup are not configured
-	// correctly for systemd.
-	// See: https://github.com/kubernetes/kubernetes/issues/102394
-	if oldCfg.CgroupDriver == "systemd" {
-		e2eskipper.Skipf("unable to run test when using systemd as cgroup driver")
 	}
 
 	// Create a cgroup manager object for manipulating cgroups.
