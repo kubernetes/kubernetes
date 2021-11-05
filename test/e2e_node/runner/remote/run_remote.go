@@ -436,27 +436,29 @@ func getImageMetadata(input string) *compute.Metadata {
 	return &ret
 }
 
-// Run tests in archive against host
-func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFlagsStr string) *TestResult {
+func registerGceHostIP(host string) error {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
-		return &TestResult{
-			err:    err,
-			host:   host,
-			exitOk: false,
-		}
+		return err
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
-		return &TestResult{
-			err:    err,
-			host:   host,
-			exitOk: false,
-		}
+		return fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 	}
 	externalIP := getExternalIP(instance)
 	if len(externalIP) > 0 {
 		remote.AddHostnameIP(host, externalIP)
+	}
+	return nil
+}
+
+// Run tests in archive against host
+func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFlagsStr string) *TestResult {
+	if err := registerGceHostIP(host); err != nil {
+		return &TestResult{
+			err:    err,
+			host:   host,
+			exitOk: false,
+		}
 	}
 
 	path, err := arc.getArchive()
