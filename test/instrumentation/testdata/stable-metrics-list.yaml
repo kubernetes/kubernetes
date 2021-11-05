@@ -1,3 +1,33 @@
+- name: evictions_total
+  subsystem: node_collector
+  help: Number of Node evictions that happened since current instance of NodeController
+    started.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - zone
+- name: framework_extension_point_duration_seconds
+  subsystem: scheduler
+  help: Latency for running all plugins of a specific extension point.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+    - extension_point
+    - profile
+    - status
+  buckets:
+    - 0.0001
+    - 0.0002
+    - 0.0004
+    - 0.0008
+    - 0.0016
+    - 0.0032
+    - 0.0064
+    - 0.0128
+    - 0.0256
+    - 0.0512
+    - 0.1024
+    - 0.2048
 - name: pending_pods
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
