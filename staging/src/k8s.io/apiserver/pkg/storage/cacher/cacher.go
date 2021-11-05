@@ -495,11 +495,22 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	bookmarkAfterResourceVersion := uint64(0) // disabled by default
+	if opts.Predicate.ConsistentWatchCache {
+		// TODO: find the cheapest way of getting a "quorum-rv"
+		_, rv, err := c.Count(key)
+		if err != nil {
+			klog.Infof("watch-list: count err = %v", err)
+			return nil, err
+		}
+		bookmarkAfterResourceVersion = uint64(rv) // safe conversion
+	}
+
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier, 0)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier, bookmarkAfterResourceVersion)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -516,33 +527,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(err), nil
 	}
 
-
-		// TODO: make it opt-in
-		if opts.Predicate.ConsistentWatchCache {
-			bookmarkEvent := &watchCacheEvent{
-				Type:            watch.Bookmark,
-				Object:          c.newFunc(),
-				ResourceVersion: watchRV, // points to c.watchCache.resourceVersion
-			}
-			if err := c.versioner.UpdateObject(bookmarkEvent.Object, bookmarkEvent.ResourceVersion); err != nil {
-				return newErrWatcher(fmt.Errorf("failed to set resourceVersion to %d on the bookmark event %+v", bookmarkEvent.ResourceVersion, bookmarkEvent.Object)), nil
-			}
-			initEvents = append(initEvents, bookmarkEvent)
-		}
-	} else if opts.Predicate.ConsistentWatchCache {
-		// TODO: make it opt-in
-		// if the request was from the reflector
-		// and there is no data just return bookmark
-		// so that the reflector can make progress
-		bookmarkEvent := &watchCacheEvent{
-			Type:            watch.Bookmark,
-			Object:          c.newFunc(),
-			ResourceVersion: c.watchCache.resourceVersion, // points to c.watchCache.resourceVersion
-		}
-		if err := c.versioner.UpdateObject(bookmarkEvent.Object, bookmarkEvent.ResourceVersion); err != nil {
-			return newErrWatcher(fmt.Errorf("failed to set resourceVersion to %d on the bookmark event %+v", bookmarkEvent.ResourceVersion, bookmarkEvent.Object)), nil
-		}
-		initEvents = append(initEvents, bookmarkEvent)
 	func() {
 		c.Lock()
 		defer c.Unlock()
