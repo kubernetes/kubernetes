@@ -740,3 +740,72 @@ func TestCleanupOutdatedRoutes(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteRouteDualStack(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	routeTableClient := mockroutetableclient.NewMockInterface(ctrl)
+
+	cloud := &Cloud{
+		RouteTablesClient: routeTableClient,
+		Config: Config{
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
+		},
+		unmanagedNodes:       sets.NewString(),
+		nodeInformerSynced:   func() bool { return true },
+		ipv6DualStackEnabled: true,
+	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
+
+	route := cloudprovider.Route{
+		TargetNode:      "node",
+		DestinationCIDR: "1.2.3.4/24",
+	}
+	routeName := mapNodeNameToRouteName(true, route.TargetNode, route.DestinationCIDR)
+	routeNameIPV4 := mapNodeNameToRouteName(false, route.TargetNode, route.DestinationCIDR)
+	routeTables := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeName,
+				},
+				{
+					Name: &routeNameIPV4,
+				},
+			},
+		},
+	}
+	routeTablesAfterFirstDeletion := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeNameIPV4,
+				},
+			},
+		},
+	}
+	routeTablesAfterSecondDeletion := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{},
+		},
+	}
+	routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(routeTables, nil).AnyTimes()
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, routeTablesAfterFirstDeletion, "").Return(nil)
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, routeTablesAfterSecondDeletion, "").Return(nil)
+	err := cloud.DeleteRoute(context.TODO(), "cluster", &route)
+	if err != nil {
+		t.Errorf("unexpected error deleting route: %v", err)
+		t.FailNow()
+	}
+}
