@@ -92,6 +92,8 @@ type authProxyRoundTripper struct {
 	rt http.RoundTripper
 }
 
+var _ utilnet.RoundTripperWrapper = &authProxyRoundTripper{}
+
 // NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for
 // authentication terminating proxy cases
 // assuming you pull the user from the context:
@@ -150,6 +152,8 @@ type userAgentRoundTripper struct {
 	rt    http.RoundTripper
 }
 
+var _ utilnet.RoundTripperWrapper = &userAgentRoundTripper{}
+
 // NewUserAgentRoundTripper will add User-Agent header to a request unless it has already been set.
 func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
 	return &userAgentRoundTripper{agent, rt}
@@ -175,6 +179,8 @@ type basicAuthRoundTripper struct {
 	password string `datapolicy:"password"`
 	rt       http.RoundTripper
 }
+
+var _ utilnet.RoundTripperWrapper = &basicAuthRoundTripper{}
 
 // NewBasicAuthRoundTripper will apply a BASIC auth authorization header to a
 // request unless it has already been set.
@@ -225,6 +231,8 @@ type impersonatingRoundTripper struct {
 	delegate    http.RoundTripper
 }
 
+var _ utilnet.RoundTripperWrapper = &impersonatingRoundTripper{}
+
 // NewImpersonatingRoundTripper will add an Act-As header to a request unless it has already been set.
 func NewImpersonatingRoundTripper(impersonate ImpersonationConfig, delegate http.RoundTripper) http.RoundTripper {
 	return &impersonatingRoundTripper{impersonate, delegate}
@@ -263,6 +271,8 @@ type bearerAuthRoundTripper struct {
 	source oauth2.TokenSource
 	rt     http.RoundTripper
 }
+
+var _ utilnet.RoundTripperWrapper = &bearerAuthRoundTripper{}
 
 // NewBearerAuthRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
@@ -372,6 +382,8 @@ type debuggingRoundTripper struct {
 	delegatedRoundTripper http.RoundTripper
 	levels                map[DebugLevel]bool
 }
+
+var _ utilnet.RoundTripperWrapper = &debuggingRoundTripper{}
 
 // DebugLevel is used to enable debugging of certain
 // HTTP requests and responses fields via the debuggingRoundTripper.
