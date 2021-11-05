@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+var mode = flag.String("mode", "gce", "Mode to operate in. One of gce|ssh. Defaults to gce")
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
@@ -223,22 +224,22 @@ func main() {
 		return
 	}
 
-	if *hosts == "" && *imageConfigFile == "" && *images == "" {
-		klog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
-	}
-	var err error
-	computeService, err = getComputeClient()
-	if err != nil {
-		klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
-	}
-
 	var gceImages *internalImageConfig
-	if gceImages, err = prepareGceImages(); err != nil {
-		klog.Fatalf("While preparing GCE images: %v", err)
-	}
-
-	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
+	if *mode == "gce" {
+		if *hosts == "" && *imageConfigFile == "" && *images == "" {
+			klog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
+		}
+		var err error
+		computeService, err = getComputeClient()
+		if err != nil {
+			klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+		}
+		if gceImages, err = prepareGceImages(); err != nil {
+			klog.Fatalf("While preparing GCE images: %v", err)
+		}
+		if *instanceNamePrefix == "" {
+			*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
+		}
 	}
 
 	// Setup coloring
