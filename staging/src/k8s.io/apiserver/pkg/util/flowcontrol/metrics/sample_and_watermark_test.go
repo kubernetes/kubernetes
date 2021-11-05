@@ -23,7 +23,6 @@ import (
 	"time"
 
 	compbasemetrics "k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	testclock "k8s.io/utils/clock/testing"
 )
@@ -47,13 +46,6 @@ var (
 	dt time.Duration
 )
 
-func init() {
-	regs := gen.metrics()
-	for _, reg := range regs {
-		legacyregistry.MustRegister(reg)
-	}
-}
-
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
    it, checking that the count in the sampling histogram is correct at
@@ -71,6 +63,11 @@ func init() {
 func TestSampler(t *testing.T) {
 	saw := gen.Generate(0, 1, []string{})
 	regs := gen.metrics()
+	var registry = compbasemetrics.NewKubeRegistry()
+	var gather compbasemetrics.Gatherer = registry
+	for _, reg := range regs {
+		registry.MustRegister(reg)
+	}
 	// `dt` is the admitted cumulative difference in fake time
 	// since the start of the test.  "admitted" means this is
 	// never allowed to decrease, which matches the designed
@@ -90,7 +87,7 @@ func TestSampler(t *testing.T) {
 		clk.SetTime(t1)
 		saw.Set(1)
 		expectedCount := int64(dt / samplingPeriod)
-		actualCount, err := getHistogramCount(regs, samplesHistName)
+		actualCount, err := getHistogramCount(gather, samplesHistName)
 		if err != nil {
 			t.Fatalf("For t0=%s, t1=%s, failed to getHistogramCount: %#+v", t0, t1, err)
 		}
@@ -102,9 +99,9 @@ func TestSampler(t *testing.T) {
 }
 
 /* getHistogramCount returns the count of the named histogram */
-func getHistogramCount(regs Registerables, metricName string) (int64, error) {
+func getHistogramCount(gather compbasemetrics.Gatherer, metricName string) (int64, error) {
 	considered := []string{}
-	mfs, err := legacyregistry.DefaultGatherer.Gather()
+	mfs, err := gather.Gather()
 	if err != nil {
 		return 0, fmt.Errorf("failed to gather metrics: %s", err)
 	}
