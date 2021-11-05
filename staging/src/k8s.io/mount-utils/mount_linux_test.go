@@ -29,6 +29,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
@@ -556,7 +557,8 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 		expectedMountPoint bool
 		// returns the path to be tested for.
 		// returns an error if something went wrong during prepare.
-		prepare     func(*testing.T) (string, error)
+		prepare         func(*testing.T) (string, error)
+		needsRootAccess bool
 	}{
 		"path is not absolute": {
 			expectedErr:        errPathNotAbsolute,
@@ -643,14 +645,92 @@ func TestIsMountPointUsingOpenAt2(t *testing.T) {
 				return "/random-path/which/does-not/exist", nil
 			},
 		},
+		"check with a normal bind mount (useful for manual testing for reviewers)": {
+			expectedMountPoint: true,
+			needsRootAccess:    true,
+			prepare: func(t *testing.T) (string, error) {
+				sourceDir, err := os.MkdirTemp("", "source")
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.Remove(sourceDir)
+				})
+
+				mountPath, err := os.MkdirTemp("", "target")
+				if err != nil {
+
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.RemoveAll(mountPath)
+				})
+				mounter := New("")
+				err = mounter.Mount(sourceDir, mountPath, "", []string{"bind"})
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					mounter.Unmount(mountPath)
+				})
+				return mountPath, nil
+			},
+		},
+		"check with a symlink to bind mount (useful for manual testing for reviewers)": {
+			expectedMountPoint: true,
+			needsRootAccess:    true,
+			prepare: func(t *testing.T) (string, error) {
+				sourceDir, err := os.MkdirTemp("", "source")
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.Remove(sourceDir)
+				})
+
+				mountPath, err := os.MkdirTemp("", "target")
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.RemoveAll(mountPath)
+				})
+
+				mounter := New("")
+				err = mounter.Mount(sourceDir, mountPath, "", []string{"bind"})
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					mounter.Unmount(mountPath)
+				})
+
+				symlink := filepath.Join(os.TempDir(), "symlink"+fmt.Sprintf("%d", time.Now().UnixNano()))
+				err = os.Symlink(mountPath, symlink)
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.Remove(symlink)
+				})
+
+				return mountPath, nil
+			},
+		},
 	}
 
 	var openAt2Func func(int, string, *unix.OpenHow) (fd int, err error) = nil
 	if !isOpenAt2Supported() {
 		t.Logf("openat2 is not supported, will use mock function openAt2Mock")
 		openAt2Func = openAt2Mock
+	} else {
+		t.Logf("openat2 is supported")
 	}
 	for name, test := range tests {
+		if test.needsRootAccess && os.Geteuid() != 0 {
+			t.Logf("skipping test `%s` as it requires root", name)
+			continue
+		}
 		path, err := test.prepare(t)
 		if err != nil {
 			t.Errorf("test (%s) failed during prepare with error: %s", name, err.Error())

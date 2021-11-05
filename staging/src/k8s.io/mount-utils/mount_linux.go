@@ -697,7 +697,6 @@ func isMountPointUsingOpenAt2(path string, openat2 func(int, string, *unix.OpenH
 	if openat2 == nil {
 		openat2 = unix.Openat2
 	}
-
 	// explicitly clean the path to remove trailing slashes.
 	// ref: https://pkg.go.dev/path/filepath#Clean
 	// otherwise, this will remove false +-ves or return errors.
@@ -746,7 +745,9 @@ func isMountPointUsingOpenAt2(path string, openat2 func(int, string, *unix.OpenH
 		return false, nil
 	case unix.EXDEV: // definitely a mount
 		// this is because for an absolute path, if we have RESOLVE_NO_XDEV, the only way to get
-		// this error is when a path is on a mount-point.
+		// this error is when a mount-point is crossed.
+		// Here are the following cases when a mount-point is crossed in Linux.
+		// Ref: https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/tools/testing/selftests/openat2/resolve_test.c#L301-L351
 		return true, nil
 	}
 	// not sure
