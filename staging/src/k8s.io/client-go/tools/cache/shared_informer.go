@@ -676,6 +676,12 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 	}
 }
 
+// threadSafeBuffer is a thread-safe wrap for buffer.RingGrowing.
+type threadSafeBuffer struct {
+	sync.RWMutex
+	ringBuffers *buffer.RingGrowing
+}
+
 // processorListener relays notifications from a sharedProcessor to
 // one ResourceEventHandler --- using two goroutines, two unbuffered
 // channels, and an unbounded ring buffer.  The `add(notification)`
@@ -698,7 +704,7 @@ type processorListener struct {
 	// added until we OOM.
 	// TODO: This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
 	// we should try to do something better.
-	pendingNotifications buffer.RingGrowing
+	pendingNotifications *threadSafeBuffer
 
 	// requestedResyncPeriod is how frequently the listener wants a
 	// full resync from the shared informer, but modified by two
@@ -728,7 +734,7 @@ func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, res
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
-		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
+		pendingNotifications:  &threadSafeBuffer{ringBuffers: buffer.NewRingGrowing(bufferSize)},
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
 	}
@@ -753,10 +759,12 @@ func (p *processorListener) pop() {
 		case nextCh <- notification:
 			// Notification dispatched
 			var ok bool
-			notification, ok = p.pendingNotifications.ReadOne()
+			p.pendingNotifications.RLock()
+			notification, ok = p.pendingNotifications.ringBuffers.ReadOne()
 			if !ok { // Nothing to pop
 				nextCh = nil // Disable this select case
 			}
+			p.pendingNotifications.RUnlock()
 		case notificationToAdd, ok := <-p.addCh:
 			if !ok {
 				return
@@ -766,7 +774,9 @@ func (p *processorListener) pop() {
 				notification = notificationToAdd
 				nextCh = p.nextCh
 			} else { // There is already a notification waiting to be dispatched
-				p.pendingNotifications.WriteOne(notificationToAdd)
+				p.pendingNotifications.Lock()
+				p.pendingNotifications.ringBuffers.WriteOne(notificationToAdd)
+				p.pendingNotifications.Unlock()
 			}
 		}
 	}
