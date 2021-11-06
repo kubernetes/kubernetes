@@ -2189,11 +2189,8 @@ type Container struct {
 }
 
 // ProbeHandler defines a specific action that should be taken in a probe.
-// This type has a strong relationship to LifecycleHandler - overlapping fields
-// should be identical.
-// TODO: pass structured data to these actions, and document that data here.
+// One and only one of the fields must be specified.
 type ProbeHandler struct {
-	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
 	// +optional
 	Exec *ExecAction
@@ -2201,25 +2198,22 @@ type ProbeHandler struct {
 	// +optional
 	HTTPGet *HTTPGetAction
 	// TCPSocket specifies an action involving a TCP port.
-	// TODO: implement a realistic TCP lifecycle hook
 	// +optional
 	TCPSocket *TCPSocketAction
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
-// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
-// should be identical.
-// TODO: pass structured data to these actions, and document that data here.
+// hook. One and only one of the fields, except TCPSocket must be specified.
 type LifecycleHandler struct {
-	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
 	// +optional
 	Exec *ExecAction
 	// HTTPGet specifies the http request to perform.
 	// +optional
 	HTTPGet *HTTPGetAction
-	// TCPSocket specifies an action involving a TCP port.
-	// TODO: implement a realistic TCP lifecycle hook
+	// Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+	// for the backward compatibility. There are no validation of this field and
+	// lifecycle hooks will fail in runtime when tcp handler is specified.
 	// +optional
 	TCPSocket *TCPSocketAction
 }
@@ -2230,17 +2224,18 @@ type LifecycleHandler struct {
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
+	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PostStart *LifecycleHandler
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
-	// container crashes or exits. The reason for termination is passed to the
-	// handler. The Pod's termination grace period countdown begins before the
-	// PreStop hooked is executed. Regardless of the outcome of the handler, the
+	// container crashes or exits. The Pod's termination grace period countdown begins before the
+	// PreStop hook is executed. Regardless of the outcome of the handler, the
 	// container will eventually terminate within the Pod's termination grace
-	// period. Other management of the container blocks until the hook completes
+	// period (unless delayed by finalizers). Other management of the container blocks until the hook completes
 	// or until the termination grace period is reached.
+	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler
 }
