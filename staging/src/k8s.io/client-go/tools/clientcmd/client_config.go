@@ -583,14 +583,8 @@ func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 		return ns, false, nil
 	}
 
-	// Fall back to the namespace associated with the service account token, if available
-	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns, false, nil
-		}
-	}
-
-	return "default", false, nil
+	namespace := restclient.InClusterNamespace()
+	return namespace, false, nil
 }
 
 func (config *inClusterClientConfig) ConfigAccess() ConfigAccess {

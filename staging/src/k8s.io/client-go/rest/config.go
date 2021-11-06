@@ -541,6 +541,18 @@ func InClusterConfig() (*Config, error) {
 	}, nil
 }
 
+// InClusterNamespace return the default namespace to be used
+// for namespaced API operations in the pod
+func InClusterNamespace() string {
+	//return the namespace associated with the service account token, if available
+	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
+			return ns
+		}
+	}
+	return "default"
+}
+
 // IsConfigTransportTLS returns true if and only if the provided
 // config will result in a protected connection to the server when it
 // is passed to restclient.RESTClientFor().  Use to determine when to
