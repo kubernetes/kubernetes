@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -159,10 +160,10 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             bytes.NewBuffer(nil),
-		natRules:              bytes.NewBuffer(nil),
-		filterChains:          bytes.NewBuffer(nil),
-		filterRules:           bytes.NewBuffer(nil),
+		natChains:             utilproxy.LineBuffer{},
+		natRules:              utilproxy.LineBuffer{},
+		filterChains:          utilproxy.LineBuffer{},
+		filterRules:           utilproxy.LineBuffer{},
 		netlinkHandle:         netlinktest.NewFakeNetlinkHandle(),
 		ipsetList:             ipsetList,
 		nodePortAddresses:     make([]string, 0),
@@ -4650,8 +4651,8 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 	expectedFilterChains := `:KUBE-FORWARD - [0:0]
 :KUBE-NODE-PORT - [0:0]
 `
-	assert.Equal(t, expectedNATChains, fp.natChains.String())
-	assert.Equal(t, expectedFilterChains, fp.filterChains.String())
+	assert.Equal(t, expectedNATChains, string(fp.natChains.Bytes()))
+	assert.Equal(t, expectedFilterChains, string(fp.filterChains.Bytes()))
 }
 
 // This test ensures that the iptables proxier supports translating Endpoints to

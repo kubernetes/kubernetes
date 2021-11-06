@@ -468,35 +468,35 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	return ""
 }
 
-// WriteLine join all words with spaces, terminate with newline and write to buff.
-func WriteLine(buf *bytes.Buffer, words ...string) {
+type LineBuffer struct {
+	b bytes.Buffer
+}
+
+// Write joins all words with spaces, terminates with newline and writes to buf.
+func (buf *LineBuffer) Write(words ...string) {
 	// We avoid strings.Join for performance reasons.
 	for i := range words {
-		buf.WriteString(words[i])
+		buf.b.WriteString(words[i])
 		if i < len(words)-1 {
-			buf.WriteByte(' ')
+			buf.b.WriteByte(' ')
 		} else {
-			buf.WriteByte('\n')
+			buf.b.WriteByte('\n')
 		}
 	}
 }
 
-// WriteRuleLine prepends the strings "-A" and chainName to the buffer and calls
-// WriteLine to join all the words into the buffer and terminate with newline.
-func WriteRuleLine(buf *bytes.Buffer, chainName string, words ...string) {
-	if len(words) == 0 {
-		return
-	}
-	buf.WriteString("-A ")
-	buf.WriteString(chainName)
-	buf.WriteByte(' ')
-	WriteLine(buf, words...)
+// WriteBytes writes bytes to buffer, and terminates with newline.
+func (buf *LineBuffer) WriteBytes(bytes []byte) {
+	buf.b.Write(bytes)
+	buf.b.WriteByte('\n')
 }
 
-// WriteBytesLine write bytes to buffer, terminate with newline
-func WriteBytesLine(buf *bytes.Buffer, bytes []byte) {
-	buf.Write(bytes)
-	buf.WriteByte('\n')
+func (buf *LineBuffer) Reset() {
+	buf.b.Reset()
+}
+
+func (buf *LineBuffer) Bytes() []byte {
+	return buf.b.Bytes()
 }
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
