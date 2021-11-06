@@ -95,7 +95,7 @@ kube::etcd::start_scraping() {
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_SCRAPE_DIR="${ARTIFACTS}/etcd-scrapes"
   else
-    ETCD_SCRAPE_DIR=$(mktemp -d -t test-etcd-scrapes.XXXXXX)
+    ETCD_SCRAPE_DIR=$(mktemp -d -t test.XXXXXX)/etcd-scrapes
   fi
   kube::log::info "Periodically scraping etcd to ${ETCD_SCRAPE_DIR} ."
   mkdir -p "${ETCD_SCRAPE_DIR}"
@@ -108,17 +108,21 @@ kube::etcd::start_scraping() {
 }
 
 kube::etcd::scrape() {
-    curl -s -S "${KUBE_INTEGRATION_ETCD_URL}/metrics" > "${ETCD_SCRAPE_DIR}/next" && mv "${ETCD_SCRAPE_DIR}/next" "${ETCD_SCRAPE_DIR}/$(date +%H%M%S).scrape"
+    curl -s -S "${KUBE_INTEGRATION_ETCD_URL}/metrics" > "${ETCD_SCRAPE_DIR}/next" && mv "${ETCD_SCRAPE_DIR}/next" "${ETCD_SCRAPE_DIR}/$(date +%s).scrape"
 }
 
 
 kube::etcd::stop() {
-  if [[ -n "${ETCD_SCRAPE_PID:-}" ]]; then
+  if [[ -n "${ETCD_SCRAPE_PID:-}" ]] && [[ -n "${ETCD_SCRAPE_DIR:-}" ]] ; then
     kill "${ETCD_SCRAPE_PID}" &>/dev/null || :
     wait "${ETCD_SCRAPE_PID}" &>/dev/null || :
     kube::etcd::scrape || :
-    # shellcheck disable=SC2015
-    tar czf "${ETCD_SCRAPE_DIR}/scrapes.tgz" "${ETCD_SCRAPE_DIR}"/*.scrape && rm "${ETCD_SCRAPE_DIR}"/*.scrape || :
+    (
+      # shellcheck disable=SC2015
+      cd "${ETCD_SCRAPE_DIR}"/.. && \
+      tar czf etcd-scrapes.tgz etcd-scrapes && \
+      rm -rf etcd-scrapes || :
+    )
   fi
   if [[ -n "${ETCD_PID-}" ]]; then
     kill "${ETCD_PID}" &>/dev/null || :
