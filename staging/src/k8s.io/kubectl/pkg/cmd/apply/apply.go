@@ -184,11 +184,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			// apply subcommands
-			cmd.AddCommand(NewCmdApplyViewLastApplied(flags.Factory, flags.IOStreams))
-			cmd.AddCommand(NewCmdApplySetLastApplied(flags.Factory, flags.IOStreams))
-			cmd.AddCommand(NewCmdApplyEditLastApplied(flags.Factory, flags.IOStreams))
-
 			o, err := flags.ToOptions(cmd, baseName, args)
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate(cmd, args))
@@ -197,6 +192,11 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	}
 
 	flags.AddFlags(cmd)
+
+	// apply subcommands
+	cmd.AddCommand(NewCmdApplyViewLastApplied(flags.Factory, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplySetLastApplied(flags.Factory, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(flags.Factory, flags.IOStreams))
 
 	return cmd
 }
