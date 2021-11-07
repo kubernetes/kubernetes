@@ -228,7 +228,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 		}
 	}
 
-	return oldCfg
+	return newCfg
 }
 
 func runGuPodTest(f *framework.Framework, cpuCount int) {
@@ -532,8 +532,10 @@ func runCPUManagerTests(f *framework.Framework) {
 
 	ginkgo.BeforeEach(func() {
 		var err error
-		oldCfg, err = getCurrentKubeletConfig()
-		framework.ExpectNoError(err)
+		if oldCfg == nil {
+			oldCfg, err = getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+		}
 	})
 
 	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {

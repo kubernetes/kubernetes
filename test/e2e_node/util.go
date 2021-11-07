@@ -163,7 +163,8 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 	var oldCfg *kubeletconfig.KubeletConfiguration
 
 	ginkgo.BeforeEach(func() {
-		oldCfg, err := getCurrentKubeletConfig()
+		var err error
+		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
 		newCfg := oldCfg.DeepCopy()

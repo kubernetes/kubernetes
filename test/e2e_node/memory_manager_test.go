@@ -53,6 +53,7 @@ const (
 	resourceMemory     = "memory"
 	staticPolicy       = "Static"
 	nonePolicy         = "None"
+	hugepages2MiCount  = 8
 )
 
 // Helper for makeMemoryManagerPod().
@@ -318,23 +319,22 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		if len(allNUMANodes) == 0 {
 			allNUMANodes = getAllNUMANodes()
 		}
-	})
-
-	// dynamically update the kubelet configuration
-	ginkgo.JustBeforeEach(func() {
-		hugepagesCount := 8
 
 		// allocate hugepages
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Configuring hugepages")
 			gomega.Eventually(func() error {
-				return configureHugePages(hugepagesSize2M, hugepagesCount)
+				return configureHugePages(hugepagesSize2M, hugepages2MiCount)
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+		}
+	})
 
-			restartKubelet(true)
-
+	// dynamically update the kubelet configuration
+	ginkgo.JustBeforeEach(func() {
+		// allocate hugepages
+		if *is2MiHugepagesSupported {
 			ginkgo.By("Waiting for hugepages resource to become available on the local node")
-			waitingForHugepages(hugepagesCount)
+			waitingForHugepages(hugepages2MiCount)
 
 			for i := 0; i < len(ctnParams); i++ {
 				ctnParams[i].hugepages2Mi = "8Mi"
@@ -358,10 +358,6 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			gomega.Eventually(func() error {
 				return configureHugePages(hugepagesSize2M, 0)
 			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
-
-			restartKubelet(true)
-
-			waitingForHugepages(0)
 		}
 	})
 
