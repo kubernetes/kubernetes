@@ -240,6 +240,16 @@ var (
 		[]string{"source", "status"},
 	)
 
+	//clientRequestCounter is a number of total requests with client name
+	clientRequestCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "client_request_total",
+			Help:           "Counter of apiserver requests broken out for each verb, group, version, resource, scope and client.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -259,6 +269,7 @@ var (
 		requestFilterDuration,
 		requestAbortsTotal,
 		requestPostTimeoutTotal,
+		clientRequestCounter,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -468,9 +479,10 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	// We are only interested in response sizes of read requests.
+	// We are only interested in response sizes and client's request count of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
+		clientRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, getClientName(req.UserAgent())).Inc()
 	}
 }
 
@@ -509,6 +521,15 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
 	}
+}
+
+//getClientName get client name from request.UserAgent
+func getClientName(name string) string {
+	list := strings.Split(name, " ")
+	if len(list) > 0 {
+		return list[0]
+	}
+	return "UnKnown"
 }
 
 // CleanScope returns the scope of the request.
