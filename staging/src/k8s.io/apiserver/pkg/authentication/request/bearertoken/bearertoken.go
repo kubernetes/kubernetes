@@ -48,7 +48,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 	// Empty bearer tokens aren't valid
 	if len(token) == 0 {
-		return nil, false, nil
+		return nil, false, invalidToken
 	}
 
 	resp, ok, err := a.auth.AuthenticateToken(req.Context(), token)
