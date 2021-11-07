@@ -36,13 +36,13 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	remoteImageEndpoint string,
 	nonMasqueradeCIDR string) error {
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
-		NonMasqueradeCIDR:  nonMasqueradeCIDR,
-		PluginName:         crOptions.NetworkPluginName,
-		PluginConfDir:      crOptions.CNIConfDir,
-		PluginBinDirString: crOptions.CNIBinDir,
-		PluginCacheDir:     crOptions.CNICacheDir,
-		MTU:                int(crOptions.NetworkPluginMTU),
+		HairpinMode:       kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
+		NonMasqueradeCIDR: nonMasqueradeCIDR,
+		PluginName:        crOptions.NetworkPluginName,
+		PluginConfDir:     crOptions.CNIConfDir,
+		PluginBinDir:      crOptions.CNIBinDir,
+		PluginCacheDir:    crOptions.CNICacheDir,
+		MTU:               int(crOptions.NetworkPluginMTU),
 	}
 
 	// Create and start the CRI shim running as a grpc server.

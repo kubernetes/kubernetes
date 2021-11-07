@@ -118,9 +118,9 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDirString is a list of directiores delimited by commas, in
+	// PluginBinDir is a list of directories delimited by commas, in
 	// which the binaries for the plugin with PluginName may be found.
-	PluginBinDirString string
+	PluginBinDir string
 	// PluginBinDirs is an array of directories in which the binaries for
 	// the plugin with PluginName may be found. The admin is responsible for
 	// provisioning these binaries before-hand.
@@ -243,7 +243,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	klog.InfoS("Hairpin mode is set", "hairpinMode", pluginSettings.HairpinMode)
 
 	// dockershim currently only supports CNI plugins.
-	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
+	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDir)
 	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginCacheDir, pluginSettings.PluginBinDirs)
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs, pluginSettings.PluginCacheDir))
 	netHost := &dockerNetworkHost{
