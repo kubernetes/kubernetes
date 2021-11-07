@@ -434,13 +434,13 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 		natChains := &utilproxy.LineBuffer{}
 		natRules := &utilproxy.LineBuffer{}
-		natChains.Write("*nat")
+		natChains.Write([]string{"*nat"})
 		// Start with chains we know we need to remove.
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
 			if _, found := existingNATChains[chain]; found {
 				chainString := string(chain)
 				natChains.WriteBytes(existingNATChains[chain]) // flush
-				natRules.Write("-X", chainString)              // delete
+				natRules.Write([]string{"-X", chainString})    // delete
 			}
 		}
 		// Hunt for service and endpoint chains.
@@ -448,10 +448,10 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 			chainString := string(chain)
 			if strings.HasPrefix(chainString, "KUBE-SVC-") || strings.HasPrefix(chainString, "KUBE-SEP-") || strings.HasPrefix(chainString, "KUBE-FW-") || strings.HasPrefix(chainString, "KUBE-XLB-") {
 				natChains.WriteBytes(existingNATChains[chain]) // flush
-				natRules.Write("-X", chainString)              // delete
+				natRules.Write([]string{"-X", chainString})    // delete
 			}
 		}
-		natRules.Write("COMMIT")
+		natRules.Write([]string{"COMMIT"})
 		natLines := append(natChains.Bytes(), natRules.Bytes()...)
 		// Write it.
 		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
@@ -471,15 +471,15 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		existingFilterChains := utiliptables.GetChainLines(utiliptables.TableFilter, iptablesData.Bytes())
 		filterChains := &utilproxy.LineBuffer{}
 		filterRules := &utilproxy.LineBuffer{}
-		filterChains.Write("*filter")
+		filterChains.Write([]string{"*filter"})
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 			if _, found := existingFilterChains[chain]; found {
 				chainString := string(chain)
 				filterChains.WriteBytes(existingFilterChains[chain])
-				filterRules.Write("-X", chainString)
+				filterRules.Write([]string{"-X", chainString})
 			}
 		}
-		filterRules.Write("COMMIT")
+		filterRules.Write([]string{"COMMIT"})
 		filterLines := append(filterChains.Bytes(), filterRules.Bytes()...)
 		// Write it.
 		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
@@ -760,10 +760,6 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
-func prepend(sl []string, args ...string) []string {
-	return append(args, sl...)
-}
-
 const endpointChainsNumberThreshold = 1000
 
 // Assumes proxier.mu is held.
@@ -894,8 +890,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.natRules.Reset()
 
 	// Write table headers.
-	proxier.filterChains.Write("*filter")
-	proxier.natChains.Write("*nat")
+	proxier.filterChains.Write([]string{"*filter"})
+	proxier.natChains.Write([]string{"*nat"})
 
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
@@ -903,14 +899,14 @@ func (proxier *Proxier) syncProxyRules() {
 		if chain, ok := existingFilterChains[chainName]; ok {
 			proxier.filterChains.WriteBytes(chain)
 		} else {
-			proxier.filterChains.Write(utiliptables.MakeChainLine(chainName))
+			proxier.filterChains.Write([]string{utiliptables.MakeChainLine(chainName)})
 		}
 	}
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
 		if chain, ok := existingNATChains[chainName]; ok {
 			proxier.natChains.WriteBytes(chain)
 		} else {
-			proxier.natChains.Write(utiliptables.MakeChainLine(chainName))
+			proxier.natChains.Write([]string{utiliptables.MakeChainLine(chainName)})
 		}
 	}
 
@@ -918,16 +914,16 @@ func (proxier *Proxier) syncProxyRules() {
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
 	// NB: THIS MUST MATCH the corresponding code in the kubelet
-	proxier.natRules.Write(
+	proxier.natRules.Write([]string{
 		"-A", string(kubePostroutingChain),
 		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
 		"-j", "RETURN",
-	)
+	})
 	// Clear the mark to avoid re-masquerading if the packet re-traverses the network stack.
-	proxier.natRules.Write(
+	proxier.natRules.Write([]string{
 		"-A", string(kubePostroutingChain),
 		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
-	)
+	})
 	masqRule := []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
@@ -936,15 +932,15 @@ func (proxier *Proxier) syncProxyRules() {
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
 	}
-	proxier.natRules.Write(masqRule...)
+	proxier.natRules.Write(masqRule)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-	proxier.natRules.Write(
+	proxier.natRules.Write([]string{
 		"-A", string(KubeMarkMasqChain),
 		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
-	)
+	})
 
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
@@ -1059,7 +1055,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if chain, ok := existingNATChains[endpointChain]; ok {
 				proxier.natChains.WriteBytes(chain)
 			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(endpointChain))
+				proxier.natChains.Write([]string{utiliptables.MakeChainLine(endpointChain)})
 			}
 			activeNATChains[endpointChain] = true
 
@@ -1068,14 +1064,14 @@ func (proxier *Proxier) syncProxyRules() {
 			// Handle traffic that loops back to the originator with SNAT.
 			proxier.natRules.Write(append(args,
 				"-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(epInfo.IP())),
-				"-j", string(KubeMarkMasqChain))...)
+				"-j", string(KubeMarkMasqChain)))
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
 			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.Endpoint)
-			proxier.natRules.Write(args...)
+			proxier.natRules.Write(args)
 		}
 
 		svcChain := svcInfo.servicePortChainName
@@ -1084,7 +1080,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if chain, ok := existingNATChains[svcChain]; ok {
 				proxier.natChains.WriteBytes(chain)
 			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(svcChain))
+				proxier.natChains.Write([]string{utiliptables.MakeChainLine(svcChain)})
 			}
 			activeNATChains[svcChain] = true
 		}
@@ -1096,7 +1092,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
 				proxier.natChains.WriteBytes(lbChain)
 			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(svcXlbChain))
+				proxier.natChains.Write([]string{utiliptables.MakeChainLine(svcXlbChain)})
 			}
 			activeNATChains[svcXlbChain] = true
 		}
@@ -1110,32 +1106,32 @@ func (proxier *Proxier) syncProxyRules() {
 				"--dport", strconv.Itoa(svcInfo.Port()),
 			)
 			if proxier.masqueradeAll {
-				args := prepend(args, "-A", string(svcChain))
-				args = append(args, "-j", string(KubeMarkMasqChain))
-				proxier.natRules.Write(args...)
+				proxier.natRules.Write(
+					[]string{"-A", string(svcChain)},
+					append(args, "-j", string(KubeMarkMasqChain)))
 			} else if proxier.localDetector.IsImplemented() {
 				// This masquerades off-cluster traffic to a service VIP.  The idea
 				// is that you can establish a static route for your Service range,
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
 				// If/when we support "Local" policy for VIPs, we should update this.
-				args := prepend(args, "-A", string(svcChain))
-				args = proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))
-				proxier.natRules.Write(args...)
+				proxier.natRules.Write(
+					[]string{"-A", string(svcChain)},
+					proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
 			}
-			args = prepend(args, "-A", string(kubeServicesChain))
-			args = append(args, "-j", string(svcChain))
-			proxier.natRules.Write(args...)
+			proxier.natRules.Write(
+				[]string{"-A", string(kubeServicesChain)},
+				append(args, "-j", string(svcChain)))
 		} else {
 			// No endpoints.
-			proxier.filterRules.Write(
+			proxier.filterRules.Write([]string{
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", utilproxy.ToCIDR(svcInfo.ClusterIP()),
 				"--dport", strconv.Itoa(svcInfo.Port()),
 				"-j", "REJECT",
-			)
+			})
 		}
 
 		// Capture externalIPs.
@@ -1188,32 +1184,34 @@ func (proxier *Proxier) syncProxyRules() {
 				// be always forwarded to the corresponding Service, so no need to SNAT
 				// If we can't differentiate the local traffic we always SNAT.
 				if !svcInfo.NodeLocalExternal() {
+					appendTo := []string{"-A", string(svcChain)}
 					destChain = svcChain
-					args := prepend(args, "-A", string(svcChain))
 					// This masquerades off-cluster traffic to a External IP.
 					if proxier.localDetector.IsImplemented() {
 						proxier.natRules.Write(
-							proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
+							appendTo,
+							proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
 					} else {
 						proxier.natRules.Write(
-							append(args, "-j", string(KubeMarkMasqChain))...)
+							appendTo,
+							append(args, "-j", string(KubeMarkMasqChain)))
 					}
 				}
 				// Send traffic bound for external IPs to the service chain.
-				args = prepend(args, "-A", string(kubeServicesChain))
 				proxier.natRules.Write(
-					append(args, "-j", string(destChain))...)
+					[]string{"-A", string(kubeServicesChain)},
+					append(args, "-j", string(destChain)))
 
 			} else {
 				// No endpoints.
-				proxier.filterRules.Write(
+				proxier.filterRules.Write([]string{
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(externalIP)),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", "REJECT",
-				)
+				})
 			}
 		}
 
@@ -1226,7 +1224,7 @@ func (proxier *Proxier) syncProxyRules() {
 					if chain, ok := existingNATChains[fwChain]; ok {
 						proxier.natChains.WriteBytes(chain)
 					} else {
-						proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
+						proxier.natChains.Write([]string{utiliptables.MakeChainLine(fwChain)})
 					}
 					activeNATChains[fwChain] = true
 					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
@@ -1241,7 +1239,7 @@ func (proxier *Proxier) syncProxyRules() {
 						"--dport", strconv.Itoa(svcInfo.Port()),
 					)
 					// jump to service firewall chain
-					proxier.natRules.Write(append(args, "-j", string(fwChain))...)
+					proxier.natRules.Write(append(args, "-j", string(fwChain)))
 
 					args = append(args[:0],
 						"-A", string(fwChain),
@@ -1253,18 +1251,18 @@ func (proxier *Proxier) syncProxyRules() {
 					// If we are proxying globally, we need to masquerade in case we cross nodes.
 					// If we are proxying only locally, we can retain the source IP.
 					if !svcInfo.NodeLocalExternal() {
-						proxier.natRules.Write(append(args, "-j", string(KubeMarkMasqChain))...)
+						proxier.natRules.Write(append(args, "-j", string(KubeMarkMasqChain)))
 						chosenChain = svcChain
 					}
 
 					if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
 						// allow all sources, so jump directly to the KUBE-SVC or KUBE-XLB chain
-						proxier.natRules.Write(append(args, "-j", string(chosenChain))...)
+						proxier.natRules.Write(append(args, "-j", string(chosenChain)))
 					} else {
 						// firewall filter based on each source range
 						allowFromNode := false
 						for _, src := range svcInfo.LoadBalancerSourceRanges() {
-							proxier.natRules.Write(append(args, "-s", src, "-j", string(chosenChain))...)
+							proxier.natRules.Write(append(args, "-s", src, "-j", string(chosenChain)))
 							_, cidr, err := netutils.ParseCIDRSloppy(src)
 							if err != nil {
 								klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
@@ -1276,23 +1274,23 @@ func (proxier *Proxier) syncProxyRules() {
 						// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 						// Need to add the following rule to allow request on host.
 						if allowFromNode {
-							proxier.natRules.Write(append(args, "-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)), "-j", string(chosenChain))...)
+							proxier.natRules.Write(append(args, "-s", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)), "-j", string(chosenChain)))
 						}
 					}
 
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
-					proxier.natRules.Write(append(args, "-j", string(KubeMarkDropChain))...)
+					proxier.natRules.Write(append(args, "-j", string(KubeMarkDropChain)))
 				} else {
 					// No endpoints.
-					proxier.filterRules.Write(
+					proxier.filterRules.Write([]string{
 						"-A", string(kubeExternalServicesChain),
 						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 						"-m", protocol, "-p", protocol,
 						"-d", utilproxy.ToCIDR(netutils.ParseIPSloppy(ingress)),
 						"--dport", strconv.Itoa(svcInfo.Port()),
 						"-j", "REJECT",
-					)
+					})
 				}
 			}
 		}
@@ -1360,10 +1358,12 @@ func (proxier *Proxier) syncProxyRules() {
 				if !svcInfo.NodeLocalExternal() {
 					// Nodeports need SNAT, unless they're local.
 					proxier.natRules.Write(
-						append(prepend(args, "-A", string(svcChain)), "-j", string(KubeMarkMasqChain))...)
+						[]string{"-A", string(svcChain)},
+						append(args, "-j", string(KubeMarkMasqChain)))
 					// Jump to the service chain.
 					proxier.natRules.Write(
-						append(prepend(args, "-A", string(kubeNodePortsChain)), "-j", string(svcChain))...)
+						[]string{"-A", string(kubeNodePortsChain)},
+						append(args, "-j", string(svcChain)))
 				} else {
 					// TODO: Make all nodePorts jump to the firewall chain.
 					// Currently we only create it for loadbalancers (#33586).
@@ -1373,22 +1373,24 @@ func (proxier *Proxier) syncProxyRules() {
 					if isIPv6 {
 						loopback = "::1/128"
 					}
-					args = prepend(args, "-A", string(kubeNodePortsChain))
+					appendTo := []string{"-A", string(kubeNodePortsChain)}
 					proxier.natRules.Write(
-						append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
+						appendTo,
+						append(args, "-s", loopback, "-j", string(KubeMarkMasqChain)))
 					proxier.natRules.Write(
-						append(args, "-j", string(svcXlbChain))...)
+						appendTo,
+						append(args, "-j", string(svcXlbChain)))
 				}
 			} else {
 				// No endpoints.
-				proxier.filterRules.Write(
+				proxier.filterRules.Write([]string{
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", "addrtype", "--dst-type", "LOCAL",
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 					"-j", "REJECT",
-				)
+				})
 			}
 		}
 
@@ -1396,13 +1398,13 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.HealthCheckNodePort() != 0 {
 			// no matter if node has local endpoints, healthCheckNodePorts
 			// need to add a rule to accept the incoming connection
-			proxier.filterRules.Write(
+			proxier.filterRules.Write([]string{
 				"-A", string(kubeNodePortsChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcNameString),
 				"-m", "tcp", "-p", "tcp",
 				"--dport", strconv.Itoa(svcInfo.HealthCheckNodePort()),
 				"-j", "ACCEPT",
-			)
+			})
 		}
 
 		if !hasEndpoints {
@@ -1421,7 +1423,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
 					"-j", string(endpointChain),
 				)
-				proxier.natRules.Write(args...)
+				proxier.natRules.Write(args)
 			}
 		}
 
@@ -1440,7 +1442,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
-			proxier.natRules.Write(args...)
+			proxier.natRules.Write(args)
 		}
 
 		// The logic below this applies only if this service is marked as OnlyLocal
@@ -1457,7 +1459,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment",
 				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
 			)
-			proxier.natRules.Write(proxier.localDetector.JumpIfLocal(args, string(svcChain))...)
+			proxier.natRules.Write(proxier.localDetector.JumpIfLocal(args, string(svcChain)))
 		}
 
 		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local
@@ -1466,10 +1468,10 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0], "-A", string(svcXlbChain))
 		proxier.natRules.Write(append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain))...)
+			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain)))
 		proxier.natRules.Write(append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
+			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain)))
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
@@ -1481,17 +1483,17 @@ func (proxier *Proxier) syncProxyRules() {
 				"-j",
 				string(KubeMarkDropChain),
 			)
-			proxier.natRules.Write(args...)
+			proxier.natRules.Write(args)
 		} else {
 			// First write session affinity rules only over local endpoints, if applicable.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				for _, endpointChain := range localEndpointChains {
-					proxier.natRules.Write(
+					proxier.natRules.Write([]string{
 						"-A", string(svcXlbChain),
 						"-m", "comment", "--comment", svcNameString,
 						"-m", "recent", "--name", string(endpointChain),
 						"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
-						"-j", string(endpointChain))
+						"-j", string(endpointChain)})
 				}
 			}
 
@@ -1512,7 +1514,7 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				// The final (or only if n == 1) rule is a guaranteed match.
 				args = append(args, "-j", string(endpointChain))
-				proxier.natRules.Write(args...)
+				proxier.natRules.Write(args)
 			}
 		}
 	}
@@ -1529,7 +1531,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// the nice effect of flushing the chain.  Then we can remove the
 			// chain.
 			proxier.natChains.WriteBytes(existingNATChains[chain])
-			proxier.natRules.Write("-X", chainString)
+			proxier.natRules.Write([]string{"-X", chainString})
 		}
 	}
 
@@ -1544,7 +1546,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
 				"-m", "addrtype", "--dst-type", "LOCAL",
 				"-j", string(kubeNodePortsChain))
-			proxier.natRules.Write(args...)
+			proxier.natRules.Write(args)
 			// Nothing else matters after the zero CIDR.
 			break
 		}
@@ -1559,46 +1561,46 @@ func (proxier *Proxier) syncProxyRules() {
 			"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
 			"-d", address,
 			"-j", string(kubeNodePortsChain))
-		proxier.natRules.Write(args...)
+		proxier.natRules.Write(args)
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
 	// unexpected connection reset.
 	// https://github.com/kubernetes/kubernetes/issues/74839
-	proxier.filterRules.Write(
+	proxier.filterRules.Write([]string{
 		"-A", string(kubeForwardChain),
 		"-m", "conntrack",
 		"--ctstate", "INVALID",
 		"-j", "DROP",
-	)
+	})
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
 	// FORWARD policy is not accept.
-	proxier.filterRules.Write(
+	proxier.filterRules.Write([]string{
 		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
 		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
 		"-j", "ACCEPT",
-	)
+	})
 
 	// The following two rules ensure the traffic after the initial packet
 	// accepted by the "kubernetes forwarding rules" rule above will be
 	// accepted.
-	proxier.filterRules.Write(
+	proxier.filterRules.Write([]string{
 		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
 		"-j", "ACCEPT",
-	)
-	proxier.filterRules.Write(
+	})
+	proxier.filterRules.Write([]string{
 		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
 		"-j", "ACCEPT",
-	)
+	})
 
 	numberFilterIptablesRules := utilproxy.CountBytesLines(proxier.filterRules.Bytes())
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(numberFilterIptablesRules))
@@ -1606,8 +1608,8 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(numberNatIptablesRules))
 
 	// Write the end-of-table markers.
-	proxier.filterRules.Write("COMMIT")
-	proxier.natRules.Write("COMMIT")
+	proxier.filterRules.Write([]string{"COMMIT"})
+	proxier.natRules.Write([]string{"COMMIT"})
 
 	// Sync rules.
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
