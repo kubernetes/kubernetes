@@ -82,10 +82,16 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					found = true
 					break
 				}
-				framework.ExpectEqual(found, true, "Found pod in stats summary")
+				if !found{
+					framework.Failf("Pod with name : %v and namespace : %v not found in the stats summary", p.Name, p.Namespace)
+				}
 				framework.Logf("Pod %s usage: %v", p.Name, cpuUsage)
-				framework.ExpectEqual(cpuUsage > 0, true, "Pods reported usage should be > 0")
-				framework.ExpectEqual((.5*1.05) > cpuUsage, true, "Pods reported usage should not exceed limit by >5%")
+				if !(cpuUsage > 0){
+					framework.Failf("Pods reported usage is %v, but it should be greater than 0", cpuUsage)
+				}
+				if !((.5*1.05) > cpuUsage){
+					framework.Failf("Pods reported usage is %v, but it should not exceed limit by >5%", cpuUsage)
+				}
 			}
 		})
 	})
