@@ -472,16 +472,26 @@ type LineBuffer struct {
 	b bytes.Buffer
 }
 
-// Write joins all words of all wordgroups with spaces, terminates with
-// newline, and writes to buf.
-func (buf *LineBuffer) Write(wordgroups ...[]string) {
-	// We avoid strings.Join for performance reasons.
-	for i, wg := range wordgroups {
-		for j, w := range wg {
-			if i+j > 0 {
-				buf.b.WriteByte(' ')
+// Write takes a list of arguments, each a string or []string, joins all the
+// individual strings with spaces, terminates with newline, and writes to buf.
+// Any other argument type will panic.
+func (buf *LineBuffer) Write(args ...interface{}) {
+	for i, arg := range args {
+		if i > 0 {
+			buf.b.WriteByte(' ')
+		}
+		switch x := arg.(type) {
+		case string:
+			buf.b.WriteString(x)
+		case []string:
+			for j, s := range x {
+				if j > 0 {
+					buf.b.WriteByte(' ')
+				}
+				buf.b.WriteString(s)
 			}
-			buf.b.WriteString(w)
+		default:
+			panic(fmt.Sprintf("unknown argument type: %T", x))
 		}
 	}
 	buf.b.WriteByte('\n')
