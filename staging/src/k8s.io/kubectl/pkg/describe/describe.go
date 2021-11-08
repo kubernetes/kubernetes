@@ -451,14 +451,31 @@ func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.Re
 		printLabelsMultiline(w, "Labels", namespace.Labels)
 		printAnnotationsMultiline(w, "Annotations", namespace.Annotations)
 		w.Write(LEVEL_0, "Status:\t%s\n", string(namespace.Status.Phase))
+
+		if len(namespace.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+			for _, c := range namespace.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
+
 		if resourceQuotaList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeResourceQuotas(resourceQuotaList, w)
 		}
+
 		if limitRangeList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeLimitRanges(limitRangeList, w)
 		}
+
 		return nil
 	})
 }
