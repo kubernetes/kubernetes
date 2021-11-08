@@ -3898,6 +3898,32 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.Bool(false),
+				},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &udpProtocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	if fexec.CommandCalls != 0 {
+		t.Fatalf("Updated UDP service with not ready endpoints must not clear UDP entries")
+	}
+
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP},
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.Bool(true),
+				},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     utilpointer.StringPtr(svcPortName.Port),
