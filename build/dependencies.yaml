@@ -120,7 +120,7 @@ dependencies:
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: buster-v1.8.0
+    version: buster-v1.9.0
     refPaths:
     - path: build/workspace.bzl
       match: tag =
@@ -136,7 +136,7 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.5
+    version: buster-v1.6.7
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
