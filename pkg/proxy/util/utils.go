@@ -472,17 +472,29 @@ type LineBuffer struct {
 	b bytes.Buffer
 }
 
-// Write joins all words with spaces, terminates with newline and writes to buf.
-func (buf *LineBuffer) Write(words ...string) {
-	// We avoid strings.Join for performance reasons.
-	for i := range words {
-		buf.b.WriteString(words[i])
-		if i < len(words)-1 {
+// Write takes a list of arguments, each a string or []string, joins all the
+// individual strings with spaces, terminates with newline, and writes to buf.
+// Any other argument type will panic.
+func (buf *LineBuffer) Write(args ...interface{}) {
+	for i, arg := range args {
+		if i > 0 {
 			buf.b.WriteByte(' ')
-		} else {
-			buf.b.WriteByte('\n')
+		}
+		switch x := arg.(type) {
+		case string:
+			buf.b.WriteString(x)
+		case []string:
+			for j, s := range x {
+				if j > 0 {
+					buf.b.WriteByte(' ')
+				}
+				buf.b.WriteString(s)
+			}
+		default:
+			panic(fmt.Sprintf("unknown argument type: %T", x))
 		}
 	}
+	buf.b.WriteByte('\n')
 }
 
 // WriteBytes writes bytes to buffer, and terminates with newline.
