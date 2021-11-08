@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	sc "k8s.io/kubernetes/pkg/securitycontext"
 )
 
 const (
@@ -883,12 +884,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 
 		metrics.StartedContainersTotal.WithLabelValues(metricLabel).Inc()
+		if sc.HasWindowsHostProcessRequest(pod, spec.container) {
+			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
+		}
 		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
 		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
 			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
+			if sc.HasWindowsHostProcessRequest(pod, spec.container) {
+				metrics.StartedHostProcessContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
+			}
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
