@@ -36,6 +36,8 @@ func TestOperationCompleteHook(t *testing.T) {
 		falseV             = false
 	)
 
+	var emptyErr error = nil
+
 	metrics := []string{"storage_operation_duration_seconds"}
 
 	opComplete := OperationCompleteHook(fakeFullPluginName, fakeOperationName)
@@ -47,14 +49,17 @@ func TestOperationCompleteHook(t *testing.T) {
 		wantMigrated string
 	}{
 		{
-			name:         "error is empty and migrated is nil",
-			param:        types.CompleteFuncParam{},
+			name: "error is empty and migrated is nil",
+			param: types.CompleteFuncParam{
+				Err: &emptyErr,
+			},
 			wantStatus:   statusSuccess,
 			wantMigrated: "false",
 		},
 		{
 			name: "error is empty and migrated is false",
 			param: types.CompleteFuncParam{
+				Err:      &emptyErr,
 				Migrated: &falseV,
 			},
 			wantStatus:   statusSuccess,
@@ -63,6 +68,7 @@ func TestOperationCompleteHook(t *testing.T) {
 		{
 			name: "error is empty and migrated is true",
 			param: types.CompleteFuncParam{
+				Err:      &emptyErr,
 				Migrated: &trueV,
 			},
 			wantStatus:   statusSuccess,

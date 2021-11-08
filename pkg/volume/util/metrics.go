@@ -94,7 +94,7 @@ func OperationCompleteHook(plugin, operationName string) func(types.CompleteFunc
 		timeTaken := time.Since(requestTime).Seconds()
 		// Create metric with operation name and plugin name
 		status := statusSuccess
-		if c.Err != nil {
+		if *c.Err != nil {
 			// TODO: Establish well-known error codes to be able to distinguish
 			// user configuration errors from system errors.
 			status = statusFailUnknown
