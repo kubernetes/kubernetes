@@ -1148,41 +1148,56 @@ func TestRevertPorts(t *testing.T) {
 	}
 }
 
-func TestWriteLine(t *testing.T) {
+func TestLineBufferWrite(t *testing.T) {
 	testCases := []struct {
 		name     string
-		words    []string
+		input    []interface{}
 		expected string
 	}{
 		{
-			name:     "write no word",
-			words:    []string{},
-			expected: "",
+			name:     "none",
+			input:    []interface{}{},
+			expected: "\n",
 		},
 		{
-			name:     "write one word",
-			words:    []string{"test1"},
+			name:     "one string",
+			input:    []interface{}{"test1"},
 			expected: "test1\n",
 		},
 		{
-			name:     "write multi word",
-			words:    []string{"test1", "test2", "test3"},
-			expected: "test1 test2 test3\n",
+			name:     "one slice",
+			input:    []interface{}{[]string{"test1", "test2"}},
+			expected: "test1 test2\n",
+		},
+		{
+			name:     "mixed",
+			input:    []interface{}{"s1", "s2", []string{"s3", "s4"}, "", "s5", []string{}, []string{"s6"}, "s7"},
+			expected: "s1 s2 s3 s4  s5  s6 s7\n",
 		},
 	}
 	testBuffer := LineBuffer{}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testBuffer.Reset()
-			testBuffer.Write(testCase.words...)
+			testBuffer.Write(testCase.input...)
 			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
-				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, want, got)
+				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
 			}
 		})
 	}
 }
 
-func TestWriteBytesLine(t *testing.T) {
+func TestLineBufferWritePanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("did not panic")
+		}
+	}()
+	testBuffer := LineBuffer{}
+	testBuffer.Write("string", []string{"a", "slice"}, 1234)
+}
+
+func TestLineBufferWriteBytes(t *testing.T) {
 	testCases := []struct {
 		name     string
 		bytes    []byte
