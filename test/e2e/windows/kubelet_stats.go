@@ -36,7 +36,7 @@ import (
 )
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
-	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
+	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 		ginkgo.Context("when running 10 pods", func() {
@@ -86,6 +86,70 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 						}
 					}
 					framework.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
+
+					time.Sleep(5 * time.Second)
+				}
+
+				avgDurationMs := totalDurationMs / int64(iterations)
+
+				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
+				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
+				framework.ExpectEqual(durationMatch, true, "Collecting kubelet stats should not take longer than 10 seconds")
+			})
+		})
+	})
+})
+var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
+	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
+
+	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
+		ginkgo.Context("when running 3 pods", func() {
+			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
+			ginkgo.It("should return within 10 seconds", func() {
+
+				ginkgo.By("Selecting a Windows node")
+				targetNode, err := findWindowsNode(f)
+				framework.ExpectNoError(err, "Error finding Windows node")
+				framework.Logf("Using node: %v", targetNode.Name)
+
+				ginkgo.By("Scheduling 3 pods")
+				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
+				pods := newKubeletStatsTestPods(3, powershellImage, targetNode.Name)
+				f.PodClient().CreateBatch(pods)
+
+				ginkgo.By("Waiting up to 3 minutes for pods to be running")
+				timeout := 3 * time.Minute
+				e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 3, 0, timeout, make(map[string]string))
+
+				ginkgo.By("Getting kubelet stats 1 time")
+				iterations := 1
+				var totalDurationMs int64
+
+				for i := 0; i < iterations; i++ {
+					start := time.Now()
+					nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, targetNode.Name)
+					duration := time.Since(start)
+					totalDurationMs += duration.Milliseconds()
+
+					framework.ExpectNoError(err, "Error getting kubelet stats")
+
+					// Perform some basic sanity checks on retrieved stats for pods in this test's namespace
+					statsChecked := 0
+					for _, podStats := range nodeStats.Pods {
+						if podStats.PodRef.Namespace != f.Namespace.Name {
+							continue
+						}
+						statsChecked = statsChecked + 1
+
+						framework.ExpectEqual(*podStats.CPU.UsageCoreNanoSeconds > 0, true, "Pod stats should not report 0 cpu usage")
+						framework.ExpectEqual(*podStats.Memory.WorkingSetBytes > 0, true, "Pod stats should not report 0 bytes for memory working set ")
+
+						for _, containerStats := range podStats.Containers {
+							framework.ExpectEqual(containerStats.Logs != nil, true, "Pod stats should have container log stats")
+							framework.ExpectEqual(*containerStats.Logs.AvailableBytes > 0, true, "container log stats should not report 0 bytes for AvailableBytes")
+						}
+					}
+					framework.ExpectEqual(statsChecked, 3, "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}
