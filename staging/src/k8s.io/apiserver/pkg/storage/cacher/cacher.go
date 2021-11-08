@@ -846,7 +846,7 @@ func (c *Cacher) dispatchEvents() {
 			// because we don't provide any guarantees on sending bookmarks.
 			if lastProcessedResourceVersion == 0 {
 				// pop expired watchers in case there has been no update
-				c.bookmarkWatchers.popExpiredWatchers()
+				//c.bookmarkWatchers.popExpiredWatchers()
 				continue
 			}
 			bookmarkEvent := &watchCacheEvent{
@@ -1332,7 +1332,7 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 		return heartbeatTime, true
 	}
 	if c.bookmarkAfterResourceVersion > 0 {
-		return now.Add(1 * time.Second), true
+		return now.Add(-1 * time.Second), true
 	}
 	if pretimeoutTime := c.deadline.Add(-2 * time.Second); pretimeoutTime.Before(heartbeatTime) {
 		heartbeatTime = pretimeoutTime

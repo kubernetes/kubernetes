@@ -325,8 +325,8 @@ func (d *dummyStorage) List(_ context.Context, _ string, _ storage.ListOptions, 
 func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Count(_ string) (int64, error) {
-	return 0, fmt.Errorf("unimplemented")
+func (d *dummyStorage) Count(_ string) (int64, int64, error) {
+	return 0, 0, fmt.Errorf("unimplemented")
 }
 
 func TestListCacheBypass(t *testing.T) {
@@ -1493,5 +1493,38 @@ func TestCacheWatcherBookmarkAfterResourceVersionNextBookmarkTime(t *testing.T) 
 	w.Stop()
 }
 
-	//initEvents := []*watchCacheEvent{}
+func TestCacheWatcherNextBookmarkTime(t *testing.T) {
+	var w *cacheWatcher
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func() {
+		// forget() has to stop the watcher, as only stopping the watcher
+		// triggers stopping the process() goroutine
+		w.stopThreadUnsafe()
+	}
+	clock := testingclock.NewFakeClock(time.Now())
+	w = newCacheWatcher(1, filter, forget, testVersioner{}, clock.Now(), true, objectType, "", 3)
 	go w.process(context.Background(), 0)
+
+	clock.Step(10 * time.Second)
+	// case 1: watcher with bookmarkAfterResourceVersion always qualifies for a bookmark event
+	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
+	watchers.addWatcher(w)
+
+	if len(watchers.watchersBuckets) != 1 {
+		t.Errorf("unexpected bucket size: %#v", watchers.watchersBuckets)
+	}
+	watchers1 := watchers.popExpiredWatchers()
+	if len(watchers1) != 1 {
+		t.Errorf("unexpected bucket size: %#v", watchers1)
+	}
+
+	// case 2: checks if adding the same watcher has the same effect as case 1
+	//         popExpiredWatchers advances the startBucketID, thus we need to advance the close
+	clock.Step(1 * time.Second)
+	watchers.addWatcher(w)
+	watchers2 := watchers.popExpiredWatchers()
+	if len(watchers2) != 1 {
+		t.Errorf("unexpected bucket size: %v", watchers1)
+	}
+	w.Stop()
+}
