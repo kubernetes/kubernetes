@@ -50,8 +50,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           resources:
-            limits:
+            requests:
               cpu: 50m
+            limits:
               memory: 30Mi
           volumeMounts:
             - mountPath: /var/run/secrets/tokens
