@@ -923,7 +923,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
-		oldCfg, err := getCurrentKubeletConfig()
+		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
 		policy := topologymanager.PolicySingleNumaNode
@@ -936,8 +936,10 @@ func runTopologyManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.AfterEach(func() {
-		// restore kubelet config
-		updateKubeletConfig(f, oldCfg, true)
+		if oldCfg != nil {
+			// restore kubelet config
+			updateKubeletConfig(f, oldCfg, true)
+		}
 	})
 }
 
