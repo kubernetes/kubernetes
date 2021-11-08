@@ -49,14 +49,14 @@ func (m *testRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 func TestGetRESTMappings(t *testing.T) {
 	tests := []struct {
 		mapper      *testRESTMapper
-		pr          *[]Resource
+		pr          []Resource
 		expectedns  int
 		expectednns int
 		expectederr error
 	}{
 		{
 			mapper:      &testRESTMapper{},
-			pr:          &[]Resource{},
+			pr:          []Resource{},
 			expectedns:  14,
 			expectednns: 2,
 			expectederr: nil,

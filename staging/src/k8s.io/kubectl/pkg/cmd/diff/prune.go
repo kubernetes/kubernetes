@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,17 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/cli-runtime/pkg/resource"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/kubectl/pkg/util/prune"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/prune"
 )
 
 type pruner struct {
@@ -55,7 +52,7 @@ func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource) *pru
 
 func (p *pruner) pruneAll() ([]runtime.Object, error) {
 	var allPruned []runtime.Object
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(p.mapper, &(p.resources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(p.mapper, p.resources)
 	if err != nil {
 		return allPruned, fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
@@ -113,28 +110,6 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 		pobjs = append(pobjs, obj)
 	}
 	return pobjs, nil
-}
-
-func (p *pruner) GetObjectName(obj runtime.Object) (string, error) {
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	name := metadata.GetName()
-	ns := metadata.GetNamespace()
-
-	group := ""
-	if gvk.Group != "" {
-		group = fmt.Sprintf("%v.", gvk.Group)
-	}
-	return group + fmt.Sprintf(
-		"%v.%v.%v.%v",
-		gvk.Version,
-		gvk.Kind,
-		ns,
-		name,
-	), nil
 }
 
 // MarkVisited marks visited namespaces and uids

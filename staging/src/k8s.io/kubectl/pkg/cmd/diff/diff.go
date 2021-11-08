@@ -25,8 +25,6 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/kubectl/pkg/util/prune"
-
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +44,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/exec"
 	"sigs.k8s.io/yaml"
@@ -173,7 +172,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringArray("prunewhitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
@@ -653,7 +652,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 			return err
 		}
 
-		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prunewhitelist"))
+		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
 		if err != nil {
 			return err
 		}
@@ -749,7 +748,7 @@ func (o *DiffOptions) Run() error {
 		// Print pruned objects into old file and thus, diff
 		// command will show them as pruned.
 		for _, p := range prunedObjs {
-			name, err := o.pruner.GetObjectName(p)
+			name, err := getObjectName(p)
 			if err != nil {
 				klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
 				continue
@@ -765,4 +764,26 @@ func (o *DiffOptions) Run() error {
 	}
 
 	return differ.Run(o.Diff)
+}
+
+func getObjectName(obj runtime.Object) (string, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	name := metadata.GetName()
+	ns := metadata.GetNamespace()
+
+	group := ""
+	if gvk.Group != "" {
+		group = fmt.Sprintf("%v.", gvk.Group)
+	}
+	return group + fmt.Sprintf(
+		"%v.%v.%v.%v",
+		gvk.Version,
+		gvk.Kind,
+		ns,
+		name,
+	), nil
 }

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubectl/pkg/util/prune"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +28,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/prune"
 )
 
 type pruner struct {
@@ -71,7 +70,7 @@ func newPruner(o *ApplyOptions) pruner {
 
 func (p *pruner) pruneAll(o *ApplyOptions) error {
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, &(o.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources)
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}

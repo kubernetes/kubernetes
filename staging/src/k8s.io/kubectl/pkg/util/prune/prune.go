@@ -35,10 +35,10 @@ func (pr Resource) String() string {
 	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
 }
 
-func GetRESTMappings(mapper meta.RESTMapper, pruneResources *[]Resource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
-	if len(*pruneResources) == 0 {
+func GetRESTMappings(mapper meta.RESTMapper, pruneResources []Resource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
+	if len(pruneResources) == 0 {
 		// default allowlist
-		*pruneResources = []Resource{
+		pruneResources = []Resource{
 			{"", "v1", "ConfigMap", true},
 			{"", "v1", "Endpoints", true},
 			{"", "v1", "Namespace", false},
@@ -58,7 +58,7 @@ func GetRESTMappings(mapper meta.RESTMapper, pruneResources *[]Resource) (namesp
 		}
 	}
 
-	for _, resource := range *pruneResources {
+	for _, resource := range pruneResources {
 		addedMapping, err := mapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
