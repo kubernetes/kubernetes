@@ -849,6 +849,7 @@ func teardownKubeVirtDevicePluginOrFail(f *framework.Framework, pod *v1.Pod) {
 	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 
 	framework.ExpectNoError(err)
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
 }
 
 func findKubeVirtResource(node *v1.Node) int64 {
