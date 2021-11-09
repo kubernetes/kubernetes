@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	utilnet "k8s.io/utils/net"
 
@@ -50,6 +51,11 @@ const (
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
 func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	// Skip service handling if managed by ingress-gce using Regional Backend Services
+	if val, ok := apiService.Annotations[RBSAnnotationKey]; ok && val == RBSEnabled {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf(errStrLbNoHosts)
 	}
