@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -119,7 +120,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 			Description: "Default Response.",
 		},
 	}
-	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
 
 	return openAPIConfig
 }
