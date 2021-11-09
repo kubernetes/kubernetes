@@ -941,6 +941,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.IngressApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressBackend"):
 		return &applyconfigurationsextensionsv1beta1.IngressBackendApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressLoadBalancerIngress"):
+		return &applyconfigurationsextensionsv1beta1.IngressLoadBalancerIngressApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressLoadBalancerStatus"):
+		return &applyconfigurationsextensionsv1beta1.IngressLoadBalancerStatusApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressPortStatus"):
+		return &applyconfigurationsextensionsv1beta1.IngressPortStatusApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressRule"):
 		return &applyconfigurationsextensionsv1beta1.IngressRuleApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressRuleValue"):
@@ -1221,6 +1227,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.IngressClassParametersReferenceApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressClassSpec"):
 		return &applyconfigurationsnetworkingv1.IngressClassSpecApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IngressLoadBalancerIngress"):
+		return &applyconfigurationsnetworkingv1.IngressLoadBalancerIngressApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IngressLoadBalancerStatus"):
+		return &applyconfigurationsnetworkingv1.IngressLoadBalancerStatusApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IngressPortStatus"):
+		return &applyconfigurationsnetworkingv1.IngressPortStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressRule"):
 		return &applyconfigurationsnetworkingv1.IngressRuleApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressRuleValue"):
@@ -1273,6 +1285,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1beta1.IngressClassParametersReferenceApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressClassSpec"):
 		return &applyconfigurationsnetworkingv1beta1.IngressClassSpecApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressLoadBalancerIngress"):
+		return &applyconfigurationsnetworkingv1beta1.IngressLoadBalancerIngressApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressLoadBalancerStatus"):
+		return &applyconfigurationsnetworkingv1beta1.IngressLoadBalancerStatusApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressPortStatus"):
+		return &applyconfigurationsnetworkingv1beta1.IngressPortStatusApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressRule"):
 		return &applyconfigurationsnetworkingv1beta1.IngressRuleApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressRuleValue"):
