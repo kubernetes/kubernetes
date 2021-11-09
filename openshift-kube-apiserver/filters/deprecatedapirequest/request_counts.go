@@ -237,7 +237,7 @@ func (c *resourceRequestCounts) String() string {
 
 type hourlyRequestCounts struct {
 	lock sync.RWMutex
-	// countToSupress is the number of requests to remove from the count to avoid double counting in persistence
+	// countToSuppress is the number of requests to remove from the count to avoid double counting in persistence
 	// TODO I think I'd like this in look-aside data, but I don't see an easy way to plumb it.
 	countToSuppress      int64
 	usersToRequestCounts map[userKey]*userRequestCounts
