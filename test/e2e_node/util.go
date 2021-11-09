@@ -405,6 +405,27 @@ func findRunningKubletServiceName() string {
 	return kubeletServiceName
 }
 
+// findKubeletServiceName searches the unit name among the services known to systemd.
+// if the `running` parameter is true, restricts the search among currently running services;
+// otherwise, also stopped, failed, exited (non-running in general) services are also considered.
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func findKubeletServiceName(running bool) string {
+	cmdLine := []string{
+		"systemctl", "list-units", "*kubelet*",
+	}
+	if running {
+		cmdLine = append(cmdLine, "--state=running")
+	}
+	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-\\w+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
+	kubeletServiceName := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
+	return kubeletServiceName
+}
+
 func restartKubelet() {
 	kubeletServiceName := findRunningKubletServiceName()
 	// reset the kubelet service start-limit-hit
