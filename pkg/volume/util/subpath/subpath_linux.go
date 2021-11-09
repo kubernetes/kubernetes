@@ -156,7 +156,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 }
 
 func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error) {
-	s, err := os.Stat(subpath.Path)
+	s, err := os.Lstat(subpath.Path)
 	if err != nil {
 		return false, fmt.Errorf("stat %s failed: %s", subpath.Path, err)
 	}
