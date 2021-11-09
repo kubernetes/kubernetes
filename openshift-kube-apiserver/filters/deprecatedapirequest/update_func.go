@@ -9,7 +9,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest/v1helpers"
 )
 
-// IncrementRequestCounts add additional api request counts to the log.
+// SetRequestCountsForNode add additional api request counts to the log.
 // countsToPersist must not be mutated
 func SetRequestCountsForNode(nodeName string, currentHour, expiredHour int, countsToPersist *resourceRequestCounts) v1helpers.UpdateStatusFunc {
 	return func(maxNumUsers int, status *apiv1.APIRequestCountStatus) {
@@ -29,6 +29,10 @@ func SetRequestCountsForNode(nodeName string, currentHour, expiredHour int, coun
 		status.RemovedInRelease = removedRelease(countsToPersist.resource)
 		status.RequestCount = newStatus.RequestCount
 	}
+}
+
+func nodeStatusDefaulter(nodeName string, currentHour, expiredHour int, resource schema.GroupVersionResource) v1helpers.UpdateStatusFunc {
+	return SetRequestCountsForNode(nodeName, currentHour, expiredHour, newResourceRequestCounts(resource))
 }
 
 func setRequestCountsForNode(status *apiv1.APIRequestCountStatus, nodeName string, currentHour, expiredHour int, hourlyNodeRequests []apiv1.PerNodeAPIRequestLog) *apiv1.APIRequestCountStatus {
