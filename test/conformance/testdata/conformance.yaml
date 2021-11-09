@@ -1496,6 +1496,14 @@
     action MUST be validated.
   release: v1.21
   file: test/e2e/network/service.go
+- testname: Service, deletes a collection of services
+  codename: '[sig-network] Services should delete a collection of services [Conformance]'
+  description: Create three services with the required labels and ports. It MUST locate
+    three services in the test namespace. It MUST succeed at deleting a collection
+    of services via a label selector. It MUST locate only one service after deleting
+    the service collection.
+  release: v1.23
+  file: test/e2e/network/service.go
 - testname: Find Kubernetes Service in default Namespace
   codename: '[sig-network] Services should find a service from listing all namespaces
     [Conformance]'

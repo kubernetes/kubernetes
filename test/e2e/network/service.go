@@ -2731,7 +2731,16 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.Logf("Service %s deleted", testSvcName)
 	})
 
-	ginkgo.It("should delete a collection of services", func() {
+	/*
+		Release: v1.23
+		Testname: Service, deletes a collection of services
+		Description: Create three services with the required
+		labels and ports. It MUST locate three services in the
+		test namespace. It MUST succeed at deleting a collection
+		of services via a label selector. It MUST locate only
+		one service after deleting the service collection.
+	*/
+	framework.ConformanceIt("should delete a collection of services", func() {
 
 		ns := f.Namespace.Name
 		svcClient := f.ClientSet.CoreV1().Services(ns)
