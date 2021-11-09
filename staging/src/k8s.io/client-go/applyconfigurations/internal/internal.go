@@ -1839,6 +1839,362 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: observedGeneration
       type:
         scalar: numeric
+- name: io.k8s.api.autoscaling.v2.ContainerResourceMetricSource
+  map:
+    fields:
+    - name: container
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: target
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricTarget
+      default: {}
+- name: io.k8s.api.autoscaling.v2.ContainerResourceMetricStatus
+  map:
+    fields:
+    - name: container
+      type:
+        scalar: string
+      default: ""
+    - name: current
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
+      default: {}
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.autoscaling.v2.ExternalMetricSource
+  map:
+    fields:
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+    - name: target
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricTarget
+      default: {}
+- name: io.k8s.api.autoscaling.v2.ExternalMetricStatus
+  map:
+    fields:
+    - name: current
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
+      default: {}
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+- name: io.k8s.api.autoscaling.v2.HPAScalingPolicy
+  map:
+    fields:
+    - name: periodSeconds
+      type:
+        scalar: numeric
+      default: 0
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    - name: value
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.autoscaling.v2.HPAScalingRules
+  map:
+    fields:
+    - name: policies
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.autoscaling.v2.HPAScalingPolicy
+          elementRelationship: atomic
+    - name: selectPolicy
+      type:
+        scalar: string
+    - name: stabilizationWindowSeconds
+      type:
+        scalar: numeric
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscaler
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerStatus
+      default: {}
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerBehavior
+  map:
+    fields:
+    - name: scaleDown
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HPAScalingRules
+    - name: scaleUp
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HPAScalingRules
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerSpec
+  map:
+    fields:
+    - name: behavior
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerBehavior
+    - name: maxReplicas
+      type:
+        scalar: numeric
+      default: 0
+    - name: metrics
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.autoscaling.v2.MetricSpec
+          elementRelationship: atomic
+    - name: minReplicas
+      type:
+        scalar: numeric
+    - name: scaleTargetRef
+      type:
+        namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
+      default: {}
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerCondition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: currentMetrics
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.autoscaling.v2.MetricStatus
+          elementRelationship: atomic
+    - name: currentReplicas
+      type:
+        scalar: numeric
+    - name: desiredReplicas
+      type:
+        scalar: numeric
+      default: 0
+    - name: lastScaleTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: observedGeneration
+      type:
+        scalar: numeric
+- name: io.k8s.api.autoscaling.v2.MetricIdentifier
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: selector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: io.k8s.api.autoscaling.v2.MetricSpec
+  map:
+    fields:
+    - name: containerResource
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ContainerResourceMetricSource
+    - name: external
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ExternalMetricSource
+    - name: object
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ObjectMetricSource
+    - name: pods
+      type:
+        namedType: io.k8s.api.autoscaling.v2.PodsMetricSource
+    - name: resource
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ResourceMetricSource
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.autoscaling.v2.MetricStatus
+  map:
+    fields:
+    - name: containerResource
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ContainerResourceMetricStatus
+    - name: external
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ExternalMetricStatus
+    - name: object
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ObjectMetricStatus
+    - name: pods
+      type:
+        namedType: io.k8s.api.autoscaling.v2.PodsMetricStatus
+    - name: resource
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ResourceMetricStatus
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.autoscaling.v2.MetricTarget
+  map:
+    fields:
+    - name: averageUtilization
+      type:
+        scalar: numeric
+    - name: averageValue
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.autoscaling.v2.MetricValueStatus
+  map:
+    fields:
+    - name: averageUtilization
+      type:
+        scalar: numeric
+    - name: averageValue
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.autoscaling.v2.ObjectMetricSource
+  map:
+    fields:
+    - name: describedObject
+      type:
+        namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
+      default: {}
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+    - name: target
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricTarget
+      default: {}
+- name: io.k8s.api.autoscaling.v2.ObjectMetricStatus
+  map:
+    fields:
+    - name: current
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
+      default: {}
+    - name: describedObject
+      type:
+        namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
+      default: {}
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+- name: io.k8s.api.autoscaling.v2.PodsMetricSource
+  map:
+    fields:
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+    - name: target
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricTarget
+      default: {}
+- name: io.k8s.api.autoscaling.v2.PodsMetricStatus
+  map:
+    fields:
+    - name: current
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
+      default: {}
+    - name: metric
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
+      default: {}
+- name: io.k8s.api.autoscaling.v2.ResourceMetricSource
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: target
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricTarget
+      default: {}
+- name: io.k8s.api.autoscaling.v2.ResourceMetricStatus
+  map:
+    fields:
+    - name: current
+      type:
+        namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
+      default: {}
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.autoscaling.v2beta1.ContainerResourceMetricSource
   map:
     fields:

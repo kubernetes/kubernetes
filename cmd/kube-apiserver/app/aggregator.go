@@ -251,6 +251,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
+	{Group: "autoscaling", Version: "v2"}:                        {group: 17500, version: 30},
 	{Group: "autoscaling", Version: "v2beta1"}:                   {group: 17500, version: 9},
 	{Group: "autoscaling", Version: "v2beta2"}:                   {group: 17500, version: 1},
 	{Group: "batch", Version: "v1"}:                              {group: 17400, version: 15},
