@@ -33,7 +33,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.30.0
-	k8s.io/kube-openapi v0.0.0-20211105084753-ee342a809c29
+	k8s.io/kube-openapi v0.0.0-20211109043139-026bd182f079
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0
 	sigs.k8s.io/yaml v1.2.0

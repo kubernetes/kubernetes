@@ -8,7 +8,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20211105084753-ee342a809c29
+	k8s.io/kube-openapi v0.0.0-20211109043139-026bd182f079
 )
 
 replace (
