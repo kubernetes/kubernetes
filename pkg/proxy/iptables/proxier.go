@@ -1302,13 +1302,9 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
 		// with just 2 rules it ends up being a waste and a cognitive burden.
-		if svcInfo.NodePort() != 0 {
+		if svcInfo.NodePort() != 0 && len(nodeAddresses) != 0 {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			if len(nodeAddresses) == 0 {
-				continue
-			}
-
 			lps := make([]netutils.LocalPort, 0)
 			for address := range nodeAddresses {
 				lp := netutils.LocalPort{
