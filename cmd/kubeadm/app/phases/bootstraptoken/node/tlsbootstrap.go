@@ -125,7 +125,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 		},
 		Subjects: []rbac.Subject{
 			{
-				Kind: "Group",
+				Kind: rbac.GroupKind,
 				Name: constants.NodeBootstrapTokenAuthGroup,
 			},
 		},
@@ -147,7 +147,7 @@ func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
 		},
 		Subjects: []rbac.Subject{
 			{
-				Kind: "Group",
+				Kind: rbac.GroupKind,
 				Name: constants.NodesGroup,
 			},
 		},
