@@ -29,7 +29,6 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/mount-utils"
 )
 
@@ -109,19 +108,12 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		notMount = true
 	}
 	if !notMount {
-		linuxHostUtil := hostutil.NewHostUtil()
-		mntInfo, err := linuxHostUtil.FindMountInfo(bindPathTarget)
+		// It's already mounted, so check if it's bind-mounted to the same path
+		samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
 		if err != nil {
-			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
+			return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
 		}
-		if mntInfo.Root != subpath.Path {
-			volumeMountInfo, err := linuxHostUtil.FindExactMountInfo(subpath.VolumePath)
-			if err == nil && mount.PathWithinBase(subpath.Path, subpath.VolumePath) &&
-				(volumeMountInfo.Major == mntInfo.Major && volumeMountInfo.Minor == mntInfo.Minor) {
-				klog.V(5).Infof("Skipping bind-mounting subpath %s, volumePath: %s, path: %s", bindPathTarget, subpath.VolumePath, subpath.Path)
-				return true, bindPathTarget, nil
-			}
-
+		if !samePath {
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
 				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
@@ -160,6 +152,23 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		}
 	}
 	return false, bindPathTarget, nil
+}
+
+func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error) {
+	s, err := os.Stat(subpath.Path)
+	if err != nil {
+		return false, fmt.Errorf("stat %s failed: %s", subpath.Path, err)
+	}
+
+	t, err := os.Lstat(bindMountTarget)
+	if err != nil {
+		return false, fmt.Errorf("lstat %s failed: %s", bindMountTarget, err)
+	}
+
+	if !os.SameFile(s, t) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func getSubpathBindTarget(subpath Subpath) string {
