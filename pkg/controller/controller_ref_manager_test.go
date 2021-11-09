@@ -208,6 +208,26 @@ func TestClaimPods(t *testing.T) {
 				patches: 1,
 			}
 		}(),
+		func() test {
+			// act as a cluster-scoped controller
+			controller := v1.ReplicationController{}
+			controller.Namespace = ""
+			controller.UID = types.UID(controllerUID)
+			pod1 := newPod("pod1", productionLabel, nil)
+			pod2 := newPod("pod2", productionLabel, nil)
+			pod2.Namespace = "fakens"
+			return test{
+				name: "Cluster scoped controller claims pods of specified namespace",
+				manager: NewPodControllerRefManager(&FakePodControl{},
+					&controller,
+					productionLabelSelector,
+					controllerKind,
+					func(ctx context.Context) error { return nil }),
+				pods:    []*v1.Pod{pod1, pod2},
+				claimed: []*v1.Pod{pod1, pod2},
+				patches: 2,
+			}
+		}(),
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
