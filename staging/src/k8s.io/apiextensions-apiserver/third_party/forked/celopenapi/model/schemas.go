@@ -128,6 +128,8 @@ var (
 	})
 )
 
+// TODO: embedded objects should have objectMeta only, and name and generateName are both optional
+
 // WithTypeAndObjectMeta ensures the kind, apiVersion and
 // metadata.name and metadata.generateName properties are specified, making a shallow copy of the provided schema if needed.
 func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {

@@ -18,15 +18,24 @@ package validation
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/ext"
+
+	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -329,4 +338,46 @@ func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStri
 		}
 	}
 	return nil
+}
+
+// CompileAndValidate provides a sanity check of the CEL validation functionality until we wire in the
+// full functionality.
+func CompileAndValidate(s *schema.Structural, bindings map[string]interface{}, rule string) (bool, error) {
+	env, err := cel.NewEnv()
+	if err != nil {
+		return false, err
+	}
+	reg := model.NewRegistry(env)
+	rt, err := model.NewRuleTypes("testType", s, reg)
+	if err != nil {
+		return false, err
+	}
+	opts, err := rt.EnvOptions(env.TypeProvider())
+	if err != nil {
+		return false, err
+	}
+	root, ok := rt.FindDeclType("testType")
+	if !ok {
+		root = model.SchemaDeclType(s).MaybeAssignTypeName("testType")
+	}
+	propDecls := []*expr.Decl{decls.NewVar("self", root.ExprType())}
+	opts = append(opts, cel.Declarations(propDecls...))
+	opts = append(opts, ext.Strings())
+	env, err = env.Extend(opts...)
+	if err != nil {
+		return false, err
+	}
+	ast, issues := env.Compile(rule)
+	if issues != nil {
+		return false, fmt.Errorf("issues: %v", issues)
+	}
+	prog, err := env.Program(ast)
+	if err != nil {
+		return false, err
+	}
+	evalResult, _, err := prog.Eval(bindings)
+	if err != nil {
+		return false, err
+	}
+	return evalResult == types.True, nil
 }

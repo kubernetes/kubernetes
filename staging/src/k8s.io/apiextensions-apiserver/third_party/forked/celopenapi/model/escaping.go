@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// TODO: replace escaping with new rules described in kEP update
+
 // celReservedSymbols is a list of RESERVED symbols defined in the CEL lexer.
 // No identifiers are allowed to collide with these symbols.
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax
