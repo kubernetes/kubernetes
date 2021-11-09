@@ -671,6 +671,7 @@ const (
 
 	// owner: @marosset
 	// alpha: v1.22
+	// beta: v1.23
 	//
 	// Enables support for 'HostProcess' containers on Windows nodes.
 	WindowsHostProcessContainers featuregate.Feature = "WindowsHostProcessContainers"
@@ -889,7 +890,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResourcesGetAllocatable:              {Default: true, PreRelease: featuregate.Beta},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
-	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
+	WindowsHostProcessContainers:                   {Default: true, PreRelease: featuregate.Beta},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
 	DisableKubeletCloudCredentialProviders:         {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetMinReadySeconds:                     {Default: true, PreRelease: featuregate.Beta},
