@@ -293,7 +293,7 @@ func (e *Store) NamespaceScoped() bool {
 		return e.UpdateStrategy.NamespaceScoped()
 	}
 
-	panic("programmer error: no CRUD for resource, you're crazy, override NamespaceScoped too")
+	panic("programmer error: no CRUD for resource, override NamespaceScoped too")
 }
 
 // GetCreateStrategy implements GenericStore.
