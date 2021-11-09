@@ -54,6 +54,28 @@ type podDesc struct {
 	cpuRequest     int // cpuRequest is in millicores
 }
 
+func (desc podDesc) CpuRequestQty() resource.Quantity {
+	qty := resource.NewMilliQuantity(int64(desc.cpuRequest), resource.DecimalSI)
+	return *qty
+}
+
+func (desc podDesc) CpuRequestExclusive() int {
+	if (desc.cpuRequest % 1000) != 0 {
+		// exclusive cpus are request only if the quantity is integral;
+		// hence, explicitly rule out non-integral requests
+		return 0
+	}
+	return desc.cpuRequest / 1000
+}
+
+func (desc podDesc) RequiresCPU() bool {
+	return desc.cpuRequest > 0
+}
+
+func (desc podDesc) RequiresDevices() bool {
+	return desc.resourceName != "" && desc.resourceAmount > 0
+}
+
 func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 	cnt := v1.Container{
 		Name:  desc.cntName,
@@ -64,15 +86,15 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 		},
 		Command: []string{"sh", "-c", "sleep 1d"},
 	}
-	if desc.cpuRequest > 0 {
-		cpuRequestQty := resource.NewMilliQuantity(int64(desc.cpuRequest), resource.DecimalSI)
-		cnt.Resources.Requests[v1.ResourceCPU] = *cpuRequestQty
-		cnt.Resources.Limits[v1.ResourceCPU] = *cpuRequestQty
+	if desc.RequiresCPU() {
+		cpuRequestQty := desc.CpuRequestQty()
+		cnt.Resources.Requests[v1.ResourceCPU] = cpuRequestQty
+		cnt.Resources.Limits[v1.ResourceCPU] = cpuRequestQty
 		// we don't really care, we only need to be in guaranteed QoS
 		cnt.Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		cnt.Resources.Limits[v1.ResourceMemory] = resource.MustParse("100Mi")
 	}
-	if desc.resourceName != "" && desc.resourceAmount > 0 {
+	if desc.RequiresDevices() {
 		cnt.Resources.Requests[v1.ResourceName(desc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", desc.resourceAmount))
 		cnt.Resources.Limits[v1.ResourceName(desc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", desc.resourceAmount))
 	}
@@ -185,15 +207,15 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 		if !ok {
 			return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, podReq.cntName)
 		}
-		if podReq.cpuRequest > 0 {
-			if isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != int(podReq.cpuRequest) {
-				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
-			}
-			if !isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != 0 {
-				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
+		if podReq.RequiresCPU() {
+			if exclusiveCpus := podReq.CpuRequestExclusive(); exclusiveCpus != len(cntInfo.CpuIds) {
+				if exclusiveCpus == 0 {
+					return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
+				}
+				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, exclusiveCpus, cntInfo.CpuIds)
 			}
 		}
-		if podReq.resourceName != "" && podReq.resourceAmount > 0 {
+		if podReq.RequiresDevices() {
 			dev := findContainerDeviceByName(cntInfo.GetDevices(), podReq.resourceName)
 			if dev == nil {
 				return fmt.Errorf("pod %q container %q expected data for resource %q not found", podReq.podName, podReq.cntName, podReq.resourceName)
@@ -774,9 +796,24 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 					expectPodResources(1, cli, []podDesc{desc})
 
+					restartTime := time.Now()
 					ginkgo.By("Restarting Kubelet")
 					restartKubelet(true)
-					framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+
+					// we need to wait for the node to be reported ready before we can safely query
+					// the podresources endpoint again. Otherwise we will have false negatives.
+					ginkgo.By("Wait for node to be ready")
+					gomega.Eventually(func() bool {
+						node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+						for _, cond := range node.Status.Conditions {
+							if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
+								return true
+							}
+						}
+						return false
+					}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+
 					expectPodResources(1, cli, []podDesc{desc})
 					tpd.deletePodsForTest(f)
 				})
@@ -827,6 +864,7 @@ func teardownKubeVirtDevicePluginOrFail(f *framework.Framework, pod *v1.Pod) {
 	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 
 	framework.ExpectNoError(err)
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
 }
 
 func findKubeVirtResource(node *v1.Node) int64 {
@@ -870,8 +908,4 @@ func getKubeVirtDevicePluginPod() *v1.Pod {
 	}
 
 	return p
-}
-
-func isIntegral(cpuRequest int) bool {
-	return (cpuRequest % 1000) == 0
 }
