@@ -53,9 +53,6 @@ func init() {
 // Handler returns an HTTP handler for the DefaultGatherer. It is
 // already instrumented with InstrumentHandler (using "prometheus" as handler
 // name).
-//
-// Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
 	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
