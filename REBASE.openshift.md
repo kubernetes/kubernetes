@@ -80,7 +80,7 @@ Before incorporating upstream changes you may want to:
 - Teach Git to remember how you’ve resolved a conflict so that the next time it can
   resolve it automatically (https://git-scm.com/book/en/v2/Git-Tools-Rerere)
 
-## Send email annoucing you're starting work
+## Send email announcing you're starting work
 
 To better spread the information send the following email:
 
@@ -405,10 +405,35 @@ git log v1.21.1..v1.21.2 --ancestry-path --reverse --no-merges
 4. `git merge <new_version>`, example `git merge v1.21.2`.
    Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
    coming from newer versions. Manually verify them, and in most cases pick the
-   newer versions of deps. This will be properly update when re-runing
+   newer versions of deps. This will be properly update when re-running
    `hack/update-vendor.sh` in the next step.
-5. Update `go.mod` dependecies to point to correct release versions.
+5. Update `go.mod` dependencies to point to correct release versions.
    NOTE: When editing `go.mod` manually you'll need to run `go mod tidy`.
 6. Update openshift dependencies and re-run `hack/update-vendor.sh`.
 7. Update kubernetes version in `openshift-hack/images/hyperkube/Dockerfile.rhel`.
 8. Run `make update` see [Updating generated files](#updating-generated-files).
+
+
+## Updating with `rebase.sh` (experimental)
+
+The above steps are available as a script that will merge and rebase along the happy path without automatic conflict 
+resolution and at the end will create a PR for you.
+
+Here are the steps:
+1. Create a new BugZilla with the respective OpenShift version to rebase (Target Release stays ---), 
+   Prio&Severity to High with a proper description of the change logs. 
+   See [BZ2021468](https://bugzilla.redhat.com/show_bug.cgi?id=2021468) as an example.
+2. It's best to start off with a fresh fork of [openshift/kubernetes](https://github.com/openshift/kubernetes/). Stay on the master branch.
+3. This script requires `jq`, `git`, `podman` and `bash`, `gh` is optional.
+4. In the root dir of that fork run:
+```
+openshift-hack/rebase.sh --k8s-tag=v1.21.2 --openshift-release=release-4.8 --bugzilla-id=2003027
+```
+
+where `k8s-tag` is the [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/) release tag, the `openshift-release`  
+is the OpenShift release branch in [openshift/kubernetes](https://github.com/openshift/kubernetes/) and the `bugzilla-id` is the 
+BugZilla ID created in step (1).
+
+5. In case of conflicts, it will ask you to step into another shell to resolve those. The script will continue by committing the resolution with `UPSTREAM: <drop>`.
+6. At the end, there will be a "rebase-$VERSION" branch pushed to your fork.
+7. If you have `gh` installed and are logged in, it will attempt to create a PR for you by opening a web browser. 
