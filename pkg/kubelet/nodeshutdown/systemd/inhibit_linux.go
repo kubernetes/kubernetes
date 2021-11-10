@@ -100,6 +100,12 @@ func (bus *DBusCon) InhibitShutdown() (InhibitLock, error) {
 	if err != nil {
 		return InhibitLock(0), fmt.Errorf("failed storing inhibit lock file descriptor: %w", err)
 	}
+	// kubelet uses k8s.io/utils/exec that internally uses go os/exec to exec processes like iptables.
+	// os/exec does not close existing file descriptors by convention as per
+	// https://github.com/golang/go/blob/release-branch.go1.17/src/syscall/exec_linux.go#L506-L509
+	// so explicitly mark this file descriptor as close-on-exec to avoid leaking
+	// it to child processes accidentally.
+	syscall.CloseOnExec(int(fd))
 
 	return InhibitLock(fd), nil
 }
