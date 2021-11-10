@@ -898,7 +898,7 @@ func TestNodePortIPv4(t *testing.T) {
 						Protocol: v1.ProtocolSCTP,
 						NodePort: int32(3001),
 					}}
-					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 				}),
 			},
 			endpoints: []*discovery.EndpointSlice{
@@ -1834,7 +1834,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				Protocol:   v1.ProtocolTCP,
 				TargetPort: intstr.FromInt(svcPort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 	epIP := "10.180.0.1"
@@ -1998,7 +1998,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -2096,14 +2096,14 @@ func TestHealthCheckNodePort(t *testing.T) {
 			Protocol: v1.ProtocolTCP,
 			NodePort: int32(svcNodePort),
 		}}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 	})
 
 	svc1, svc2, invalidSvc3 := *sampleSvc, *sampleSvc, *sampleSvc
 	svc1.Name, svc1.Spec.HealthCheckNodePort = "valid-svc1", 30000
 	svc2.Name, svc2.Spec.HealthCheckNodePort = "valid-svc2", 30001
 	// make svc3 invalid by setting external traffic policy to cluster
-	invalidSvc3.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+	invalidSvc3.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 	invalidSvc3.Name, invalidSvc3.Spec.HealthCheckNodePort = "invalid-svc3", 30002
 
 	makeServiceMap(fp,
@@ -2350,7 +2350,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -2486,7 +2486,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.HealthCheckNodePort = 345
 		}),
 	}
@@ -2640,7 +2640,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				{IP: "10.1.2.3"},
 			},
 		}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = 345
 	})
 
@@ -4472,7 +4472,7 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
 			Type:                  "LoadBalancer",
 			HealthCheckNodePort:   30000,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	}
 	fp.OnServiceAdd(&svc)
@@ -4873,7 +4873,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 			ClusterIP:             "172.20.1.1",
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",
@@ -5049,7 +5049,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 			ClusterIP:             "172.20.1.1",
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",
@@ -5222,7 +5222,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 			ClusterIP:             "172.20.1.1",
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",

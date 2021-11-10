@@ -257,7 +257,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 					Port:     tc.svcPort,
 					Protocol: tc.protocol,
 				}}
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			}),
 		)
 
@@ -400,7 +400,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 					Port:     tc.svcPort,
 					Protocol: tc.protocol,
 				}}
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			}),
 		)
 
@@ -1064,7 +1064,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		// create LoadBalancer service
 		makeTestService("ns2", "svc2", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.ClusterIP = "10.20.30.42"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
@@ -1084,7 +1084,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		// create LoadBalancer service with Cluster traffic policy and no source ranges
 		makeTestService("ns2b", "svc2b", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 			svc.Spec.ClusterIP = "10.20.30.43"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
@@ -1615,7 +1615,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 				NodePort: int32(svcNodePort),
 			}}
 			svc.Spec.HealthCheckNodePort = int32(svcHealthCheckNodePort)
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -1766,7 +1766,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.ExternalIPs = []string{svcExternalIPs}
 			svc.Spec.Ports = []v1.ServicePort{{
@@ -2009,7 +2009,7 @@ func TestLoadBalancerReject(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -2076,7 +2076,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -2270,7 +2270,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -2404,7 +2404,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.HealthCheckNodePort = 345
 		}),
 	}
@@ -2547,7 +2547,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				{IP: "10.1.2.3"},
 			},
 		}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = 345
 	})
 
@@ -3650,7 +3650,7 @@ COMMIT
 			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), NodePort: 30010, Protocol: v1.ProtocolTCP}},
 			Type:                  "LoadBalancer",
 			HealthCheckNodePort:   30000,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	}
 	fp.OnServiceAdd(svc)
@@ -4264,7 +4264,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP:             "172.20.1.1",
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			Selector:              map[string]string{"foo": "bar"},
 			Ports: []v1.ServicePort{
 				{

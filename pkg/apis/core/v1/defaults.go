@@ -128,7 +128,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	if (obj.Spec.Type == v1.ServiceTypeNodePort ||
 		obj.Spec.Type == v1.ServiceTypeLoadBalancer) &&
 		obj.Spec.ExternalTrafficPolicy == "" {
-		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && obj.Spec.InternalTrafficPolicy == nil {

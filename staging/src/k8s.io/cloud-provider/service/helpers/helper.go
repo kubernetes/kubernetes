@@ -101,7 +101,7 @@ func RequestsOnlyLocalTraffic(service *v1.Service) bool {
 		service.Spec.Type != v1.ServiceTypeNodePort {
 		return false
 	}
-	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal
 }
 
 // NeedsHealthCheck checks if service needs health check.

@@ -624,7 +624,7 @@ func needsHCNodePort(svc *api.Service) bool {
 	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
-	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyLocal {
 		return false
 	}
 	return true

@@ -468,7 +468,7 @@ func TestDropTypeDependentFields(t *testing.T) {
 		svc.Spec.Ports[0].Protocol = "UDP"
 	}
 	setHCNodePort := func(svc *api.Service) {
-		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = int32(32000)
 	}
 	changeHCNodePort := func(svc *api.Service) {

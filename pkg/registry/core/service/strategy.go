@@ -367,7 +367,7 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
 	// AND they did not change this field, it is safe to drop it.
 	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
-		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
+		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicy("")
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.
@@ -441,7 +441,7 @@ func needsHCNodePort(svc *api.Service) bool {
 	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
-	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyLocal {
 		return false
 	}
 	return true

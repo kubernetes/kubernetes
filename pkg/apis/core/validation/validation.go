@@ -4516,7 +4516,7 @@ var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityCli
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
 
-var supportedServiceInternalTrafficPolicy = sets.NewString(string(core.ServiceInternalTrafficPolicyCluster), string(core.ServiceExternalTrafficPolicyTypeLocal))
+var supportedServiceInternalTrafficPolicy = sets.NewString(string(core.ServiceInternalTrafficPolicyCluster), string(core.ServiceExternalTrafficPolicyLocal))
 
 var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
@@ -4752,8 +4752,8 @@ func needsExternalTrafficPolicy(svc *api.Service) bool {
 }
 
 var validExternalTrafficPolicies = sets.NewString(
-	string(core.ServiceExternalTrafficPolicyTypeCluster),
-	string(core.ServiceExternalTrafficPolicyTypeLocal))
+	string(core.ServiceExternalTrafficPolicyCluster),
+	string(core.ServiceExternalTrafficPolicyLocal))
 
 func validateServiceExternalTrafficPolicy(service *core.Service) field.ErrorList {
 	allErrs := field.ErrorList{}

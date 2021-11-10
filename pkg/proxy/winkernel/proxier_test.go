@@ -722,7 +722,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
 			svc.Spec.ClusterIP = svcIP
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),

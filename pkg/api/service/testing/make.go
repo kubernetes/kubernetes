@@ -73,7 +73,7 @@ func SetTypeClusterIP(svc *api.Service) {
 // SetTypeNodePort sets the service type to NodePort and clears other fields.
 func SetTypeNodePort(svc *api.Service) {
 	svc.Spec.Type = api.ServiceTypeNodePort
-	svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
+	svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyCluster
 	svc.Spec.ExternalName = ""
 	svc.Spec.AllocateLoadBalancerNodePorts = nil
 }
@@ -81,7 +81,7 @@ func SetTypeNodePort(svc *api.Service) {
 // SetTypeLoadBalancer sets the service type to LoadBalancer and clears other fields.
 func SetTypeLoadBalancer(svc *api.Service) {
 	svc.Spec.Type = api.ServiceTypeLoadBalancer
-	svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
+	svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyCluster
 	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 	svc.Spec.ExternalName = ""
 }
@@ -180,7 +180,7 @@ func SetInternalTrafficPolicy(policy api.ServiceInternalTrafficPolicyType) Tweak
 }
 
 // SetExternalTrafficPolicy sets the externalTrafficPolicy field for a Service.
-func SetExternalTrafficPolicy(policy api.ServiceExternalTrafficPolicyType) Tweak {
+func SetExternalTrafficPolicy(policy api.ServiceExternalTrafficPolicy) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.ExternalTrafficPolicy = policy
 	}

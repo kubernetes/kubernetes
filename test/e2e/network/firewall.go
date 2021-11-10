@@ -128,7 +128,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
 		ginkgo.By("Updating LoadBalancer service to ExternalTrafficPolicy=Local")
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		})
 		framework.ExpectNoError(err)
 

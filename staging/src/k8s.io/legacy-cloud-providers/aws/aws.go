@@ -3860,7 +3860,7 @@ func (c *Cloud) buildNLBHealthCheckConfiguration(svc *v1.Service) (healthCheckCo
 		HealthyThreshold:   defaultNlbHealthCheckThreshold,
 		UnhealthyThreshold: defaultNlbHealthCheckThreshold,
 	}
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
 		path, port := servicehelpers.GetServiceHealthCheckPathPort(svc)
 		hc = healthCheckConfig{
 			Port:               strconv.Itoa(int(port)),

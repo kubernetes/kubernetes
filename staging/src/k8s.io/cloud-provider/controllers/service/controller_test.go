@@ -1171,7 +1171,7 @@ func TestNeedsUpdate(t *testing.T) {
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
-				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			},
 			expectedNeedsUpdate: true,
 		},
