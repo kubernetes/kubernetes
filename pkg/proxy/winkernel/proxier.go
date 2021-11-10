@@ -461,7 +461,7 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
 	info := &serviceInfo{BaseServicePortInfo: bsvcPortInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
-	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false

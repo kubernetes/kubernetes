@@ -196,7 +196,7 @@ func (j *TestJig) CreateOnlyLocalNodePortService(createPod bool) (*v1.Service, e
 	ginkgo.By("creating a service " + j.Namespace + "/" + j.Name + " with type=NodePort and ExternalTrafficPolicy=Local")
 	svc, err := j.CreateTCPService(func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80}}
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func (j *TestJig) CreateOnlyLocalLoadBalancerService(timeout time.Duration, crea
 	tweak func(svc *v1.Service)) (*v1.Service, error) {
 	_, err := j.CreateLoadBalancerService(timeout, func(svc *v1.Service) {
 		ginkgo.By("setting ExternalTrafficPolicy=Local")
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		if tweak != nil {
 			tweak(svc)
 		}

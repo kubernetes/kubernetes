@@ -4382,20 +4382,29 @@ const (
 	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicyType = "Local"
 )
 
-// ServiceExternalTrafficPolicyType describes how nodes distribute service traffic they
+// ServiceExternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
-// and LoadBalancer IPs).
+// and LoadBalancer IPs.
 // +enum
-type ServiceExternalTrafficPolicyType string
+type ServiceExternalTrafficPolicy string
 
 const (
-	// ServiceExternalTrafficPolicyTypeCluster routes traffic to all endpoints.
-	ServiceExternalTrafficPolicyTypeCluster ServiceExternalTrafficPolicyType = "Cluster"
+	// ServiceExternalTrafficPolicyCluster routes traffic to all endpoints.
+	ServiceExternalTrafficPolicyCluster ServiceExternalTrafficPolicy = "Cluster"
 
-	// ServiceExternalTrafficPolicyTypeLocal preserves the source IP of the traffic by
+	// ServiceExternalTrafficPolicyLocal preserves the source IP of the traffic by
 	// routing only to endpoints on the same node as the traffic was received on
 	// (dropping the traffic if there are no local endpoints).
-	ServiceExternalTrafficPolicyTypeLocal ServiceExternalTrafficPolicyType = "Local"
+	ServiceExternalTrafficPolicyLocal ServiceExternalTrafficPolicy = "Local"
+)
+
+// for backwards compat
+// +enum
+type ServiceExternalTrafficPolicyType = ServiceExternalTrafficPolicy
+
+const (
+	ServiceExternalTrafficPolicyTypeLocal   = ServiceExternalTrafficPolicyLocal
+	ServiceExternalTrafficPolicyTypeCluster = ServiceExternalTrafficPolicyCluster
 )
 
 // These are the valid conditions of a service.
@@ -4628,7 +4637,7 @@ type ServiceSpec struct {
 	// a NodePort from within the cluster may need to take traffic policy into account
 	// when picking a node.
 	// +optional
-	ExternalTrafficPolicy ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty" protobuf:"bytes,11,opt,name=externalTrafficPolicy"`
+	ExternalTrafficPolicy ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty" protobuf:"bytes,11,opt,name=externalTrafficPolicy"`
 
 	// healthCheckNodePort specifies the healthcheck nodePort for the service.
 	// This only applies when type is set to LoadBalancer and

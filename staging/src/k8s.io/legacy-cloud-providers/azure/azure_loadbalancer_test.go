@@ -2102,7 +2102,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 
 	service7 := getTestService("service1", v1.ProtocolUDP, nil, false, 80)
 	service7.Spec.HealthCheckNodePort = 10081
-	service7.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	service7.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 	lb7 := getTestLoadBalancer(pointer.String("testCluster"), pointer.String("rg"), pointer.String("testCluster"), pointer.String("aservice1"), service7, "basic")
 	lb7.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{}
 	lb7.Probes = &[]network.Probe{}
