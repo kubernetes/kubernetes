@@ -249,20 +249,26 @@ func getIPFromInterface(intfName string, forFamily AddressFamily, nw networkInte
 	if err != nil {
 		return nil, err
 	}
-	if isInterfaceUp(intf) {
-		addrs, err := nw.Addrs(intf)
-		if err != nil {
-			return nil, err
-		}
-		klog.V(4).Infof("Interface %q has %d addresses :%v.", intfName, len(addrs), addrs)
-		matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
-		if err != nil {
-			return nil, err
-		}
-		if matchingIP != nil {
-			klog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intfName)
-			return matchingIP, nil
-		}
+	if !isInterfaceUp(intf) {
+		return nil, nil
+	}
+	return getValidIP(intf, forFamily, nw)
+}
+
+// getValidIP returns a global unicast address within the requested family, or nil if none were found.
+func getValidIP(intf *net.Interface, forFamily AddressFamily, nw networkInterfacer) (net.IP, error) {
+	addrs, err := nw.Addrs(intf)
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("Interface %q has %d addresses :%v.", intf.Name, len(addrs), addrs)
+	matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
+	if err != nil {
+		return nil, err
+	}
+	if matchingIP != nil {
+		klog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intf.Name)
+		return matchingIP, nil
 	}
 	return nil, nil
 }
@@ -365,18 +371,6 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 // with no internet connection, it returns error.
 func ChooseHostInterface() (net.IP, error) {
 	return chooseHostInterface(preferIPv4)
-}
-
-func chooseHostInterface(addressFamilies AddressFamilyPreference) (net.IP, error) {
-	var nw networkInterfacer = networkInterface{}
-	if _, err := os.Stat(ipv4RouteFile); os.IsNotExist(err) {
-		return chooseIPFromHostInterfaces(nw, addressFamilies)
-	}
-	routes, err := getAllDefaultRoutes()
-	if err != nil {
-		return nil, err
-	}
-	return chooseHostInterfaceFromRoute(routes, nw, addressFamilies)
 }
 
 // networkInterfacer defines an interface for several net library functions. Production
