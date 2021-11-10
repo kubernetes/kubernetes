@@ -43,11 +43,11 @@ const (
 	// TODO: This k8s-generic, well-known constant should be fetchable from another source, not be in this package
 	KubeProxyClusterRoleName = "system:node-proxier"
 
+	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
+	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
+
 	// KubeProxyServiceAccountName describes the name of the ServiceAccount for the kube-proxy addon
 	KubeProxyServiceAccountName = "kube-proxy"
-
-	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
-	KubeProxyClusterRoleBindingName = "kubeam:node-proxier"
 
 	// KubeProxyConfigMapRoleName sets the name of ClusterRole for ConfigMap
 	KubeProxyConfigMapRoleName = "kube-proxy"
