@@ -193,7 +193,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 
 		driverName, volumeHandle := pl.getCSIDriverInfo(csiNode, pvc)
 		if driverName == "" || volumeHandle == "" {
-			klog.V(5).Info("Could not find a CSI driver name or volume handle, not counting volume")
+			klog.V(5).InfoS("Could not find a CSI driver name or volume handle, not counting volume")
 			continue
 		}
 
