@@ -2408,14 +2408,15 @@ func TestSyncLabels(t *testing.T) {
 							t.Logf("No action yet")
 							return false, nil
 						}
-						action := actions[1]
-						if action.GetVerb() == "patch" {
-							patchAction := action.(core.PatchActionImpl)
-							var err error
-							savedNode, err = applyNodeStatusPatch(test.existingNode, patchAction.GetPatch())
-							if err != nil {
-								t.Logf("node patching failed, %v", err)
-								return false, nil
+						for _, action := range actions {
+							if action.GetVerb() == "patch" {
+								patchAction := action.(core.PatchActionImpl)
+								var err error
+								savedNode, err = applyNodeStatusPatch(test.existingNode, patchAction.GetPatch())
+								if err != nil {
+									t.Logf("node patching failed, %v", err)
+									return false, nil
+								}
 							}
 						}
 					} else {
