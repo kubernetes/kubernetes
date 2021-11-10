@@ -27,11 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -537,7 +535,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		Name:     params.Name,
 	}, fldPath)...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IngressClassNamespacedParams) && params.Scope == nil {
+	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
 		return allErrs
 	}
