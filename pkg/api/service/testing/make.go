@@ -153,7 +153,7 @@ func SetIPFamilies(families ...api.IPFamily) Tweak {
 }
 
 // SetIPFamilyPolicy sets the service IPFamilyPolicy field.
-func SetIPFamilyPolicy(policy api.IPFamilyPolicyType) Tweak {
+func SetIPFamilyPolicy(policy api.IPFamilyPolicy) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.IPFamilyPolicy = &policy
 	}

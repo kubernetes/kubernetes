@@ -75,7 +75,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 		serviceType        v1.ServiceType
 		clusterIPs         []string
 		ipFamilies         []v1.IPFamily
-		ipFamilyPolicy     v1.IPFamilyPolicyType
+		ipFamilyPolicy     v1.IPFamilyPolicy
 		expectedIPFamilies []v1.IPFamily
 		expectError        bool
 	}{
@@ -292,7 +292,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 		clusterIPs         []string
 		ipFamilies         []v1.IPFamily
 		expectedIPFamilies []v1.IPFamily
-		ipFamilyPolicy     v1.IPFamilyPolicyType
+		ipFamilyPolicy     v1.IPFamilyPolicy
 		expectError        bool
 	}{
 		{
@@ -518,7 +518,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 		clusterIPs         []string
 		ipFamilies         []v1.IPFamily
 		expectedIPFamilies []v1.IPFamily
-		ipFamilyPolicy     v1.IPFamilyPolicyType
+		ipFamilyPolicy     v1.IPFamilyPolicy
 		expectError        bool
 	}{
 		{
@@ -756,7 +756,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 		clusterIPs         []string
 		ipFamilies         []v1.IPFamily
 		expectedIPFamilies []v1.IPFamily
-		ipFamilyPolicy     v1.IPFamilyPolicyType
+		ipFamilyPolicy     v1.IPFamilyPolicy
 		expectError        bool
 	}{
 		{

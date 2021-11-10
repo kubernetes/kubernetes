@@ -126,7 +126,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		name           string
 		serviceType    v1.ServiceType
 		ipFamilies     []v1.IPFamily
-		ipFamilyPolicy v1.IPFamilyPolicyType
+		ipFamilyPolicy v1.IPFamilyPolicy
 	}{
 		{
 			name:           "Service IPv4 Only",
