@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -322,7 +323,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, err := jm.syncCronJob(&cj, js)
+			cjCopy, requeueAfter, err := jm.syncCronJob(context.TODO(), &cj, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}

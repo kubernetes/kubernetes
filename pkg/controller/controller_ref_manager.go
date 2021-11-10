@@ -66,7 +66,7 @@ func (m *BaseControllerRefManager) CanAdopt(ctx context.Context) error {
 // own the object.
 //
 // No reconciliation will be attempted if the controller is being deleted.
-func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.Object, match func(metav1.Object) bool, adopt func(context.Context, metav1.Object) error, release func(metav1.Object) error) (bool, error) {
+func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.Object, match func(metav1.Object) bool, adopt, release func(context.Context, metav1.Object) error) (bool, error) {
 	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
 		if controllerRef.UID != m.Controller.GetUID() {
@@ -85,7 +85,7 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 		if m.Controller.GetDeletionTimestamp() != nil {
 			return false, nil
 		}
-		if err := release(obj); err != nil {
+		if err := release(ctx, obj); err != nil {
 			// If the pod no longer exists, ignore the error.
 			if errors.IsNotFound(err) {
 				return false, nil
@@ -200,8 +200,8 @@ func (m *PodControllerRefManager) ClaimPods(ctx context.Context, pods []*v1.Pod,
 	adopt := func(ctx context.Context, obj metav1.Object) error {
 		return m.AdoptPod(ctx, obj.(*v1.Pod))
 	}
-	release := func(obj metav1.Object) error {
-		return m.ReleasePod(obj.(*v1.Pod))
+	release := func(ctx context.Context, obj metav1.Object) error {
+		return m.ReleasePod(ctx, obj.(*v1.Pod))
 	}
 
 	for _, pod := range pods {
@@ -230,19 +230,19 @@ func (m *PodControllerRefManager) AdoptPod(ctx context.Context, pod *v1.Pod) err
 	if err != nil {
 		return err
 	}
-	return m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
+	return m.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patchBytes)
 }
 
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
+func (m *PodControllerRefManager) ReleasePod(ctx context.Context, pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	patchBytes, err := GenerateDeleteOwnerRefStrategicMergeBytes(pod.UID, []types.UID{m.Controller.GetUID()}, m.finalizers...)
 	if err != nil {
 		return err
 	}
-	err = m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
+	err = m.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the pod no longer exists, ignore it.
@@ -326,8 +326,8 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(ctx context.Context, s
 	adopt := func(ctx context.Context, obj metav1.Object) error {
 		return m.AdoptReplicaSet(ctx, obj.(*apps.ReplicaSet))
 	}
-	release := func(obj metav1.Object) error {
-		return m.ReleaseReplicaSet(obj.(*apps.ReplicaSet))
+	release := func(ctx context.Context, obj metav1.Object) error {
+		return m.ReleaseReplicaSet(ctx, obj.(*apps.ReplicaSet))
 	}
 
 	for _, rs := range sets {
@@ -355,19 +355,19 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(ctx context.Context, rs
 	if err != nil {
 		return err
 	}
-	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, patchBytes)
+	return m.rsControl.PatchReplicaSet(ctx, rs.Namespace, rs.Name, patchBytes)
 }
 
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
+func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(ctx context.Context, replicaSet *apps.ReplicaSet) error {
 	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	patchBytes, err := GenerateDeleteOwnerRefStrategicMergeBytes(replicaSet.UID, []types.UID{m.Controller.GetUID()})
 	if err != nil {
 		return err
 	}
-	err = m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, patchBytes)
+	err = m.rsControl.PatchReplicaSet(ctx, replicaSet.Namespace, replicaSet.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the ReplicaSet no longer exists, ignore it.
@@ -464,8 +464,8 @@ func (m *ControllerRevisionControllerRefManager) ClaimControllerRevisions(ctx co
 	adopt := func(ctx context.Context, obj metav1.Object) error {
 		return m.AdoptControllerRevision(ctx, obj.(*apps.ControllerRevision))
 	}
-	release := func(obj metav1.Object) error {
-		return m.ReleaseControllerRevision(obj.(*apps.ControllerRevision))
+	release := func(ctx context.Context, obj metav1.Object) error {
+		return m.ReleaseControllerRevision(ctx, obj.(*apps.ControllerRevision))
 	}
 
 	for _, h := range histories {
@@ -493,12 +493,12 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(ctx con
 	if err != nil {
 		return err
 	}
-	return m.crControl.PatchControllerRevision(history.Namespace, history.Name, patchBytes)
+	return m.crControl.PatchControllerRevision(ctx, history.Namespace, history.Name, patchBytes)
 }
 
 // ReleaseControllerRevision sends a patch to free the ControllerRevision from the control of its controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
+func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(ctx context.Context, history *apps.ControllerRevision) error {
 	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
 		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	patchBytes, err := GenerateDeleteOwnerRefStrategicMergeBytes(history.UID, []types.UID{m.Controller.GetUID()})
@@ -506,7 +506,7 @@ func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(histo
 		return err
 	}
 
-	err = m.crControl.PatchControllerRevision(history.Namespace, history.Name, patchBytes)
+	err = m.crControl.PatchControllerRevision(ctx, history.Namespace, history.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the ControllerRevision no longer exists, ignore it.

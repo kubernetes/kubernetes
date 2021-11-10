@@ -123,7 +123,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 		}
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
-		return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
+		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
 	}
 
 	// When surging, we create new pods whenever an old pod is unavailable, and we can create up
@@ -201,7 +201,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	}
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
 
-	return dsc.syncNodes(ds, oldPodsToDelete, newNodesToCreate, hash)
+	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
 }
 
 // findUpdatedPodsOnNode looks at non-deleted pods on a given node and returns true if there

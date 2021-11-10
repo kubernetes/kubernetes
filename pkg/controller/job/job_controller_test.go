@@ -775,13 +775,13 @@ func TestControllerSyncJob(t *testing.T) {
 				setPodsStatusesWithIndexes(podIndexer, job, tc.podsWithIndexes)
 
 				actual := job
-				manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+				manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 					actual = job
 					return job, nil
 				}
 
 				// run
-				forget, err := manager.syncJob(testutil.GetKey(job, t))
+				forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 
 				// We need requeue syncJob task if podController error
 				if tc.podControllerError != nil {
@@ -1016,20 +1016,20 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			jobPatches := 0
-			manager.patchJobHandler = func(*batch.Job, []byte) error {
+			manager.patchJobHandler = func(context.Context, *batch.Job, []byte) error {
 				jobPatches++
 				return nil
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(&tc.job)
 
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				actual = job
 				return job, nil
 			}
 
 			// Run.
-			_, err := manager.syncJob(testutil.GetKey(&tc.job, t))
+			_, err := manager.syncJob(context.TODO(), testutil.GetKey(&tc.job, t))
 			if err != nil {
 				t.Fatalf("Syncing job: %v", err)
 			}
@@ -1629,7 +1629,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			metrics.JobPodsFinished.Reset()
 			manager.podControl = &fakePodControl
 			var statusUpdates []batch.JobStatus
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				statusUpdates = append(statusUpdates, *job.Status.DeepCopy())
 				return job, tc.statusUpdateErr
 			}
@@ -1639,7 +1639,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			}
 			uncounted := newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
 			succeededIndexes := succeededIndexesFromJob(job)
-			err := manager.trackJobStatusAndRemoveFinalizers(job, tc.pods, succeededIndexes, *uncounted, tc.expectedRmFinalizers, tc.finishedCond, tc.needsFlush)
+			err := manager.trackJobStatusAndRemoveFinalizers(context.TODO(), job, tc.pods, succeededIndexes, *uncounted, tc.expectedRmFinalizers, tc.finishedCond, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
@@ -1775,7 +1775,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				actual = job
 				return job, nil
 			}
@@ -1791,7 +1791,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods, 0)
 
 			// run
-			forget, err := manager.syncJob(testutil.GetKey(job, t))
+			forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 			if err != nil {
 				t.Errorf("Unexpected error when syncing jobs %v", err)
 			}
@@ -1852,7 +1852,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	var actual *batch.Job
-	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 		actual = job
 		return job, nil
 	}
@@ -1864,7 +1864,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline"))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-	forget, err := manager.syncJob(testutil.GetKey(job, t))
+	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
 	}
@@ -1893,7 +1893,7 @@ func TestSyncJobComplete(t *testing.T) {
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobComplete, v1.ConditionTrue, "", ""))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-	forget, err := manager.syncJob(testutil.GetKey(job, t))
+	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
 	}
@@ -1917,11 +1917,11 @@ func TestSyncJobDeleted(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 		return job, nil
 	}
 	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
-	forget, err := manager.syncJob(testutil.GetKey(job, t))
+	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
 	}
@@ -1965,13 +1965,13 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				return job, tc.updateErr
 			}
 			job := newJob(2, 2, 6, batch.NonIndexedCompletion)
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			manager.queue.Add(testutil.GetKey(job, t))
-			manager.processNextWorkItem()
+			manager.processNextWorkItem(context.TODO())
 			// With DefaultJobBackOff=0, the queueing is synchronous.
 			requeued := manager.queue.Len() > 0
 			if requeued != tc.wantRequeue {
@@ -2148,7 +2148,7 @@ func TestGetPodsForJob(t *testing.T) {
 					informer.Core().V1().Pods().Informer().GetIndexer().Add(p)
 				}
 
-				pods, err := jm.getPodsForJob(job, wFinalizers)
+				pods, err := jm.getPodsForJob(context.TODO(), job, wFinalizers)
 				if err != nil {
 					t.Fatalf("getPodsForJob() error: %v", err)
 				}
@@ -2468,7 +2468,7 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 		return job, nil
 	}
 
@@ -2486,7 +2486,7 @@ func TestSyncJobExpectations(t *testing.T) {
 			podIndexer.Add(pods[1])
 		},
 	}
-	manager.syncJob(testutil.GetKey(job, t))
+	manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if len(fakePodControl.Templates) != 0 {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.Templates))
 	}
@@ -2508,7 +2508,7 @@ func TestWatchJobs(t *testing.T) {
 
 	// The update sent through the fakeWatcher should make its way into the workqueue,
 	// and eventually into the syncHandler.
-	manager.syncHandler = func(key string) (bool, error) {
+	manager.syncHandler = func(ctx context.Context, key string) (bool, error) {
 		defer close(received)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
@@ -2529,7 +2529,7 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	sharedInformerFactory.Start(stopCh)
-	go manager.Run(1, stopCh)
+	go manager.Run(context.TODO(), 1)
 
 	// We're sending new job to see if it reaches syncHandler.
 	testJob.Namespace = "bar"
@@ -2553,7 +2553,7 @@ func TestWatchPods(t *testing.T) {
 	received := make(chan struct{})
 	// The pod update sent through the fakeWatcher should figure out the managing job and
 	// send it into the syncHandler.
-	manager.syncHandler = func(key string) (bool, error) {
+	manager.syncHandler = func(ctx context.Context, key string) (bool, error) {
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			t.Errorf("Error getting namespace/name from key %v: %v", key, err)
@@ -2575,7 +2575,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
-	go manager.Run(1, stopCh)
+	go manager.Run(context.TODO(), 1)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
 	testPod := pods[0]
@@ -2594,7 +2594,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	jobSynced := false
-	manager.syncHandler = func(jobKey string) (bool, error) {
+	manager.syncHandler = func(ctx context.Context, jobKey string) (bool, error) {
 		jobSynced = true
 		return true, nil
 	}
@@ -2605,7 +2605,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go sharedInformers.Core().V1().Pods().Informer().Run(stopCh)
-	go manager.Run(1, stopCh)
+	go manager.Run(context.TODO(), 1)
 
 	orphanPod := buildPod().name("a").job(testJob).deletionTimestamp().trackingFinalizer().Pod
 	orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
@@ -2674,7 +2674,7 @@ func TestJobBackoffReset(t *testing.T) {
 		manager.podStoreSynced = alwaysReady
 		manager.jobStoreSynced = alwaysReady
 		var actual *batch.Job
-		manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+		manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 			actual = job
 			return job, nil
 		}
@@ -2687,7 +2687,7 @@ func TestJobBackoffReset(t *testing.T) {
 
 		setPodsStatuses(podIndexer, job, tc.pods[0].pending, tc.pods[0].active, tc.pods[0].succeed, tc.pods[0].failed, 0)
 		manager.queue.Add(key)
-		manager.processNextWorkItem()
+		manager.processNextWorkItem(context.TODO())
 		retries := manager.queue.NumRequeues(key)
 		if retries != 1 {
 			t.Errorf("%s: expected exactly 1 retry, got %d", name, retries)
@@ -2696,7 +2696,7 @@ func TestJobBackoffReset(t *testing.T) {
 		job = actual
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Replace([]interface{}{actual}, actual.ResourceVersion)
 		setPodsStatuses(podIndexer, job, tc.pods[1].pending, tc.pods[1].active, tc.pods[1].succeed, tc.pods[1].failed, 0)
-		manager.processNextWorkItem()
+		manager.processNextWorkItem(context.TODO())
 		retries = manager.queue.NumRequeues(key)
 		if retries != 0 {
 			t.Errorf("%s: expected exactly 0 retries, got %d", name, retries)
@@ -2854,7 +2854,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				actual = job
 				return job, nil
 			}
@@ -2870,7 +2870,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			}
 
 			// run
-			forget, err := manager.syncJob(testutil.GetKey(job, t))
+			forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 
 			if err != nil {
 				t.Errorf("unexpected error syncing job.  Got %#v", err)
@@ -2956,7 +2956,7 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 				actual = job
 				return job, nil
 			}
@@ -2974,7 +2974,7 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			}
 
 			// run
-			forget, err := manager.syncJob(testutil.GetKey(job, t))
+			forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 
 			if (err != nil) != tc.isExpectingAnError {
 				t.Errorf("unexpected error syncing job. Got %#v, isExpectingAnError: %v\n", err, tc.isExpectingAnError)
@@ -3094,7 +3094,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	manager.podControl = &controller.FakePodControl{Err: errors.New("fake pod controller error")}
-	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 		return job, nil
 	}
 
@@ -3114,7 +3114,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 	jobKey := testutil.GetKey(job, t)
 
-	manager.syncJob(jobKey)
+	manager.syncJob(context.TODO(), jobKey)
 	gotExpectedUIDs := manager.finalizerExpectations.getExpectedUIDs(jobKey)
 	if len(gotExpectedUIDs) != 0 {
 		t.Errorf("Got unwanted expectations for removed finalizers after first syncJob with client failures:\n%s", gotExpectedUIDs.List())
@@ -3122,7 +3122,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 
 	// Remove failures and re-sync.
 	manager.podControl.(*controller.FakePodControl).Err = nil
-	manager.syncJob(jobKey)
+	manager.syncJob(context.TODO(), jobKey)
 	gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)
 	if diff := cmp.Diff(uids, gotExpectedUIDs); diff != "" {
 		t.Errorf("Different expectations for removed finalizers after syncJob (-want,+got):\n%s", diff)

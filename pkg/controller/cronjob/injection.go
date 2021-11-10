@@ -33,9 +33,9 @@ import (
 // cjControlInterface is an interface that knows how to update CronJob status
 // created as an interface to allow testing.
 type cjControlInterface interface {
-	UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error)
+	UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error)
 	// GetCronJob retrieves a CronJob.
-	GetCronJob(namespace, name string) (*batchv1.CronJob, error)
+	GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error)
 }
 
 // realCJControl is the default implementation of cjControlInterface.
@@ -43,14 +43,14 @@ type realCJControl struct {
 	KubeClient clientset.Interface
 }
 
-func (c *realCJControl) GetCronJob(namespace, name string) (*batchv1.CronJob, error) {
-	return c.KubeClient.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (c *realCJControl) GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 var _ cjControlInterface = &realCJControl{}
 
-func (c *realCJControl) UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error) {
-	return c.KubeClient.BatchV1().CronJobs(cj.Namespace).UpdateStatus(context.TODO(), cj, metav1.UpdateOptions{})
+func (c *realCJControl) UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(cj.Namespace).UpdateStatus(ctx, cj, metav1.UpdateOptions{})
 }
 
 // fakeCJControl is the default implementation of cjControlInterface.
@@ -59,7 +59,7 @@ type fakeCJControl struct {
 	Updates []batchv1.CronJob
 }
 
-func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1.CronJob, error) {
+func (c *fakeCJControl) GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error) {
 	if name == c.CronJob.Name && namespace == c.CronJob.Namespace {
 		return c.CronJob, nil
 	}
@@ -71,7 +71,7 @@ func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1.CronJob, er
 
 var _ cjControlInterface = &fakeCJControl{}
 
-func (c *fakeCJControl) UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error) {
+func (c *fakeCJControl) UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error) {
 	c.Updates = append(c.Updates, *cj)
 	return cj, nil
 }
