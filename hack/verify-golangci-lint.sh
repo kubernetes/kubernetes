@@ -44,14 +44,24 @@ popd >/dev/null
 cd "${KUBE_ROOT}"
 
 # The config is in ${KUBE_ROOT}/.golangci.yaml
-echo 'running golangci-lint '
-if [[ "$#" > 0 ]]; then
-    golangci-lint run "$@"
+RET=0
+if [[ "$#" -gt 0 ]]; then
+    echo "running golangci-lint $@"
+    if ! golangci-lint run "$@"; then
+        RET=1
+    fi
 else
-    golangci-lint run ./...
+    echo "running golangci-lint for module $(go list -m)"
+    if ! golangci-lint run ./... ; then
+        RET=1
+    fi
     for d in staging/src/k8s.io/*; do
-        pushd ./vendor/k8s.io/$(basename "$d") >/dev/null
-        golangci-lint run ./...
+        pushd "./vendor/k8s.io/$(basename "$d")" >/dev/null
+        echo "running golangci-lint for module $(go list -m)"
+        if ! golangci-lint run ./... ; then
+            RET=1
+        fi
         popd >/dev/null
     done
 fi
+exit $RET

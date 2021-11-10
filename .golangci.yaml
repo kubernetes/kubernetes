@@ -14,6 +14,7 @@ linters:
     - staticcheck
     - unused
     - varcheck
+
 linters-settings: # please keep this alphabetized
   staticcheck:
     go: "1.17"
