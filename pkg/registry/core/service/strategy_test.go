@@ -174,7 +174,7 @@ func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
 	}
 }
 
-func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
+func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicy) *api.Service {
 	return &api.Service{
 		Spec: api.ServiceSpec{
 			InternalTrafficPolicy: policy,

@@ -54,7 +54,7 @@ type BaseServiceInfo struct {
 	healthCheckNodePort      int
 	nodeLocalExternal        bool
 	nodeLocalInternal        bool
-	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
+	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicy
 	hintsAnnotation          string
 }
 
@@ -130,7 +130,7 @@ func (info *BaseServiceInfo) NodeLocalInternal() bool {
 }
 
 // InternalTrafficPolicy is part of ServicePort interface
-func (info *BaseServiceInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType {
+func (info *BaseServiceInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicy {
 	return info.internalTrafficPolicy
 }
 

@@ -11422,7 +11422,7 @@ func TestFeatureInternalTrafficPolicy(t *testing.T) {
 	prove := func(proofs ...svcTestProof) []svcTestProof {
 		return proofs
 	}
-	proveITP := func(want api.ServiceInternalTrafficPolicyType) svcTestProof {
+	proveITP := func(want api.ServiceInternalTrafficPolicy) svcTestProof {
 		return func(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
 			t.Helper()
 			if got := after.Spec.InternalTrafficPolicy; got == nil {

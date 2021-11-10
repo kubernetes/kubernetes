@@ -12284,7 +12284,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "invalid internalTraffic field",
 			tweakSvc: func(s *core.Service) {
-				invalid := core.ServiceInternalTrafficPolicyType("invalid")
+				invalid := core.ServiceInternalTrafficPolicy("invalid")
 				s.Spec.InternalTrafficPolicy = &invalid
 			},
 			numErrs: 1,
