@@ -43,12 +43,15 @@ popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
+# The config is in ${KUBE_ROOT}/.golangci.yaml
 echo 'running golangci-lint '
-golangci-lint run \
-  --timeout 30m \
-  --disable-all \
-  -E deadcode \
-  -E unused \
-  -E varcheck \
-  -E ineffassign \
-  -E staticcheck
+if [[ "$#" > 0 ]]; then
+    golangci-lint run "$@"
+else
+    golangci-lint run ./...
+    for d in staging/src/k8s.io/*; do
+        pushd ./vendor/k8s.io/$(basename "$d") >/dev/null
+        golangci-lint run ./...
+        popd >/dev/null
+    done
+fi

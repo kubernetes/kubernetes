@@ -1,0 +1,18 @@
+run:
+  timeout: 30m
+  skip-files:
+    - "^zz_generated.*"
+
+issues:
+  max-same-issues: 0
+
+linters:
+  disable-all: true
+  enable: # please keep this alphabetized
+    - deadcode
+    - ineffassign
+    - unused
+    - varcheck
+linters-settings: # please keep this alphabetized
+  unused:
+    go: "1.17"
