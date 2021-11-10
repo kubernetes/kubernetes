@@ -823,9 +823,7 @@ type fakeTestingT struct {
 
 func (f fakeTestingT) Helper() {}
 
-func (f fakeTestingT) Errorf(format string, args ...interface{}) {
-	f.t.Logf(format, args...)
-}
+func (f fakeTestingT) Errorf(format string, args ...interface{}) {}
 
 func verifyEquiv(t testingTInterface, call string, tc *svcTestCase, got *api.Service) bool {
 	t.Helper()
