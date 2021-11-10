@@ -571,8 +571,6 @@ func dropDisabledFields(
 		})
 	}
 
-	dropDisabledFSGroupFields(podSpec, oldPodSpec)
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		podSpec.Overhead = nil
@@ -620,16 +618,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 			}
 			return true
 		})
-	}
-}
-
-func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
-		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
-		// if ConfigurableFSGroupPolicy feature is disabled
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.FSGroupChangePolicy = nil
-		}
 	}
 }
 
@@ -708,17 +696,6 @@ func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
-}
-
-func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	securityContext := podSpec.SecurityContext
-	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
-		return true
-	}
-	return false
 }
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
