@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 
@@ -62,14 +61,4 @@ func PortPart(s string) (int, error) {
 		return -1, err
 	}
 	return portNumber, nil
-}
-
-// ToCIDR returns a host address of the form <ip-address>/32 for
-// IPv4 and <ip-address>/128 for IPv6
-func ToCIDR(ip net.IP) string {
-	len := 32
-	if ip.To4() == nil {
-		len = 128
-	}
-	return fmt.Sprintf("%s/%d", ip.String(), len)
 }
