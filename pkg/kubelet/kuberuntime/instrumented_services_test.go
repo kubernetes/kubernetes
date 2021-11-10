@@ -1,12 +1,9 @@
 /*
 Copyright 2016 The Kubernetes Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,20 +16,27 @@ package kuberuntime
 import (
 	"net"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/component-base/metrics/legacyregistry"
+	compbasemetrics "k8s.io/component-base/metrics"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+var registerMetrics sync.Once
+
 func TestRecordOperation(t *testing.T) {
-	legacyregistry.MustRegister(metrics.RuntimeOperations)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsDuration)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsErrors)
+	// Use local registry
+	var registry = compbasemetrics.NewKubeRegistry()
+	registry.MustRegister(metrics.RuntimeOperations)
+	registry.MustRegister(metrics.RuntimeOperationsDuration)
+	registry.MustRegister(metrics.RuntimeOperationsErrors)
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
@@ -41,7 +45,8 @@ func TestRecordOperation(t *testing.T) {
 	prometheusURL := "http://" + l.Addr().String() + "/metrics"
 	mux := http.NewServeMux()
 	//lint:ignore SA1019 ignore deprecated warning until we move off of global registries
-	mux.Handle("/metrics", legacyregistry.Handler())
+	handler := promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	mux.Handle("/metrics", handler)
 	server := &http.Server{
 		Addr:    l.Addr().String(),
 		Handler: mux,
@@ -61,6 +66,8 @@ func TestRecordOperation(t *testing.T) {
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
 	}), "GET", prometheusURL, nil, runtimeOperationsDurationExpected)
+
+	registry.Reset()
 }
 
 func TestInstrumentedVersion(t *testing.T) {
