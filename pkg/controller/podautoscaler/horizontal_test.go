@@ -18,7 +18,6 @@ package podautoscaler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
@@ -40,7 +39,6 @@ import (
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -74,7 +72,7 @@ var statusOk = []autoscalingv2.HorizontalPodAutoscalerCondition{
 }
 
 // statusOkWithOverrides returns the "ok" status with the given conditions as overridden
-func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCondition) []autoscalingv1.HorizontalPodAutoscalerCondition {
+func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCondition) []autoscalingv2.HorizontalPodAutoscalerCondition {
 	resv2 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(statusOk))
 	copy(resv2, statusOk)
 	for _, override := range overrides {
@@ -82,10 +80,10 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 	}
 
 	// copy to a v1 slice
-	resv1 := make([]autoscalingv1.HorizontalPodAutoscalerCondition, len(resv2))
+	resv1 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(resv2))
 	for i, cond := range resv2 {
-		resv1[i] = autoscalingv1.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv1.HorizontalPodAutoscalerConditionType(cond.Type),
+		resv1[i] = autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.HorizontalPodAutoscalerConditionType(cond.Type),
 			Status: cond.Status,
 			Reason: cond.Reason,
 		}
@@ -129,7 +127,7 @@ type testCase struct {
 	useMetricsAPI                bool
 	metricsTarget                []autoscalingv2.MetricSpec
 	expectedDesiredReplicas      int32
-	expectedConditions           []autoscalingv1.HorizontalPodAutoscalerCondition
+	expectedConditions           []autoscalingv2.HorizontalPodAutoscalerCondition
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
@@ -243,6 +241,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					Resource: &autoscalingv2.ResourceMetricSource{
 						Name: v1.ResourceCPU,
 						Target: autoscalingv2.MetricTarget{
+							Type:               autoscalingv2.UtilizationMetricType,
 							AverageUtilization: &tc.CPUTarget,
 						},
 					},
@@ -265,13 +264,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			}
 		}
 
-		// and... convert to autoscaling v1 to return the right type
-		objv1, err := unsafeConvertToVersionVia(obj, autoscalingv1.SchemeGroupVersion)
-		if err != nil {
-			return true, nil, err
-		}
-
-		return true, objv1, nil
+		return true, obj, nil
 	})
 
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -364,23 +357,20 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 	})
 
 	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		handled, obj, err := func() (handled bool, ret *autoscalingv1.HorizontalPodAutoscaler, err error) {
+		handled, obj, err := func() (handled bool, ret *autoscalingv2.HorizontalPodAutoscaler, err error) {
 			tc.Lock()
 			defer tc.Unlock()
 
-			obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.HorizontalPodAutoscaler)
+			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
 			assert.Equal(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
 			assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
 			assert.Equal(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
 			if tc.verifyCPUCurrent {
-				if assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage, "the reported CPU utilization percentage should be non-nil") {
-					assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage, "the report CPU utilization percentage should be as expected")
+				if utilization := findCpuUtilization(obj.Status.CurrentMetrics); assert.NotNil(t, utilization, "the reported CPU utilization percentage should be non-nil") {
+					assert.Equal(t, tc.CPUCurrent, *utilization, "the report CPU utilization percentage should be as expected")
 				}
 			}
-			var actualConditions []autoscalingv1.HorizontalPodAutoscalerCondition
-			if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
-				return true, nil, err
-			}
+			actualConditions := obj.Status.Conditions
 			// TODO: it's ok not to sort these because statusOk
 			// contains all the conditions, so we'll never be appending.
 			// Default to statusOk when missing any specific conditions
@@ -654,6 +644,25 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient
 }
 
+func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
+	for _, s := range metricStatus {
+		if s.Type != autoscalingv2.ResourceMetricSourceType {
+			continue
+		}
+		if s.Resource == nil {
+			continue
+		}
+		if s.Resource.Name != v1.ResourceCPU {
+			continue
+		}
+		if s.Resource.Current.AverageUtilization == nil {
+			continue
+		}
+		return s.Resource.Current.AverageUtilization
+	}
+	return nil
+}
+
 func (tc *testCase) verifyResults(t *testing.T) {
 	tc.Lock()
 	defer tc.Unlock()
@@ -717,10 +726,10 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	hpaController := NewHorizontalController(
 		eventClient.CoreV1(),
 		testScaleClient,
-		testClient.AutoscalingV1(),
+		testClient.AutoscalingV2(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		metricsClient,
-		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
 		informerFactory.Core().V1().Pods(),
 		100*time.Millisecond, // we need non-zero resync period to avoid race conditions
 		defaultDownscalestabilizationWindow,
@@ -1000,6 +1009,7 @@ func TestScaleUpCM(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1028,6 +1038,7 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1058,6 +1069,7 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1097,6 +1109,7 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1140,6 +1153,7 @@ func TestScaleUpCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1172,6 +1186,7 @@ func TestScaleUpFromZeroCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1204,6 +1219,7 @@ func TestScaleUpFromZeroIgnoresToleranceCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1236,6 +1252,7 @@ func TestScaleUpPerPodCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &targetAverageValue,
 					},
 				},
@@ -1262,6 +1279,7 @@ func TestScaleUpCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(6666, resource.DecimalSI),
 					},
 				},
@@ -1288,6 +1306,7 @@ func TestScaleUpPerPodCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: resource.NewMilliQuantity(2222, resource.DecimalSI),
 					},
 				},
@@ -1415,9 +1434,9 @@ func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
 		},
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 	}
 	tc.runTest(t)
@@ -1466,6 +1485,7 @@ func TestScaleDownCM(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1500,6 +1520,7 @@ func TestScaleDownCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1534,6 +1555,7 @@ func TestScaleDownToZeroCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1568,6 +1590,7 @@ func TestScaleDownPerPodCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &targetAverageValue,
 					},
 				},
@@ -1596,6 +1619,7 @@ func TestScaleDownCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(14400, resource.DecimalSI),
 					},
 				},
@@ -1623,6 +1647,7 @@ func TestScaleDownToZeroCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(14400, resource.DecimalSI),
 					},
 				},
@@ -1650,6 +1675,7 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: resource.NewMilliQuantity(3000, resource.DecimalSI),
 					},
 				},
@@ -1776,6 +1802,7 @@ func TestToleranceCM(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -1813,6 +1840,7 @@ func TestToleranceCMObject(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -1845,6 +1873,7 @@ func TestToleranceCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(8666, resource.DecimalSI),
 					},
 				},
@@ -1881,6 +1910,7 @@ func TestTolerancePerPodCMObject(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
 					},
 				},
@@ -1912,6 +1942,7 @@ func TestTolerancePerPodCMExternal(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
 					},
 				},
@@ -2001,9 +2032,9 @@ func TestZeroReplicas(t *testing.T) {
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
 		},
 	}
 	tc.runTest(t)
@@ -2020,8 +2051,8 @@ func TestTooFewReplicas(t *testing.T) {
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
 	}
 	tc.runTest(t)
@@ -2038,8 +2069,8 @@ func TestTooManyReplicas(t *testing.T) {
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
 	}
 	tc.runTest(t)
@@ -2112,9 +2143,9 @@ func TestEmptyMetrics(t *testing.T) {
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
 		},
 	}
 	tc.runTest(t)
@@ -2131,9 +2162,9 @@ func TestEmptyCPURequest(t *testing.T) {
 		reportedLevels:          []uint64{200},
 		reportedCPURequests:     []resource.Quantity{},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
 		},
 	}
 	tc.runTest(t)
@@ -2274,14 +2305,14 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 		reportedLevels:          []uint64{100, 200, 300},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{
-				Type:   autoscalingv1.AbleToScale,
+				Type:   autoscalingv2.AbleToScale,
 				Status: v1.ConditionTrue,
 				Reason: "SucceededGetScale",
 			},
 			{
-				Type:   autoscalingv1.ScalingActive,
+				Type:   autoscalingv2.ScalingActive,
 				Status: v1.ConditionFalse,
 				Reason: "InvalidSelector",
 			},
@@ -2320,14 +2351,14 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 		reportedLevels:          []uint64{100, 200, 300},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{
-				Type:   autoscalingv1.AbleToScale,
+				Type:   autoscalingv2.AbleToScale,
 				Status: v1.ConditionTrue,
 				Reason: "SucceededGetScale",
 			},
 			{
-				Type:   autoscalingv1.ScalingActive,
+				Type:   autoscalingv2.ScalingActive,
 				Status: v1.ConditionFalse,
 				Reason: "InvalidSelector",
 			},
@@ -2369,6 +2400,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -2387,6 +2419,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: &targetValue,
 					},
 				},
@@ -2401,6 +2434,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
 					},
 				},
@@ -2435,9 +2469,9 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 		})
 
-		tc.expectedConditions = []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: reason},
+		tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: reason},
 		}
 		if specs != nil {
 			tc.CPUTarget = 0
@@ -2463,14 +2497,14 @@ func TestConditionInvalidSourceType(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{20000},
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{
-				Type:   autoscalingv1.AbleToScale,
+				Type:   autoscalingv2.AbleToScale,
 				Status: v1.ConditionTrue,
 				Reason: "SucceededGetScale",
 			},
 			{
-				Type:   autoscalingv1.ScalingActive,
+				Type:   autoscalingv2.ScalingActive,
 				Status: v1.ConditionFalse,
 				Reason: "InvalidMetricSourceType",
 			},
@@ -2490,9 +2524,9 @@ func TestConditionFailedGetScale(t *testing.T) {
 		reportedLevels:          []uint64{100, 200, 300},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{
-				Type:   autoscalingv1.AbleToScale,
+				Type:   autoscalingv2.AbleToScale,
 				Status: v1.ConditionFalse,
 				Reason: "FailedGetScale",
 			},
@@ -2555,6 +2589,7 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -2599,6 +2634,7 @@ func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
 						Name: "qps",
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
 						AverageValue: &averageValue,
 					},
 				},
@@ -2770,8 +2806,8 @@ func TestScaleUpRCImmediately(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		lastScaleTime:           &time,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
 	}
 	tc.runTest(t)
@@ -2790,8 +2826,8 @@ func TestScaleDownRCImmediately(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 		useMetricsAPI:           true,
 		lastScaleTime:           &time,
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
 	}
 	tc.runTest(t)
@@ -2831,6 +2867,8 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 			tc.processed <- "test-hpa"
 		}()
 
+		var eighty int32 = 80
+
 		quantity := resource.MustParse("400m")
 		obj := &autoscalingv2.HorizontalPodAutoscalerList{
 			Items: []autoscalingv2.HorizontalPodAutoscaler{
@@ -2846,7 +2884,21 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 							Name:       "test-rc",
 							APIVersion: "v1",
 						},
-
+						Metrics: []autoscalingv2.MetricSpec{{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								Name: v1.ResourceCPU,
+								Target: autoscalingv2.MetricTarget{
+									Type: autoscalingv2.UtilizationMetricType,
+									// TODO: Change this to &tc.CPUTarget and the expected ScaleLimited
+									//       condition to False. This test incorrectly leaves the v1
+									//       HPA field TargetCPUUtilizization field blank and the
+									//       controller defaults to a target of 80. So the test relies
+									//       on downscale stabilization to prevent a scale change.
+									AverageUtilization: &eighty,
+								},
+							},
+						}},
 						MinReplicas: &tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
 					},
@@ -2893,13 +2945,8 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 				},
 			},
 		}
-		// and... convert to autoscaling v1 to return the right type
-		objv1, err := unsafeConvertToVersionVia(obj, autoscalingv1.SchemeGroupVersion)
-		if err != nil {
-			return true, nil, err
-		}
 
-		return true, objv1, nil
+		return true, obj, nil
 	})
 	testClient.PrependReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		assert.Fail(t, "should not have attempted to update the HPA when nothing changed")
@@ -4024,6 +4071,7 @@ func TestScaleUpOneMetricEmpty(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 					},
 				},
@@ -4057,9 +4105,9 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
 		recommendations:     []timestampedRecommendation{},
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 	}
 
@@ -4083,6 +4131,7 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 						Selector: &metav1.LabelSelector{},
 					},
 					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
 						Value: resource.NewMilliQuantity(1000, resource.DecimalSI),
 					},
 				},
@@ -4092,9 +4141,9 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
 		recommendations:     []timestampedRecommendation{},
-		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
 		},
 	}
 	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
