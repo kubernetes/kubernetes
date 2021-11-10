@@ -38,7 +38,9 @@ function os::build::version::git_vars() {
 			fi
 		fi
 		# Use git describe to find the version based on annotated tags.
-		if [[ -n ${OS_GIT_VERSION-} ]] || OS_GIT_VERSION=$("${git[@]}" describe --long --tags --abbrev=7 --match 'v[0-9]*' "${OS_GIT_COMMIT}^{commit}" 2>/dev/null); then
+		if [[ -n ${OS_GIT_VERSION-} ]] || OS_GIT_VERSION=$(sed -rn 's/.*io.openshift.build.versions="kubernetes=(1.[0-9]+.[0-9]+)"/v\1/p' openshift-hack/images/hyperkube/Dockerfile.rhel); then
+			# combine GIT_COMMIT with GIT_VERSION which is being read from the above Dockerfile
+			OS_GIT_VERSION+="+${OS_GIT_COMMIT:0:7}"
 			# Try to match the "git describe" output to a regex to try to extract
 			# the "major" and "minor" versions and whether this is the exact tagged
 			# version or whether the tree is between two tagged versions.
@@ -46,18 +48,8 @@ function os::build::version::git_vars() {
 				OS_GIT_MAJOR=${BASH_REMATCH[1]}
 				OS_GIT_MINOR=${BASH_REMATCH[2]}
 				OS_GIT_PATCH=${BASH_REMATCH[3]}
-				if [[ -n "${BASH_REMATCH[5]}" ]]; then
-					OS_GIT_MINOR+="+"
-				fi
 			fi
 
-			# This translates the "git describe" to an actual semver.org
-			# compatible semantic version that looks something like this:
-			#   v1.1.0-alpha.0.6+84c76d1-345
-            # shellcheck disable=SC2001
-			OS_GIT_VERSION=$(echo "${OS_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{7,40\}\)$/\+\2-\1/")
-			# If this is an exact tag, remove the last segment.
-			OS_GIT_VERSION="${OS_GIT_VERSION//-0$/}"
 			if [[ "${OS_GIT_TREE_STATE}" == "dirty" ]]; then
 				# git describe --dirty only considers changes to existing files, but
 				# that is problematic since new untracked .go files affect the build,
