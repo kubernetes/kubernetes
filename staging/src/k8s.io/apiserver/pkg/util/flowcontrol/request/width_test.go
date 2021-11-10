@@ -410,7 +410,7 @@ func TestWorkEstimator(t *testing.T) {
 				req = req.WithContext(apirequest.WithRequestInfo(req.Context(), test.requestInfo))
 			}
 
-			workestimateGot := estimator.EstimateWork(req)
+			workestimateGot := estimator.EstimateWork(req, "testFS", "testPL")
 			if test.initialSeatsExpected != workestimateGot.InitialSeats {
 				t.Errorf("Expected work estimate to match: %d initial seats, but got: %d", test.initialSeatsExpected, workestimateGot.InitialSeats)
 			}

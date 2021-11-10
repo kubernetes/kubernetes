@@ -445,7 +445,7 @@ func TestNoRestraint(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			now := time.Now()
 			clk, counter := testeventclock.NewFake(now, 0, nil)
-			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
+			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk), newExecSeatsObserver(clk))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -481,7 +481,7 @@ func TestBaseline(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +550,7 @@ func TestSeparations(t *testing.T) {
 				HandSize:         3,
 				RequestWaitLimit: 10 * time.Minute,
 			}
-			qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+			qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -589,7 +589,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,7 +626,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,7 +662,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -702,7 +702,7 @@ func TestSeatSecondsRollover(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 40 * Quarter,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -740,7 +740,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -777,7 +777,7 @@ func TestDifferentWidths(t *testing.T) {
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -813,7 +813,7 @@ func TestTooWide(t *testing.T) {
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,7 +874,7 @@ func TestWindup(t *testing.T) {
 				HandSize:         1,
 				RequestWaitLimit: 10 * time.Minute,
 			}
-			qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+			qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -909,7 +909,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		DesiredNumQueues: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -945,7 +945,7 @@ func TestTimeout(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -996,7 +996,7 @@ func TestContextCancel(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1102,7 +1102,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 		DesiredNumQueues: 0,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk), newExecSeatsObserver(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1357,7 +1357,8 @@ func TestFinishRequestLocked(t *testing.T) {
 			qs := &queueSet{
 				clock:                    clk,
 				estimatedServiceDuration: time.Second,
-				obsPair:                  newObserverPair(clk),
+				reqsObsPair:              newObserverPair(clk),
+				execSeatsObs:             newExecSeatsObserver(clk),
 			}
 			queue := &queue{
 				requests: newRequestFIFO(),
@@ -1462,4 +1463,8 @@ func newFIFO(requests ...*request) fifo {
 
 func newObserverPair(clk clock.PassiveClock) metrics.TimedObserverPair {
 	return metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, []string{"test"})
+}
+
+func newExecSeatsObserver(clk clock.PassiveClock) metrics.TimedObserver {
+	return metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, []string{"test"})
 }

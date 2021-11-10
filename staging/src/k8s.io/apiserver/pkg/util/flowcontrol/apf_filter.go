@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -41,8 +42,9 @@ const ConfigConsumerAsFieldManager = "api-priority-and-fairness-config-consumer-
 // Interface defines how the API Priority and Fairness filter interacts with the underlying system.
 type Interface interface {
 	// Handle takes care of queuing and dispatching a request
-	// characterized by the given digest.  The given `noteFn` will be
-	// invoked with the results of request classification.  If the
+	// characterized by the given digest.  The given `workEstimator` will be
+	// invoked with the results of request classification and must return the
+	// work parameters for the request.  If the
 	// request is queued then `queueNoteFn` will be called twice,
 	// first with `true` and then with `false`; otherwise
 	// `queueNoteFn` will not be called at all.  If Handle decides
@@ -53,7 +55,7 @@ type Interface interface {
 	// ctx is cancelled or times out.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
-		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+		workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate,
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
@@ -92,7 +94,8 @@ func New(
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
-		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 }
@@ -131,8 +134,11 @@ type TestableConfig struct {
 	// RequestWaitLimit configured on the server
 	RequestWaitLimit time.Duration
 
-	// ObsPairGenerator for metrics
-	ObsPairGenerator metrics.TimedObserverPairGenerator
+	// ObsPairGenerator for metrics about requests
+	ReqsObsPairGenerator metrics.TimedObserverPairGenerator
+
+	// TimedObserverPairGenerator for metrics about seats occupied by all phases of execution
+	ExecSeatsObsGenerator metrics.TimedObserverGenerator
 
 	// QueueSetFactory for the queuing implementation
 	QueueSetFactory fq.QueueSetFactory
@@ -144,12 +150,11 @@ func NewTestable(config TestableConfig) Interface {
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
-	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate,
 	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
-	fs, pl, isExempt, req, startWaitingTime, flowDistinguisher := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
+	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, workEstimator, queueNoteFn)
 	queued := startWaitingTime != time.Time{}
-	noteFn(fs, pl, flowDistinguisher)
 	if req == nil {
 		if queued {
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))

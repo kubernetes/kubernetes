@@ -105,7 +105,7 @@ type ctlrTestRequest struct {
 	descr1, descr2 interface{}
 }
 
-func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, ip metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, rip metrics.TimedObserverPair, eso metrics.TimedObserver) (fq.QueueSetCompleter, error) {
 	return ctlrTestQueueSetCompleter{cts, nil, qc}, nil
 }
 
@@ -261,7 +261,8 @@ func TestConfigConsumer(t *testing.T) {
 				FlowcontrolClient:      flowcontrolClient,
 				ServerConcurrencyLimit: 100,         // server concurrency limit
 				RequestWaitLimit:       time.Minute, // request wait limit
-				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
 				QueueSetFactory:        cts,
 			})
 			cts.cfgCtlr = ctlr
@@ -392,7 +393,8 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: 100,
 		RequestWaitLimit:       time.Minute,
-		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
 		QueueSetFactory:        cts,
 	})
 
@@ -460,7 +462,7 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 				startWG.Add(1)
 				go func(matches, isResource bool, rdu RequestDigest) {
 					expectedMatch := matches && ftr.wellFormed && (fsPrecedes(fs, catchAlls[isResource]) || fs.Name == catchAlls[isResource].Name)
-					ctlr.Handle(ctx, rdu, func(matchFS *flowcontrol.FlowSchema, matchPL *flowcontrol.PriorityLevelConfiguration, _ string) {
+					ctlr.Handle(ctx, rdu, func(matchFS *flowcontrol.FlowSchema, matchPL *flowcontrol.PriorityLevelConfiguration, _ string) fcrequest.WorkEstimate {
 						matchIsExempt := matchPL.Spec.Type == flowcontrol.PriorityLevelEnablementExempt
 						if testDebugLogs {
 							t.Logf("Considering FlowSchema %s, expectedMatch=%v, isResource=%v: Handle(%#+v) => note(fs=%s, pl=%s, isExempt=%v)", fs.Name, expectedMatch, isResource, rdu, matchFS.Name, matchPL.Name, matchIsExempt)
@@ -473,6 +475,7 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 								t.Errorf("Fail at %s/%s: expected=%v, actual=%v", trialName, fs.Name, fs.Spec.PriorityLevelConfiguration.Name, matchPL.Name)
 							}
 						}
+						return fcrequest.WorkEstimate{InitialSeats: 1}
 					}, func(inQueue bool) {
 					}, func() {
 						startWG.Done()
