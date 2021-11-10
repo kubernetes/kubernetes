@@ -132,7 +132,7 @@ require (
 	k8s.io/mount-utils v0.0.0
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
-	k8s.io/system-validators v1.5.0
+	k8s.io/system-validators v1.6.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0
 	sigs.k8s.io/yaml v1.2.0
@@ -516,7 +516,7 @@ replace (
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-	k8s.io/system-validators => k8s.io/system-validators v1.5.0
+	k8s.io/system-validators => k8s.io/system-validators v1.6.0
 	k8s.io/utils => k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
