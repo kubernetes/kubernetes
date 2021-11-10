@@ -834,12 +834,12 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		}(256),
 	}
 	for _, s := range valid {
-		if !IsValidSysctlPattern(s) {
+		if !IsValidSysctlPattern(s, false) {
 			t.Errorf("%q expected to be a valid sysctl pattern", s)
 		}
 	}
 	for _, s := range invalid {
-		if IsValidSysctlPattern(s) {
+		if IsValidSysctlPattern(s, false) {
 			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
