@@ -19,7 +19,6 @@ DEP_PROGS=\
 	$(GOBIN)/gotestsum\
 	$(GOBIN)/misspell\
 	$(GOBIN)/prettybench\
-	$(GOBIN)/staticcheck\
 	$(GOBIN)/logcheck\
 
 .PHONY: all
@@ -45,9 +44,6 @@ $(GOBIN)/misspell: deps
 
 $(GOBIN)/prettybench: deps
 	go install github.com/cespare/prettybench
-
-$(GOBIN)/staticcheck: deps
-	go install honnef.co/go/tools/cmd/staticcheck
 
 $(GOBIN)/logcheck: deps
 	go install k8s.io/klog/hack/tools/logcheck
