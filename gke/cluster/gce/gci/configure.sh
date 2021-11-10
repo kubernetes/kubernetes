@@ -410,6 +410,7 @@ EOF
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
+  rm -f "${crictl}"
 
   record-preload-info "${crictl}" "${crictl_hash}"
 }
