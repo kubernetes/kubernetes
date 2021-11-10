@@ -7,19 +7,14 @@ issues:
   max-same-issues: 0
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
-    # exclude ineffassing linter for generated files for conversion
-    - path: conversion\.go
+    # exclude ineffassign linter for generated files for conversion
+    - path: "conversion.go"
       linters:
         - ineffassign
 
 linters:
   disable-all: true
   enable: # please keep this alphabetized
-  # Don't use soon to deprecated[1] linters that lead to false
-  # https://github.com/golangci/golangci-lint/issues/1841
-  # - deadcode
-  # - structcheck
-  # - varcheck
     - ineffassign
     - staticcheck
     - unused
