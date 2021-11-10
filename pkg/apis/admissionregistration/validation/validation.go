@@ -217,8 +217,9 @@ func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors
@@ -248,8 +249,9 @@ func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors
