@@ -19,6 +19,8 @@ package persistentvolume
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/slice"
 	"strconv"
 	"time"
 
@@ -323,7 +325,8 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx context.Context,
+	claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	// TODO: update[Claim|Volume]MigrationAnnotations can be optimized to not
 	// copy the claim/volume if no modifications are required. Though this
 	// requires some refactoring as well as an interesting change in the
@@ -331,7 +334,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx cont
 	// when no modifications are required this function could sometimes return a
 	// copy of the volume and sometimes return a ref to the original
 	claimClone := claim.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
+	modified := updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, nil, true)
 	if !modified {
 		return claimClone, nil
 	}
@@ -346,33 +349,36 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx cont
 	return newClaim, nil
 }
 
-func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(ctx context.Context, volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinalizers(ctx context.Context,
+	volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, false)
+	modified := updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator,
+		volumeClone.Annotations, &volumeClone.Finalizers, false)
 	if !modified {
 		return volumeClone, nil
 	}
 	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations or finalizer: %v", err)
 	}
 	_, err = ctrl.storeVolumeUpdate(newVol)
 	if err != nil {
-		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations or finalizer: %v", err)
 	}
 	return newVol, nil
-
 }
 
-// updateMigrationAnnotations takes an Annotations map and checks for a
+// updateMigrationAnnotationsAndFinalizers takes an Annotations map and finalizers slice and checks for a
 // provisioner name depending if the annotation came from a PVC or not.
 // It will then add a "pv.kubernetes.io/migrated-to" annotation if migration with
 // the CSI driver name for that provisioner is "on" based on feature flags, it will also
-// remove the annotation if migration is "off" for that provisioner in rollback
-// scenarios. Returns true if the annotations map was modified and false otherwise.
+// remove the PV deletion protection finalizer and "pv.kubernetes.io/migrated-to" annotation
+// if migration is "off" for that provisioner in rollback scenarios. Returns true if the annotations
+// map or finalizers were modified and false otherwise.
 // Parameters:
 // - claim: true means the ann came from a PVC, false means the ann came from a PV
-func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, claim bool) bool {
+func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, translator CSINameTranslator,
+	ann map[string]string, finalizers *[]string, claim bool) bool {
 	var csiDriverName string
 	var err error
 
@@ -416,6 +422,12 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 		if migratedToDriver != "" {
 			// Migration annotation exists but the driver isn't migrated currently
 			delete(ann, pvutil.AnnMigratedTo)
+			// Remove the PV deletion protection finalizer on volumes.
+			if !claim && finalizers != nil && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+				if slice.ContainsString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil) {
+					*finalizers = slice.RemoveString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil)
+				}
+			}
 			return true
 		}
 	}
@@ -576,8 +588,8 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	// TODO: remove the beta storage provisioner anno after the deprecation period
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
-	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
+	updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, nil, true)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
 	}
