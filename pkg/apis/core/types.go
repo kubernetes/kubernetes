@@ -3781,18 +3781,18 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
-// ServiceInternalTrafficPolicyType describes the endpoint-selection policy for
+// ServiceInternalTrafficPolicy describes the endpoint-selection policy for
 // traffic sent to the ClusterIP.
-type ServiceInternalTrafficPolicyType string
+type ServiceInternalTrafficPolicy string
 
 const (
 	// ServiceInternalTrafficPolicyCluster routes traffic to all endpoints.
-	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicyType = "Cluster"
+	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicy = "Cluster"
 
 	// ServiceInternalTrafficPolicyLocal routes traffic only to endpoints on the same
 	// node as the traffic was received on (dropping the traffic if there are no
 	// local endpoints).
-	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicyType = "Local"
+	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicy = "Local"
 )
 
 // ServiceExternalTrafficPolicy describes the endpoint-selection policy for
@@ -4064,7 +4064,7 @@ type ServiceSpec struct {
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
 	// +optional
-	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
+	InternalTrafficPolicy *ServiceInternalTrafficPolicy
 }
 
 // ServicePort represents the port on which the service is exposed

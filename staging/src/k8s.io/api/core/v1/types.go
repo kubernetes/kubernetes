@@ -4368,19 +4368,23 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
-// ServiceInternalTrafficPolicyType describes how nodes distribute service traffic they
+// ServiceInternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on the ClusterIP.
 // +enum
-type ServiceInternalTrafficPolicyType string
+type ServiceInternalTrafficPolicy string
 
 const (
 	// ServiceInternalTrafficPolicyCluster routes traffic to all endpoints.
-	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicyType = "Cluster"
+	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicy = "Cluster"
 
 	// ServiceInternalTrafficPolicyLocal routes traffic only to endpoints on the same
 	// node as the client pod (dropping the traffic if there are no local endpoints).
-	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicyType = "Local"
+	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicy = "Local"
 )
+
+// for backwards compat
+// +enum
+type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
 
 // ServiceExternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
@@ -4734,7 +4738,7 @@ type ServiceSpec struct {
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
 	// +optional
-	InternalTrafficPolicy *ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
+	InternalTrafficPolicy *ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
 }
 
 // ServicePort contains information on service's port.

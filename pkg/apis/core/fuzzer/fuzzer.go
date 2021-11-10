@@ -297,8 +297,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			types := []core.ServiceExternalTrafficPolicy{core.ServiceExternalTrafficPolicyCluster, core.ServiceExternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.ServiceInternalTrafficPolicyType, c fuzz.Continue) {
-			types := []core.ServiceInternalTrafficPolicyType{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
+		func(p *core.ServiceInternalTrafficPolicy, c fuzz.Continue) {
+			types := []core.ServiceInternalTrafficPolicy{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *core.Container, c fuzz.Continue) {

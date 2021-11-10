@@ -1859,7 +1859,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	local := v1.ServiceInternalTrafficPolicyLocal
 	testCases := []struct {
 		name                          string
-		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
+		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicy
 		svc                           v1.Service
 	}{
 		{

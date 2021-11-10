@@ -177,7 +177,7 @@ func SetNodePorts(values ...int) Tweak {
 }
 
 // SetInternalTrafficPolicy sets the internalTrafficPolicy field for a Service.
-func SetInternalTrafficPolicy(policy api.ServiceInternalTrafficPolicyType) Tweak {
+func SetInternalTrafficPolicy(policy api.ServiceInternalTrafficPolicy) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.InternalTrafficPolicy = &policy
 	}

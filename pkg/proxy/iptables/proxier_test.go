@@ -5620,7 +5620,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	testCases := []struct {
 		name                      string
 		line                      int
-		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicyType
+		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicy
 		featureGateOn             bool
 		endpoints                 []endpoint
 		expectEndpointRule        bool
@@ -8642,7 +8642,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 	metrics.RegisterMetrics()
 	testCases := []struct {
 		name                                                string
-		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicyType
+		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy
 		externalTrafficPolicy                               v1.ServiceExternalTrafficPolicy
 		endpoints                                           []endpoint
 		expectedSyncProxyRulesNoLocalEndpointsTotalInternal int
