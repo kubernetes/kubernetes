@@ -16,7 +16,7 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	k8s.io/gengo v0.0.0-20201113003025-83324d819ded
 	k8s.io/klog/v2 v2.4.0
-	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
+	k8s.io/kube-openapi v0.0.0-20211110013926-83f114cd0513
 )
 
 replace k8s.io/code-generator => ../code-generator

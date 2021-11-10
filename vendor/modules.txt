@@ -2326,9 +2326,9 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 ## explicit
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd => k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
+# k8s.io/kube-openapi v0.0.0-20211110013926-83f114cd0513 => k8s.io/kube-openapi v0.0.0-20211110013926-83f114cd0513
 ## explicit
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
+# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211110013926-83f114cd0513
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
