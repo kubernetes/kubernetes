@@ -103,7 +103,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	if kp.config.BindAddress == "" {
 		kp.config.BindAddress = defaultBindAddress
 	} else if kp.config.BindAddress != defaultBindAddress {
-		warnDefaultComponentConfigValue(kind, "bindAddress", kp.config.BindAddress, defaultBindAddress)
+		warnDefaultComponentConfigValue(kind, "bindAddress", defaultBindAddress, kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
