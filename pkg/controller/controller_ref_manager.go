@@ -107,6 +107,12 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 		// Ignore if the object is being deleted
 		return false, nil
 	}
+
+	if len(m.Controller.GetNamespace()) > 0 && m.Controller.GetNamespace() != obj.GetNamespace() {
+		// Ignore if namespace not match
+		return false, nil
+	}
+
 	// Selector matches. Try to adopt.
 	if err := adopt(ctx, obj); err != nil {
 		// If the pod no longer exists, ignore the error.

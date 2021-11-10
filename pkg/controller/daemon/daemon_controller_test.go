@@ -225,6 +225,19 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 	}
 }
 
+func newControllerRevision(name string, namespace string, label map[string]string,
+	ownerReferences []metav1.OwnerReference) *apps.ControllerRevision {
+	return &apps.ControllerRevision{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Labels:          label,
+			Namespace:       namespace,
+			OwnerReferences: ownerReferences,
+		},
+	}
+}
+
 type fakePodControl struct {
 	sync.Mutex
 	*controller.FakePodControl
