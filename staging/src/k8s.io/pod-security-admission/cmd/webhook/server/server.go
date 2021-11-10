@@ -141,7 +141,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	<-listenerStoppedCh
-	klog.V(1).InfoS("[graceful-termination] HTTP Server is stopped listening")
+	klog.V(1).InfoS("[graceful-termination] HTTP Server has stopped listening")
 
 	// Wait for graceful shutdown.
 	<-shutdownCh
