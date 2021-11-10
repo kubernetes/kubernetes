@@ -41,6 +41,7 @@ package volume
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -51,6 +52,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -233,6 +235,73 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
 	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
+}
+
+// GetVolumeAttachmentName returns the hash value of the provisioner, the config ClientNodeSelection name,
+// and the VolumeAttachment name of the PV that is bound to the PVC with the passed in claimName and claimNamespace.
+func GetVolumeAttachmentName(cs clientset.Interface, config TestConfig, provisioner string, claimName string, claimNamespace string) string {
+	var nodeName string
+	// For provisioning tests, ClientNodeSelection is not set so we do not know the NodeName of the VolumeAttachment of the PV that is
+	// bound to the PVC with the passed in claimName and claimNamespace. We need this NodeName because it is used to generate the
+	// attachmentName that is returned, and used to look up a certain VolumeAttachment in WaitForVolumeAttachmentTerminated.
+	// To get the nodeName of the VolumeAttachment, we get all the VolumeAttachments, look for the VolumeAttachment with a
+	// PersistentVolumeName equal to the PV that is bound to the passed in PVC, and then we get the NodeName from that VolumeAttachment.
+	if config.ClientNodeSelection.Name == "" {
+		claim, _ := cs.CoreV1().PersistentVolumeClaims(claimNamespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+		pvName := claim.Spec.VolumeName
+		volumeAttachments, _ := cs.StorageV1().VolumeAttachments().List(context.TODO(), metav1.ListOptions{})
+		for _, volumeAttachment := range volumeAttachments.Items {
+			if *volumeAttachment.Spec.Source.PersistentVolumeName == pvName {
+				nodeName = volumeAttachment.Spec.NodeName
+				break
+			}
+		}
+	} else {
+		nodeName = config.ClientNodeSelection.Name
+	}
+	handle := getVolumeHandle(cs, claimName, claimNamespace)
+	attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, provisioner, nodeName)))
+	return fmt.Sprintf("csi-%x", attachmentHash)
+}
+
+// getVolumeHandle returns the VolumeHandle of the PV that is bound to the PVC with the passed in claimName and claimNamespace.
+func getVolumeHandle(cs clientset.Interface, claimName string, claimNamespace string) string {
+	// re-get the claim to the latest state with bound volume
+	claim, err := cs.CoreV1().PersistentVolumeClaims(claimNamespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PVC")
+		return ""
+	}
+	pvName := claim.Spec.VolumeName
+	pv, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PV")
+		return ""
+	}
+	if pv.Spec.CSI == nil {
+		gomega.Expect(pv.Spec.CSI).NotTo(gomega.BeNil())
+		return ""
+	}
+	return pv.Spec.CSI.VolumeHandle
+}
+
+// WaitForVolumeAttachmentTerminated waits for the VolumeAttachment with the passed in attachmentName to be terminated.
+func WaitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Interface, timeout time.Duration) error {
+	waitErr := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		_, err := cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+		if err != nil {
+			// if the volumeattachment object is not found, it means it has been terminated.
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
+	}
+	return nil
 }
 
 // startVolumeServer starts a container specified by config.serverImage and exports all
