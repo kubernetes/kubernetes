@@ -19,6 +19,7 @@ package testsuites
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -269,6 +270,15 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
 		}
+		// For GCE PD, cloning fails if the source disk has another operation going on. When we try create the clone in TestDynamicProvisioning,
+		// the source disk could still be in the process of detaching since InjectContent in preparePVCDataSourceForProvisioning defers
+		// deleting the injector pod. To verify the disk is ready, we create a pod with the source claim and wait for the pod to be ready.
+		source, _ := l.cs.CoreV1().PersistentVolumeClaims(l.sourcePVC.Namespace).Create(context.TODO(), l.sourcePVC, metav1.CreateOptions{})
+		pod, _ := e2epod.CreatePod(l.cs, source.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{source}, true /* isPrivileged */, "while true ; do sleep 2; done" /* command */)
+		defer func() {
+			e2epod.DeletePodOrFail(l.testCase.Client, pod.Namespace, pod.Name)
+			e2epod.WaitForPodToDisappear(l.testCase.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
+		}()
 		l.testCase.TestDynamicProvisioning()
 	})
 
@@ -279,6 +289,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
 			e2eskipper.Skipf("Driver %q does not support block volumes - skipping", dInfo.Name)
+		}
+		if strings.HasPrefix(dInfo.Name, "csi-gcepd") {
+			e2eskipper.Skipf("Driver %q does not support cloning in parallel due to the rate limit GCE has for the cloning frequency per disk - skipping", dInfo.Name)
 		}
 
 		init()
