@@ -11,8 +11,12 @@ linters:
   enable: # please keep this alphabetized
     - deadcode
     - ineffassign
+    - staticcheck
     - unused
     - varcheck
 linters-settings: # please keep this alphabetized
+  staticcheck:
+    go: "1.17"
+    checks: [ "all" ]
   unused:
     go: "1.17"
