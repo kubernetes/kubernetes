@@ -2046,7 +2046,13 @@ function prepare-konnectivity-server-manifest {
   params+=("--kubeconfig-burst=150")
   params+=("--keepalive-time=60s")
   params+=("--frontend-keepalive-time=60s")
+  params+=("--warn-on-channel-limit=true")
+  params+=("--enable-profiling=true")
+  params+=("--v=5")
   konnectivity_args=""
+  if [[ -n "${KONNECTIVITY_STRATEGIES:-}" ]]; then
+    konnectivity_args="--proxy-strategies=${KONNECTIVITY_STRATEGIES}"
+  fi
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
   done

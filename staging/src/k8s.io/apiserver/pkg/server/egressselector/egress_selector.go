@@ -103,7 +103,7 @@ func lookupServiceName(name string) (EgressType, error) {
 
 func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
 	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
-	br := bufio.NewReader(proxyConn)
+	br := bufio.NewReaderSize(proxyConn, 1<<15) // Match GRPC Window size
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
 		proxyConn.Close()
