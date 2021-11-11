@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 	"text/tabwriter"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,6 +44,7 @@ import (
 
 const (
 	ChangeCauseAnnotation = "kubernetes.io/change-cause"
+	CreatedAtAnnotation = "object.kubernetes.io/createdAt"
 )
 
 // HistoryViewer provides an interface for resources have historical information.
@@ -129,6 +131,11 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if len(changeCause) > 0 {
 			historyInfo[v].Annotations[ChangeCauseAnnotation] = changeCause
 		}
+
+		creationTime := getCreationTime(rs)
+		if len(creationTime) > 0 {
+			historyInfo[v].Annotations[CreatedAtAnnotation] = creationTime
+		}
 	}
 
 	if len(historyInfo) == 0 {
@@ -211,6 +218,16 @@ func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTe
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
 		podTemplate, err := getPodTemplate(history)
+
+		if podTemplate.Annotations == nil {
+			podTemplate.Annotations = make(map[string]string)
+		}
+
+		creationTime := getCreationTime(history)
+		if len(creationTime) > 0 {
+			podTemplate.Annotations[CreatedAtAnnotation] = creationTime
+		}
+
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
@@ -407,4 +424,19 @@ func getChangeCause(obj runtime.Object) string {
 		return ""
 	}
 	return accessor.GetAnnotations()[ChangeCauseAnnotation]
+}
+
+// getCreationTime returns the CreationTimestamp of the input object
+func getCreationTime(obj runtime.Object) string {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return ""
+	}
+
+	timestamp := accessor.GetCreationTimestamp()
+	if timestamp.IsZero() {
+		return ""
+	}
+
+	return timestamp.Format(time.RFC3339)
 }
