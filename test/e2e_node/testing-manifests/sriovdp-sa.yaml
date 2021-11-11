@@ -1,5 +1,0 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: sriov-device-plugin
-  namespace: kube-system

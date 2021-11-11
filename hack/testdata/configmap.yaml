@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  key-1: value-1
-  key-2: value-2
-kind: ConfigMap
-metadata:
-  name: test-set-env-config

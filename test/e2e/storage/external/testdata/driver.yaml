@@ -1,5 +1,0 @@
-DriverInfo:
-  Name: foo.example.com
-  SupportedSizeRange:
-    Min: 10Gi
-ShortName: foo

@@ -1,9 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-reviewers:
-- smarterclayton
-- wojtek-t
-- deads2k
-- liggitt
-- krousey
-- caesarxuchao

@@ -1,8 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-# approval on api packages bubbles to api-approvers
-reviewers:
-- sig-apps-api-reviewers
-- sig-apps-api-approvers
-labels:
-- sig/apps

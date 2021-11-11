@@ -1,5 +1,0 @@
-kind: ServiceAccount
-apiVersion: v1
-metadata:
-  name: apiserver
-  namespace: wardle

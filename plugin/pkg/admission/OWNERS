@@ -1,9 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-approvers:
-- derekwaynecarr
-- deads2k
-reviewers:
-- derekwaynecarr
-- deads2k
-- yue9944882

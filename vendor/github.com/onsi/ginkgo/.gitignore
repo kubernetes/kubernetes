@@ -1,7 +1,0 @@
-.DS_Store
-TODO
-tmp/**/*
-*.coverprofile
-.vscode
-.idea/
-*.log

@@ -1,9 +1,0 @@
-{
-    "kind": "ConfigMapList",
-    "apiVersion": "v1",
-    "metadata": {
-        "selfLink": "/api/v1/namespaces/edit-test/configmaps",
-        "resourceVersion": "252"
-    },
-    "items": []
-}

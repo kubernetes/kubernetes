@@ -1,5 +1,0 @@
-{{.CommentWithoutT "a"}}
-func (a *Assertions) {{.DocInfo.Name}}({{.Params}}) bool {
-	if h, ok := a.t.(tHelper); ok { h.Helper() }
-	return {{.DocInfo.Name}}(a.t, {{.ForwardedParams}})
-}

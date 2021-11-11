@@ -1,7 +1,0 @@
-{
-	"metadata": {
-		"annotations": {
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"svc1\",\"new-label\":\"foo\",\"new-label2\":\"foo2\"},\"name\":\"svc1\",\"namespace\":\"myproject\"},\"spec\":{\"ports\":[{\"name\":\"80\",\"port\":82,\"protocol\":\"TCP\",\"targetPort\":81}],\"sessionAffinity\":\"None\",\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
-		}
-	}
-}

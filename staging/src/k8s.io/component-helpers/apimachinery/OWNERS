@@ -1,8 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-approvers:
-- sig-api-machinery-api-approvers
-reviewers:
-- sig-api-machinery-api-reviewers
-labels:
-- sig/api-machinery

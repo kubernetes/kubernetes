@@ -1,4 +1,0 @@
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-address: 1.2.3.4
-address: 1.2.3.4

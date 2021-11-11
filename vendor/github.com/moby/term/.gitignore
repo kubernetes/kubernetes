@@ -1,8 +1,0 @@
-# if you want to ignore files created by your editor/tools, consider using a
-# global .gitignore or .git/info/exclude see https://help.github.com/articles/ignoring-files
-.*
-!.github
-!.gitignore
-profile.out
-# support running go modules in vendor mode for local development
-vendor/

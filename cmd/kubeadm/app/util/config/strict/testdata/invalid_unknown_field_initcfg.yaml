@@ -1,3 +1,0 @@
-apiVersion: kubeadm.k8s.io/v1beta2
-kind: InitConfiguration
-unknownField: test
