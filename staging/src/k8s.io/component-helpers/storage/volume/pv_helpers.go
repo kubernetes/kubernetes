@@ -340,22 +340,3 @@ func CheckAccessModes(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolu
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
-
-// GetVolumeNodeAffinity returns a VolumeNodeAffinity for given key and value.
-func GetVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
-	return &v1.VolumeNodeAffinity{
-		Required: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      key,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{value},
-						},
-					},
-				},
-			},
-		},
-	}
-}

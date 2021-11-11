@@ -666,7 +666,21 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 		},
 	}
 	if node != "" {
-		pv.Spec.NodeAffinity = volume.GetVolumeNodeAffinity(nodeLabelKey, node)
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      nodeLabelKey,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{node},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	if boundToPVC != nil {

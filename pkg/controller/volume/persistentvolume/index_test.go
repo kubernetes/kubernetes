@@ -447,6 +447,25 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	}
 }
 
+// createVolumeNodeAffinity returns a VolumeNodeAffinity for given key and value.
+func createNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{value},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func createTestVolumes() []*v1.PersistentVolume {
 	fs := v1.PersistentVolumeFilesystem
 	// these volumes are deliberately out-of-order to test indexing and sorting
@@ -770,7 +789,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     createNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -794,7 +813,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     createNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -819,7 +838,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classWait,
 				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     createNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -843,7 +862,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value3"),
+				NodeAffinity:     createNodeAffinity("key1", "value3"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -867,7 +886,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     createNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -891,7 +910,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     createNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -915,7 +934,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     createNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -939,7 +958,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     volume.GetVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     createNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 		},
