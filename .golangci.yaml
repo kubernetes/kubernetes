@@ -17,6 +17,15 @@ linters:
 linters-settings: # please keep this alphabetized
   staticcheck:
     go: "1.17"
-    checks: [ "all" ]
+    checks: [
+      "all",
+      "-S1*",   # Omit code simplifications for now.
+      "-ST1*",  # Mostly stylistic, redundant w/ golint
+      "-SA5011" # Possible nil pointer dereference
+    ]
+    ignore_pattern: [
+      "vendor/k8s.io/kubectl/pkg/cmd/edit/testdata",  # golang/go#24854, dominikh/go-tools#565
+      "cluster/addons/fluentd-elasticsearch/es-image" # cannot traverse go modules
+    ]
   unused:
     go: "1.17"
