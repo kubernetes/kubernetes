@@ -23,6 +23,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -213,6 +215,21 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		isSystemd = true
+
+		// If we are running on systemd >=240, we can append to the
+		// same log file on restarts
+		logLocation := "StandardError=file:"
+		if version, verr := exec.Command("systemd-run", "--version").Output(); verr == nil {
+			// sample output from $ systemd-run --version
+			// systemd 245 (245.4-4ubuntu3.13)
+			re := regexp.MustCompile(`systemd (\d+)`)
+			if match := re.FindSubmatch(version); len(match) > 1 {
+				num, _ := strconv.Atoi(string(match[1]))
+				if num >= 240 {
+					logLocation = "StandardError=append:"
+				}
+			}
+		}
 		// We can ignore errors, to have GetTimestampFromWorkspaceDir() fallback
 		// to the current time.
 		cwd, _ := os.Getwd()
@@ -222,7 +239,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
-			"-p", "StandardError=file:"+framework.TestContext.ReportDir+"/kubelet.log",
+			"-p", logLocation+framework.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,
 			"--slice=runtime.slice",
 			"--remain-after-exit",
