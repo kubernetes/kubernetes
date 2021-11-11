@@ -407,6 +407,14 @@ func (r *Registry) MustRegister(cs ...Collector) {
 
 // Gather implements Gatherer.
 func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
+	r.mtx.RLock()
+
+	if len(r.collectorsByID) == 0 && len(r.uncheckedCollectors) == 0 {
+		// Fast path.
+		r.mtx.RUnlock()
+		return nil, nil
+	}
+
 	var (
 		checkedMetricChan   = make(chan Metric, capMetricChan)
 		uncheckedMetricChan = make(chan Metric, capMetricChan)
@@ -416,7 +424,6 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 		registeredDescIDs   map[uint64]struct{} // Only used for pedantic checks
 	)
 
-	r.mtx.RLock()
 	goroutineBudget := len(r.collectorsByID) + len(r.uncheckedCollectors)
 	metricFamiliesByName := make(map[string]*dto.MetricFamily, len(r.dimHashesByName))
 	checkedCollectors := make(chan Collector, len(r.collectorsByID))

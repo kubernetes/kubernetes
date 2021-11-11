@@ -242,10 +242,7 @@ func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, me
 	defer factoriesLock.RUnlock()
 
 	// Create the ContainerHandler with the first factory that supports it.
-	// Note that since RawContainerHandler can support a wide range of paths,
-	// it's evaluated last just to make sure if any other ContainerHandler
-	// can support it.
-	for _, factory := range GetReorderedFactoryList(watchType) {
+	for _, factory := range factories[watchType] {
 		canHandle, canAccept, err := factory.CanHandleAndAccept(name)
 		if err != nil {
 			klog.V(4).Infof("Error trying to work out if we can handle %s: %v", name, err)
@@ -287,27 +284,4 @@ func DebugInfo() map[string][]string {
 		}
 	}
 	return out
-}
-
-// GetReorderedFactoryList returns the list of ContainerHandlerFactory where the
-// RawContainerHandler is always the last element.
-func GetReorderedFactoryList(watchType watcher.ContainerWatchSource) []ContainerHandlerFactory {
-	ContainerHandlerFactoryList := make([]ContainerHandlerFactory, 0, len(factories))
-
-	var rawFactory ContainerHandlerFactory
-	for _, v := range factories[watchType] {
-		if v != nil {
-			if v.String() == "raw" {
-				rawFactory = v
-				continue
-			}
-			ContainerHandlerFactoryList = append(ContainerHandlerFactoryList, v)
-		}
-	}
-
-	if rawFactory != nil {
-		ContainerHandlerFactoryList = append(ContainerHandlerFactoryList, rawFactory)
-	}
-
-	return ContainerHandlerFactoryList
 }

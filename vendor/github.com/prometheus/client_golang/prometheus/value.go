@@ -38,6 +38,23 @@ const (
 	UntypedValue
 )
 
+var (
+	CounterMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_COUNTER; return &d }()
+	GaugeMetricTypePtr   = func() *dto.MetricType { d := dto.MetricType_GAUGE; return &d }()
+	UntypedMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_UNTYPED; return &d }()
+)
+
+func (v ValueType) ToDTO() *dto.MetricType {
+	switch v {
+	case CounterValue:
+		return CounterMetricTypePtr
+	case GaugeValue:
+		return GaugeMetricTypePtr
+	default:
+		return UntypedMetricTypePtr
+	}
+}
+
 // valueFunc is a generic metric for simple values retrieved on collect time
 // from a function. It implements Metric and Collector. Its effective type is
 // determined by ValueType. This is a low-level building block used by the
@@ -91,11 +108,15 @@ func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues 
 	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
 		return nil, err
 	}
+
+	metric := &dto.Metric{}
+	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric); err != nil {
+		return nil, err
+	}
+
 	return &constMetric{
-		desc:       desc,
-		valType:    valueType,
-		val:        value,
-		labelPairs: MakeLabelPairs(desc, labelValues),
+		desc:   desc,
+		metric: metric,
 	}, nil
 }
 
@@ -110,10 +131,8 @@ func MustNewConstMetric(desc *Desc, valueType ValueType, value float64, labelVal
 }
 
 type constMetric struct {
-	desc       *Desc
-	valType    ValueType
-	val        float64
-	labelPairs []*dto.LabelPair
+	desc   *Desc
+	metric *dto.Metric
 }
 
 func (m *constMetric) Desc() *Desc {
@@ -121,7 +140,11 @@ func (m *constMetric) Desc() *Desc {
 }
 
 func (m *constMetric) Write(out *dto.Metric) error {
-	return populateMetric(m.valType, m.val, m.labelPairs, nil, out)
+	out.Label = m.metric.Label
+	out.Counter = m.metric.Counter
+	out.Gauge = m.metric.Gauge
+	out.Untyped = m.metric.Untyped
+	return nil
 }
 
 func populateMetric(

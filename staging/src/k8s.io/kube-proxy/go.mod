@@ -10,6 +10,7 @@ require (
 )
 
 replace (
+	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

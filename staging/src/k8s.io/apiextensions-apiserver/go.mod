@@ -35,6 +35,7 @@ require (
 )
 
 replace (
+	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery

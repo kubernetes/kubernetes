@@ -116,6 +116,34 @@ func ExponentialBuckets(start, factor float64, count int) []float64 {
 	return buckets
 }
 
+// ExponentialBucketsRange creates 'count' buckets, where the lowest bucket is
+// 'min' and the highest bucket is 'max'. The final +Inf bucket is not counted
+// and not included in the returned slice. The returned slice is meant to be
+// used for the Buckets field of HistogramOpts.
+//
+// The function panics if 'count' is 0 or negative, if 'min' is 0 or negative.
+func ExponentialBucketsRange(min, max float64, count int) []float64 {
+	if count < 1 {
+		panic("ExponentialBucketsRange count needs a positive count")
+	}
+	if min <= 0 {
+		panic("ExponentialBucketsRange min needs to be greater than 0")
+	}
+
+	// Formula for exponential buckets.
+	// max = min*growthFactor^(bucketCount-1)
+
+	// We know max/min and highest bucket. Solve for growthFactor.
+	growthFactor := math.Pow(max/min, 1.0/float64(count-1))
+
+	// Now that we know growthFactor, solve for each bucket.
+	buckets := make([]float64, count)
+	for i := 1; i <= count; i++ {
+		buckets[i-1] = min * math.Pow(growthFactor, float64(i-1))
+	}
+	return buckets
+}
+
 // HistogramOpts bundles the options for creating a Histogram metric. It is
 // mandatory to set Name to a non-empty string. All other fields are optional
 // and can safely be left at their zero value, although it is strongly
