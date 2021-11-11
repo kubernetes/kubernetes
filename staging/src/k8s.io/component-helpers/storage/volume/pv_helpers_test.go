@@ -119,6 +119,25 @@ func TestDelayBindingMode(t *testing.T) {
 	}
 }
 
+// makeVolumeNodeAffinity returns a VolumeNodeAffinity for given key and value.
+func makeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{value},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestFindMatchVolumeWithNode(t *testing.T) {
 	volumes := []*v1.PersistentVolume{
 		makeTestVolume("local-small", "local001", "5G", true, nil),
@@ -127,24 +146,24 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 		}),
 		makeTestVolume("affinity-pv", "affinity001", "100G", true, func(pv *v1.PersistentVolume) {
 			pv.Spec.StorageClassName = "wait"
-			pv.Spec.NodeAffinity = GetVolumeNodeAffinity("key1", "value1")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value1")
 		}),
 		makeTestVolume("affinity-pv2", "affinity002", "150G", true, func(pv *v1.PersistentVolume) {
 			pv.Spec.StorageClassName = "wait"
-			pv.Spec.NodeAffinity = GetVolumeNodeAffinity("key1", "value1")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value1")
 		}),
 		makeTestVolume("affinity-prebound", "affinity003", "100G", true, func(pv *v1.PersistentVolume) {
 			pv.Spec.StorageClassName = "wait"
 			pv.Spec.ClaimRef = &v1.ObjectReference{Name: "claim02", Namespace: "myns"}
-			pv.Spec.NodeAffinity = GetVolumeNodeAffinity("key1", "value1")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value1")
 		}),
 		makeTestVolume("affinity-pv3", "affinity003", "200G", true, func(pv *v1.PersistentVolume) {
 			pv.Spec.StorageClassName = "wait"
-			pv.Spec.NodeAffinity = GetVolumeNodeAffinity("key1", "value3")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value3")
 		}),
 		makeTestVolume("affinity-pv4", "affinity004", "200G", false, func(pv *v1.PersistentVolume) {
 			pv.Spec.StorageClassName = "wait"
-			pv.Spec.NodeAffinity = GetVolumeNodeAffinity("key1", "value4")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value4")
 		}),
 	}
 
