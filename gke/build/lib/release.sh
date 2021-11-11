@@ -460,6 +460,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/networkd-monitor.sh" "${dst_dir}/networkd-monitor.sh"
   cp -r "${KUBE_ROOT}/gke/cluster/gce/gci/sysctl/" "${dst_dir}/sysctl/"
+  cp -r "${KUBE_ROOT}/gke/cluster/gce/gci/gpu/" "${dst_dir}/gpu/"
   # Merge GCE-specific addons with general purpose addons.
   for d in gke/cluster/addons gke/cluster/gce/addons; do
     find "${KUBE_ROOT}/${d}" \( \( -name \*.yaml -o -name \*.yaml.in -o -name \*.json \) -a ! \( -name \*demo\* \) \) -print0 | "${TAR}" c --transform "s|${KUBE_ROOT#/*}/${d}||" --null -T - | "${TAR}" x -C "${dst_dir}"

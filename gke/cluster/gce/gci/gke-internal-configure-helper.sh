@@ -685,11 +685,22 @@ EOF
 function gke-create-gpu-config {
   local -r gpu_config_file="/etc/nvidia/gpu_config.json"
   mkdir -p "$(dirname "${gpu_config_file}")"
-  cat > "${gpu_config_file}" <<EOF
-{
-  "GPUPartitionSize": "${GPU_PARTITION_SIZE}"
-}
-EOF
+  local -r dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gpu"
+  
+  local gpu_partition_size=""
+  if [ -n "${GPU_PARTITION_SIZE:-}" ]; then
+    gpu_partition_size="${GPU_PARTITION_SIZE}"
+  fi
+  
+  local max_time_shared_clients_per_gpu=""
+  if [ -n "${MAX_TIME_SHARED_CLIENTS_PER_GPU:-}" ]; then
+      max_time_shared_clients_per_gpu="${MAX_TIME_SHARED_CLIENTS_PER_GPU}"
+  fi
+
+  python3 "${dir}/generate-gpu-config.py" \
+    --gpu-partition-size="${gpu_partition_size}" \
+    --max-time-shared-clients-per-gpu=${max_time_shared_clients_per_gpu} \
+    --file-path=${gpu_config_file}
 }
 
 # Set up the inplace agent.

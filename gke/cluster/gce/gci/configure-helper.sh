@@ -3587,8 +3587,7 @@ function main() {
       fi
       log-wrap 'StartNodeProblemDetector' start-node-problem-detector
     fi
-
-    if [ -n "${GPU_PARTITION_SIZE:-}" ]; then
+    if [ -n "${GPU_PARTITION_SIZE:-}" ] || [ -n "${MAX_TIME_SHARED_CLIENTS_PER_GPU:-}" ]; then
       log-wrap 'GKECreateGPUConfig' gke-create-gpu-config
     fi
   fi
