@@ -37,7 +37,7 @@ DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6ea
 
 RIPTIDE_FUSE_BUCKET="${RIPTIDE_FUSE_BUCKET:-gke-release}"
 RIPTIDE_SNAPSHOTTER_BUCKET="${RIPTIDE_SNAPSHOTTER_BUCKET:-gke-release}"
-RIPTIDE_FUSE_VERSION="${RIPTIDE_FUSE_VERSION:-v0.66.0}"
+RIPTIDE_FUSE_VERSION="${RIPTIDE_FUSE_VERSION:-v0.75.0}"
 RIPTIDE_SNAPSHOTTER_VERSION="${RIPTIDE_SNAPSHOTTER_VERSION:-v1.4-12}"
 
 # Standard curl flags.
@@ -1141,9 +1141,9 @@ detect_host_info
 
 # Preloader will source this script, and skip the main function. The preloader
 # will choose what to preload by calling install-X functions directly.
-# When configure.sh is sourced by the preload script, $0 and $BASH_SOURCE are 
+# When configure.sh is sourced by the preload script, $0 and $BASH_SOURCE are
 # different. $BASH_SOURCE still contains the path of configure.sh, while $0 is
-# the path of the preload script. 
+# the path of the preload script.
 if [[ "$0" != "$BASH_SOURCE" && "${IS_PRELOADER:-"false"}" == "true" ]]; then
   echo "Running in preloader instead of VM bootsrapping. Skipping installation steps as preloader script will source configure.sh and call corresponding functions."
   return
