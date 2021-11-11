@@ -947,6 +947,12 @@ func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
 }
 
 func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
+	defaultShape := []config.UtilizationShapePoint{
+		{
+			Utilization: 30,
+			Score:       3,
+		},
+	}
 	tests := []struct {
 		name      string
 		resources []config.ResourceSpec
@@ -954,7 +960,18 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 		wantErrs  field.ErrorList
 	}{
 		{
-			name: "weight greater than max",
+			name:   "no shapes",
+			shapes: nil,
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeRequired,
+					Field: "shape",
+				},
+			},
+		},
+		{
+			name:   "weight greater than max",
+			shapes: defaultShape,
 			resources: []config.ResourceSpec{
 				{
 					Name:   "cpu",
@@ -969,7 +986,8 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			},
 		},
 		{
-			name: "weight less than min",
+			name:   "weight less than min",
+			shapes: defaultShape,
 			resources: []config.ResourceSpec{
 				{
 					Name:   "cpu",
@@ -984,13 +1002,8 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			},
 		},
 		{
-			name: "valid shapes",
-			shapes: []config.UtilizationShapePoint{
-				{
-					Utilization: 30,
-					Score:       3,
-				},
-			},
+			name:     "valid shapes",
+			shapes:   defaultShape,
 			wantErrs: nil,
 		},
 		{
