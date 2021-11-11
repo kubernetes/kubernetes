@@ -166,6 +166,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
+	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Cannot specify both shutdownGracePeriodByPodPriority and shutdownGracePeriod at the same time"))
+		}
+	}
+	if !localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if len(kc.ShutdownGracePeriodByPodPriority) != 0 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority"))
+		}
+	}
 	if localFeatureGate.Enabled(features.NodeSwap) {
 		if kc.MemorySwap.SwapBehavior != "" && kc.MemorySwap.SwapBehavior != kubetypes.LimitedSwap && kc.MemorySwap.SwapBehavior != kubetypes.UnlimitedSwap {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
