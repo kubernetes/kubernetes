@@ -84,11 +84,15 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 		// https://github.com/kubernetes/kubeadm/issues/1582
 		var UnversionedKubeletConfigMap bool
 		if _, ok := m["featureGates"]; ok {
-			if featureGates, ok := m["featureGates"].(map[string]bool); ok {
+			if featureGates, ok := m["featureGates"].(map[interface{}]interface{}); ok {
 				// TODO: update the default to true once this graduates to Beta.
 				UnversionedKubeletConfigMap = false
 				if val, ok := featureGates["UnversionedKubeletConfigMap"]; ok {
-					UnversionedKubeletConfigMap = val
+					if valBool, ok := val.(bool); ok {
+						UnversionedKubeletConfigMap = valBool
+					} else {
+						framework.Failf("unable to cast the value of feature gate UnversionedKubeletConfigMap to bool")
+					}
 				}
 			} else {
 				framework.Failf("unable to cast the featureGates field in the %s ConfigMap", kubeadmConfigName)
