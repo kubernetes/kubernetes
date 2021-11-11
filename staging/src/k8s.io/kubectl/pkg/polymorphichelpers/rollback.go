@@ -182,7 +182,6 @@ func equalIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 // annotationsToSkip lists the annotations that should be preserved from the deployment and not
 // copied from the replicaset when rolling a deployment back
 var annotationsToSkip = map[string]bool{
-	corev1.LastAppliedConfigAnnotation:       true,
 	deploymentutil.RevisionAnnotation:        true,
 	deploymentutil.RevisionHistoryAnnotation: true,
 	deploymentutil.DesiredReplicasAnnotation: true,
