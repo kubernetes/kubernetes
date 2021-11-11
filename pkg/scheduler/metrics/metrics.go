@@ -111,7 +111,7 @@ var (
 			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
 			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"attempts"})
 
@@ -121,7 +121,7 @@ var (
 			Name:           "pod_scheduling_attempts",
 			Help:           "Number of attempts to successfully schedule a pod.",
 			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		})
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
@@ -131,7 +131,7 @@ var (
 			Help:      "Latency for running all plugins of a specific extension point.",
 			// Start with 0.1ms with the last bucket being [~200ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"extension_point", "status", "profile"})
 
@@ -152,7 +152,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "queue_incoming_pods_total",
 			Help:           "Number of pods added to scheduling queues by event and queue type.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		}, []string{"queue", "event"})
 
 	PermitWaitDuration = metrics.NewHistogramVec(
