@@ -921,8 +921,11 @@ type hookedListener struct {
 }
 
 func (wl *hookedListener) Accept() (net.Conn, error) {
-	wl.onAccept()
-	return wl.l.Accept()
+	conn, err := wl.l.Accept()
+	if err == nil {
+		wl.onAccept()
+	}
+	return conn, err
 }
 
 func (wl *hookedListener) Close() error {
@@ -1015,8 +1018,11 @@ func TestFlowControlSignal(t *testing.T) {
 
 			req := tc.Request
 			req.URL = surl
-			_, err = server.Client().Do(&req)
+			res, err := server.Client().Do(&req)
 			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := res.Body.Close(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
