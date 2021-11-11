@@ -7,7 +7,7 @@ reviewers:
   - dims
   - fejta
   - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-  - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+  #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
   - lavalamp
   - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
   - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
