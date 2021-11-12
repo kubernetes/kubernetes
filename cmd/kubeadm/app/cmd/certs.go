@@ -22,7 +22,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -215,8 +214,6 @@ type renewFlags struct {
 	cfgPath        string
 	kubeconfigPath string
 	cfg            kubeadmapiv1.ClusterConfiguration
-	csrOnly        bool
-	csrPath        string
 }
 
 func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
@@ -255,7 +252,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 					return err
 				}
 
-				return renewCert(flags, kdir, internalcfg, handler)
+				return renewCert(kdir, internalcfg, handler)
 			}
 		}(handler)
 		// install the implementation into the command
@@ -282,7 +279,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 
 			// Renew certificates
 			for _, handler := range rm.Certificates() {
-				if err := renewCert(flags, kdir, internalcfg, handler); err != nil {
+				if err := renewCert(kdir, internalcfg, handler); err != nil {
 					return err
 				}
 			}
@@ -303,7 +300,7 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
 }
 
-func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
+func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 	if err != nil {
@@ -314,17 +311,6 @@ func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfi
 		fmt.Printf("MISSING! %s\n", handler.LongName)
 		return nil
 	}
-
-	// if the renewal operation is set to generate CSR request only
-	if flags.csrOnly {
-		// checks a path for storing CSR request is given
-		if flags.csrPath == "" {
-			return errors.New("please provide a path where CSR request should be stored")
-		}
-		return rm.CreateRenewCSR(handler.Name, flags.csrPath)
-	}
-
-	// otherwise, the renewal operation has to actually renew a certificate
 
 	// renew using local certificate authorities.
 	// this operation can't complete in case the certificate key is not provided (external CA)
