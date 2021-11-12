@@ -45,6 +45,10 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir string) 
 		return errors.New("no kubelet component config found")
 	}
 
+	if err := kubeletCfg.Mutate(); err != nil {
+		return err
+	}
+
 	kubeletBytes, err := kubeletCfg.Marshal()
 	if err != nil {
 		return err
