@@ -22,12 +22,10 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os/exec"
-	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -87,12 +85,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
-					bytes, err := ioutil.ReadFile("/etc/os-release")
-					if err != nil {
-						if strings.Contains(string(bytes), "ubuntu") {
-							ginkgo.Skip("Test fails with in-tree docker + ubuntu. Skipping test.")
-						}
-					}
+					ginkgo.Skip("Test fails with in-tree docker + ubuntu. Skipping test.")
 				}
 
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
