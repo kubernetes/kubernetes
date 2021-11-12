@@ -942,6 +942,12 @@ func extractIDFromCgroupPath(cgroupPath string) string {
 			id = components[len(components)-1]
 		}
 	}
+
+	// case2 == systemd: "/system.slice/containerd.service/kubepods-burstable-pod36b6d6be73b1065af369b3985edafa09.slice:cri-containerd:79fedb3bd23ca77c9d9ccb41909038316f713df22b54b7d942b71d3812e7c74e"
+	components := strings.Split(id, ":")
+	if len(components) > 1 {
+		id = components[len(components)-1]
+	}
 	return id
 }
 

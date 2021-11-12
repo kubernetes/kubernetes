@@ -1099,6 +1099,10 @@ func TestExtractIDFromCgroupPath(t *testing.T) {
 			cgroupPath: "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod2fc932ce_fdcc_454b_97bd_aadfdeb4c340.slice/cri-o-aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9.scope",
 			expected:   "aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9",
 		},
+		{
+			cgroupPath: "/system.slice/containerd.service/kubepods-burstable-pod36b6d6be73b1065af369b3985edafa09.slice:cri-containerd:79fedb3bd23ca77c9d9ccb41909038316f713df22b54b7d942b71d3812e7c74e",
+			expected:   "79fedb3bd23ca77c9d9ccb41909038316f713df22b54b7d942b71d3812e7c74e",
+		},
 	}
 
 	for _, test := range tests {
