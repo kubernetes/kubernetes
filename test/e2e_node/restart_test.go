@@ -85,7 +85,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-test")
 	ginkgo.Context("Container Runtime", func() {
 		ginkgo.Context("Network", func() {
-			ginkgo.It("should recover from ip leak [Flaky]", func() {
+			ginkgo.It("should recover from ip leak", func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
 					bytes, err := ioutil.ReadFile("/etc/os-release")
 					if err != nil {
