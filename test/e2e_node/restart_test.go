@@ -48,8 +48,8 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 		}
 
 		runningPods = []*v1.Pod{}
-		for _, pod := range podList.Items {
-			pod := pod
+		for i := range podList.Items {
+			pod := podList.Items[i]
 			if r, err := testutils.PodRunningReadyOrSucceeded(&pod); err != nil || !r {
 				continue
 			}
