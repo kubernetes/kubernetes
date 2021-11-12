@@ -31,12 +31,10 @@ import (
 	libipvs "github.com/moby/ipvs"
 
 	"k8s.io/klog/v2"
-	utilexec "k8s.io/utils/exec"
 )
 
 // runner implements ipvs.Interface.
 type runner struct {
-	exec       utilexec.Interface
 	ipvsHandle *libipvs.Handle
 	mu         sync.Mutex // Protect Netlink calls
 }
@@ -45,14 +43,13 @@ type runner struct {
 type Protocol uint16
 
 // New returns a new Interface which will call ipvs APIs.
-func New(exec utilexec.Interface) Interface {
+func New() Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
 		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{
-		exec:       exec,
 		ipvsHandle: handle,
 	}
 }
