@@ -872,7 +872,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		// bootstrap the cert manager with the contents of the initial client config.
 
 		klog.InfoS("Client rotation is on, will bootstrap in background")
-		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -882,7 +882,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 
 		kubeClientConfigOverrides(s, clientConfig)
 
-		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
+		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDir, nodeName)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -922,7 +922,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
-		if err := bootstrap.LoadClientCert(ctx, s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(ctx, s.KubeConfig, s.BootstrapKubeconfig, s.CertDir, nodeName); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -1032,8 +1032,8 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
 	if !kc.ServerTLSBootstrap && kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
-		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
-		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
+		kc.TLSCertFile = path.Join(kc.CertDir, "kubelet.crt")
+		kc.TLSPrivateKeyFile = path.Join(kc.CertDir, "kubelet.key")
 
 		canReadCertAndKey, err := certutil.CanReadCertAndKey(kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		if err != nil {
@@ -1184,7 +1184,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		nodeIPs,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
-		kubeServer.CertDirectory,
+		kubeServer.CertDir,
 		kubeServer.RootDirectory,
 		kubeServer.ImageCredentialProviderConfigFile,
 		kubeServer.ImageCredentialProviderBinDir,

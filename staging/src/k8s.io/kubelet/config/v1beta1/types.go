@@ -172,11 +172,11 @@ type KubeletConfiguration struct {
 	// Default: 0 (disabled)
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
-	// CertDirectory is the directory where the TLS certs are located.
+	// CertDir is the directory where the TLS certs are located.
 	// If tlsCertFile and tlsPrivateKeyFile are provided, this option will be ignored.
 	// Default: "/var/lib/kubelet/pki"
 	// +optional
-	CertDirectory string `json:"certDirectory,omitempty"`
+	CertDir string `json:"certDir,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS. (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate

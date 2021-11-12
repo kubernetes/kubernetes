@@ -265,8 +265,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor)
 	}
-	if obj.CertDirectory == "" {
-		obj.CertDirectory = filepath.Join(DefaultKubeletRunDir, DefaultCertDirRelativeToKubeletRunDir)
+	if obj.CertDir == "" {
+		obj.CertDir = filepath.Join(DefaultKubeletRunDir, DefaultCertDirRelativeToKubeletRunDir)
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = utilpointer.BoolPtr(true)

@@ -153,7 +153,7 @@ var (
 	kubeletConfigurationPathFieldPaths = sets.NewString(
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
-		"CertDirectory",
+		"CertDir",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
 		"ResolverConfig",

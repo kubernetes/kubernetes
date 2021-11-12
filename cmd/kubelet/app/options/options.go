@@ -423,7 +423,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.DurationVar(&c.Authorization.Webhook.CacheUnauthorizedTTL.Duration, "authorization-webhook-cache-unauthorized-ttl", c.Authorization.Webhook.CacheUnauthorizedTTL.Duration, ""+
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
-	fs.StringVar(&c.CertDirectory, "cert-dir", c.CertDirectory, "The directory where the TLS certs are located. "+
+	fs.StringVar(&c.CertDir, "cert-dir", c.CertDir, "The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are specified or corresponding kubelet config flags set, this option will be ignored.")
 
 	fs.StringVar(&c.TLSCertFile, "tls-cert-file", c.TLSCertFile, ""+

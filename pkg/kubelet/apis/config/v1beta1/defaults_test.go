@@ -120,6 +120,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.BoolPtr(true),
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
+				CertDir:                 "/var/lib/kubelet/pki",
 				RegisterNode:            utilpointer.BoolPtr(true),
 			},
 		},
@@ -246,6 +247,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.BoolPtr(false),
+				CertDir:                         "/var/lib/kubelet/pki",
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -342,6 +344,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(false),
 				MemoryThrottlingFactor:  utilpointer.Float64(0),
 				RegisterNode:            utilpointer.BoolPtr(false),
+				CertDir:                 "/var/lib/kubelet/pki",
 			},
 		},
 		{
@@ -357,6 +360,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Address:            "192.168.1.2",
 				Port:               10250,
 				ReadOnlyPort:       10251,
+				CertDir:            "/var/lib/kubelet/pki",
 				TLSCertFile:        "tls-cert-file",
 				TLSPrivateKeyFile:  "tls-private-key-file",
 				TLSCipherSuites:    []string{"TLS_AES_128_GCM_SHA256"},
@@ -639,6 +643,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				CertDir:                 "/var/lib/kubelet/pki",
 			},
 		},
 		{
@@ -725,6 +730,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				CertDir:                 "/var/lib/kubelet/pki",
 			},
 		},
 	}
