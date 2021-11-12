@@ -27,6 +27,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"k8s.io/apimachinery/pkg/types"
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
@@ -70,6 +71,11 @@ func TestZapLoggerInfo(t *testing.T) {
 			msg:        "test for duplicate keys",
 			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duplicate keys\",\"v\":0,\"akey\":\"avalue\",\"akey\":\"anothervalue\"}\n",
 			keysValues: []interface{}{"akey", "avalue", "akey", "anothervalue"},
+		},
+		{
+			msg:        "test for NamespacedName argument",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument\",\"v\":0,\"obj\":{\"Name\":\"kube-proxy\",\"Namespace\":\"kube-system\"}}\n",
+			keysValues: []interface{}{"obj", types.NamespacedName{Name: "kube-proxy", Namespace: "kube-system"}},
 		},
 	}
 
