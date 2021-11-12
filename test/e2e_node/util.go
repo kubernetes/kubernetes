@@ -447,6 +447,17 @@ func stopKubelet() func() {
 	}
 }
 
+// killKubelet sends a signal (SIGINT, SIGSTOP, SIGTERM...) to the running kubelet
+func killKubelet(sig string) {
+	kubeletServiceName := findKubeletServiceName(true)
+
+	// reset the kubelet service start-limit-hit
+	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
+
+	stdout, err = exec.Command("sudo", "systemctl", "kill", "-s", sig, kubeletServiceName).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
+}
 func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
