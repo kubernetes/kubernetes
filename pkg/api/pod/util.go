@@ -329,6 +329,20 @@ func usesHugePagesInProjectedEnv(item api.Container) bool {
 	return false
 }
 
+// hasSysctlsWithSlashNames returns true if the sysctl name contains a slash, otherwise it returns false
+func hasSysctlsWithSlashNames(podSpec *api.PodSpec) bool {
+	if podSpec.SecurityContext == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	for _, s := range securityContext.Sysctls {
+		if strings.Contains(s.Name, "/") {
+			return true
+		}
+	}
+	return false
+}
+
 func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
 	for resourceName, quantity := range container.Resources.Limits {
 		if helper.IsHugePageResourceName(resourceName) {
@@ -420,6 +434,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 		// Allow pod spec to use OS field
 		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
+		// The default sysctl value does not contain a forward slash, and in 1.24 we intend to relax this to be true by default
+		AllowSysctlRegexContainSlash: false,
 	}
 
 	if oldPodSpec != nil {
@@ -440,6 +456,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
+
+		// if old spec used use relaxed validation for Update requests where the existing object's sysctl contains a slash, we must allow it.
+		opts.AllowSysctlRegexContainSlash = hasSysctlsWithSlashNames(oldPodSpec)
+
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -551,8 +571,6 @@ func dropDisabledFields(
 		})
 	}
 
-	dropDisabledFSGroupFields(podSpec, oldPodSpec)
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		podSpec.Overhead = nil
@@ -600,16 +618,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 			}
 			return true
 		})
-	}
-}
-
-func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
-		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
-		// if ConfigurableFSGroupPolicy feature is disabled
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.FSGroupChangePolicy = nil
-		}
 	}
 }
 
@@ -688,17 +696,6 @@ func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
-}
-
-func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	securityContext := podSpec.SecurityContext
-	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
-		return true
-	}
-	return false
 }
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set

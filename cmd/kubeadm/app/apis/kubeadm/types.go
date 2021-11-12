@@ -453,6 +453,9 @@ type ComponentConfig interface {
 	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
 	SetUserSupplied(userSupplied bool)
 
+	// Mutate allows applying pre-defined modifications to the config before it's marshaled.
+	Mutate() error
+
 	// Set can be used to set the internal configuration in the ComponentConfig
 	Set(interface{})
 

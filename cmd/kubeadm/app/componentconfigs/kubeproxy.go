@@ -103,7 +103,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	if kp.config.BindAddress == "" {
 		kp.config.BindAddress = defaultBindAddress
 	} else if kp.config.BindAddress != defaultBindAddress {
-		warnDefaultComponentConfigValue(kind, "bindAddress", kp.config.BindAddress, defaultBindAddress)
+		warnDefaultComponentConfigValue(kind, "bindAddress", defaultBindAddress, kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
@@ -117,4 +117,9 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	} else if kp.config.ClientConnection.Kubeconfig != kubeproxyKubeConfigFileName {
 		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, kp.config.ClientConnection.Kubeconfig)
 	}
+}
+
+// Mutate is NOP for the kube-proxy config
+func (kp *kubeProxyConfig) Mutate() error {
+	return nil
 }

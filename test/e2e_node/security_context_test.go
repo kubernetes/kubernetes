@@ -41,7 +41,7 @@ var _ = SIGDescribe("Security Context", func() {
 		podClient = f.PodClient()
 	})
 
-	ginkgo.Context("Container PID namespace sharing", func() {
+	ginkgo.Context("[NodeConformance][LinuxOnly] Container PID namespace sharing", func() {
 		ginkgo.It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
 			ginkgo.By("Create a pod with isolated PID namespaces.")
 			f.PodClient().CreateSync(&v1.Pod{

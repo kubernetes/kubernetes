@@ -322,3 +322,35 @@ func TestRejectPodAdmissionBasedOnOSSelector(t *testing.T) {
 		})
 	}
 }
+
+func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		expectRejection bool
+	}{
+		{
+			name:            "OS field match",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: v1.OSName(goruntime.GOOS)}}},
+			expectRejection: false,
+		},
+		{
+			name:            "OS field mismatch",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "no OS field",
+			pod:             &v1.Pod{Spec: v1.PodSpec{}},
+			expectRejection: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult := rejectPodAdmissionBasedOnOSField(test.pod)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}

@@ -29,10 +29,12 @@ func TestNewAllowlist(t *testing.T) {
 	}
 	for _, test := range []Test{
 		{sysctls: []string{"kernel.msg*", "kernel.sem"}},
+		{sysctls: []string{"kernel/msg*", "kernel/sem"}},
 		{sysctls: []string{" kernel.msg*"}, err: true},
 		{sysctls: []string{"kernel.msg* "}, err: true},
 		{sysctls: []string{"net.-"}, err: true},
 		{sysctls: []string{"net.*.foo"}, err: true},
+		{sysctls: []string{"net.*/foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
 	} {
 		_, err := NewAllowlist(append(sysctl.SafeSysctlAllowlist(), test.sysctls...))
@@ -51,9 +53,11 @@ func TestAllowlist(t *testing.T) {
 	}
 	valid := []Test{
 		{sysctl: "kernel.shm_rmid_forced"},
+		{sysctl: "kernel/shm_rmid_forced"},
 		{sysctl: "net.ipv4.ip_local_port_range"},
 		{sysctl: "kernel.msgmax"},
 		{sysctl: "kernel.sem"},
+		{sysctl: "kernel/sem"},
 	}
 	invalid := []Test{
 		{sysctl: "kernel.shm_rmid_forced", hostIPC: true},

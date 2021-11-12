@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
 	"mime"
 	"net/http"
@@ -30,9 +31,9 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
+	klog "k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -55,13 +56,40 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	specBytes []byte
-	specPb    []byte
-	specPbGz  []byte
+	jsonCache  cache
+	protoCache cache
+}
 
-	specBytesETag string
-	specPbETag    string
-	specPbGzETag  string
+type cache struct {
+	BuildCache func() ([]byte, error)
+	once       sync.Once
+	bytes      []byte
+	etag       string
+	err        error
+}
+
+func (c *cache) Get() ([]byte, string, error) {
+	c.once.Do(func() {
+		bytes, err := c.BuildCache()
+		// if there is an error updating the cache, there can be situations where
+		// c.bytes contains a valid value (carried over from the previous update)
+		// but c.err is also not nil; the cache user is expected to check for this
+		c.err = err
+		if c.err == nil {
+			// don't override previous spec if we had an error
+			c.bytes = bytes
+			c.etag = computeETag(c.bytes)
+		}
+	})
+	return c.bytes, c.etag, c.err
+}
+
+func (c *cache) New(cacheBuilder func() ([]byte, error)) cache {
+	return cache{
+		bytes:      c.bytes,
+		etag:       c.etag,
+		BuildCache: cacheBuilder,
+	}
 }
 
 func init() {
@@ -71,6 +99,9 @@ func init() {
 }
 
 func computeETag(data []byte) string {
+	if data == nil {
+		return ""
+	}
 	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
@@ -83,51 +114,40 @@ func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 	return o, nil
 }
 
-func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time) {
+func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	return o.specBytes, o.specBytesETag, o.lastModified
+	specBytes, etag, err := o.jsonCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specBytes, etag, o.lastModified, nil
 }
 
-func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time) {
+func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	return o.specPb, o.specPbETag, o.lastModified
-}
-
-func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	return o.specPbGz, o.specPbGzETag, o.lastModified
+	specPb, etag, err := o.protoCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specPb, etag, o.lastModified, nil
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
-	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(openapiSpec)
-	if err != nil {
-		return err
-	}
-	specPb, err := ToProtoBinary(specBytes)
-	if err != nil {
-		return err
-	}
-	specPbGz := toGzip(specPb)
-
-	specBytesETag := computeETag(specBytes)
-	specPbETag := computeETag(specPb)
-	specPbGzETag := computeETag(specPbGz)
-
-	lastModified := time.Now()
-
 	o.rwMutex.Lock()
 	defer o.rwMutex.Unlock()
-
-	o.specBytes = specBytes
-	o.specPb = specPb
-	o.specPbGz = specPbGz
-	o.specBytesETag = specBytesETag
-	o.specPbETag = specPbETag
-	o.specPbGzETag = specPbGzETag
-	o.lastModified = lastModified
+	o.jsonCache = o.jsonCache.New(func() ([]byte, error) {
+		return json.Marshal(openapiSpec)
+	})
+	o.protoCache = o.protoCache.New(func() ([]byte, error) {
+		json, _, err := o.jsonCache.Get()
+		if err != nil {
+			return nil, err
+		}
+		return ToProtoBinary(json)
+	})
+	o.lastModified = time.Now()
 
 	return nil
 }
@@ -206,7 +226,7 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 	accepted := []struct {
 		Type           string
 		SubType        string
-		GetDataAndETag func() ([]byte, string, time.Time)
+		GetDataAndETag func() ([]byte, string, time.Time, error)
 	}{
 		{"application", "json", o.getSwaggerBytes},
 		{"application", "com.github.proto-openapi.spec.v2@v1.0+protobuf", o.getSwaggerPbBytes},
@@ -230,7 +250,15 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 					}
 
 					// serve the first matching media type in the sorted clause list
-					data, etag, lastModified := accepts.GetDataAndETag()
+					data, etag, lastModified, err := accepts.GetDataAndETag()
+					if err != nil {
+						klog.Errorf("Error in OpenAPI handler: %s", err)
+						// only return a 503 if we have no older cache data to serve
+						if data == nil {
+							w.WriteHeader(http.StatusServiceUnavailable)
+							return
+						}
+					}
 					w.Header().Set("Etag", etag)
 					// ServeContent will take care of caching using eTag.
 					http.ServeContent(w, r, servePath, lastModified, bytes.NewReader(data))

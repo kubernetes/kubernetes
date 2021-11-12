@@ -24,10 +24,10 @@ import (
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	versionapi "github.com/containerd/containerd/api/services/version/v1"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/pkg/dialer"
 	ptypes "github.com/gogo/protobuf/types"
+	"github.com/google/cadvisor/container/containerd/containers"
+	"github.com/google/cadvisor/container/containerd/errdefs"
+	"github.com/google/cadvisor/container/containerd/pkg/dialer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 )

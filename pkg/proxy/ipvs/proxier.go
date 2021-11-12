@@ -1307,102 +1307,100 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture load-balancer ingress.
 		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
-			if ingress != "" {
-				// ipset call
-				entry = &utilipset.Entry{
-					IP:       ingress,
-					Port:     svcInfo.Port(),
-					Protocol: protocol,
-					SetType:  utilipset.HashIPPort,
-				}
-				// add service load balancer ingressIP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
-				// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
-				// If we are proxying globally, we need to masquerade in case we cross nodes.
-				// If we are proxying only locally, we can retain the source IP.
-				if valid := proxier.ipsetList[kubeLoadBalancerSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSet].Name)
+			// ipset call
+			entry = &utilipset.Entry{
+				IP:       ingress,
+				Port:     svcInfo.Port(),
+				Protocol: protocol,
+				SetType:  utilipset.HashIPPort,
+			}
+			// add service load balancer ingressIP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
+			// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
+			// If we are proxying globally, we need to masquerade in case we cross nodes.
+			// If we are proxying only locally, we can retain the source IP.
+			if valid := proxier.ipsetList[kubeLoadBalancerSet].validateEntry(entry); !valid {
+				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSet].Name)
+				continue
+			}
+			proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
+			// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
+			if svcInfo.NodeLocalExternal() {
+				if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerLocalSet].Name)
 					continue
 				}
-				proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
-				// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
-				if svcInfo.NodeLocalExternal() {
-					if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
-						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerLocalSet].Name)
-						continue
-					}
-					proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
+				proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
+			}
+			if len(svcInfo.LoadBalancerSourceRanges()) != 0 {
+				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
+				// This currently works for loadbalancers that preserves source ips.
+				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+				if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadbalancerFWSet].Name)
+					continue
 				}
-				if len(svcInfo.LoadBalancerSourceRanges()) != 0 {
-					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
-					// This currently works for loadbalancers that preserves source ips.
-					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-					if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
-						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadbalancerFWSet].Name)
+				proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
+				allowFromNode := false
+				for _, src := range svcInfo.LoadBalancerSourceRanges() {
+					// ipset call
+					entry = &utilipset.Entry{
+						IP:       ingress,
+						Port:     svcInfo.Port(),
+						Protocol: protocol,
+						Net:      src,
+						SetType:  utilipset.HashIPPortNet,
+					}
+					// enumerate all white list source cidr
+					if valid := proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].validateEntry(entry); !valid {
+						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name)
 						continue
 					}
-					proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
-					allowFromNode := false
-					for _, src := range svcInfo.LoadBalancerSourceRanges() {
-						// ipset call
-						entry = &utilipset.Entry{
-							IP:       ingress,
-							Port:     svcInfo.Port(),
-							Protocol: protocol,
-							Net:      src,
-							SetType:  utilipset.HashIPPortNet,
-						}
-						// enumerate all white list source cidr
-						if valid := proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].validateEntry(entry); !valid {
-							klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name)
-							continue
-						}
-						proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
+					proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
 
-						// ignore error because it has been validated
-						_, cidr, _ := netutils.ParseCIDRSloppy(src)
-						if cidr.Contains(proxier.nodeIP) {
-							allowFromNode = true
-						}
-					}
-					// generally, ip route rule was added to intercept request to loadbalancer vip from the
-					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
-					// Need to add the following rule to allow request on host.
-					if allowFromNode {
-						entry = &utilipset.Entry{
-							IP:       ingress,
-							Port:     svcInfo.Port(),
-							Protocol: protocol,
-							IP2:      ingress,
-							SetType:  utilipset.HashIPPortIP,
-						}
-						// enumerate all white list source ip
-						if valid := proxier.ipsetList[kubeLoadBalancerSourceIPSet].validateEntry(entry); !valid {
-							klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name)
-							continue
-						}
-						proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
+					// ignore error because it has been validated
+					_, cidr, _ := netutils.ParseCIDRSloppy(src)
+					if cidr.Contains(proxier.nodeIP) {
+						allowFromNode = true
 					}
 				}
-				// ipvs call
-				serv := &utilipvs.VirtualServer{
-					Address:   netutils.ParseIPSloppy(ingress),
-					Port:      uint16(svcInfo.Port()),
-					Protocol:  string(svcInfo.Protocol()),
-					Scheduler: proxier.ipvsScheduler,
-				}
-				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-					serv.Flags |= utilipvs.FlagPersistent
-					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
-				}
-				if err := proxier.syncService(svcNameString, serv, true, bindedAddresses); err == nil {
-					activeIPVSServices[serv.String()] = true
-					activeBindAddrs[serv.Address.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
-						klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
+				// generally, ip route rule was added to intercept request to loadbalancer vip from the
+				// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
+				// Need to add the following rule to allow request on host.
+				if allowFromNode {
+					entry = &utilipset.Entry{
+						IP:       ingress,
+						Port:     svcInfo.Port(),
+						Protocol: protocol,
+						IP2:      ingress,
+						SetType:  utilipset.HashIPPortIP,
 					}
-				} else {
-					klog.ErrorS(err, "Failed to sync service", "serviceName", svcName, "virtualServer", serv)
+					// enumerate all white list source ip
+					if valid := proxier.ipsetList[kubeLoadBalancerSourceIPSet].validateEntry(entry); !valid {
+						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name)
+						continue
+					}
+					proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
 				}
+			}
+			// ipvs call
+			serv := &utilipvs.VirtualServer{
+				Address:   netutils.ParseIPSloppy(ingress),
+				Port:      uint16(svcInfo.Port()),
+				Protocol:  string(svcInfo.Protocol()),
+				Scheduler: proxier.ipvsScheduler,
+			}
+			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+				serv.Flags |= utilipvs.FlagPersistent
+				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+			}
+			if err := proxier.syncService(svcNameString, serv, true, bindedAddresses); err == nil {
+				activeIPVSServices[serv.String()] = true
+				activeBindAddrs[serv.Address.String()] = true
+				if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
+					klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
+				}
+			} else {
+				klog.ErrorS(err, "Failed to sync service", "serviceName", svcName, "virtualServer", serv)
 			}
 		}
 
@@ -1807,19 +1805,11 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-j", "ACCEPT",
 	)
 
-	// The following two rules ensure the traffic after the initial packet
-	// accepted by the "kubernetes forwarding rules" rule above will be
-	// accepted.
+	// The following rule ensures the traffic after the initial packet accepted
+	// by the "kubernetes forwarding rules" rule above will be accepted.
 	proxier.filterRules.Write(
 		"-A", string(KubeForwardChain),
-		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
-		"-m", "conntrack",
-		"--ctstate", "RELATED,ESTABLISHED",
-		"-j", "ACCEPT",
-	)
-	proxier.filterRules.Write(
-		"-A", string(KubeForwardChain),
-		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
+		"-m", "comment", "--comment", `"kubernetes forwarding conntrack rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
 		"-j", "ACCEPT",

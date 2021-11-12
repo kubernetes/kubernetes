@@ -260,13 +260,23 @@ const (
 	KubeProxyConfigMapKey = "config.conf"
 
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
 	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
+
+	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	KubeletBaseConfigurationConfigMap = "kubelet-config"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
 	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
+
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 
 	// KubeletRunDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRunDirectory = "/var/lib/kubelet"
@@ -672,6 +682,11 @@ func GetAPIServerVirtualIP(svcSubnetList string) (net.IP, error) {
 }
 
 // GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s
-func GetKubeletConfigMapName(k8sVersion *version.Version) string {
+// TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func GetKubeletConfigMapName(k8sVersion *version.Version, legacy bool) string {
+	if !legacy {
+		return KubeletBaseConfigurationConfigMap
+	}
 	return fmt.Sprintf("%s%d.%d", KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
 }

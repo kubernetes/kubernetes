@@ -29,9 +29,10 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Ephemeral Containers", func() {
+var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
@@ -74,9 +75,11 @@ var _ = SIGDescribe("Ephemeral Containers", func() {
 		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 		ginkgo.By("checking pod container endpoints")
-		_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, ecName, []string{"/bin/echo", "marco"}, "marco", time.Minute)
-		framework.ExpectNoError(err, "Failed to exec in pod %q ephemeral container %q", format.Pod(pod), ecName)
-		_, err = framework.LookForStringInLog(pod.Namespace, pod.Name, ecName, "polo", time.Minute)
-		framework.ExpectNoError(err, "Failed to find logs in pod %q ephemeral container %q", format.Pod(pod), ecName)
+		// Can't use anything depending on kubectl here because it's not available in the node test environment
+		output := f.ExecCommandInContainer(pod.Name, ecName, "/bin/echo", "marco")
+		gomega.Expect(output).To(gomega.ContainSubstring("marco"))
+		log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, ecName)
+		framework.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", format.Pod(pod), ecName)
+		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
 	})
 })

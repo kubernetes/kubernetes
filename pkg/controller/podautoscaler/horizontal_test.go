@@ -26,7 +26,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,7 +41,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingapiv2beta2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
@@ -230,7 +230,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			},
 		}
 		// Initialize default values
-		autoscalingapiv2beta2.SetDefaults_HorizontalPodAutoscalerBehavior(&hpa)
+		autoscalingapiv2.SetDefaults_HorizontalPodAutoscalerBehavior(&hpa)
 
 		obj := &autoscalingv2.HorizontalPodAutoscalerList{
 			Items: []autoscalingv2.HorizontalPodAutoscaler{hpa},
@@ -2982,7 +2982,7 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 }
 
 func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
-	policy := autoscalingv2.MinPolicySelect
+	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
@@ -3004,7 +3004,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 }
 
 func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
-	policy := autoscalingv2.MinPolicySelect
+	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
@@ -3026,7 +3026,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 }
 
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
-	policy := autoscalingv2.MaxPolicySelect
+	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: utilpointer.Int32Ptr(stabilizationWindow),
 		SelectPolicy:               &policy,
@@ -3610,8 +3610,8 @@ func TestScalingWithRules(t *testing.T) {
 			}
 			arg := NormalizationArg{
 				Key:               tc.key,
-				ScaleUpBehavior:   autoscalingapiv2beta2.GenerateHPAScaleUpRules(tc.scaleUpRules),
-				ScaleDownBehavior: autoscalingapiv2beta2.GenerateHPAScaleDownRules(tc.scaleDownRules),
+				ScaleUpBehavior:   autoscalingapiv2.GenerateHPAScaleUpRules(tc.scaleUpRules),
+				ScaleDownBehavior: autoscalingapiv2.GenerateHPAScaleDownRules(tc.scaleDownRules),
 				MinReplicas:       tc.specMinReplicas,
 				MaxReplicas:       tc.specMaxReplicas,
 				DesiredReplicas:   tc.prenormalizedDesiredReplicas,

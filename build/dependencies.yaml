@@ -136,7 +136,7 @@ dependencies:
       match: BASE_IMAGE_VERSION\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: bullseye-v1.0.0
+    version: bullseye-v1.1.0
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=

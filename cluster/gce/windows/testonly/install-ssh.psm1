@@ -241,11 +241,11 @@ while($true) {
       # https://github.com/PowerShell/Win32-OpenSSH/wiki/Various-Considerations
       #
       # these files will be append only, only new keys will be added
-      $found = Select-String -Path $user_keys_file -Pattern $ssh_key
+      $found = Select-String -Path $user_keys_file -Pattern $ssh_key -SimpleMatch
       if ($found -eq $null) {
         Add-Content -Encoding UTF8 $user_keys_file $ssh_key
       }
-      $found = Select-String -Path $administrator_keys_file -Pattern $ssh_key
+      $found = Select-String -Path $administrator_keys_file -Pattern $ssh_key -SimpleMatch
       if ($found -eq $null) {
         Add-Content -Encoding UTF8 $administrator_keys_file $ssh_key
       }

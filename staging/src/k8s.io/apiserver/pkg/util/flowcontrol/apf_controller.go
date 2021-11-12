@@ -89,9 +89,8 @@ type StartFunction func(ctx context.Context, hashValue uint64) (execute bool, af
 
 // RequestDigest holds necessary info from request for flow-control
 type RequestDigest struct {
-	RequestInfo  *request.RequestInfo
-	User         user.Info
-	WorkEstimate fcrequest.WorkEstimate
+	RequestInfo *request.RequestInfo
+	User        user.Info
 }
 
 // `*configController` maintains eventual consistency with the API
@@ -100,10 +99,11 @@ type RequestDigest struct {
 // this type and cfgMeal follow the convention that the suffix
 // "Locked" means that the caller must hold the configController lock.
 type configController struct {
-	name             string // varies in tests of fighting controllers
-	clock            clock.PassiveClock
-	queueSetFactory  fq.QueueSetFactory
-	obsPairGenerator metrics.TimedObserverPairGenerator
+	name                  string // varies in tests of fighting controllers
+	clock                 clock.PassiveClock
+	queueSetFactory       fq.QueueSetFactory
+	reqsObsPairGenerator  metrics.TimedObserverPairGenerator
+	execSeatsObsGenerator metrics.TimedObserverGenerator
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -192,8 +192,11 @@ type priorityLevelState struct {
 	// returned StartFunction
 	numPending int
 
-	// Observers tracking number waiting, executing
-	obsPair metrics.TimedObserverPair
+	// Observers tracking number of requests waiting, executing
+	reqsObsPair metrics.TimedObserverPair
+
+	// Observer of number of seats occupied throughout execution
+	execSeatsObs metrics.TimedObserver
 }
 
 // NewTestableController is extra flexible to facilitate testing
@@ -202,7 +205,8 @@ func newTestableController(config TestableConfig) *configController {
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
-		obsPairGenerator:       config.ObsPairGenerator,
+		reqsObsPairGenerator:   config.ReqsObsPairGenerator,
+		execSeatsObsGenerator:  config.ExecSeatsObsGenerator,
 		asFieldManager:         config.AsFieldManager,
 		foundToDangling:        config.FoundToDangling,
 		serverConcurrencyLimit: config.ServerConcurrencyLimit,
@@ -534,9 +538,10 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 	for _, pl := range newPLs {
 		state := meal.cfgCtlr.priorityLevelStates[pl.Name]
 		if state == nil {
-			state = &priorityLevelState{obsPair: meal.cfgCtlr.obsPairGenerator.Generate(1, 1, []string{pl.Name})}
+			labelValues := []string{pl.Name}
+			state = &priorityLevelState{reqsObsPair: meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsObsGenerator.Generate(1, 1, labelValues)}
 		}
-		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.obsPair)
+		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsObsPair, state.execSeatsObs)
 		if err != nil {
 			klog.Warningf("Ignoring PriorityLevelConfiguration object %s because its spec (%s) is broken: %s", pl.Name, fcfmt.Fmt(pl.Spec), err)
 			continue
@@ -639,7 +644,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			}
 		}
 		var err error
-		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues, plState.pl, meal.cfgCtlr.requestWaitLimit, plState.obsPair)
+		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues, plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsObsPair, plState.execSeatsObs)
 		if err != nil {
 			// This can not happen because queueSetCompleterForPL already approved this config
 			panic(fmt.Sprintf("%s from name=%q spec=%s", err, plName, fcfmt.Fmt(plState.pl.Spec)))
@@ -688,7 +693,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // given priority level configuration.  Returns nil if that config
 // does not call for limiting.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, intPair metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.TimedObserverPair, execSeatsObs metrics.TimedObserver) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
 		return nil, errors.New("broken union structure at the top")
 	}
@@ -717,7 +722,7 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 	if queues != nil {
 		qsc, err = queues.BeginConfigChange(qcQS)
 	} else {
-		qsc, err = qsf.BeginConstruction(qcQS, intPair)
+		qsc, err = qsf.BeginConstruction(qcQS, reqsIntPair, execSeatsObs)
 	}
 	if err != nil {
 		err = fmt.Errorf("priority level %q has QueuingConfiguration %#+v, which is invalid: %w", pl.Name, qcAPI, err)
@@ -762,17 +767,20 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 // that does not actually exist (right now) as a real API object.
 func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration) {
 	klog.V(3).Infof("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
-	obsPair := meal.cfgCtlr.obsPairGenerator.Generate(1, 1, []string{proto.Name})
-	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, obsPair)
+	labelValues := []string{proto.Name}
+	reqsObsPair := meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues)
+	execSeatsObs := meal.cfgCtlr.execSeatsObsGenerator.Generate(1, 1, labelValues)
+	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsObsPair, execSeatsObs)
 	if err != nil {
 		// This can not happen because proto is one of the mandatory
 		// objects and these are not erroneous
 		panic(err)
 	}
 	meal.newPLStates[proto.Name] = &priorityLevelState{
-		pl:          proto,
-		qsCompleter: qsCompleter,
-		obsPair:     obsPair,
+		pl:           proto,
+		qsCompleter:  qsCompleter,
+		reqsObsPair:  reqsObsPair,
+		execSeatsObs: execSeatsObs,
 	}
 	if proto.Spec.Limited != nil {
 		meal.shareSum += float64(proto.Spec.Limited.AssuredConcurrencyShares)
@@ -791,7 +799,7 @@ func (immediateRequest) Finish(execute func()) bool {
 // The returned bool indicates whether the request is exempt from
 // limitation.  The startWaitingTime is when the request started
 // waiting in its queue, or `Time{}` if this did not happen.
-func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time, flowDistinguisher string) {
+func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
 	klog.V(7).Infof("startRequest(%#+v)", rd)
 	cfgCtlr.lock.RLock()
 	defer cfgCtlr.lock.RUnlock()
@@ -823,24 +831,26 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	plState := cfgCtlr.priorityLevelStates[plName]
 	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
 		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
-		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}, ""
+		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
 	}
 	var numQueues int32
 	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
 		numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
 	}
+	var flowDistinguisher string
 	var hashValue uint64
 	if numQueues > 1 {
 		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
 		hashValue = hashFlowID(selectedFlowSchema.Name, flowDistinguisher)
 	}
+	workEstimate := workEstimator(selectedFlowSchema, plState.pl, flowDistinguisher)
 	startWaitingTime = time.Now()
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
-	req, idle := plState.queues.StartRequest(ctx, &rd.WorkEstimate, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
+	req, idle := plState.queues.StartRequest(ctx, &workEstimate, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
 	if idle {
 		cfgCtlr.maybeReapReadLocked(plName, plState)
 	}
-	return selectedFlowSchema, plState.pl, false, req, startWaitingTime, flowDistinguisher
+	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
 }
 
 // maybeReap will remove the last internal traces of the named

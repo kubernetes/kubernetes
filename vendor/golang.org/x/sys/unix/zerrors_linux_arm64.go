@@ -306,6 +306,7 @@ const (
 	SO_MARK                          = 0x24
 	SO_MAX_PACING_RATE               = 0x2f
 	SO_MEMINFO                       = 0x37
+	SO_NETNS_COOKIE                  = 0x47
 	SO_NOFCS                         = 0x2b
 	SO_OOBINLINE                     = 0xa
 	SO_PASSCRED                      = 0x10

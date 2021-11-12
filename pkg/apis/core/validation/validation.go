@@ -3377,6 +3377,8 @@ type PodValidationOptions struct {
 	AllowExpandedDNSConfig bool
 	// Allow OSField to be set in the pod spec
 	AllowOSField bool
+	// Allow sysctl name to contain a slash
+	AllowSysctlRegexContainSlash bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -3473,7 +3475,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
-	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
+	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"), opts)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
@@ -4028,29 +4030,48 @@ const (
 	// a sysctl name regex
 	SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
 
+	// a sysctl name regex with slash allowed
+	SysctlContainSlashFmt string = "(" + SysctlSegmentFmt + "[\\./])*" + SysctlSegmentFmt
+
 	// the maximal length of a sysctl name
 	SysctlMaxLength int = 253
 )
 
 var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
 
+var sysctlContainSlashRegexp = regexp.MustCompile("^" + SysctlContainSlashFmt + "$")
+
 // IsValidSysctlName checks that the given string is a valid sysctl name,
-// i.e. matches SysctlFmt.
-func IsValidSysctlName(name string) bool {
+// i.e. matches SysctlFmt (or SysctlContainSlashFmt if canContainSlash is true).
+// More info:
+//   https://man7.org/linux/man-pages/man8/sysctl.8.html
+//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func IsValidSysctlName(name string, canContainSlash bool) bool {
 	if len(name) > SysctlMaxLength {
 		return false
+	}
+	if canContainSlash {
+		return sysctlContainSlashRegexp.MatchString(name)
 	}
 	return sysctlRegexp.MatchString(name)
 }
 
-func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList {
+func getSysctlFmt(canContainSlash bool) string {
+	if canContainSlash {
+		// use relaxed validation everywhere in 1.24
+		return SysctlContainSlashFmt
+	}
+	// Will be removed in 1.24
+	return SysctlFmt
+}
+func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, allowSysctlRegexContainSlash bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	names := make(map[string]struct{})
 	for i, s := range sysctls {
 		if len(s.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
-		} else if !IsValidSysctlName(s.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, SysctlFmt)))
+		} else if !IsValidSysctlName(s.Name, allowSysctlRegexContainSlash) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, getSysctlFmt(allowSysctlRegexContainSlash))))
 		} else if _, ok := names[s.Name]; ok {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
@@ -4060,7 +4081,7 @@ func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList
 }
 
 // ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
-func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *core.PodSpec, specPath, fldPath *field.Path) field.ErrorList {
+func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *core.PodSpec, specPath, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if securityContext != nil {
@@ -4090,7 +4111,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 		}
 
 		if len(securityContext.Sysctls) != 0 {
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"), opts.AllowSysctlRegexContainSlash)...)
 		}
 
 		if securityContext.FSGroupChangePolicy != nil {

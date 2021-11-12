@@ -110,6 +110,10 @@ func (cc *clusterConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadma
 	cc.config.KubernetesVersion = "bar"
 }
 
+func (cc *clusterConfig) Mutate() error {
+	return nil
+}
+
 // fakeKnown replaces temporarily during the execution of each test here known (in configset.go)
 var fakeKnown = []*handler{
 	&clusterConfigHandler,
@@ -357,7 +361,8 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				}
 
 				client := clientsetfake.NewSimpleClientset(configMap)
-				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
+				legacyKubeletConfigMap := true
+				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
 				}
@@ -453,7 +458,7 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 									t.Errorf("unexpected result: %v", got)
 								} else {
 									if !reflect.DeepEqual(test.out, got) {
-										t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+										t.Errorf("mismatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
 									}
 								}
 							}
@@ -482,7 +487,8 @@ func TestLoadingFromCluster(t *testing.T) {
 			testClusterConfigMap(in, false),
 		)
 
-		return clusterConfigHandler.FromCluster(client, testClusterCfg())
+		legacyKubeletConfigMap := true
+		return clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
 	})
 }
 
@@ -575,7 +581,8 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				clusterCfg := testClusterCfg()
+				legacyKubeletConfigMap := true
+				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 
 				err = FetchFromClusterWithLocalOverwrites(clusterCfg, client, docmap)
 				if err != nil {
@@ -709,7 +716,8 @@ func TestGetVersionStates(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				clusterCfg := testClusterCfg()
+				legacyKubeletConfigMap := true
+				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 
 				got, err := GetVersionStates(clusterCfg, client, docmap)
 				if err != nil {

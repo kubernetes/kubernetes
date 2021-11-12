@@ -161,6 +161,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
 		}
 	}
+	// By this time, node labels should have been synced, this helps in identifying the pod with the usage.
+	if rejectPodAdmissionBasedOnOSField(admitPod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSNotSupported",
+			Message: "Failed to admit pod as the OS field doesn't match node OS",
+		}
+	}
 	return PodAdmitResult{
 		Admit: true,
 	}
@@ -185,6 +193,17 @@ func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
 		return true
 	}
 	return false
+}
+
+// rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
+// TODO: Relax this restriction when we start supporting LCOW in kubernetes where podOS may not match
+// 		 node's OS.
+func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
+	if pod.Spec.OS == nil {
+		return false
+	}
+	// If the pod OS doesn't match runtime.GOOS return false
+	return string(pod.Spec.OS.Name) != runtime.GOOS
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {

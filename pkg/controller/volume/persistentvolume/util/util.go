@@ -75,6 +75,9 @@ const (
 	// TODO: remove beta anno once deprecation period ends
 	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
 	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+
+	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
+	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation

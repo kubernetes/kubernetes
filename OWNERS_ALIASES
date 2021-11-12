@@ -132,7 +132,7 @@ aliases:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
     - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
@@ -195,6 +195,8 @@ aliases:
     - soltysh
     - pwittrock
     - eddiezane
+    - brianpursley
+    - KnVerey
   # emeritus:
   # - adohe
   # - brendandburns

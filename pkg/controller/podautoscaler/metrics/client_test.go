@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	autoscalingapi "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	autoscalingapi "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

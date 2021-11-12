@@ -933,7 +933,7 @@ func (dsc *DaemonSetsController) manage(ctx context.Context, ds *apps.DaemonSet,
 	podsToDelete = append(podsToDelete, getUnscheduledPodsWithoutNode(nodeList, nodeToDaemonPods)...)
 
 	// Label new pods using the hash label value of the current history when creating them
-	if err = dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
+	if err = dsc.syncNodes(ctx, ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
 		return err
 	}
 
@@ -942,7 +942,7 @@ func (dsc *DaemonSetsController) manage(ctx context.Context, ds *apps.DaemonSet,
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with errors if any
-func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -996,7 +996,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 				podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(
 					podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
 
-				err := dsc.podControl.CreatePods(ds.Namespace, podTemplate,
+				err := dsc.podControl.CreatePods(ctx, ds.Namespace, podTemplate,
 					ds, metav1.NewControllerRef(ds, controllerKind))
 
 				if err != nil {
@@ -1032,7 +1032,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	for i := 0; i < deleteDiff; i++ {
 		go func(ix int) {
 			defer deleteWait.Done()
-			if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[ix], ds); err != nil {
+			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
 				dsc.expectations.DeletionObserved(dsKey)
 				if !apierrors.IsNotFound(err) {
 					klog.V(2).Infof("Failed deletion, decremented expectations for set %q/%q", ds.Namespace, ds.Name)

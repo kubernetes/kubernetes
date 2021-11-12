@@ -23,7 +23,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1046,7 +1046,7 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []
 	var selectPolicyFn func(int32, int32) int32
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
 		return currentReplicas // Scaling is disabled
-	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
+	} else if *scalingRules.SelectPolicy == autoscalingv2.MinChangePolicySelect {
 		result = math.MaxInt32
 		selectPolicyFn = min // For scaling up, the lowest change ('min' policy) produces a minimum value
 	} else {
@@ -1074,7 +1074,7 @@ func calculateScaleDownLimitWithBehaviors(currentReplicas int32, scaleEvents []t
 	var selectPolicyFn func(int32, int32) int32
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
 		return currentReplicas // Scaling is disabled
-	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
+	} else if *scalingRules.SelectPolicy == autoscalingv2.MinChangePolicySelect {
 		result = math.MinInt32
 		selectPolicyFn = max // For scaling down, the lowest change ('min' policy) produces a maximum value
 	} else {

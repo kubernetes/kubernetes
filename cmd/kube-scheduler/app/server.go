@@ -205,7 +205,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 					os.Exit(0)
 				default:
 					// We lost the lock.
-					klog.Exitf("leaderelection lost")
+					klog.ErrorS(nil, "Leaderelection lost")
+					os.Exit(1)
 				}
 			},
 		}

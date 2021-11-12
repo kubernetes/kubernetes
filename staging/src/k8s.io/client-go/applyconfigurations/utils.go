@@ -26,6 +26,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	v2 "k8s.io/api/autoscaling/v2"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -69,6 +70,7 @@ import (
 	applyconfigurationsappsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
+	autoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	autoscalingv2beta1 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta1"
 	autoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
 	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
@@ -289,6 +291,54 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsautoscalingv1.ScaleSpecApplyConfiguration{}
 	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleStatus"):
 		return &applyconfigurationsautoscalingv1.ScaleStatusApplyConfiguration{}
+
+		// Group=autoscaling, Version=v2
+	case v2.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
+		return &autoscalingv2.ContainerResourceMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ContainerResourceMetricStatus"):
+		return &autoscalingv2.ContainerResourceMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("CrossVersionObjectReference"):
+		return &autoscalingv2.CrossVersionObjectReferenceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ExternalMetricSource"):
+		return &autoscalingv2.ExternalMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ExternalMetricStatus"):
+		return &autoscalingv2.ExternalMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler"):
+		return &autoscalingv2.HorizontalPodAutoscalerApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerBehavior"):
+		return &autoscalingv2.HorizontalPodAutoscalerBehaviorApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerCondition"):
+		return &autoscalingv2.HorizontalPodAutoscalerConditionApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerSpec"):
+		return &autoscalingv2.HorizontalPodAutoscalerSpecApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
+		return &autoscalingv2.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HPAScalingPolicy"):
+		return &autoscalingv2.HPAScalingPolicyApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HPAScalingRules"):
+		return &autoscalingv2.HPAScalingRulesApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricIdentifier"):
+		return &autoscalingv2.MetricIdentifierApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricSpec"):
+		return &autoscalingv2.MetricSpecApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricStatus"):
+		return &autoscalingv2.MetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricTarget"):
+		return &autoscalingv2.MetricTargetApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricValueStatus"):
+		return &autoscalingv2.MetricValueStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ObjectMetricSource"):
+		return &autoscalingv2.ObjectMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ObjectMetricStatus"):
+		return &autoscalingv2.ObjectMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("PodsMetricSource"):
+		return &autoscalingv2.PodsMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("PodsMetricStatus"):
+		return &autoscalingv2.PodsMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ResourceMetricSource"):
+		return &autoscalingv2.ResourceMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ResourceMetricStatus"):
+		return &autoscalingv2.ResourceMetricStatusApplyConfiguration{}
 
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):

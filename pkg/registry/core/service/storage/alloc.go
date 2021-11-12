@@ -305,7 +305,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (transaction, error) {
 	// clusterIPs that were allocated may need to be released in case of
 	// failure at a higher level.
-	toReleaseClusterIPs, err := al.allocClusterIPs(service, dryRun)
+	allocated, err := al.allocClusterIPs(service, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -315,10 +315,21 @@ func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (tra
 			if dryRun {
 				return
 			}
-			released, err := al.releaseIPs(toReleaseClusterIPs)
+			actuallyReleased, err := al.releaseIPs(allocated)
 			if err != nil {
-				klog.Warningf("failed to release clusterIPs for failed new service:%v allocated:%v released:%v error:%v",
-					service.Name, toReleaseClusterIPs, released, err)
+				klog.ErrorS(err, "failed to clean up after failed service create",
+					"service", klog.KObj(service),
+					"shouldRelease", allocated,
+					"released", actuallyReleased)
+			}
+		},
+		commit: func() {
+			if !dryRun {
+				if len(allocated) > 0 {
+					klog.V(0).InfoS("allocated clusterIPs",
+						"service", klog.KObj(service),
+						"clusterIPs", allocated)
+				}
 			}
 		},
 	}
@@ -397,6 +408,9 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 			allocated[family] = allocatedIP.String()
 		} else {
 			parsedIP := netutils.ParseIPSloppy(ip)
+			if parsedIP == nil {
+				return allocated, errors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
+			}
 			if err := allocator.Allocate(parsedIP); err != nil {
 				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP %v: %v", ip, err))}
 				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
@@ -417,12 +431,16 @@ func (al *Allocators) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPF
 	for family, ip := range toRelease {
 		allocator, ok := al.serviceIPAllocatorsByFamily[family]
 		if !ok {
-			// cluster was configured for dual stack, then single stack
-			klog.V(4).Infof("delete service. Not releasing ClusterIP:%v because IPFamily:%v is no longer configured on server", ip, family)
+			// Maybe the cluster was previously configured for dual-stack,
+			// then switched to single-stack?
+			klog.V(0).Infof("not releasing ClusterIP %q because %s is not enabled", ip, family)
 			continue
 		}
 
 		parsedIP := netutils.ParseIPSloppy(ip)
+		if parsedIP == nil {
+			return released, errors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
+		}
 		if err := allocator.Release(parsedIP); err != nil {
 			return released, err
 		}
@@ -531,7 +549,6 @@ func (al *Allocators) allocHealthCheckNodePort(service *api.Service, nodePortOp 
 			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
 				healthCheckNodePort, err)
 		}
-		klog.V(4).Infof("Reserved user requested healthCheckNodePort: %d", healthCheckNodePort)
 	} else {
 		// If the request has no health check nodePort specified, allocate any.
 		healthCheckNodePort, err := nodePortOp.AllocateNext()
@@ -539,7 +556,6 @@ func (al *Allocators) allocHealthCheckNodePort(service *api.Service, nodePortOp 
 			return fmt.Errorf("failed to allocate a HealthCheck NodePort %v: %v", healthCheckNodePort, err)
 		}
 		service.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
-		klog.V(4).Infof("Reserved allocated healthCheckNodePort: %d", healthCheckNodePort)
 	}
 	return nil
 }
@@ -599,9 +615,16 @@ func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun boo
 			if dryRun {
 				return
 			}
+			if len(allocated) > 0 {
+				klog.V(0).InfoS("allocated clusterIPs",
+					"service", klog.KObj(service),
+					"clusterIPs", allocated)
+			}
 			if actuallyReleased, err := al.releaseIPs(released); err != nil {
-				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v",
-					service.Namespace, service.Name, err, released, actuallyReleased)
+				klog.ErrorS(err, "failed to clean up after successful service update",
+					"service", klog.KObj(service),
+					"shouldRelease", released,
+					"released", actuallyReleased)
 			}
 		},
 		revert: func() {
@@ -609,8 +632,10 @@ func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun boo
 				return
 			}
 			if actuallyReleased, err := al.releaseIPs(allocated); err != nil {
-				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v",
-					service.Namespace, service.Name, err, allocated, actuallyReleased)
+				klog.ErrorS(err, "failed to clean up after failed service update",
+					"service", klog.KObj(service),
+					"shouldRelease", allocated,
+					"released", actuallyReleased)
 			}
 		},
 	}
@@ -818,7 +843,6 @@ func (al *Allocators) updateHealthCheckNodePort(after After, before Before, node
 	// Allocate a health check node port or attempt to reserve the user-specified one if provided.
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
-		klog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
 		if err := al.allocHealthCheckNodePort(service, nodePortOp); err != nil {
 			return false, errors.NewInternalError(err)
 		}
@@ -826,8 +850,6 @@ func (al *Allocators) updateHealthCheckNodePort(after After, before Before, node
 	// Case 2: Transition from needs HealthCheckNodePort to don't need HealthCheckNodePort.
 	// Free the existing healthCheckNodePort and clear the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && !needsHealthCheckNodePort:
-		klog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTrafficPolicy=Global")
-		klog.V(4).Infof("Releasing healthCheckNodePort: %d", oldHealthCheckNodePort)
 		nodePortOp.ReleaseDeferred(int(oldHealthCheckNodePort))
 	}
 	return true, nil

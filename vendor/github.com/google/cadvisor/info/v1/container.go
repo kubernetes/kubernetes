@@ -963,6 +963,8 @@ type ContainerStats struct {
 	Resctrl ResctrlStats `json:"resctrl,omitempty"`
 
 	CpuSet CPUSetStats `json:"cpuset,omitempty"`
+
+	OOMEvents uint64 `json:"oom_events,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {

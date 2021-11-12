@@ -337,18 +337,18 @@ type podControlAdapter struct {
 	controller.PodControlInterface
 }
 
-func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (pc podControlAdapter) CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.CreatePods(namespace, template, rc, controllerRef)
+	return pc.PodControlInterface.CreatePods(ctx, namespace, template, rc, controllerRef)
 }
 
-func (pc podControlAdapter) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (pc podControlAdapter) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.DeletePod(namespace, podID, rc)
+	return pc.PodControlInterface.DeletePod(ctx, namespace, podID, rc)
 }

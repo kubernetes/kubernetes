@@ -385,8 +385,13 @@ func (cs *clientStream) abortRequestBodyWrite(err error) {
 	}
 	cc := cs.cc
 	cc.mu.Lock()
-	cs.stopReqBody = err
-	cc.cond.Broadcast()
+	if cs.stopReqBody == nil {
+		cs.stopReqBody = err
+		if cs.req.Body != nil {
+			cs.req.Body.Close()
+		}
+		cc.cond.Broadcast()
+	}
 	cc.mu.Unlock()
 }
 
@@ -1110,40 +1115,28 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 		return res, false, nil
 	}
 
+	handleError := func(err error) (*http.Response, bool, error) {
+		if !hasBody || bodyWritten {
+			cc.writeStreamReset(cs.ID, ErrCodeCancel, nil)
+		} else {
+			bodyWriter.cancel()
+			cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
+			<-bodyWriter.resc
+		}
+		cc.forgetStreamID(cs.ID)
+		return nil, cs.getStartedWrite(), err
+	}
+
 	for {
 		select {
 		case re := <-readLoopResCh:
 			return handleReadLoopResponse(re)
 		case <-respHeaderTimer:
-			if !hasBody || bodyWritten {
-				cc.writeStreamReset(cs.ID, ErrCodeCancel, nil)
-			} else {
-				bodyWriter.cancel()
-				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
-				<-bodyWriter.resc
-			}
-			cc.forgetStreamID(cs.ID)
-			return nil, cs.getStartedWrite(), errTimeout
+			return handleError(errTimeout)
 		case <-ctx.Done():
-			if !hasBody || bodyWritten {
-				cc.writeStreamReset(cs.ID, ErrCodeCancel, nil)
-			} else {
-				bodyWriter.cancel()
-				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
-				<-bodyWriter.resc
-			}
-			cc.forgetStreamID(cs.ID)
-			return nil, cs.getStartedWrite(), ctx.Err()
+			return handleError(ctx.Err())
 		case <-req.Cancel:
-			if !hasBody || bodyWritten {
-				cc.writeStreamReset(cs.ID, ErrCodeCancel, nil)
-			} else {
-				bodyWriter.cancel()
-				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
-				<-bodyWriter.resc
-			}
-			cc.forgetStreamID(cs.ID)
-			return nil, cs.getStartedWrite(), errRequestCanceled
+			return handleError(errRequestCanceled)
 		case <-cs.peerReset:
 			// processResetStream already removed the
 			// stream from the streams map; no need for
@@ -1290,7 +1283,13 @@ func (cs *clientStream) writeRequestBody(body io.Reader, bodyCloser io.Closer) (
 		// Request.Body is closed by the Transport,
 		// and in multiple cases: server replies <=299 and >299
 		// while still writing request body
-		cerr := bodyCloser.Close()
+		var cerr error
+		cc.mu.Lock()
+		if cs.stopReqBody == nil {
+			cs.stopReqBody = errStopReqBodyWrite
+			cerr = bodyCloser.Close()
+		}
+		cc.mu.Unlock()
 		if err == nil {
 			err = cerr
 		}

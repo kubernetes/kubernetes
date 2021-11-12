@@ -46,7 +46,7 @@ import (
 )
 
 const queueMetricMetadata = `
-		# HELP scheduler_queue_incoming_pods_total [ALPHA] Number of pods added to scheduling queues by event and queue type.
+		# HELP scheduler_queue_incoming_pods_total [STABLE] Number of pods added to scheduling queues by event and queue type.
 		# TYPE scheduler_queue_incoming_pods_total counter
 	`
 

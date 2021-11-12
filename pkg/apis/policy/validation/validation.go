@@ -359,12 +359,24 @@ const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
 // SysctlPatternFmt is a regex used for matching valid sysctl patterns.
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
+// SysctlContainSlashPatternFmt is a regex that contains a slash used for matching valid sysctl patterns.
+const SysctlContainSlashPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "[\\./])*" + sysctlPatternSegmentFmt
+
 var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
+var sysctlContainSlashPatternRegexp = regexp.MustCompile("^" + SysctlContainSlashPatternFmt + "$")
+
 // IsValidSysctlPattern checks if name is a valid sysctl pattern.
-func IsValidSysctlPattern(name string) bool {
+// i.e. matches sysctlPatternRegexp (or sysctlContainSlashPatternRegexp if canContainSlash is true).
+// More info:
+//   https://man7.org/linux/man-pages/man8/sysctl.8.html
+//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func IsValidSysctlPattern(name string, canContainSlash bool) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
 		return false
+	}
+	if canContainSlash {
+		return sysctlContainSlashPatternRegexp.MatchString(name)
 	}
 	return sysctlPatternRegexp.MatchString(name)
 }
@@ -422,7 +434,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	for i, s := range sysctls {
 		if len(s) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], "empty sysctl not allowed"))
-		} else if !IsValidSysctlPattern(string(s)) {
+		} else if !IsValidSysctlPattern(string(s), false) {
 			allErrs = append(
 				allErrs,
 				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",

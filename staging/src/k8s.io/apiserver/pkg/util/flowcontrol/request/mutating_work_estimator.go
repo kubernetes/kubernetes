@@ -22,6 +22,7 @@ import (
 	"time"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 const (
@@ -49,7 +50,9 @@ type mutatingWorkEstimator struct {
 	enabled bool
 }
 
-func (e *mutatingWorkEstimator) estimate(r *http.Request) WorkEstimate {
+func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
+	// TODO(wojtekt): Remove once we tune the algorithm to not fail
+	// scalability tests.
 	if !e.enabled {
 		return WorkEstimate{
 			InitialSeats: 1,
@@ -67,6 +70,7 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request) WorkEstimate {
 		}
 	}
 	watchCount := e.countFn(requestInfo)
+	metrics.ObserveWatchCount(r.Context(), priorityLevelName, flowSchemaName, watchCount)
 
 	// The cost of the request associated with the watchers of that event
 	// consists of three parts:

@@ -123,7 +123,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 		}
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
-		return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
+		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
 	}
 
 	// When surging, we create new pods whenever an old pod is unavailable, and we can create up
@@ -201,7 +201,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	}
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
 
-	return dsc.syncNodes(ds, oldPodsToDelete, newNodesToCreate, hash)
+	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
 }
 
 // findUpdatedPodsOnNode looks at non-deleted pods on a given node and returns true if there
@@ -406,7 +406,7 @@ func (dsc *DaemonSetsController) controlledHistories(ctx context.Context, ds *ap
 
 	// List all histories to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to the controller.
-	histories, err := dsc.historyLister.List(labels.Everything())
+	histories, err := dsc.historyLister.ControllerRevisions(ds.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}

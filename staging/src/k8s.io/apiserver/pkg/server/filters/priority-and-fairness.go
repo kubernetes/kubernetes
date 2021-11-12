@@ -101,7 +101,7 @@ func WithPriorityAndFairness(
 		}
 
 		var classification *PriorityAndFairnessClassification
-		note := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) {
+		estimateWork := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) flowcontrolrequest.WorkEstimate {
 			classification = &PriorityAndFairnessClassification{
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
@@ -111,6 +111,7 @@ func WithPriorityAndFairness(
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
 			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
+			return workEstimator(r, fs.Name, pl.Name)
 		}
 
 		var served bool
@@ -137,13 +138,9 @@ func WithPriorityAndFairness(
 			}
 		}
 
-		// find the estimated amount of work of the request
-		// TODO: Estimate cost should also take fcIfc.GetWatchCount(requestInfo) as a parameter.
-		workEstimate := workEstimator.EstimateWork(r)
 		digest := utilflowcontrol.RequestDigest{
-			RequestInfo:  requestInfo,
-			User:         user,
-			WorkEstimate: workEstimate,
+			RequestInfo: requestInfo,
+			User:        user,
 		}
 
 		if isWatchRequest {
@@ -179,7 +176,7 @@ func WithPriorityAndFairness(
 			execute := func() {
 				startedAt := time.Now()
 				defer func() {
-					httplog.AddKeyValue(ctx, "apf_init_latency", time.Now().Sub(startedAt))
+					httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
 				}()
 				noteExecutingDelta(1)
 				defer noteExecutingDelta(-1)
@@ -238,7 +235,7 @@ func WithPriorityAndFairness(
 				// Note that Handle will return irrespective of whether the request
 				// executes or is rejected. In the latter case, the function will return
 				// without calling the passed `execute` function.
-				fcIfc.Handle(handleCtx, digest, note, queueNote, execute)
+				fcIfc.Handle(handleCtx, digest, estimateWork, queueNote, execute)
 			}()
 
 			select {
@@ -269,7 +266,7 @@ func WithPriorityAndFairness(
 				handler.ServeHTTP(w, r)
 			}
 
-			fcIfc.Handle(ctx, digest, note, queueNote, execute)
+			fcIfc.Handle(ctx, digest, estimateWork, queueNote, execute)
 		}
 
 		if !served {
