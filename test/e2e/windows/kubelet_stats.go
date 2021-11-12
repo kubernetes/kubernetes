@@ -80,6 +80,11 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 						framework.ExpectEqual(*podStats.CPU.UsageCoreNanoSeconds > 0, true, "Pod stats should not report 0 cpu usage")
 						framework.ExpectEqual(*podStats.Memory.WorkingSetBytes > 0, true, "Pod stats should not report 0 bytes for memory working set ")
 
+						framework.ExpectEqual(podStats.Network != nil, true, "Pod stats should report network stats")
+						framework.ExpectEqual(podStats.Network.Name != "", true, "Pod stats should report network name")
+						framework.ExpectEqual(*podStats.Network.TxBytes > 0, true, "Pod stats should report network Tx stats")
+						framework.ExpectEqual(len(podStats.Network.Interfaces) > 0, true, "Pod Stats should report individual interfaces stats")
+
 						for _, containerStats := range podStats.Containers {
 							framework.ExpectEqual(containerStats.Logs != nil, true, "Pod stats should have container log stats")
 							framework.ExpectEqual(*containerStats.Logs.AvailableBytes > 0, true, "container log stats should not report 0 bytes for AvailableBytes")
