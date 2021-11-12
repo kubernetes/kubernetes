@@ -16,7 +16,6 @@ go_library(
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:android": [
-            "//pkg/volume/util/hostutil:go_default_library",
             "//staging/src/k8s.io/mount-utils:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog/v2:go_default_library",
@@ -46,7 +45,6 @@ go_library(
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/volume/util/hostutil:go_default_library",
             "//staging/src/k8s.io/mount-utils:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog/v2:go_default_library",
