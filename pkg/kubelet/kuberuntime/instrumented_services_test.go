@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"net"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 
@@ -30,8 +29,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
-
-var registerMetrics sync.Once
 
 func TestRecordOperation(t *testing.T) {
 	// Use local registry
