@@ -281,44 +281,39 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 			// Define test pods
 			pods := []*v1.Pod{
-				getGracePeriodOverrideTestPod("period-120", nodeName, 120, ""),
 				getGracePeriodOverrideTestPod("period-5", nodeName, 5, ""),
-				getGracePeriodOverrideTestPod("period-c-120", nodeName, 120, customClassC.Name),
 				getGracePeriodOverrideTestPod("period-c-5", nodeName, 5, customClassC.Name),
-				getGracePeriodOverrideTestPod("period-b-120", nodeName, 120, customClassB.Name),
 				getGracePeriodOverrideTestPod("period-b-5", nodeName, 5, customClassB.Name),
-				getGracePeriodOverrideTestPod("period-a-120", nodeName, 120, customClassA.Name),
 				getGracePeriodOverrideTestPod("period-a-5", nodeName, 5, customClassA.Name),
-				getGracePeriodOverrideTestPod("period-critical-120", nodeName, 120, scheduling.SystemNodeCritical),
 				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, scheduling.SystemNodeCritical),
 			}
 
 			// Expected down steps
 			downSteps := [][]string{
 				{
-					"period-5", "period-120",
+					"period-5",
 				},
 				{
-					"period-5", "period-120",
-					"period-c-5", "period-c-120",
+					"period-5",
+					"period-c-5",
 				},
 				{
-					"period-5", "period-120",
-					"period-c-5", "period-c-120",
-					"period-b-5", "period-b-120",
+					"period-5",
+					"period-c-5",
+					"period-b-5",
 				},
 				{
-					"period-5", "period-120",
-					"period-c-5", "period-c-120",
-					"period-b-5", "period-b-120",
-					"period-a-5", "period-a-120",
+					"period-5",
+					"period-c-5",
+					"period-b-5",
+					"period-a-5",
 				},
 				{
-					"period-5", "period-120",
-					"period-c-5", "period-c-120",
-					"period-b-5", "period-b-120",
-					"period-a-5", "period-a-120",
-					"period-critical-5", "period-critical-120",
+					"period-5",
+					"period-c-5",
+					"period-b-5",
+					"period-a-5",
+					"period-critical-5",
 				},
 			}
 
