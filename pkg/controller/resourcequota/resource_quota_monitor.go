@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -148,6 +148,10 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 				oldService := oldObj.(*v1.Service)
 				newService := newObj.(*v1.Service)
 				notifyUpdate = core.GetQuotaServiceType(oldService) != core.GetQuotaServiceType(newService)
+			case schema.GroupResource{Resource: "persistentvolumeclaims"}:
+				oldPVC := oldObj.(*v1.PersistentVolumeClaim)
+				newPVC := newObj.(*v1.PersistentVolumeClaim)
+				notifyUpdate = core.RequiresQuotaReplenish(newPVC, oldPVC)
 			}
 			if notifyUpdate {
 				event := &event{

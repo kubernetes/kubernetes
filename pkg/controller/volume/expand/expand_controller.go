@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,12 +45,14 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
+	"k8s.io/kubernetes/pkg/features"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -302,19 +305,31 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 		return util.DeleteAnnPreResizeCapacity(pv, expc.GetKubeClient())
 	}
 
-	pvc, err := util.MarkResizeInProgressWithResizer(pvc, resizerName, expc.kubeClient)
-	if err != nil {
-		klog.V(5).Infof("Error setting PVC %s in progress with error : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
-		return err
+	var generatedOptions volumetypes.GeneratedOperations
+	var err error
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		generatedOptions, err = expc.operationGenerator.GenerateExpandAndRecoverVolumeFunc(pvc, pv, resizerName)
+		if err != nil {
+			klog.Errorf("Error starting ExpandVolume for pvc %s with %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+			return err
+		}
+	} else {
+		pvc, err := util.MarkResizeInProgressWithResizer(pvc, resizerName, expc.kubeClient)
+		if err != nil {
+			klog.Errorf("Error setting PVC %s in progress with error : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+			return err
+		}
+
+		generatedOptions, err = expc.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
+		if err != nil {
+			klog.Errorf("Error starting ExpandVolume for pvc %s with %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+			return err
+		}
 	}
 
-	generatedOperations, err := expc.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
-	if err != nil {
-		klog.Errorf("Error starting ExpandVolume for pvc %s with %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
-		return err
-	}
 	klog.V(5).Infof("Starting ExpandVolume for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
-	_, detailedErr := generatedOperations.Run()
+	_, detailedErr := generatedOptions.Run()
 
 	return detailedErr
 }
@@ -357,8 +372,15 @@ func (expc *expandController) getPersistentVolume(ctx context.Context, pvc *v1.P
 // isNodeExpandComplete returns true if  pvc.Status.Capacity >= pv.Spec.Capacity
 func (expc *expandController) isNodeExpandComplete(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) bool {
 	klog.V(4).Infof("pv %q capacity = %v, pvc %s capacity = %v", pv.Name, pv.Spec.Capacity[v1.ResourceStorage], pvc.ObjectMeta.Name, pvc.Status.Capacity[v1.ResourceStorage])
-	pvcCap, pvCap := pvc.Status.Capacity[v1.ResourceStorage], pv.Spec.Capacity[v1.ResourceStorage]
-	return pvcCap.Cmp(pvCap) >= 0
+	pvcSpecCap := pvc.Spec.Resources.Requests.Storage()
+	pvcStatusCap, pvCap := pvc.Status.Capacity[v1.ResourceStorage], pv.Spec.Capacity[v1.ResourceStorage]
+
+	// since we allow shrinking volumes, we must compare both pvc status and capacity
+	// with pv spec capacity.
+	if pvcStatusCap.Cmp(*pvcSpecCap) >= 0 && pvcStatusCap.Cmp(pvCap) >= 0 {
+		return true
+	}
+	return false
 }
 
 // Implementing VolumeHost interface
