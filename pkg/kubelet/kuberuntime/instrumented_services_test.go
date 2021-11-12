@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
 
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -33,6 +32,7 @@ import (
 func TestRecordOperation(t *testing.T) {
 	// Use local registry
 	var registry = compbasemetrics.NewKubeRegistry()
+	var gather compbasemetrics.Gatherer = registry
 	defer registry.Reset()
 	registry.MustRegister(metrics.RuntimeOperations)
 	registry.MustRegister(metrics.RuntimeOperationsDuration)
@@ -44,7 +44,7 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + l.Addr().String() + "/metrics"
 	mux := http.NewServeMux()
-	handler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+	handler := compbasemetrics.HandlerFor(gather, compbasemetrics.HandlerOpts{})
 	mux.Handle("/metrics", handler)
 	server := &http.Server{
 		Addr:    l.Addr().String(),
