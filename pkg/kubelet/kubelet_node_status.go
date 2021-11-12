@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )

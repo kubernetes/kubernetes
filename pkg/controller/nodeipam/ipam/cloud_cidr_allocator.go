@@ -43,8 +43,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
+	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/legacy-cloud-providers/gce"
 	netutils "k8s.io/utils/net"
@@ -112,21 +112,21 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		AddFunc: controllerutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
 			networkUnavailableTaint := &v1.Taint{Key: v1.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
-			_, cond := nodeutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
+			_, cond := controllerutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
 		}),
-		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
 	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
@@ -258,11 +258,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 
 	cidrStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidr(s) from provider: %v", err)
 	}
 	if len(cidrStrings) == 0 {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
 	//Can have at most 2 ips (one for v4 and one for v6)
@@ -290,19 +290,19 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = utilnode.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
+			if err = nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
 				klog.InfoS("Set the node PodCIDRs", "nodeName", node.Name, "cidrStrings", cidrStrings)
 				break
 			}
 		}
 	}
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
 		klog.ErrorS(err, "Failed to update the node PodCIDR after multiple attempts", "nodeName", node.Name, "cidrStrings", cidrStrings)
 		return err
 	}
 
-	err = utilnode.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
+	err = nodeutil.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,
 		Reason:             "RouteCreated",

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-
-NOTE: the contents of this file has been copied from k8s.io/kubernetes/pkg/util/node. The reason for duplicating this code is to remove
-dependencies for cloud controller manager.
-*/
-
-package helpers
+package util
 
 import (
 	"context"

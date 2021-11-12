@@ -25,7 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"

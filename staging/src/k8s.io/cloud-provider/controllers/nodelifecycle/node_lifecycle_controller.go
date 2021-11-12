@@ -36,6 +36,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 )
 
@@ -128,7 +129,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	for _, node := range nodes {
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
-		if _, c := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
+		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
 			status = c.Status
 		}
 
