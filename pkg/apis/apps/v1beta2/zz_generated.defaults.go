@@ -924,6 +924,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
 		v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		v1.SetDefaults_ResourceList(&a.Status.AllocatedResources)
 	}
 }
 

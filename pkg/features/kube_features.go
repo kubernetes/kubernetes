@@ -803,6 +803,13 @@ const (
 	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
 	// deletion ordering.
 	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
+
+	// owner: @gnufied
+	// kep: http://kep.k8s.io/1790
+	// alpha: v1.23
+	//
+	// Allow users to recover from volume expansion failure
+	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 )
 
 func init() {
@@ -920,6 +927,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	IdentifyPodOS:                                  {Default: false, PreRelease: featuregate.Alpha},
 	PodAndContainerStatsFromCRI:                    {Default: false, PreRelease: featuregate.Alpha},
 	HonorPVReclaimPolicy:                           {Default: false, PreRelease: featuregate.Alpha},
+	RecoverVolumeExpansionFailure:                  {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

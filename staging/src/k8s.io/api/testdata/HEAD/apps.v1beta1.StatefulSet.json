@@ -1642,39 +1642,43 @@
               "reason": "523",
               "message": "524"
             }
-          ]
+          ],
+          "allocatedResources": {
+            "鐳VDɝ": "844"
+          },
+          "resizeStatus": "但Ǭľa执mÎDƃ"
         }
       }
     ],
     "serviceName": "525",
-    "podManagementPolicy": "婵=ǻ",
+    "podManagementPolicy": "ƌ妜;)t罎j´A",
     "updateStrategy": {
-      "type": "ɝÔȗ$`Ž#",
+      "type": "徙蔿Yċʤw俣Ǫ",
       "rollingUpdate": {
-        "partition": -1644040574
+        "partition": 2000146968
       }
     },
-    "revisionHistoryLimit": -1205784111,
-    "minReadySeconds": 1505300966
+    "revisionHistoryLimit": 560461224,
+    "minReadySeconds": 2059121580
   },
   "status": {
-    "observedGeneration": 2345785178116014414,
-    "replicas": 923301621,
-    "readyReplicas": 2036280873,
-    "currentReplicas": 2102009515,
-    "updatedReplicas": -1974512490,
+    "observedGeneration": -8200913189823252840,
+    "replicas": 1892314617,
+    "readyReplicas": -1893854851,
+    "currentReplicas": 658548230,
+    "updatedReplicas": -301228056,
     "currentRevision": "526",
     "updateRevision": "527",
-    "collisionCount": -1001798049,
+    "collisionCount": 446542989,
     "conditions": [
       {
-        "type": "Ǒl徙蔿Yċʤw",
-        "status": "ǹ脡È6",
-        "lastTransitionTime": "2744-07-10T16:37:22Z",
+        "type": "Ǚ3洠º襊Ł靫挕欰ĳ敪賻yʗHiv",
+        "status": "V汦\u003e蒃U",
+        "lastTransitionTime": "2800-08-07T22:03:04Z",
         "reason": "528",
         "message": "529"
       }
     ],
-    "availableReplicas": -180607525
+    "availableReplicas": -2059927818
   }
 }

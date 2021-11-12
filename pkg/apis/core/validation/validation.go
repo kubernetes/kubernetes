@@ -2020,20 +2020,26 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 	return allErrs
 }
 
-// PersistentVolumeClaimSpecValidationOptions contains the different settings for PersistentVolumeClaim validation
 type PersistentVolumeClaimSpecValidationOptions struct {
 	// Allow spec to contain the "ReadWiteOncePod" access mode
 	AllowReadWriteOncePod bool
+	// Allow pvc expansion after PVC is created and bound to a PV
+	EnableExpansion bool
+	// Allow users to recover from previously failing expansion operation
+	EnableRecoverFromExpansionFailure bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		AllowReadWriteOncePod:             utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableExpansion:                   utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes),
+		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
 	}
+
 	if helper.ContainsAccessMode(oldPvc.Spec.AccessModes, core.ReadWriteOncePod) {
 		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
 		opts.AllowReadWriteOncePod = true
@@ -2173,7 +2179,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if opts.EnableExpansion {
 		// lets make sure storage values are same.
 		if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
 			newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
@@ -2181,13 +2187,23 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 		oldSize := oldPvc.Spec.Resources.Requests["storage"]
 		newSize := newPvc.Spec.Resources.Requests["storage"]
+		statusSize := oldPvc.Status.Capacity["storage"]
 
 		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
 			specDiff := diff.ObjectDiff(newPvcClone.Spec, oldPvcClone.Spec)
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
 		}
 		if newSize.Cmp(oldSize) < 0 {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+			if !opts.EnableRecoverFromExpansionFailure {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+			} else {
+				// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
+				// so that users can recover from volume expansion failure, but Kubernetes does not actually
+				// support volume shrinking
+				if newSize.Cmp(statusSize) <= 0 {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than status.capacity"))
+				}
+			}
 		}
 
 	} else {
@@ -2220,8 +2236,15 @@ func validateStorageClassUpgrade(oldAnnotations, newAnnotations map[string]strin
 		(!newAnnotationExist || newScInAnnotation == oldSc) /* condition 4 */
 }
 
+var resizeStatusSet = sets.NewString(string(core.PersistentVolumeClaimNoExpansionInProgress),
+	string(core.PersistentVolumeClaimControllerExpansionInProgress),
+	string(core.PersistentVolumeClaimControllerExpansionFailed),
+	string(core.PersistentVolumeClaimNodeExpansionPending),
+	string(core.PersistentVolumeClaimNodeExpansionInProgress),
+	string(core.PersistentVolumeClaimNodeExpansionFailed))
+
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
-func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim) field.ErrorList {
+func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	if len(newPvc.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
@@ -2229,9 +2252,31 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	if len(newPvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("Spec", "accessModes"), ""))
 	}
+
 	capPath := field.NewPath("status", "capacity")
 	for r, qty := range newPvc.Status.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
+	}
+	if validationOpts.EnableRecoverFromExpansionFailure {
+		resizeStatusPath := field.NewPath("status", "resizeStatus")
+		if newPvc.Status.ResizeStatus != nil {
+			resizeStatus := *newPvc.Status.ResizeStatus
+			if !resizeStatusSet.Has(string(resizeStatus)) {
+				allErrs = append(allErrs, field.NotSupported(resizeStatusPath, resizeStatus, resizeStatusSet.List()))
+			}
+		}
+		allocPath := field.NewPath("status", "allocatedResources")
+		for r, qty := range newPvc.Status.AllocatedResources {
+			if r != core.ResourceStorage {
+				allErrs = append(allErrs, field.NotSupported(allocPath, r, []string{string(core.ResourceStorage)}))
+				continue
+			}
+			if errs := validateBasicResource(qty, allocPath.Key(string(r))); len(errs) > 0 {
+				allErrs = append(allErrs, errs...)
+			} else {
+				allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), qty, allocPath.Key(string(r)))...)
+			}
+		}
 	}
 	return allErrs
 }
