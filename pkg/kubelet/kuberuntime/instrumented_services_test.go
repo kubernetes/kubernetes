@@ -33,6 +33,7 @@ import (
 func TestRecordOperation(t *testing.T) {
 	// Use local registry
 	var registry = compbasemetrics.NewKubeRegistry()
+	defer registry.Reset()
 	registry.MustRegister(metrics.RuntimeOperations)
 	registry.MustRegister(metrics.RuntimeOperationsDuration)
 	registry.MustRegister(metrics.RuntimeOperationsErrors)
@@ -64,8 +65,6 @@ func TestRecordOperation(t *testing.T) {
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
 	}), "GET", prometheusURL, nil, runtimeOperationsDurationExpected)
-
-	registry.Reset()
 }
 
 func TestInstrumentedVersion(t *testing.T) {
