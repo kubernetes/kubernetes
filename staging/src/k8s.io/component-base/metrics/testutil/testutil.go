@@ -19,7 +19,9 @@ package testutil
 import (
 	"fmt"
 	"io"
+	"net/http"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -83,4 +85,8 @@ func NewFakeKubeRegistry(ver string) metrics.KubeRegistry {
 	}
 
 	return metrics.NewKubeRegistry()
+}
+
+func NewFakePromHttpHandler(registry metrics.KubeRegistry) http.Handler {
+	return promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 }
