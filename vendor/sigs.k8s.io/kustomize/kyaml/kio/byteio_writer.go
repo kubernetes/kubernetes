@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -62,10 +63,25 @@ func (w ByteWriter) Write(inputNodes []*yaml.RNode) error {
 	// Even though we use the this value further down we must check this before removing annotations
 	jsonEncodeSingleBareNode := w.shouldJSONEncodeSingleBareNode(nodes)
 
+	// store seqindent annotation value for each node in order to set the encoder indentation
+	var seqIndentsForNodes []string
+	for i := range nodes {
+		seqIndentsForNodes = append(seqIndentsForNodes, nodes[i].GetAnnotations()[kioutil.SeqIndentAnnotation])
+	}
+
 	for i := range nodes {
 		// clean resources by removing annotations set by the Reader
 		if !w.KeepReaderAnnotations {
 			_, err := nodes[i].Pipe(yaml.ClearAnnotation(kioutil.IndexAnnotation))
+			if err != nil {
+				return errors.Wrap(err)
+			}
+			_, err = nodes[i].Pipe(yaml.ClearAnnotation(kioutil.LegacyIndexAnnotation))
+			if err != nil {
+				return errors.Wrap(err)
+			}
+
+			_, err = nodes[i].Pipe(yaml.ClearAnnotation(kioutil.SeqIndentAnnotation))
 			if err != nil {
 				return errors.Wrap(err)
 			}
@@ -97,8 +113,13 @@ func (w ByteWriter) Write(inputNodes []*yaml.RNode) error {
 	// don't wrap the elements
 	if w.WrappingKind == "" {
 		for i := range nodes {
-			if err := encoder.Encode(nodes[i].Document()); err != nil {
-				return err
+			if seqIndentsForNodes[i] == string(yaml.WideSequenceStyle) {
+				encoder.DefaultSeqIndent()
+			} else {
+				encoder.CompactSeqIndent()
+			}
+			if err := encoder.Encode(upWrapBareSequenceNode(nodes[i].Document())); err != nil {
+				return errors.Wrap(err)
 			}
 		}
 		return nil
@@ -164,4 +185,14 @@ func (w ByteWriter) shouldJSONEncodeSingleBareNode(nodes []*yaml.RNode) bool {
 		}
 	}
 	return false
+}
+
+// upWrapBareSequenceNode unwraps the bare sequence nodes wrapped by yaml.BareSeqNodeWrappingKey
+func upWrapBareSequenceNode(node *yaml.Node) *yaml.Node {
+	rNode := yaml.NewRNode(node)
+	seqNode, err := rNode.Pipe(yaml.Lookup(yaml.BareSeqNodeWrappingKey))
+	if err == nil && !seqNode.IsNilOrEmpty() {
+		return seqNode.YNode()
+	}
+	return node
 }

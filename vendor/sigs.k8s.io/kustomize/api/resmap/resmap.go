@@ -136,6 +136,10 @@ type ResMap interface {
 	// self, then its behavior _cannot_ be merge or replace.
 	AbsorbAll(ResMap) error
 
+	// AnnotateAll annotates all resources in the ResMap with
+	// the provided key value pair.
+	AnnotateAll(key string, value string) error
+
 	// AsYaml returns the yaml form of resources.
 	AsYaml() ([]byte, error)
 
@@ -209,6 +213,35 @@ type ResMap interface {
 	// referenced by the resource, e.g. objects in other
 	// namespaces. Cluster wide objects are never excluded.
 	SubsetThatCouldBeReferencedByResource(*resource.Resource) ResMap
+
+	// DeAnchor replaces YAML aliases with structured data copied from anchors.
+	// This cannot be undone; if desired, call DeepCopy first.
+	// Subsequent marshalling to YAML will no longer have anchor
+	// definitions ('&') or aliases ('*').
+	//
+	// Anchors are not expected to work across YAML 'documents'.
+	// If three resources are loaded from one file containing three YAML docs:
+	//
+	//   {resourceA}
+	//   ---
+	//   {resourceB}
+	//   ---
+	//   {resourceC}
+	//
+	// then anchors defined in A cannot be seen from B and C and vice versa.
+	// OTOH, cross-resource links (a field in B referencing fields in A) will
+	// work if the resources are gathered in a ResourceList:
+	//
+	//   apiVersion: config.kubernetes.io/v1
+	//   kind: ResourceList
+	//   metadata:
+	//     name: someList
+	//   items:
+	//   - {resourceA}
+	//   - {resourceB}
+	//   - {resourceC}
+	//
+	DeAnchor() error
 
 	// DeepCopy copies the ResMap and underlying resources.
 	DeepCopy() ResMap
