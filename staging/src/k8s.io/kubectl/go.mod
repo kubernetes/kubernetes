@@ -47,6 +47,10 @@ require (
 )
 
 replace (
+	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.33.2-0.20211111141403-f81b61d24fd4
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
+	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

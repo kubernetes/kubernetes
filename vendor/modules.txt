@@ -360,7 +360,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 github.com/google/btree
-# github.com/google/cadvisor v0.43.0 => github.com/google/cadvisor v0.43.0
+# github.com/google/cadvisor v0.39.2 => github.com/openshift/google-cadvisor v0.33.2-0.20211111141403-f81b61d24fd4
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -2586,9 +2586,13 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.1
+<<<<<<< HEAD
 # github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
 # github.com/google/cel-go => github.com/google/cel-go v0.9.0
 # github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
+=======
+# github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.33.2-0.20211111141403-f81b61d24fd4
+>>>>>>> 4bd1758d6e1 (UPSTREAM: <carry>: bump cadvisor for upstream patches 2957, 2999 and 2979)
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
