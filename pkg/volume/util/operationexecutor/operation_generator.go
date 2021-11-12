@@ -47,6 +47,7 @@ import (
 const (
 	unknownVolumePlugin           string = "UnknownVolumePlugin"
 	unknownAttachableVolumePlugin string = "UnknownAttachableVolumePlugin"
+	DetachOperationName           string = "volume_detach"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -490,9 +491,9 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	}
 
 	return volumetypes.GeneratedOperations{
-		OperationName:     "volume_detach",
+		OperationName:     DetachOperationName,
 		OperationFunc:     detachVolumeFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec), "volume_detach"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec), DetachOperationName),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
