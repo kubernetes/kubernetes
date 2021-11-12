@@ -17,14 +17,36 @@ import (
 type AnnotationKey = string
 
 const (
+	// internalPrefix is the prefix given to internal annotations that are used
+	// internally by the orchestrator
+	internalPrefix string = "internal.config.kubernetes.io/"
+
 	// IndexAnnotation records the index of a specific resource in a file or input stream.
-	IndexAnnotation AnnotationKey = "config.kubernetes.io/index"
+	IndexAnnotation AnnotationKey = internalPrefix + "index"
 
 	// PathAnnotation records the path to the file the Resource was read from
-	PathAnnotation AnnotationKey = "config.kubernetes.io/path"
+	PathAnnotation AnnotationKey = internalPrefix + "path"
+
+	// SeqIndentAnnotation records the sequence nodes indentation of the input resource
+	SeqIndentAnnotation AnnotationKey = internalPrefix + "seqindent"
+
+	// IdAnnotation records the id of the resource to map inputs to outputs
+	IdAnnotation AnnotationKey = internalPrefix + "id"
+
+	// Deprecated: Use IndexAnnotation instead.
+	LegacyIndexAnnotation AnnotationKey = "config.kubernetes.io/index"
+
+	// Deprecated: use PathAnnotation instead.
+	LegacyPathAnnotation AnnotationKey = "config.kubernetes.io/path"
+
+	// Deprecated: use IdAnnotation instead.
+	LegacyIdAnnotation = "config.k8s.io/id"
 )
 
 func GetFileAnnotations(rn *yaml.RNode) (string, string, error) {
+	if err := CopyLegacyAnnotations(rn); err != nil {
+		return "", "", err
+	}
 	meta, err := rn.GetMeta()
 	if err != nil {
 		return "", "", err
@@ -32,6 +54,46 @@ func GetFileAnnotations(rn *yaml.RNode) (string, string, error) {
 	path := meta.Annotations[PathAnnotation]
 	index := meta.Annotations[IndexAnnotation]
 	return path, index, nil
+}
+
+func CopyLegacyAnnotations(rn *yaml.RNode) error {
+	meta, err := rn.GetMeta()
+	if err != nil {
+		if err == yaml.ErrMissingMetadata {
+			// resource has no metadata, this should be a no-op
+			return nil
+		}
+		return err
+	}
+	if err := copyAnnotations(meta, rn, LegacyPathAnnotation, PathAnnotation); err != nil {
+		return err
+	}
+	if err := copyAnnotations(meta, rn, LegacyIndexAnnotation, IndexAnnotation); err != nil {
+		return err
+	}
+	if err := copyAnnotations(meta, rn, LegacyIdAnnotation, IdAnnotation); err != nil {
+		return err
+	}
+	return nil
+}
+
+func copyAnnotations(meta yaml.ResourceMeta, rn *yaml.RNode, legacyKey string, newKey string) error {
+	newValue := meta.Annotations[newKey]
+	legacyValue := meta.Annotations[legacyKey]
+	if newValue != "" {
+		if legacyValue == "" {
+			if err := rn.PipeE(yaml.SetAnnotation(legacyKey, newValue)); err != nil {
+				return err
+			}
+		}
+	} else {
+		if legacyValue != "" {
+			if err := rn.PipeE(yaml.SetAnnotation(newKey, legacyValue)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // ErrorIfMissingAnnotation validates the provided annotations are present on the given resources
@@ -64,6 +126,9 @@ func DefaultPathAndIndexAnnotation(dir string, nodes []*yaml.RNode) error {
 
 	// check each node for the path annotation
 	for i := range nodes {
+		if err := CopyLegacyAnnotations(nodes[i]); err != nil {
+			return err
+		}
 		m, err := nodes[i].GetMeta()
 		if err != nil {
 			return err
@@ -88,6 +153,9 @@ func DefaultPathAndIndexAnnotation(dir string, nodes []*yaml.RNode) error {
 		if err := nodes[i].PipeE(yaml.SetAnnotation(PathAnnotation, path)); err != nil {
 			return err
 		}
+		if err := nodes[i].PipeE(yaml.SetAnnotation(LegacyPathAnnotation, path)); err != nil {
+			return err
+		}
 	}
 
 	// set the index annotations
@@ -110,6 +178,10 @@ func DefaultPathAndIndexAnnotation(dir string, nodes []*yaml.RNode) error {
 			yaml.SetAnnotation(IndexAnnotation, fmt.Sprintf("%d", c))); err != nil {
 			return err
 		}
+		if err := nodes[i].PipeE(
+			yaml.SetAnnotation(LegacyIndexAnnotation, fmt.Sprintf("%d", c))); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -119,6 +191,9 @@ func DefaultPathAndIndexAnnotation(dir string, nodes []*yaml.RNode) error {
 func DefaultPathAnnotation(dir string, nodes []*yaml.RNode) error {
 	// check each node for the path annotation
 	for i := range nodes {
+		if err := CopyLegacyAnnotations(nodes[i]); err != nil {
+			return err
+		}
 		m, err := nodes[i].GetMeta()
 		if err != nil {
 			return err
@@ -132,6 +207,9 @@ func DefaultPathAnnotation(dir string, nodes []*yaml.RNode) error {
 		// set a path annotation on the Resource
 		path := CreatePathAnnotationValue(dir, m)
 		if err := nodes[i].PipeE(yaml.SetAnnotation(PathAnnotation, path)); err != nil {
+			return err
+		}
+		if err := nodes[i].PipeE(yaml.SetAnnotation(LegacyPathAnnotation, path)); err != nil {
 			return err
 		}
 	}
@@ -182,6 +260,12 @@ func SortNodes(nodes []*yaml.RNode) error {
 		if err != nil {
 			return false
 		}
+		if err := CopyLegacyAnnotations(nodes[i]); err != nil {
+			return false
+		}
+		if err := CopyLegacyAnnotations(nodes[j]); err != nil {
+			return false
+		}
 		var iMeta, jMeta yaml.ResourceMeta
 		if iMeta, _ = nodes[i].GetMeta(); err != nil {
 			return false
@@ -230,4 +314,88 @@ func SortNodes(nodes []*yaml.RNode) error {
 		return false
 	})
 	return errors.Wrap(err)
+}
+
+// CopyInternalAnnotations copies the annotations that begin with the prefix
+// `internal.config.kubernetes.io` from the source RNode to the destination RNode.
+// It takes a parameter exclusions, which is a list of annotation keys to ignore.
+func CopyInternalAnnotations(src *yaml.RNode, dst *yaml.RNode, exclusions ...AnnotationKey) error {
+	srcAnnotations := GetInternalAnnotations(src)
+	for k, v := range srcAnnotations {
+		if stringSliceContains(exclusions, k) {
+			continue
+		}
+		if err := dst.PipeE(yaml.SetAnnotation(k, v)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ConfirmInternalAnnotationUnchanged compares the annotations of the RNodes that begin with the prefix
+// `internal.config.kubernetes.io`, throwing an error if they differ. It takes a parameter exclusions,
+// which is a list of annotation keys to ignore.
+func ConfirmInternalAnnotationUnchanged(r1 *yaml.RNode, r2 *yaml.RNode, exclusions ...AnnotationKey) error {
+	r1Annotations := GetInternalAnnotations(r1)
+	r2Annotations := GetInternalAnnotations(r2)
+
+	// this is a map to prevent duplicates
+	diffAnnos := make(map[string]bool)
+
+	for k, v1 := range r1Annotations {
+		if stringSliceContains(exclusions, k) {
+			continue
+		}
+		if v2, ok := r2Annotations[k]; !ok || v1 != v2 {
+			diffAnnos[k] = true
+		}
+	}
+
+	for k, v2 := range r2Annotations {
+		if stringSliceContains(exclusions, k) {
+			continue
+		}
+		if v1, ok := r1Annotations[k]; !ok || v2 != v1 {
+			diffAnnos[k] = true
+		}
+	}
+
+	if len(diffAnnos) > 0 {
+		keys := make([]string, 0, len(diffAnnos))
+		for k := range diffAnnos {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		errorString := "internal annotations differ: "
+		for _, key := range keys {
+			errorString = errorString + key + ", "
+		}
+		return errors.Errorf(errorString[0 : len(errorString)-2])
+	}
+
+	return nil
+}
+
+// GetInternalAnnotations returns a map of all the annotations of the provided RNode that begin
+// with the prefix `internal.config.kubernetes.io`
+func GetInternalAnnotations(rn *yaml.RNode) map[string]string {
+	annotations := rn.GetAnnotations()
+	result := make(map[string]string)
+	for k, v := range annotations {
+		if strings.HasPrefix(k, internalPrefix) {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+// stringSliceContains returns true if the slice has the string.
+func stringSliceContains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }

@@ -47,6 +47,11 @@ func (l *Loader) Config() *types.PluginConfig {
 	return l.pc
 }
 
+// SetWorkDir sets the working directory for this loader's plugins
+func (l *Loader) SetWorkDir(wd string) {
+	l.pc.FnpLoadingOptions.WorkingDir = wd
+}
+
 func (l *Loader) LoadGenerators(
 	ldr ifc.Loader, v ifc.Validator, rm resmap.ResMap) ([]resmap.Generator, error) {
 	var result []resmap.Generator

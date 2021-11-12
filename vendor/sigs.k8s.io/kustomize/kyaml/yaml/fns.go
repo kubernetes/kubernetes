@@ -424,10 +424,44 @@ func Lookup(path ...string) PathGetter {
 	return PathGetter{Path: path}
 }
 
-// Lookup returns a PathGetter to lookup a field by its path and create it if it doesn't already
+// LookupCreate returns a PathGetter to lookup a field by its path and create it if it doesn't already
 // exist.
 func LookupCreate(kind yaml.Kind, path ...string) PathGetter {
 	return PathGetter{Path: path, Create: kind}
+}
+
+// ConventionalContainerPaths is a list of paths at which containers typically appear in workload APIs.
+// It is intended for use with LookupFirstMatch.
+var ConventionalContainerPaths = [][]string{
+	// e.g. Deployment, ReplicaSet, DaemonSet, Job, StatefulSet
+	{"spec", "template", "spec", "containers"},
+	// e.g. CronJob
+	{"spec", "jobTemplate", "spec", "template", "spec", "containers"},
+	// e.g. Pod
+	{"spec", "containers"},
+	// e.g. PodTemplate
+	{"template", "spec", "containers"},
+}
+
+// LookupFirstMatch returns a Filter for locating a value that may exist at one of several possible paths.
+// For example, it can be used with ConventionalContainerPaths to find the containers field in a standard workload resource.
+// If more than one of the paths exists in the resource, the first will be returned. If none exist,
+// nil will be returned. If an error is encountered during lookup, it will be returned.
+func LookupFirstMatch(paths [][]string) Filter {
+	return FilterFunc(func(object *RNode) (*RNode, error) {
+		var result *RNode
+		var err error
+		for _, path := range paths {
+			result, err = object.Pipe(PathGetter{Path: path})
+			if err != nil {
+				return nil, errors.Wrap(err)
+			}
+			if result != nil {
+				return result, nil
+			}
+		}
+		return nil, nil
+	})
 }
 
 // PathGetter returns the RNode under Path.

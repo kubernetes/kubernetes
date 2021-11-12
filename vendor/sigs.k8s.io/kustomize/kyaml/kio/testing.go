@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Setup creates directories and files for testing
@@ -21,18 +21,12 @@ type Setup struct {
 // setupDirectories creates directories for reading test configuration from
 func SetupDirectories(t *testing.T, dirs ...string) Setup {
 	d, err := ioutil.TempDir("", "kyaml-test")
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, err.Error())
-	}
+	require.NoError(t, err)
 	err = os.Chdir(d)
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, err.Error())
-	}
+	require.NoError(t, err)
 	for _, s := range dirs {
 		err = os.MkdirAll(s, 0700)
-		if !assert.NoError(t, err) {
-			assert.FailNow(t, err.Error())
-		}
+		require.NoError(t, err)
 	}
 	return Setup{Root: d}
 }
@@ -40,13 +34,9 @@ func SetupDirectories(t *testing.T, dirs ...string) Setup {
 // writeFile writes a file under the test directory
 func (s Setup) WriteFile(t *testing.T, path string, value []byte) {
 	err := os.MkdirAll(filepath.Dir(filepath.Join(s.Root, path)), 0700)
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, err.Error())
-	}
+	require.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(s.Root, path), value, 0600)
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, err.Error())
-	}
+	require.NoError(t, err)
 }
 
 // clean deletes the test config

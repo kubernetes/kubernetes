@@ -209,5 +209,17 @@ func parseLiteralSource(source string) (keyName, value string, err error) {
 	if len(items) != 2 {
 		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
 	}
-	return items[0], strings.Trim(items[1], "\"'"), nil
+	return items[0], removeQuotes(items[1]), nil
+}
+
+// removeQuotes removes the surrounding quotes from the provided string only if it is surrounded on both sides
+// rather than blindly trimming all quotation marks on either side.
+func removeQuotes(str string) string {
+	if len(str) == 0 || str[0] != str[len(str)-1] {
+		return str
+	}
+	if str[0] == '"' || str[0] == '\'' {
+		return str[1 : len(str)-1]
+	}
+	return str
 }
