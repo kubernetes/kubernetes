@@ -25,12 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
+	root := NewKubectlCommand(KubectlOptions{IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")
@@ -129,14 +128,9 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			pluginsHandler := &testPluginHandler{
 				pluginsDirectory: "plugin/testdata",
 			}
-			_, in, out, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 
-			cmdutil.BehaviorOnFatal(func(str string, code int) {
-				errOut.Write([]byte(str))
-			})
-
-			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
-			root.SetOut(out)
+			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
 			if err := root.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
