@@ -968,6 +968,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 		}
 		for _, pv := range allPVs.Items {
 			if pv.Spec.StorageClassName == scName {
+				pv := pv
 				remainingPVs = append(remainingPVs, &pv)
 			}
 		}
