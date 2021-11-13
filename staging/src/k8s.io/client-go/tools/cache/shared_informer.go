@@ -627,8 +627,8 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 
 func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 	func() {
-		p.listenersLock.RLock()
-		defer p.listenersLock.RUnlock()
+		p.listenersLock.Lock()
+		defer p.listenersLock.Unlock()
 		for _, listener := range p.listeners {
 			p.wg.Start(listener.run)
 			p.wg.Start(listener.pop)
