@@ -583,7 +583,16 @@ func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 		return ns, false, nil
 	}
 
-	namespace := restclient.InClusterNamespace()
+	//get the namespace associated with the service account of current pod, if available
+	namespace, err := restclient.InClusterNamespace()
+	if err != nil {
+		klog.Error("Fail to get in-cluster namespace: ", err)
+		return "default", false, nil
+	}
+	// for compatibility, return default if the namespace is empty
+	if len(namespace) == 0 {
+		return "default", false, nil
+	}
 	return namespace, false, nil
 }
 

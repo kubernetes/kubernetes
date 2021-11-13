@@ -543,14 +543,15 @@ func InClusterConfig() (*Config, error) {
 
 // InClusterNamespace return the default namespace to be used
 // for namespaced API operations in the pod
-func InClusterNamespace() string {
-	//return the namespace associated with the service account token, if available
-	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns
-		}
+func InClusterNamespace() (string, error) {
+	//return the namespace associated with the service account of the pod, if available
+	nsFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	data, err := ioutil.ReadFile(nsFile)
+	if err != nil {
+		klog.Errorf("Expected to get namespace from %s, but got err: %v", nsFile, err)
+		return "", err
 	}
-	return "default"
+	return strings.TrimSpace(string(data)), nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided
