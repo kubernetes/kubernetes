@@ -545,7 +545,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 				klog.ErrorS(err, "Failed to ensure process in container with oom score")
 				return
 			}
-			cont, err := getContainer(os.Getpid())
+			cgp, err := getContainerCgp(os.Getpid())
 			if err != nil {
 				klog.ErrorS(err, "Failed to find cgroups of kubelet")
 				return
@@ -553,7 +553,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			cm.Lock()
 			defer cm.Unlock()
 
-			cm.KubeletCgroupsName = cont
+			cm.KubeletCgroupsName = cgp
 		})
 	}
 
@@ -569,11 +569,11 @@ func getContainerNameForProcess(name, pidFile string) (string, error) {
 	if len(pids) == 0 {
 		return "", nil
 	}
-	cont, err := getContainer(pids[0])
+	cgp, err := getContainerCgp(pids[0])
 	if err != nil {
 		return "", err
 	}
-	return cont, nil
+	return cgp, nil
 }
 
 func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
@@ -904,7 +904,7 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgro
 
 	var errs []error
 	if manager != nil {
-		cont, err := getContainer(pid)
+		cgp, err := getContainerCgp(pid)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
 		}
@@ -917,10 +917,10 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgro
 			name = cgroups.Name
 		}
 
-		if cont != name {
+		if cgp != name {
 			err = manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cont, name, err))
+				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cgp, name, err))
 			}
 		}
 	}
@@ -935,10 +935,10 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgro
 	return utilerrors.NewAggregate(errs)
 }
 
-// getContainer returns the cgroup associated with the specified pid.
+// getContainerCgp returns the cgroup associated with the specified pid.
 // It enforces a unified hierarchy for memory and cpu cgroups.
 // On systemd environments, it uses the name=systemd cgroup for the specified pid.
-func getContainer(pid int) (string, error) {
+func getContainerCgp(pid int) (string, error) {
 	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err

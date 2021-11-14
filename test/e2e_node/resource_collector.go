@@ -36,7 +36,7 @@ import (
 	cadvisorclient "github.com/google/cadvisor/client/v2"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -503,17 +503,17 @@ func getContainerNameForProcess(name, pidFile string) (string, error) {
 	if len(pids) == 0 {
 		return "", nil
 	}
-	cont, err := getContainer(pids[0])
+	cgp, err := getContainerCgp(pids[0])
 	if err != nil {
 		return "", err
 	}
-	return cont, nil
+	return cgp, nil
 }
 
-// getContainer returns the cgroup associated with the specified pid.
+// getContainerCgp returns the cgroup associated with the specified pid.
 // It enforces a unified hierarchy for memory and cpu cgroups.
 // On systemd environments, it uses the name=systemd cgroup for the specified pid.
-func getContainer(pid int) (string, error) {
+func getContainerCgp(pid int) (string, error) {
 	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err

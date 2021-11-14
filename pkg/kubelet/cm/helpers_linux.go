@@ -25,7 +25,7 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -329,11 +329,11 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 // GetKubeletContainer returns the cgroup the kubelet will use
 func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	if kubeletCgroups == "" {
-		cont, err := getContainer(os.Getpid())
+		cgp, err := getContainerCgp(os.Getpid())
 		if err != nil {
 			return "", err
 		}
-		return cont, nil
+		return cgp, nil
 	}
 	return kubeletCgroups, nil
 }
