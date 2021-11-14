@@ -55,6 +55,9 @@ const (
 	SchedulerError = "SchedulerError"
 	// Percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent = 10
+	// Duration the scheduler will wait before expiring an assumed pod.
+	// See issue #106361 for more details about this parameter and its value.
+	durationToExpireAssumedPod = 2 * time.Minute
 )
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -202,8 +205,7 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
-	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-
+	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
