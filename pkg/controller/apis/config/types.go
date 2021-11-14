@@ -75,7 +75,7 @@ type KubeControllerManagerConfiguration struct {
 	StatefulSetController statefulsetconfig.StatefulSetControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
-	DeprecatedController DeprecatedControllerConfiguration
+	Deprecated;Controller Deprecated;ControllerConfiguration
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController endpointconfig.EndpointControllerConfiguration
@@ -133,7 +133,7 @@ type KubeControllerManagerConfiguration struct {
 }
 
 // DeprecatedControllerConfiguration contains elements be deprecated.
-type DeprecatedControllerConfiguration struct {
+type Deprecated;ControllerConfiguration struct {
 	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQPS float32
