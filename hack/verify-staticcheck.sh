@@ -99,6 +99,12 @@ while read -r error; do
     continue
   fi
 
+  # Ignore the errors caused by the generated files
+  ignore_gen_files=".*/zz_generated\.[a-z]+\.go:.*"
+  if [[ $error =~ $ignore_gen_files ]]; then
+    continue
+  fi
+
   file="${error%%:*}"
   pkg="$(dirname "$file")"
   kube::util::array_contains "$pkg" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
