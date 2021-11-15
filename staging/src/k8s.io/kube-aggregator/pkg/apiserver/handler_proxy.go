@@ -134,6 +134,14 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// TODO: fix me
+	//       the aggregated APIs don't support stream watch so for now return a well known error
+	//       to instruct the reflector to fall back to the previous mode
+	if strings.Contains(req.URL.String(), "consistentWatchCache") {
+		http.Error(w, "the server does not allow this method on the requested resource", http.StatusMethodNotAllowed)
+		return
+	}
+
 	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		proxyError(w, req, "missing user", http.StatusInternalServerError)
