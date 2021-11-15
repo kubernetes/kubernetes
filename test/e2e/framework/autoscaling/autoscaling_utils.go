@@ -24,7 +24,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -628,27 +628,27 @@ func runReplicaSet(config testutils.ReplicaSetConfig) error {
 
 // CreateContainerResourceCPUHorizontalPodAutoscaler create a horizontal pod autoscaler with container resource target
 // for consuming resources.
-func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv2beta2.HorizontalPodAutoscaler {
-	hpa := &autoscalingv2beta2.HorizontalPodAutoscaler{
+func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.nsName,
 		},
-		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				APIVersion: rc.kind.GroupVersion().String(),
 				Kind:       rc.kind.Kind,
 				Name:       rc.name,
 			},
 			MinReplicas: &minReplicas,
 			MaxReplicas: maxRepl,
-			Metrics: []autoscalingv2beta2.MetricSpec{
+			Metrics: []autoscalingv2.MetricSpec{
 				{
 					Type: "ContainerResource",
-					ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+					ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
 						Name:      "cpu",
 						Container: rc.name,
-						Target: autoscalingv2beta2.MetricTarget{
+						Target: autoscalingv2.MetricTarget{
 							Type:               "Utilization",
 							AverageUtilization: &cpu,
 						},
@@ -657,14 +657,14 @@ func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu
 			},
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
 }
 
 // DeleteContainerResourceHPA delete the horizontalPodAutoscaler for consuming resources.
 func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
-	rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 
 //SidecarStatusType type for sidecar status
