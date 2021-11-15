@@ -14,28 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aggregator
+package schemamutation
 
 import (
-	_ "net/http/pprof"
-
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// Run a walkRefCallback method on all references of an OpenAPI spec, replacing the values.
-type mutatingReferenceWalker struct {
-	// walkRefCallback will be called on each reference. Do not mutate the input, always create a copy first and return that.
-	walkRefCallback func(ref *spec.Ref) *spec.Ref
+// Walker runs callback functions on all references of an OpenAPI spec,
+// replacing the values when visiting corresponding types.
+type Walker struct {
+	// SchemaCallback will be called on each schema, taking the original schema,
+	// and before any other callbacks of the Walker.
+	// If the schema needs to be mutated, DO NOT mutate it in-place,
+	// always create a copy, mutate, and return it.
+	SchemaCallback func(schema *spec.Schema) *spec.Schema
+
+	// RefCallback will be called on each ref.
+	// If the ref needs to be mutated, DO NOT mutate it in-place,
+	// always create a copy, mutate, and return it.
+	RefCallback func(ref *spec.Ref) *spec.Ref
 }
 
-// replaceReferences rewrites the references without mutating the input.
+type SchemaCallbackFunc func(schema *spec.Schema) *spec.Schema
+type RefCallbackFunc func(ref *spec.Ref) *spec.Ref
+
+var SchemaCallBackNoop SchemaCallbackFunc = func(schema *spec.Schema) *spec.Schema {
+	return schema
+}
+var RefCallbackNoop RefCallbackFunc = func(ref *spec.Ref) *spec.Ref {
+	return ref
+}
+
+// ReplaceReferences rewrites the references without mutating the input.
 // The output might share data with the input.
-func replaceReferences(walkRef func(ref *spec.Ref) *spec.Ref, sp *spec.Swagger) *spec.Swagger {
-	walker := &mutatingReferenceWalker{walkRefCallback: walkRef}
-	return walker.Start(sp)
+func ReplaceReferences(walkRef func(ref *spec.Ref) *spec.Ref, sp *spec.Swagger) *spec.Swagger {
+	walker := &Walker{RefCallback: walkRef, SchemaCallback: SchemaCallBackNoop}
+	return walker.WalkRoot(sp)
 }
 
-func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
+func (w *Walker) WalkSchema(schema *spec.Schema) *spec.Schema {
 	if schema == nil {
 		return nil
 	}
@@ -48,14 +65,18 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 		}
 	}
 
-	if r := w.walkRefCallback(&schema.Ref); r != &schema.Ref {
+	// Always run callback on the whole schema first
+	// so that SchemaCallback can take the original schema as input.
+	schema = w.SchemaCallback(schema)
+
+	if r := w.RefCallback(&schema.Ref); r != &schema.Ref {
 		clone()
 		schema.Ref = *r
 	}
 
 	definitionsCloned := false
 	for k, v := range schema.Definitions {
-		if s := w.walkSchema(&v); s != &v {
+		if s := w.WalkSchema(&v); s != &v {
 			if !definitionsCloned {
 				definitionsCloned = true
 				clone()
@@ -70,7 +91,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	propertiesCloned := false
 	for k, v := range schema.Properties {
-		if s := w.walkSchema(&v); s != &v {
+		if s := w.WalkSchema(&v); s != &v {
 			if !propertiesCloned {
 				propertiesCloned = true
 				clone()
@@ -85,7 +106,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	patternPropertiesCloned := false
 	for k, v := range schema.PatternProperties {
-		if s := w.walkSchema(&v); s != &v {
+		if s := w.WalkSchema(&v); s != &v {
 			if !patternPropertiesCloned {
 				patternPropertiesCloned = true
 				clone()
@@ -100,7 +121,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	allOfCloned := false
 	for i := range schema.AllOf {
-		if s := w.walkSchema(&schema.AllOf[i]); s != &schema.AllOf[i] {
+		if s := w.WalkSchema(&schema.AllOf[i]); s != &schema.AllOf[i] {
 			if !allOfCloned {
 				allOfCloned = true
 				clone()
@@ -113,7 +134,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	anyOfCloned := false
 	for i := range schema.AnyOf {
-		if s := w.walkSchema(&schema.AnyOf[i]); s != &schema.AnyOf[i] {
+		if s := w.WalkSchema(&schema.AnyOf[i]); s != &schema.AnyOf[i] {
 			if !anyOfCloned {
 				anyOfCloned = true
 				clone()
@@ -126,7 +147,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	oneOfCloned := false
 	for i := range schema.OneOf {
-		if s := w.walkSchema(&schema.OneOf[i]); s != &schema.OneOf[i] {
+		if s := w.WalkSchema(&schema.OneOf[i]); s != &schema.OneOf[i] {
 			if !oneOfCloned {
 				oneOfCloned = true
 				clone()
@@ -138,21 +159,21 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 	}
 
 	if schema.Not != nil {
-		if s := w.walkSchema(schema.Not); s != schema.Not {
+		if s := w.WalkSchema(schema.Not); s != schema.Not {
 			clone()
 			schema.Not = s
 		}
 	}
 
 	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
-		if s := w.walkSchema(schema.AdditionalProperties.Schema); s != schema.AdditionalProperties.Schema {
+		if s := w.WalkSchema(schema.AdditionalProperties.Schema); s != schema.AdditionalProperties.Schema {
 			clone()
 			schema.AdditionalProperties = &spec.SchemaOrBool{Schema: s, Allows: schema.AdditionalProperties.Allows}
 		}
 	}
 
 	if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
-		if s := w.walkSchema(schema.AdditionalItems.Schema); s != schema.AdditionalItems.Schema {
+		if s := w.WalkSchema(schema.AdditionalItems.Schema); s != schema.AdditionalItems.Schema {
 			clone()
 			schema.AdditionalItems = &spec.SchemaOrBool{Schema: s, Allows: schema.AdditionalItems.Allows}
 		}
@@ -160,14 +181,14 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 
 	if schema.Items != nil {
 		if schema.Items.Schema != nil {
-			if s := w.walkSchema(schema.Items.Schema); s != schema.Items.Schema {
+			if s := w.WalkSchema(schema.Items.Schema); s != schema.Items.Schema {
 				clone()
 				schema.Items = &spec.SchemaOrArray{Schema: s}
 			}
 		} else {
 			itemsCloned := false
 			for i := range schema.Items.Schemas {
-				if s := w.walkSchema(&schema.Items.Schemas[i]); s != &schema.Items.Schemas[i] {
+				if s := w.WalkSchema(&schema.Items.Schemas[i]); s != &schema.Items.Schemas[i] {
 					if !itemsCloned {
 						clone()
 						schema.Items = &spec.SchemaOrArray{
@@ -185,7 +206,7 @@ func (w *mutatingReferenceWalker) walkSchema(schema *spec.Schema) *spec.Schema {
 	return schema
 }
 
-func (w *mutatingReferenceWalker) walkParameter(param *spec.Parameter) *spec.Parameter {
+func (w *Walker) walkParameter(param *spec.Parameter) *spec.Parameter {
 	if param == nil {
 		return nil
 	}
@@ -200,16 +221,16 @@ func (w *mutatingReferenceWalker) walkParameter(param *spec.Parameter) *spec.Par
 		}
 	}
 
-	if r := w.walkRefCallback(&param.Ref); r != &param.Ref {
+	if r := w.RefCallback(&param.Ref); r != &param.Ref {
 		clone()
 		param.Ref = *r
 	}
-	if s := w.walkSchema(param.Schema); s != param.Schema {
+	if s := w.WalkSchema(param.Schema); s != param.Schema {
 		clone()
 		param.Schema = s
 	}
 	if param.Items != nil {
-		if r := w.walkRefCallback(&param.Items.Ref); r != &param.Items.Ref {
+		if r := w.RefCallback(&param.Items.Ref); r != &param.Items.Ref {
 			param.Items.Ref = *r
 		}
 	}
@@ -217,7 +238,7 @@ func (w *mutatingReferenceWalker) walkParameter(param *spec.Parameter) *spec.Par
 	return param
 }
 
-func (w *mutatingReferenceWalker) walkParameters(params []spec.Parameter) ([]spec.Parameter, bool) {
+func (w *Walker) walkParameters(params []spec.Parameter) ([]spec.Parameter, bool) {
 	if params == nil {
 		return nil, false
 	}
@@ -242,7 +263,7 @@ func (w *mutatingReferenceWalker) walkParameters(params []spec.Parameter) ([]spe
 	return params, cloned
 }
 
-func (w *mutatingReferenceWalker) walkResponse(resp *spec.Response) *spec.Response {
+func (w *Walker) walkResponse(resp *spec.Response) *spec.Response {
 	if resp == nil {
 		return nil
 	}
@@ -257,11 +278,11 @@ func (w *mutatingReferenceWalker) walkResponse(resp *spec.Response) *spec.Respon
 		}
 	}
 
-	if r := w.walkRefCallback(&resp.Ref); r != &resp.Ref {
+	if r := w.RefCallback(&resp.Ref); r != &resp.Ref {
 		clone()
 		resp.Ref = *r
 	}
-	if s := w.walkSchema(resp.Schema); s != resp.Schema {
+	if s := w.WalkSchema(resp.Schema); s != resp.Schema {
 		clone()
 		resp.Schema = s
 	}
@@ -269,7 +290,7 @@ func (w *mutatingReferenceWalker) walkResponse(resp *spec.Response) *spec.Respon
 	return resp
 }
 
-func (w *mutatingReferenceWalker) walkResponses(resps *spec.Responses) *spec.Responses {
+func (w *Walker) walkResponses(resps *spec.Responses) *spec.Responses {
 	if resps == nil {
 		return nil
 	}
@@ -307,7 +328,7 @@ func (w *mutatingReferenceWalker) walkResponses(resps *spec.Responses) *spec.Res
 	return resps
 }
 
-func (w *mutatingReferenceWalker) walkOperation(op *spec.Operation) *spec.Operation {
+func (w *Walker) walkOperation(op *spec.Operation) *spec.Operation {
 	if op == nil {
 		return nil
 	}
@@ -343,7 +364,7 @@ func (w *mutatingReferenceWalker) walkOperation(op *spec.Operation) *spec.Operat
 	return op
 }
 
-func (w *mutatingReferenceWalker) walkPathItem(pathItem *spec.PathItem) *spec.PathItem {
+func (w *Walker) walkPathItem(pathItem *spec.PathItem) *spec.PathItem {
 	if pathItem == nil {
 		return nil
 	}
@@ -394,7 +415,7 @@ func (w *mutatingReferenceWalker) walkPathItem(pathItem *spec.PathItem) *spec.Pa
 	return pathItem
 }
 
-func (w *mutatingReferenceWalker) walkPaths(paths *spec.Paths) *spec.Paths {
+func (w *Walker) walkPaths(paths *spec.Paths) *spec.Paths {
 	if paths == nil {
 		return nil
 	}
@@ -427,7 +448,7 @@ func (w *mutatingReferenceWalker) walkPaths(paths *spec.Paths) *spec.Paths {
 	return paths
 }
 
-func (w *mutatingReferenceWalker) Start(swagger *spec.Swagger) *spec.Swagger {
+func (w *Walker) WalkRoot(swagger *spec.Swagger) *spec.Swagger {
 	if swagger == nil {
 		return nil
 	}
@@ -474,7 +495,7 @@ func (w *mutatingReferenceWalker) Start(swagger *spec.Swagger) *spec.Swagger {
 
 	definitionsCloned := false
 	for k, v := range swagger.Definitions {
-		if s := w.walkSchema(&v); s != &v {
+		if s := w.WalkSchema(&v); s != &v {
 			if !definitionsCloned {
 				definitionsCloned = true
 				clone()

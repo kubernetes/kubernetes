@@ -243,6 +243,7 @@ replace (
 	github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
+	github.com/getkin/kin-openapi => github.com/getkin/kin-openapi v0.76.0
 	github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0
 	github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
