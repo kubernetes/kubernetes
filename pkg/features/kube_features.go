@@ -602,6 +602,7 @@ const (
 	// owner: @robscott
 	// kep: http://kep.k8s.io/2433
 	// alpha: v1.21
+	// beta: v1.23
 	//
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
@@ -912,7 +913,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProbeTerminationGracePeriod:                    {Default: false, PreRelease: featuregate.Beta}, // Default to false in beta 1.22, set to true in 1.24
 	NodeSwap:                                       {Default: false, PreRelease: featuregate.Alpha},
 	PodDeletionCost:                                {Default: true, PreRelease: featuregate.Beta},
-	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
+	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Beta},
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.Beta},
 	IngressClassNamespacedParams:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
