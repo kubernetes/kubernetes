@@ -23,8 +23,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -212,7 +210,6 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 
 			if dInfo.Capabilities[storageframework.CapVolumeMountGroup] &&
-				utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) &&
 				policy == v1.FSGroupChangeOnRootMismatch {
 				e2eskipper.Skipf("Driver %q supports VolumeMountGroup, which doesn't supported the OnRootMismatch FSGroup policy - skipping", dInfo.Name)
 			}
