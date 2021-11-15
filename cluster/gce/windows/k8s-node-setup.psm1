@@ -1256,7 +1256,7 @@ function Start-WorkerServices {
         "A kubelet process is already running, don't know what to do"
   }
   Log-Output "Creating kubelet service"
-  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
+  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kubelet.log ${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
   & sc.exe failure kubelet reset= 0 actions= restart/10000
   Log-Output "Starting kubelet service"
   & sc.exe start kubelet
@@ -1270,7 +1270,7 @@ function Start-WorkerServices {
         "A kube-proxy process is already running, don't know what to do"
   }
   Log-Output "Creating kube-proxy service"
-  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
+  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kube-proxy.log ${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
   & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
   & sc.exe start kube-proxy
