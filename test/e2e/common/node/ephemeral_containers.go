@@ -61,7 +61,7 @@ var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", fu
 			EphemeralContainerCommon: v1.EphemeralContainerCommon{
 				Name:    ecName,
 				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: e2epod.GenerateScriptCmd("while true; do sleep 2; echo polo; done"),
+				Command: e2epod.GenerateScriptCmd("while true; do echo polo; sleep 2; done"),
 				Stdin:   true,
 				TTY:     true,
 			},
