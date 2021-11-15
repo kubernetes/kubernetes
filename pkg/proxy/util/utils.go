@@ -252,6 +252,27 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 	return uniqueAddressList, nil
 }
 
+// AddressSet validates the addresses in the slice using the "isValid" function.
+// Addresses that pass the validation are returned as a string Set.
+func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.String {
+	ips := sets.NewString()
+	for _, a := range addrs {
+		var ip net.IP
+		switch v := a.(type) {
+		case *net.IPAddr:
+			ip = v.IP
+		case *net.IPNet:
+			ip = v.IP
+		default:
+			continue
+		}
+		if isValid(ip) {
+			ips.Insert(ip.String())
+		}
+	}
+	return ips
+}
+
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
