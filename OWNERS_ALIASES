@@ -378,6 +378,12 @@ aliases:
     - liggitt
     - smarterclayton
 
+  sig-cluster-lifecycle-leads:
+    - fabriziopandini
+    - justinsb
+    - neolit123
+    - vincepri
+
   sig-network-api-approvers:
     - smarterclayton
     - thockin
