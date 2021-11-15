@@ -878,7 +878,7 @@ func (KeyToPath) SwaggerDoc() map[string]string {
 var map_Lifecycle = map[string]string{
 	"":          "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
 	"postStart": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks",
-	"preStop":   "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod's termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks",
+	"preStop":   "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks",
 }
 
 func (Lifecycle) SwaggerDoc() map[string]string {
@@ -886,10 +886,10 @@ func (Lifecycle) SwaggerDoc() map[string]string {
 }
 
 var map_LifecycleHandler = map[string]string{
-	"":          "LifecycleHandler defines a specific action that should be taken in a lifecycle hook.  This type has a strong relationship to ProbeHandler - overlapping fields should be identical.",
-	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"":          "LifecycleHandler defines a specific action that should be taken in a lifecycle hook. One and only one of the fields, except TCPSocket must be specified.",
+	"exec":      "Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+	"tcpSocket": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.",
 }
 
 func (LifecycleHandler) SwaggerDoc() map[string]string {
@@ -1793,10 +1793,10 @@ func (Probe) SwaggerDoc() map[string]string {
 }
 
 var map_ProbeHandler = map[string]string{
-	"":          "ProbeHandler defines a specific action that should be taken in a probe. This type has a strong relationship to LifecycleHandler - overlapping fields should be identical.",
-	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"":          "ProbeHandler defines a specific action that should be taken in a probe. One and only one of the fields must be specified.",
+	"exec":      "Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port.",
 }
 
 func (ProbeHandler) SwaggerDoc() map[string]string {
