@@ -77,7 +77,11 @@ func startEtcd() (func(), error) {
 	}
 	klog.V(1).Infof("could not connect to etcd: %v", err)
 
-	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil)
+	// TODO: the following sets progress notification flag
+	//       in the future put it behind a feature flag
+	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
+
+	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", etcdArgs)
 	if err != nil {
 		return nil, err
 	}
