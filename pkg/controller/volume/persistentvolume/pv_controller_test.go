@@ -678,6 +678,9 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 }
 
 func TestUpdateFinalizer(t *testing.T) {
+	// This set of tests ensures that protection finalizer is removed when CSI migration is disabled
+	// and PV controller needs to remove finalizers added by the external-provisioner.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	const gcePlugin = "kubernetes.io/gce-pd"
 	const gceDriver = "pd.csi.storage.gke.io"
