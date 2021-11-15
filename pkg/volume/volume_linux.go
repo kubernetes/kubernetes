@@ -98,7 +98,7 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 
 	err = os.Chmod(filename, info.Mode()|mask)
 	if err != nil {
-		klog.ErrorS(err, "Chown failed", "path", filename)
+		klog.ErrorS(err, "chmod failed", "path", filename)
 	}
 
 	return nil
