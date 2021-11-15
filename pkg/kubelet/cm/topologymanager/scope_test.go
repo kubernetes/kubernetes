@@ -108,7 +108,7 @@ func TestRemoveContainer(t *testing.T) {
 	for _, tc := range testCases {
 		scope.podMap.Add(string(tc.podUID), tc.name, tc.containerID)
 		scope.podTopologyHints[string(tc.podUID)] = make(map[string]TopologyHints)
-		scope.podTopologyHints[string(tc.podUID)][tc.name] = TopologyHints{}
+		scope.podTopologyHints[string(tc.podUID)][tc.name] = TopologyHints{MergedHint: TopologyHint{}}
 		len1 = len(scope.podMap)
 		lenHints1 = len(scope.podTopologyHints)
 		err := scope.RemoveContainer(tc.containerID)
