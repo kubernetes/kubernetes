@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -75,7 +75,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
-	Logf("ExecWithOptions: execute(POST %s %s)", req.URL())
+	Logf("ExecWithOptions: execute(POST %s)", req.URL())
 	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
