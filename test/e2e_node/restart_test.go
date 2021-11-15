@@ -73,7 +73,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		podCount            = 100
 		podCreationInterval = 100 * time.Millisecond
 		recoverTimeout      = 5 * time.Minute
-		startTimeout        = 3 * time.Minute
+		startTimeout        = 5 * time.Minute
 		// restartCount is chosen so even with minPods we exhaust the default
 		// allocation of a /24.
 		minPods      = 50
@@ -199,7 +199,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			// restart may think these old pods are consuming CPU and we
 			// will get an OutOfCpu error.
 			ginkgo.By("verifying restartNever pods succeed and restartAlways pods stay running")
-			postRestartRunningPods := waitForPods(f, numAllPods, startTimeout)
+			postRestartRunningPods := waitForPods(f, numAllPods, recoverTimeout)
 			if len(postRestartRunningPods) < numAllPods {
 				framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 			}
