@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	utiltrace "k8s.io/utils/trace"
@@ -263,7 +264,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 	}
 
-	if err := r.Do(ctx).Into(response); err != nil {
+	do := func() { err = r.Do(ctx).Into(response) }
+	if wd, ok := endpointsrequest.WebhookDurationFrom(ctx); ok {
+		tmp := do
+		do = func() { wd.AdmitTracker.Track(tmp) }
+	}
+	do()
+	if err != nil {
 		var status *apierrors.StatusError
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se
