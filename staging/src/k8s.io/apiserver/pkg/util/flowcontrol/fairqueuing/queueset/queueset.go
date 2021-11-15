@@ -61,8 +61,8 @@ type promiseFactoryFactory func(*queueSet) promiseFactory
 // the fields `factory` and `theSet` is non-nil.
 type queueSetCompleter struct {
 	factory      *queueSetFactory
-	reqsObsPair  metrics.TimedObserverPair
-	execSeatsObs metrics.TimedObserver
+	reqsObsPair  metrics.RatioedChangeObserverPair
+	execSeatsObs metrics.RatioedChangeObserver
 	theSet       *queueSet
 	qCfg         fq.QueuingConfig
 	dealer       *shufflesharding.Dealer
@@ -81,9 +81,9 @@ type queueSet struct {
 	clock                    eventclock.Interface
 	estimatedServiceDuration time.Duration
 
-	reqsObsPair metrics.TimedObserverPair // .RequestsExecuting covers regular phase only
+	reqsObsPair metrics.RatioedChangeObserverPair // .RequestsExecuting covers regular phase only
 
-	execSeatsObs metrics.TimedObserver // for all phases of execution
+	execSeatsObs metrics.RatioedChangeObserver // for all phases of execution
 
 	promiseFactory promiseFactory
 
@@ -148,7 +148,7 @@ func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory pr
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair metrics.TimedObserverPair, execSeatsObs metrics.TimedObserver) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
@@ -243,9 +243,9 @@ func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig,
 	if qll < 1 {
 		qll = 1
 	}
-	qs.reqsObsPair.RequestsWaiting.SetX1(float64(qll))
-	qs.reqsObsPair.RequestsExecuting.SetX1(float64(dCfg.ConcurrencyLimit))
-	qs.execSeatsObs.SetX1(float64(dCfg.ConcurrencyLimit))
+	qs.reqsObsPair.RequestsWaiting.SetDenominator(float64(qll))
+	qs.reqsObsPair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyLimit))
+	qs.execSeatsObs.SetDenominator(float64(dCfg.ConcurrencyLimit))
 
 	qs.dispatchAsMuchAsPossibleLocked()
 }

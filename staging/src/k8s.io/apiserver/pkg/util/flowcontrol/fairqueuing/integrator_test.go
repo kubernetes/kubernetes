@@ -38,7 +38,7 @@ func TestIntegrator(t *testing.T) {
 	if !results.Equal(&rToo) {
 		t.Errorf("expected %#+v, got %#+v", results, rToo)
 	}
-	igr.Set(2)
+	igr.Observe(2)
 	results = igr.GetResults()
 	if e := (IntegratorResults{Duration: 0, Average: math.NaN(), Deviation: math.NaN(), Min: 2, Max: 3}); !e.Equal(&results) {
 		t.Errorf("expected %#+v, got %#+v", e, results)

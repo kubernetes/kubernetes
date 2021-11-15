@@ -135,10 +135,10 @@ type TestableConfig struct {
 	RequestWaitLimit time.Duration
 
 	// ObsPairGenerator for metrics about requests
-	ReqsObsPairGenerator metrics.TimedObserverPairGenerator
+	ReqsObsPairGenerator metrics.RatioedChangeObserverPairGenerator
 
-	// TimedObserverPairGenerator for metrics about seats occupied by all phases of execution
-	ExecSeatsObsGenerator metrics.TimedObserverGenerator
+	// RatioedChangeObserverPairGenerator for metrics about seats occupied by all phases of execution
+	ExecSeatsObsGenerator metrics.RatioedChangeObserverGenerator
 
 	// QueueSetFactory for the queuing implementation
 	QueueSetFactory fq.QueueSetFactory
