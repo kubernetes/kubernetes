@@ -71,6 +71,7 @@ type JobList struct {
 }
 
 // CompletionMode specifies how Pod completions of a Job are tracked.
+// +enum
 type CompletionMode string
 
 const (
@@ -288,6 +289,7 @@ type UncountedTerminatedPods struct {
 	Failed []types.UID `json:"failed,omitempty" protobuf:"bytes,2,rep,name=failed,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
+// +enum
 type JobConditionType string
 
 // These are valid conditions of a job.
@@ -412,6 +414,7 @@ type CronJobSpec struct {
 // Only one of the following concurrent policies may be specified.
 // If none of the following policies is specified, the default one
 // is AllowConcurrent.
+// +enum
 type ConcurrencyPolicy string
 
 const (
