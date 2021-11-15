@@ -90,6 +90,7 @@ type StorageClassList struct {
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+// +enum
 type VolumeBindingMode string
 
 const (

@@ -371,6 +371,7 @@ type VolumeNodeAffinity struct {
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
+// +enum
 type PersistentVolumeReclaimPolicy string
 
 const (
@@ -386,6 +387,7 @@ const (
 )
 
 // PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
+// +enum
 type PersistentVolumeMode string
 
 const (
@@ -517,6 +519,7 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
+// +enum
 type PersistentVolumeClaimConditionType string
 
 const (
@@ -566,6 +569,7 @@ type PersistentVolumeClaimStatus struct {
 	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 }
 
+// +enum
 type PersistentVolumeAccessMode string
 
 const (
@@ -580,6 +584,7 @@ const (
 	ReadWriteOncePod PersistentVolumeAccessMode = "ReadWriteOncePod"
 )
 
+// +enum
 type PersistentVolumePhase string
 
 const (
@@ -598,6 +603,7 @@ const (
 	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
+// +enum
 type PersistentVolumeClaimPhase string
 
 const (
@@ -611,6 +617,7 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+// +enum
 type HostPathType string
 
 const (
@@ -939,6 +946,7 @@ const (
 )
 
 // Protocol defines network protocols supported for things like container ports.
+// +enum
 type Protocol string
 
 const (
@@ -1367,7 +1375,10 @@ type PhotonPersistentDiskVolumeSource struct {
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 
+// +enum
 type AzureDataDiskCachingMode string
+
+// +enum
 type AzureDataDiskKind string
 
 const (
@@ -1892,6 +1903,7 @@ type VolumeMount struct {
 }
 
 // MountPropagationMode describes mount propagation.
+// +enum
 type MountPropagationMode string
 
 const (
@@ -2082,6 +2094,7 @@ type HTTPGetAction struct {
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions
+// +enum
 type URIScheme string
 
 const (
@@ -2154,6 +2167,7 @@ type Probe struct {
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
+// +enum
 type PullPolicy string
 
 const (
@@ -2166,6 +2180,7 @@ const (
 )
 
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
+// +enum
 type PreemptionPolicy string
 
 const (
@@ -2176,6 +2191,7 @@ const (
 )
 
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
+// +enum
 type TerminationMessagePolicy string
 
 const (
@@ -2534,6 +2550,7 @@ type ContainerStatus struct {
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
+// +enum
 type PodPhase string
 
 // These are the valid statuses of pods.
@@ -2558,6 +2575,7 @@ const (
 )
 
 // PodConditionType is a valid value for PodCondition.Type
+// +enum
 type PodConditionType string
 
 // These are valid conditions of pod.
@@ -2607,6 +2625,7 @@ type PodCondition struct {
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
 // is RestartPolicyAlways.
+// +enum
 type RestartPolicy string
 
 const (
@@ -2616,6 +2635,7 @@ const (
 )
 
 // DNSPolicy defines how a pod's DNS will be configured.
+// +enum
 type DNSPolicy string
 
 const (
@@ -2686,6 +2706,7 @@ type NodeSelectorRequirement struct {
 
 // A node selector operator is the set of operators that can be used in
 // a node selector requirement.
+// +enum
 type NodeSelectorOperator string
 
 const (
@@ -2903,6 +2924,7 @@ type Taint struct {
 	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
 }
 
+// +enum
 type TaintEffect string
 
 const (
@@ -2956,6 +2978,7 @@ type Toleration struct {
 }
 
 // A toleration operator is the set of operators that can be used in a toleration.
+// +enum
 type TolerationOperator string
 
 const (
@@ -3245,6 +3268,7 @@ type PodOS struct {
 	Name OSName `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
+// +enum
 type UnsatisfiableConstraintAction string
 
 const (
@@ -3327,6 +3351,7 @@ type HostAlias struct {
 
 // PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
 // when volume is mounted.
+// +enum
 type PodFSGroupChangePolicy string
 
 const (
@@ -3442,6 +3467,7 @@ type SeccompProfile struct {
 }
 
 // SeccompProfileType defines the supported seccomp profile types.
+// +enum
 type SeccompProfileType string
 
 const (
@@ -3455,6 +3481,7 @@ const (
 )
 
 // PodQOSClass defines the supported qos classes of Pods.
+// +enum
 type PodQOSClass string
 
 const (
@@ -4006,6 +4033,7 @@ type ReplicationControllerList struct {
 }
 
 // Session Affinity Type string
+// +enum
 type ServiceAffinity string
 
 const (
@@ -4035,6 +4063,7 @@ type ClientIPConfig struct {
 }
 
 // Service Type string describes ingress methods for a service
+// +enum
 type ServiceType string
 
 const (
@@ -4059,6 +4088,7 @@ const (
 
 // ServiceInternalTrafficPolicyType describes the type of traffic routing for
 // internal traffic
+// +enum
 type ServiceInternalTrafficPolicyType string
 
 const (
@@ -4071,6 +4101,7 @@ const (
 )
 
 // Service External Traffic Policy Type string
+// +enum
 type ServiceExternalTrafficPolicyType string
 
 const (
@@ -4132,6 +4163,7 @@ type LoadBalancerIngress struct {
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
 // to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
+// +enum
 type IPFamily string
 
 const (
@@ -4142,6 +4174,7 @@ const (
 )
 
 // IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
+// +enum
 type IPFamilyPolicyType string
 
 const (
@@ -4949,6 +4982,7 @@ type ContainerImage struct {
 	SizeBytes int64 `json:"sizeBytes,omitempty" protobuf:"varint,2,opt,name=sizeBytes"`
 }
 
+// +enum
 type NodePhase string
 
 // These are the valid phases of node.
@@ -4961,6 +4995,7 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
+// +enum
 type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -4999,6 +5034,7 @@ type NodeCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
+// +enum
 type NodeAddressType string
 
 // These are valid address type of node.
@@ -5154,6 +5190,7 @@ type NamespaceStatus struct {
 	Conditions []NamespaceCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 
+// +enum
 type NamespacePhase string
 
 // These are the valid phases of a namespace.
@@ -5170,6 +5207,7 @@ const (
 	NamespaceTerminatingCause metav1.CauseType = "NamespaceTerminating"
 )
 
+// +enum
 type NamespaceConditionType string
 
 // These are valid conditions of a namespace.
@@ -5661,6 +5699,7 @@ type EventList struct {
 type List metav1.List
 
 // LimitType is a type of object that is limited
+// +enum
 type LimitType string
 
 const (
@@ -5777,6 +5816,7 @@ const (
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
+// +enum
 type ResourceQuotaScope string
 
 const (
@@ -5839,6 +5879,7 @@ type ScopedResourceSelectorRequirement struct {
 
 // A scope selector operator is the set of operators that can be used in
 // a scope selector requirement.
+// +enum
 type ScopeSelectorOperator string
 
 const (
@@ -6281,6 +6322,7 @@ type SecurityContext struct {
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 }
 
+// +enum
 type ProcMountType string
 
 const (
