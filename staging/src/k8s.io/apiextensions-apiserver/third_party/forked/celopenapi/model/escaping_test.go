@@ -17,99 +17,156 @@ limitations under the License.
 package model
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 // TestEscaping tests that property names are escaped as expected.
 func TestEscaping(t *testing.T) {
-	cases := []struct{
-		unescaped string
-		escaped string
-		reservedAtRoot bool
-	} {
+	cases := []struct {
+		unescaped   string
+		escaped     string
+		unescapable bool
+	}{
+		// '.', '-', '/' and '__' are escaped since
+		// CEL only allows identifiers of the form: [a-zA-Z_][a-zA-Z0-9_]*
+		{unescaped: "a.a", escaped: "a__dot__a"},
+		{unescaped: "a-a", escaped: "a__dash__a"},
+		{unescaped: "a__a", escaped: "a__underscores__a"},
+		{unescaped: "a.-/__a", escaped: "a__dot____dash____slash____underscores__a"},
+		{unescaped: "a._a", escaped: "a__dot___a"},
+		{unescaped: "a__.__a", escaped: "a__underscores____dot____underscores__a"},
+		{unescaped: "a___a", escaped: "a__underscores___a"},
+		{unescaped: "a____a", escaped: "a__underscores____underscores__a"},
+		{unescaped: "a__dot__a", escaped: "a__underscores__dot__underscores__a"},
+		{unescaped: "a__underscores__a", escaped: "a__underscores__underscores__underscores__a"},
 		// CEL lexer RESERVED keywords must be escaped
-		{ unescaped: "true", escaped: "_true" },
-		{ unescaped: "false", escaped: "_false" },
-		{ unescaped: "null", escaped: "_null" },
-		{ unescaped: "in", escaped: "_in" },
-		{ unescaped: "as", escaped: "_as" },
-		{ unescaped: "break", escaped: "_break" },
-		{ unescaped: "const", escaped: "_const" },
-		{ unescaped: "continue", escaped: "_continue" },
-		{ unescaped: "else", escaped: "_else" },
-		{ unescaped: "for", escaped: "_for" },
-		{ unescaped: "function", escaped: "_function" },
-		{ unescaped: "if", escaped: "_if" },
-		{ unescaped: "import", escaped: "_import" },
-		{ unescaped: "let", escaped: "_let" },
-		{ unescaped: "loop", escaped: "_loop" },
-		{ unescaped: "package", escaped: "_package" },
-		{ unescaped: "namespace", escaped: "_namespace" },
-		{ unescaped: "return", escaped: "_return" },
-		{ unescaped: "var", escaped: "_var" },
-		{ unescaped: "void", escaped: "_void" },
-		{ unescaped: "while", escaped: "_while" },
-		// CEL language identifiers do not need to be escaped, but collide with builtin language identifier if bound as
-		// root variable names.
-		// i.e. "self.int == 1" is legal, but "int == 1" is not.
-		{ unescaped: "int", escaped: "int", reservedAtRoot: true },
-		{ unescaped: "uint", escaped: "uint", reservedAtRoot: true },
-		{ unescaped: "double", escaped: "double", reservedAtRoot: true },
-		{ unescaped: "bool", escaped: "bool", reservedAtRoot: true },
-		{ unescaped: "string", escaped: "string", reservedAtRoot: true },
-		{ unescaped: "bytes", escaped: "bytes", reservedAtRoot: true },
-		{ unescaped: "list", escaped: "list", reservedAtRoot: true },
-		{ unescaped: "map", escaped: "map", reservedAtRoot: true },
-		{ unescaped: "null_type", escaped: "null_type", reservedAtRoot: true },
-		{ unescaped: "type", escaped: "type", reservedAtRoot: true },
-		// To prevent escaping from colliding with other identifiers, all identifiers prefixed by _s are escaped by
-		// prefixing them with N+1 _s.
-		{ unescaped: "_if", escaped: "__if" },
-		{ unescaped: "__if", escaped: "___if" },
-		{ unescaped: "___if", escaped: "____if" },
-		{ unescaped: "_has", escaped: "__has" },
-		{ unescaped: "_int", escaped: "__int" },
-		{ unescaped: "_anything", escaped: "__anything" },
-		// CEL macro and function names do not need to be escaped because the parser can disambiguate them from the function and
-		// macro identifiers.
-		{ unescaped: "has", escaped: "has" },
-		{ unescaped: "all", escaped: "all" },
-		{ unescaped: "exists", escaped: "exists" },
-		{ unescaped: "exists_one", escaped: "exists_one" },
-		{ unescaped: "filter", escaped: "filter" },
-		{ unescaped: "size", escaped: "size" },
-		{ unescaped: "contains", escaped: "contains" },
-		{ unescaped: "startsWith", escaped: "startsWith" },
-		{ unescaped: "endsWith", escaped: "endsWith" },
-		{ unescaped: "matches", escaped: "matches" },
-		{ unescaped: "duration", escaped: "duration" },
-		{ unescaped: "timestamp", escaped: "timestamp" },
-		{ unescaped: "getDate", escaped: "getDate" },
-		{ unescaped: "getDayOfMonth", escaped: "getDayOfMonth" },
-		{ unescaped: "getDayOfWeek", escaped: "getDayOfWeek" },
-		{ unescaped: "getFullYear", escaped: "getFullYear" },
-		{ unescaped: "getHours", escaped: "getHours" },
-		{ unescaped: "getMilliseconds", escaped: "getMilliseconds" },
-		{ unescaped: "getMinutes", escaped: "getMinutes" },
-		{ unescaped: "getMonth", escaped: "getMonth" },
-		{ unescaped: "getSeconds", escaped: "getSeconds" },
+		{unescaped: "true", escaped: "__true__"},
+		{unescaped: "false", escaped: "__false__"},
+		{unescaped: "null", escaped: "__null__"},
+		{unescaped: "in", escaped: "__in__"},
+		{unescaped: "as", escaped: "__as__"},
+		{unescaped: "break", escaped: "__break__"},
+		{unescaped: "const", escaped: "__const__"},
+		{unescaped: "continue", escaped: "__continue__"},
+		{unescaped: "else", escaped: "__else__"},
+		{unescaped: "for", escaped: "__for__"},
+		{unescaped: "function", escaped: "__function__"},
+		{unescaped: "if", escaped: "__if__"},
+		{unescaped: "import", escaped: "__import__"},
+		{unescaped: "let", escaped: "__let__"},
+		{unescaped: "loop", escaped: "__loop__"},
+		{unescaped: "package", escaped: "__package__"},
+		{unescaped: "namespace", escaped: "__namespace__"},
+		{unescaped: "return", escaped: "__return__"},
+		{unescaped: "var", escaped: "__var__"},
+		{unescaped: "void", escaped: "__void__"},
+		{unescaped: "while", escaped: "__while__"},
+		// Not all property names are escapable
+		{unescaped: "@", unescapable: true},
+		{unescaped: "1up", unescapable: true},
+		{unescaped: "👑", unescapable: true},
+		// CEL macro and function names do not need to be escaped because the parser keeps identifiers in a
+		// different namespace than function and  macro names.
+		{unescaped: "has", escaped: "has"},
+		{unescaped: "all", escaped: "all"},
+		{unescaped: "exists", escaped: "exists"},
+		{unescaped: "exists_one", escaped: "exists_one"},
+		{unescaped: "filter", escaped: "filter"},
+		{unescaped: "size", escaped: "size"},
+		{unescaped: "contains", escaped: "contains"},
+		{unescaped: "startsWith", escaped: "startsWith"},
+		{unescaped: "endsWith", escaped: "endsWith"},
+		{unescaped: "matches", escaped: "matches"},
+		{unescaped: "duration", escaped: "duration"},
+		{unescaped: "timestamp", escaped: "timestamp"},
+		{unescaped: "getDate", escaped: "getDate"},
+		{unescaped: "getDayOfMonth", escaped: "getDayOfMonth"},
+		{unescaped: "getDayOfWeek", escaped: "getDayOfWeek"},
+		{unescaped: "getFullYear", escaped: "getFullYear"},
+		{unescaped: "getHours", escaped: "getHours"},
+		{unescaped: "getMilliseconds", escaped: "getMilliseconds"},
+		{unescaped: "getMinutes", escaped: "getMinutes"},
+		{unescaped: "getMonth", escaped: "getMonth"},
+		{unescaped: "getSeconds", escaped: "getSeconds"},
+		// we don't escape a single _
+		{unescaped: "_if", escaped: "_if"},
+		{unescaped: "_has", escaped: "_has"},
+		{unescaped: "_int", escaped: "_int"},
+		{unescaped: "_anything", escaped: "_anything"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.unescaped, func(t *testing.T) {
-			e := Escape(tc.unescaped)
+			e, escapable := Escape(tc.unescaped)
+			if tc.unescapable {
+				if escapable {
+					t.Errorf("Expected escapable=false, but got %t", escapable)
+				}
+				return
+			}
+			if !escapable {
+				t.Fatalf("Expected escapable=true, but got %t", escapable)
+			}
 			if tc.escaped != e {
 				t.Errorf("Expected %s to escape to %s, but got %s", tc.unescaped, tc.escaped, e)
 			}
-			u := Unescape(tc.escaped)
-			if tc.unescaped != u {
-				t.Errorf("Expected %s to unescape to %s, but got %s", tc.escaped, tc.unescaped, e)
+
+			if !validCelIdent.MatchString(e) {
+				t.Errorf("Expected %s to escape to a valid CEL identifier, but got %s", tc.unescaped, e)
 			}
 
-			isRootReserved := IsRootReserved(tc.unescaped)
-			if tc.reservedAtRoot != isRootReserved {
-				t.Errorf("Expected isRootReserved=%t for %s, but got %t", tc.reservedAtRoot, tc.unescaped, isRootReserved)
+			u, ok := Unescape(tc.escaped)
+			if !ok {
+				t.Fatalf("Expected %s to be escapable, but it was not", tc.escaped)
+			}
+			if tc.unescaped != u {
+				t.Errorf("Expected %s to unescape to %s, but got %s", tc.escaped, tc.unescaped, u)
 			}
 		})
 	}
 }
+
+func TestUnescapeMalformed(t *testing.T) {
+	for _, s := range []string{"__int__extra", "__illegal__"} {
+		t.Run(s, func(t *testing.T) {
+			e, ok := Unescape(s)
+			if ok {
+				t.Fatalf("Expected %s to be unescapable, but it escaped to: %s", s, e)
+			}
+		})
+	}
+}
+
+func TestEscapingFuzz(t *testing.T) {
+	fuzzer := fuzz.New()
+	for i := 0; i < 1000; i++ {
+		var unescaped string
+		fuzzer.Fuzz(&unescaped)
+		t.Run(fmt.Sprintf("%d - '%s'", i, unescaped), func(t *testing.T) {
+			if len(unescaped) == 0 {
+				return
+			}
+			escaped, ok := Escape(unescaped)
+			if !ok {
+				return
+			}
+
+			if !validCelIdent.MatchString(escaped) {
+				t.Errorf("Expected %s to escape to a valid CEL identifier, but got %s", unescaped, escaped)
+			}
+			u, ok := Unescape(escaped)
+			if !ok {
+				t.Fatalf("Expected %s to be unescapable, but it was not", escaped)
+			}
+			if unescaped != u {
+				t.Errorf("Expected %s to unescape to %s, but got %s", escaped, unescaped, u)
+			}
+		})
+	}
+}
+
+var validCelIdent = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)

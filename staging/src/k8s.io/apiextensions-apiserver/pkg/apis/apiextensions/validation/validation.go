@@ -19,11 +19,13 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -909,11 +911,50 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if len(schema.XValidations) > 0 {
+		for i, rule := range schema.XValidations {
+			trimmedRule := strings.TrimSpace(rule.Rule)
+			trimmedMsg := strings.TrimSpace(rule.Message)
+			if len(trimmedRule) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), "rule is not specified"))
+			} else if len(rule.Message) > 0 && len(trimmedMsg) == 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must be non-empty if specified"))
+			} else if hasNewlines(trimmedMsg) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must not contain line breaks"))
+			} else if hasNewlines(trimmedRule) && len(trimmedMsg) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), "message must be specified if rule contains line breaks"))
+			}
+		}
+
+		structural, err := structuralschema.NewStructural(schema)
+		if err == nil {
+			compResults, err := cel.Compile(structural, isRoot)
+			if err != nil {
+				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
+			} else {
+				for i, cr := range compResults {
+					if cr.Error != nil {
+						if cr.Error.Type == cel.ErrorTypeRequired {
+							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
+						} else {
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i], cr.Error.Detail))
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if opts.requireMapListKeysMapSetValidation {
 		allErrs = append(allErrs, validateMapListKeysMapSet(schema, fldPath)...)
 	}
 
 	return allErrs
+}
+
+var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
+func hasNewlines(s string) bool {
+	return newlineMatcher.MatchString(s)
 }
 
 func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
@@ -1112,7 +1153,7 @@ func validateSimpleJSONPath(s string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example", "XPreserveUnknownFields"}
+var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example", "XPreserveUnknownFields", "XValidations"}
 
 func allowedAtRootSchema(field string) bool {
 	for _, v := range allowedFieldsAtRootSchema {
@@ -1144,16 +1185,16 @@ func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitio
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	return hasSchemaWith(spec, schemaHasDefaults)
+	return HasSchemaWith(spec, schemaHasDefaults)
 }
 
 func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
-	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+	return SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
 		return s.Default != nil
 	})
 }
 
-func hasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
+func HasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil && pred(spec.Validation.OpenAPIV3Schema) {
 		return true
 	}
@@ -1165,7 +1206,7 @@ func hasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s
 	return false
 }
 
-func schemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
+func SchemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if s == nil {
 		return false
 	}
@@ -1175,60 +1216,60 @@ func schemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSON
 	}
 
 	if s.Items != nil {
-		if s.Items != nil && schemaHas(s.Items.Schema, pred) {
+		if s.Items != nil && SchemaHas(s.Items.Schema, pred) {
 			return true
 		}
 		for _, s := range s.Items.JSONSchemas {
-			if schemaHas(&s, pred) {
+			if SchemaHas(&s, pred) {
 				return true
 			}
 		}
 	}
 	for _, s := range s.AllOf {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.AnyOf {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.OneOf {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
-	if schemaHas(s.Not, pred) {
+	if SchemaHas(s.Not, pred) {
 		return true
 	}
 	for _, s := range s.Properties {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalProperties != nil {
-		if schemaHas(s.AdditionalProperties.Schema, pred) {
+		if SchemaHas(s.AdditionalProperties.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.PatternProperties {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalItems != nil {
-		if schemaHas(s.AdditionalItems.Schema, pred) {
+		if SchemaHas(s.AdditionalItems.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.Definitions {
-		if schemaHas(&s, pred) {
+		if SchemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, d := range s.Dependencies {
-		if schemaHas(d.Schema, pred) {
+		if SchemaHas(d.Schema, pred) {
 			return true
 		}
 	}
@@ -1249,8 +1290,8 @@ func specHasKubernetesExtensions(spec *apiextensions.CustomResourceDefinitionSpe
 }
 
 func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
-	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
-		return s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil
+	return SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil || len(s.XValidations) > 0
 	})
 }
 
@@ -1322,12 +1363,12 @@ func schemaHasUnprunedDefaults(schema *apiextensions.JSONSchemaProps) (bool, err
 
 // requireAtomicSetType returns true if the old CRD spec as at least one x-kubernetes-list-type=set with non-atomic items type.
 func requireAtomicSetType(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	return !hasSchemaWith(oldCRDSpec, hasNonAtomicSetType)
+	return !HasSchemaWith(oldCRDSpec, hasNonAtomicSetType)
 }
 
 // hasNonAtomicSetType recurses over the schema and returns whether any list of type "set" as non-atomic item types.
 func hasNonAtomicSetType(schema *apiextensions.JSONSchemaProps) bool {
-	return schemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
+	return SchemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
 		if schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // we don't support schema.Items.JSONSchemas
 			is := schema.Items.Schema
 			switch is.Type {
@@ -1344,11 +1385,11 @@ func hasNonAtomicSetType(schema *apiextensions.JSONSchemaProps) bool {
 }
 
 func requireMapListKeysMapSetValidation(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	return !hasSchemaWith(oldCRDSpec, hasInvalidMapListKeysMapSet)
+	return !HasSchemaWith(oldCRDSpec, hasInvalidMapListKeysMapSet)
 }
 
 func hasInvalidMapListKeysMapSet(schema *apiextensions.JSONSchemaProps) bool {
-	return schemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
+	return SchemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
 		return len(validateMapListKeysMapSet(schema, field.NewPath(""))) > 0
 	})
 }
@@ -1426,7 +1467,7 @@ func specHasInvalidTypes(spec *apiextensions.CustomResourceDefinitionSpec) bool 
 
 // SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.
 func SchemaHasInvalidTypes(s *apiextensions.JSONSchemaProps) bool {
-	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+	return SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
 		return len(s.Type) > 0 && !openapiV3Types.Has(s.Type)
 	})
 }

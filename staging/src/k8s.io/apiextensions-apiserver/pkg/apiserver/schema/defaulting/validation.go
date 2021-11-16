@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -84,6 +85,8 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
+			} else if celValidator := cel.NewValidator(s); celValidator != nil {
+				allErrs = append(allErrs, celValidator.Validate(pth.Child("default"), s, s.Default.Object)...)
 			}
 		} else {
 			// check whether default is pruned
@@ -102,6 +105,8 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
+			} else if celValidator := cel.NewValidator(s); celValidator != nil {
+				allErrs = append(allErrs, celValidator.Validate(pth.Child("default"), s, s.Default.Object)...)
 			}
 		}
 	}
