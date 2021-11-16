@@ -100,10 +100,6 @@ const (
 	// TerminatedPodWork indicates the pod is stopped, can have no more running
 	// containers, and any foreground cleanup can be executed.
 	TerminatedPodWork
-	// TemporarilyTerminatedPodWork is the same as TerminatedPodWork, but indicates
-	// that a create update was delivered AFTER the pod was terminated, indicating
-	// that the pod may have been recreated with the same UID.
-	TemporarilyTerminatedPodWork
 )
 
 // podWork is the internal changes
@@ -132,7 +128,7 @@ type PodWorkers interface {
 	// and have been terminated for a significant period of time. Once this method
 	// has been called once, the workers are assumed to be fully initialized and
 	// subsequent calls to ShouldPodContentBeRemoved on unknown pods will return
-	// true. It returns a map describing the state of each known pod worker.
+	// true.
 	SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkType
 
 	// IsPodKnownTerminated returns true if the provided pod UID is known by the pod
@@ -259,11 +255,6 @@ type podSyncStatus struct {
 	// to remove the pod. A terminal pod (Succeeded/Failed) will have
 	// termination status until the pod is deleted.
 	finished bool
-	// restartRequested is true if the pod worker was informed the pod is
-	// expected to exist (update type of create, update, or sync) after
-	// it has been killed. When known pods are synced, any pod that is
-	// terminated and has restartRequested will have its history cleared.
-	restartRequested bool
 	// notifyPostTerminating will be closed once the pod transitions to
 	// terminated. After the pod is in terminated state, nothing should be
 	// added to this list.
@@ -554,19 +545,6 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 			}
 		}
 		p.podSyncStatuses[uid] = status
-	}
-
-	// if an update is received that implies the pod should be running, but we are already terminating a pod by
-	// that UID, assume that two pods with the same UID were created in close temporal proximity (usually static
-	// pod but it's possible for an apiserver to extremely rarely do something similar) - flag the sync status
-	// to indicate that after the pod terminates it should be reset to "not running" to allow a subsequent add/update
-	// to start the pod worker again
-	if status.IsTerminationRequested() {
-		if options.UpdateType == kubetypes.SyncPodCreate {
-			status.restartRequested = true
-			klog.V(4).InfoS("Pod is terminating but has been requested to restart with same UID, will be reconciled later", "pod", klog.KObj(pod), "podUID", pod.UID)
-			return
-		}
 	}
 
 	// once a pod is terminated by UID, it cannot reenter the pod worker (until the UID is purged by housekeeping)
@@ -1032,16 +1010,12 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkT
 
 	p.podsSynced = true
 	for uid, status := range p.podSyncStatuses {
-		if _, exists := known[uid]; !exists || status.restartRequested {
+		if _, exists := known[uid]; !exists {
 			p.removeTerminatedWorker(uid)
 		}
 		switch {
 		case !status.terminatedAt.IsZero():
-			if status.restartRequested {
-				workers[uid] = TemporarilyTerminatedPodWork
-			} else {
-				workers[uid] = TerminatedPodWork
-			}
+			workers[uid] = TerminatedPodWork
 		case !status.terminatingAt.IsZero():
 			workers[uid] = TerminatingPodWork
 		default:
@@ -1068,11 +1042,7 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 		return
 	}
 
-	if status.restartRequested {
-		klog.V(4).InfoS("Pod has been terminated but another pod with the same UID was created, remove history to allow restart", "podUID", uid)
-	} else {
-		klog.V(4).InfoS("Pod has been terminated and is no longer known to the kubelet, remove all history", "podUID", uid)
-	}
+	klog.V(4).InfoS("Pod has been terminated and is no longer known to the kubelet, remove all history", "podUID", uid)
 	delete(p.podSyncStatuses, uid)
 	delete(p.podUpdates, uid)
 	delete(p.lastUndeliveredWorkUpdate, uid)
