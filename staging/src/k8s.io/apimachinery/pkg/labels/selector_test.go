@@ -148,7 +148,7 @@ func expectMatchDirect(t *testing.T, selector, ls Set) {
 	}
 }
 
-//lint:ignore U1000 currently commented out in TODO of TestSetMatches
+//nolint:staticcheck //iccheck // U1000 currently commented out in TODO of TestSetMatches
 //nolint:unused,deadcode
 func expectNoMatchDirect(t *testing.T, selector, ls Set) {
 	if SelectorFromSet(selector).Matches(ls) {

@@ -35,7 +35,7 @@ type MemoryManagerCheckpoint struct {
 
 // NewMemoryManagerCheckpoint returns an instance of Checkpoint
 func NewMemoryManagerCheckpoint() *MemoryManagerCheckpoint {
-	//lint:ignore unexported-type-in-api user-facing error message
+	//nolint:staticcheck // unexported-type-in-api user-facing error message
 	return &MemoryManagerCheckpoint{
 		Entries:      ContainerMemoryAssignments{},
 		MachineState: NUMANodeMap{},
