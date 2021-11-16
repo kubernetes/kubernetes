@@ -74,6 +74,21 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 	}
 }
 
+func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && oldPVC.Status.Conditions == nil {
+		pvc.Status.Conditions = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		if !allocatedResourcesInUse(oldPVC) {
+			pvc.Status.AllocatedResources = nil
+		}
+		if !resizeStatusInUse(oldPVC) {
+			pvc.Status.ResizeStatus = nil
+		}
+	}
+}
+
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 	if oldPVCSpec == nil {
 		return false
@@ -117,4 +132,26 @@ func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
 		// Using the new way of setting a data source
 		pvcSpec.DataSource = pvcSpec.DataSourceRef.DeepCopy()
 	}
+}
+
+func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+	if oldPVC.Status.ResizeStatus != nil {
+		return true
+	}
+	return false
+}
+
+func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+
+	if oldPVC.Status.AllocatedResources != nil {
+		return true
+	}
+
+	return false
 }

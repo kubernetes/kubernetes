@@ -58,6 +58,8 @@ spec:
 status:
   accessModes:
   - l殛瓷雼浢Ü礽
+  allocatedResources:
+    ' u衲<¿燥': "98"
   capacity:
     '{囥': "721"
   conditions:
@@ -68,3 +70,4 @@ status:
     status: Ka縳讋ɮ衺勽Ƙq
     type: n(鲼ƳÐƣKʘńw:5塋訩塶"=
   phase: gɸ=ǤÆ碛,1ZƜ/C龷Ȫ
+  resizeStatus: '{舁吉蓨O澘'

@@ -2975,6 +2975,18 @@ func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimSt
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.AllocatedResources != nil {
+		in, out := &in.AllocatedResources, &out.AllocatedResources
+		*out = make(ResourceList, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	}
+	if in.ResizeStatus != nil {
+		in, out := &in.ResizeStatus, &out.ResizeStatus
+		*out = new(PersistentVolumeClaimResizeStatus)
+		**out = **in
+	}
 	return
 }
 

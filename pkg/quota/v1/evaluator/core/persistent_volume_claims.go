@@ -159,23 +159,48 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 		result[storageClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 
-	// charge for storage
-	if request, found := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; found {
-		roundedRequest := request.DeepCopy()
-		if !roundedRequest.RoundUp(0) {
-			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
-			// See http://issue.k8s.io/94313
-			request = roundedRequest
-		}
-
-		result[corev1.ResourceRequestsStorage] = request
+	requestedStorage := p.getStorageUsage(pvc)
+	if requestedStorage != nil {
+		result[corev1.ResourceRequestsStorage] = *requestedStorage
 		// charge usage to the storage class (if present)
 		if len(storageClassRef) > 0 {
 			storageClassStorage := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourceRequestsStorage))
-			result[storageClassStorage] = request
+			result[storageClassStorage] = *requestedStorage
 		}
 	}
+
 	return result, nil
+}
+
+func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resource.Quantity {
+	var result *resource.Quantity
+	roundUpFunc := func(i *resource.Quantity) *resource.Quantity {
+		roundedRequest := i.DeepCopy()
+		if !roundedRequest.RoundUp(0) {
+			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
+			// See http://issue.k8s.io/94313
+			return &roundedRequest
+		}
+		return i
+	}
+
+	if userRequest, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+		result = roundUpFunc(&userRequest)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) && result != nil {
+		if len(pvc.Status.AllocatedResources) == 0 {
+			return result
+		}
+
+		// if AllocatedResources is set and is greater than user request, we should use it.
+		if allocatedRequest, ok := pvc.Status.AllocatedResources[corev1.ResourceStorage]; ok {
+			if allocatedRequest.Cmp(*result) > 0 {
+				result = roundUpFunc(&allocatedRequest)
+			}
+		}
+	}
+	return result
 }
 
 // UsageStats calculates aggregate usage for the object.
@@ -199,4 +224,14 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 		return nil, fmt.Errorf("expect *api.PersistentVolumeClaim or *v1.PersistentVolumeClaim, got %v", t)
 	}
 	return pvc, nil
+}
+
+// RequiresQuotaReplenish enables quota monitoring for PVCs.
+func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
+		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
+			return true
+		}
+	}
+	return false
 }
