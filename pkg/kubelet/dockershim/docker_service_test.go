@@ -85,6 +85,7 @@ func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *testi
 		network:           pm,
 		checkpointManager: ckm,
 		networkReady:      make(map[string]bool),
+		dockerRootDir:     "/docker/root/dir",
 	}, c, fakeClock
 }
 
