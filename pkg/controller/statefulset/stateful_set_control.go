@@ -98,7 +98,7 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod, revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, *apps.StatefulSetStatus, error) {
 	var currentStatus *apps.StatefulSetStatus
 	// get the current, and update revisions
-	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
+	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions, pods)
 	if err != nil {
 		return currentRevision, updateRevision, currentStatus, err
 	}
@@ -189,7 +189,8 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 // This method expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	set *apps.StatefulSet,
-	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
+	revisions []*apps.ControllerRevision,
+	pods []*v1.Pod) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 
 	revisionCount := len(revisions)
@@ -233,12 +234,8 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	}
 
 	// attempt to find the revision that corresponds to the current revision
-	for i := range revisions {
-		if revisions[i].Name == set.Status.CurrentRevision {
-			currentRevision = revisions[i]
-			break
-		}
-	}
+	// or update the current revision if required for an OnDelete statefulset
+	currentRevision = getCurrentRevision(set, revisions, pods)
 
 	// if the current revision is nil we initialize the history by setting it to the update revision
 	if currentRevision == nil {
@@ -665,7 +662,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
 	// complete any in progress rolling update if necessary
-	completeRollingUpdate(set, status)
+	completeUpdate(set, status)
 
 	// if the status is not inconsistent do not perform an update
 	if !inconsistentStatus(set, status) {

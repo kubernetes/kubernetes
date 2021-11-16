@@ -90,3 +90,8 @@ func ExpectHaveKey(actual interface{}, key interface{}, explain ...interface{}) 
 func ExpectEmpty(actual interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.BeEmpty(), explain...)
 }
+
+// ExpectContains expects actual array contains an item element
+func ExpectContains(actual interface{}, item interface{}, explain ...interface{}) {
+	gomega.ExpectWithOffset(1, actual).To(gomega.ContainElement(item), explain...)
+}

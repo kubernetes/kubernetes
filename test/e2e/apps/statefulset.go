@@ -553,15 +553,46 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Creating a new revision")
+			ginkgo.By("Creating a second revision")
 			ss = waitForStatus(c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
 
-			ginkgo.By("Recreating Pods at the new revision")
+			ginkgo.By("Recreating a Pod at the second revision")
 			deleteStatefulPodAtIndex(c, 0, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
+			ss = getStatefulSet(c, ss.Namespace, ss.Name)
+			pods = e2estatefulset.GetPodList(c, ss)
+			framework.ExpectEqual(pods.Items[0].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, "Deleted pod revisions should equal update revision")
+
+			ginkgo.By("Adding an environment variable")
+			// Adding an environment variable to create a new revision
+			ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+					Name:  "foo",
+					Value: "bar",
+				})
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a third revision")
+			firstRevision := currentRevision
+			ss = waitForStatus(c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectEqual(firstRevision, currentRevision, "Current revision still be the oldest revision")
+			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+
+			ginkgo.By("Recreating Pods at the third revision")
 			deleteStatefulPodAtIndex(c, 1, ss)
 			deleteStatefulPodAtIndex(c, 2, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
+			ss = waitForStatus(c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			pods = e2estatefulset.GetPodList(c, ss)
+			framework.ExpectEqual(pods.Items[0].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, "Current revision should be the oldest pod revision")
+
+			ginkgo.By("Recreating last pod at the third revision")
+			deleteStatefulPodAtIndex(c, 0, ss)
 			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 			ss = getStatefulSet(c, ss.Namespace, ss.Name)
 			pods = e2estatefulset.GetPodList(c, ss)
@@ -576,7 +607,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Name,
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					updateRevision))
+				framework.ExpectContains(pods.Items[i].Spec.Containers[0].Env, v1.EnvVar{
+					Name:  "foo",
+					Value: "bar",
+				})
 			}
+			ss = waitForStatus(c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectEqual(currentRevision, updateRevision, "Current revision should equal update revision after rolling update")
 		})
 
 		/*
