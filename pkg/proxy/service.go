@@ -139,6 +139,24 @@ func (info *BaseServiceInfo) HintsAnnotation() string {
 	return info.hintsAnnotation
 }
 
+// ExternallyAccessible is part of ServicePort interface.
+func (info *BaseServiceInfo) ExternallyAccessible() bool {
+	return info.nodePort != 0 || len(info.loadBalancerStatus.Ingress) != 0 || len(info.externalIPs) != 0
+}
+
+// UsesClusterEndpoints is part of ServicePort interface.
+func (info *BaseServiceInfo) UsesClusterEndpoints() bool {
+	// The service port uses Cluster endpoints if the internal traffic policy is "Cluster",
+	// or if it accepts external traffic at all. (Even if the external traffic policy is
+	// "Local", we need Cluster endpoints to implement short circuiting.)
+	return !info.nodeLocalInternal || info.ExternallyAccessible()
+}
+
+// UsesLocalEndpoints is part of ServicePort interface.
+func (info *BaseServiceInfo) UsesLocalEndpoints() bool {
+	return info.nodeLocalInternal || (info.nodeLocalExternal && info.ExternallyAccessible())
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	nodeLocalExternal := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
