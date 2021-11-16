@@ -268,9 +268,6 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 		return nil, err
 	}
 
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = f.discoveryBurst
 
 	cacheDir := defaultCacheDir
