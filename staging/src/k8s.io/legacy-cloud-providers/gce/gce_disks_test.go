@@ -268,7 +268,7 @@ func TestCreateDisk_MultiZone(t *testing.T) {
 		nodeInformerSynced: func() bool { return true },
 	}
 
-	diskName := "disk"
+	var diskName string
 	diskType := DiskTypeStandard
 	const sizeGb int64 = 128
 
@@ -420,7 +420,7 @@ func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
-	diskName := "disk"
+	var diskName string
 	diskType := DiskTypeSSD
 	const sizeGb int64 = 128
 
