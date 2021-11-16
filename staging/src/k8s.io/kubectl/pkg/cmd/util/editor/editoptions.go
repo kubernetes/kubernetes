@@ -19,6 +19,7 @@ package editor
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -667,8 +668,14 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				return err
 			}
+			var patchMap map[string]interface{}
+			err = json.Unmarshal(patch, &patchMap)
+			if err != nil {
+				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				return err
+			}
 			for _, precondition := range preconditions {
-				if !precondition(patch) {
+				if !precondition(patchMap) {
 					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
