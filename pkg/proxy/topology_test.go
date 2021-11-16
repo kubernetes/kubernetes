@@ -113,56 +113,38 @@ func TestFilterEndpoints(t *testing.T) {
 			&BaseEndpointInfo{Endpoint: "10.1.2.6:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
-	}}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
-
-			filteredEndpoints := FilterEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeLabels)
-			err := checkExpectedEndpoints(tc.expectedEndpoints, filteredEndpoints)
-			if err != nil {
-				t.Errorf(err.Error())
-			}
-		})
-	}
-}
-
-func Test_filterEndpointsWithHints(t *testing.T) {
-	testCases := []struct {
-		name              string
-		nodeLabels        map[string]string
-		hintsAnnotation   string
-		endpoints         []Endpoint
-		expectedEndpoints sets.String
-	}{{
-		name:            "empty node labels",
-		nodeLabels:      map[string]string{},
-		hintsAnnotation: "auto",
+	}, {
+		name:         "empty node labels",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80"),
 	}, {
-		name:            "empty zone label",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: ""},
-		hintsAnnotation: "auto",
+		name:         "empty zone label",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: ""},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80"),
 	}, {
-		name:            "node in different zone, no endpoint filtering",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-b"},
-		hintsAnnotation: "auto",
+		name:         "node in different zone, no endpoint filtering",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-b"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80"),
 	}, {
-		name:            "normal endpoint filtering, auto annotation",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "auto",
+		name:         "normal endpoint filtering, auto annotation",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -171,9 +153,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.6:80"),
 	}, {
-		name:            "unready endpoint",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "auto",
+		name:         "unready endpoint",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -182,9 +165,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80"),
 	}, {
-		name:            "only unready endpoints in same zone (should not filter)",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "auto",
+		name:         "only unready endpoints in same zone (should not filter)",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: false},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -193,9 +177,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 	}, {
-		name:            "normal endpoint filtering, Auto annotation",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "Auto",
+		name:         "normal endpoint filtering, Auto annotation",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "Auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -204,9 +189,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.6:80"),
 	}, {
-		name:            "hintsAnnotation empty, no filtering applied",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "",
+		name:         "hintsAnnotation empty, no filtering applied",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: ""},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -215,9 +201,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 	}, {
-		name:            "hintsAnnotation disabled, no filtering applied",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "disabled",
+		name:         "hintsAnnotation disabled, no filtering applied",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "disabled"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -226,9 +213,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 	}, {
-		name:            "missing hints, no filtering applied",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
-		hintsAnnotation: "auto",
+		name:         "missing hints, no filtering applied",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
@@ -237,9 +225,10 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 	}, {
-		name:            "multiple hints per endpoint, filtering includes any endpoint with zone included",
-		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-c"},
-		hintsAnnotation: "auto",
+		name:         "multiple hints per endpoint, filtering includes any endpoint with zone included",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-c"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a", "zone-b", "zone-c"), Ready: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b", "zone-c"), Ready: true},
@@ -247,59 +236,43 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 			&BaseEndpointInfo{Endpoint: "10.1.2.6:80", ZoneHints: sets.NewString("zone-c"), Ready: true},
 		},
 		expectedEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.6:80"),
+	}, {
+		name:              "internalTrafficPolicy: Local, with empty endpoints",
+		serviceInfo:       &BaseServiceInfo{nodeLocalInternal: true},
+		endpoints:         []Endpoint{},
+		expectedEndpoints: nil,
+	}, {
+		name:        "internalTrafficPolicy: Local, but all endpoints are remote",
+		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
+			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
+		},
+		expectedEndpoints: nil,
+	}, {
+		name:        "internalTrafficPolicy: Local, all endpoints are local",
+		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
+			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: true},
+		},
+		expectedEndpoints: sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
+	}, {
+		name:        "internalTrafficPolicy: Local, some endpoints are local",
+		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
+			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
+		},
+		expectedEndpoints: sets.NewString("10.0.0.0:80"),
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			filteredEndpoints := filterEndpointsWithHints(tc.endpoints, tc.hintsAnnotation, tc.nodeLabels)
-			err := checkExpectedEndpoints(tc.expectedEndpoints, filteredEndpoints)
-			if err != nil {
-				t.Errorf(err.Error())
-			}
-		})
-	}
-}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
 
-func TestFilterLocalEndpoint(t *testing.T) {
-	testCases := []struct {
-		name      string
-		endpoints []Endpoint
-		expected  sets.String
-	}{
-		{
-			name:      "with empty endpoints",
-			endpoints: []Endpoint{},
-			expected:  nil,
-		},
-		{
-			name: "all endpoints not local",
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
-			},
-			expected: nil,
-		},
-		{
-			name: "all endpoints are local",
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: true},
-			},
-			expected: sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
-		},
-		{
-			name: "some endpoints are local",
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
-			},
-			expected: sets.NewString("10.0.0.0:80"),
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			filteredEndpoint := FilterLocalEndpoint(tc.endpoints)
-			err := checkExpectedEndpoints(tc.expected, filteredEndpoint)
+			filteredEndpoints := FilterEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeLabels)
+			err := checkExpectedEndpoints(tc.expectedEndpoints, filteredEndpoints)
 			if err != nil {
 				t.Errorf(err.Error())
 			}
