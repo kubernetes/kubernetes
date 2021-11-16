@@ -33,10 +33,12 @@ func TestRecordOperation(t *testing.T) {
 	// Use local registry
 	var registry = compbasemetrics.NewKubeRegistry()
 	var gather compbasemetrics.Gatherer = registry
-	defer registry.Reset()
+
 	registry.MustRegister(metrics.RuntimeOperations)
 	registry.MustRegister(metrics.RuntimeOperationsDuration)
 	registry.MustRegister(metrics.RuntimeOperationsErrors)
+
+	registry.Reset()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
