@@ -68,9 +68,8 @@ type criStatsProvider struct {
 	imageService internalapi.ImageManagerService
 	// hostStatsProvider is used to get the status of the host filesystem consumed by pods.
 	hostStatsProvider HostStatsProvider
-	//lint:ignore U1000 We can't import hcsshim due to Build constraints in hcsshim
 	// windowsNetworkStatsProvider is used by kubelet to gather networking stats on Windows
-	windowsNetworkStatsProvider interface{}
+	windowsNetworkStatsProvider interface{} //nolint:unused // U1000 We can't import hcsshim due to Build constraints in hcsshim
 	// clock is used report current time
 	clock clock.Clock
 

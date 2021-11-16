@@ -55,7 +55,7 @@ type fakeObjectConvertor struct {
 	apiVersion fieldpath.APIVersion
 }
 
-//lint:ignore SA4009 backwards compatibility
+//nolint:staticcheck // SA4009 backwards compatibility
 func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
 	if typedValue, ok := in.(*typed.TypedValue); ok {
 		var err error

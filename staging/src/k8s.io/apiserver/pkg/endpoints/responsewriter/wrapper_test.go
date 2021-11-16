@@ -61,7 +61,7 @@ func TestWithHTTP1(t *testing.T) {
 		// so each decorator is expected to tick the count by one for each method.
 		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 3})
 
-		//lint:ignore SA1019 backward compatibility
+		//nolint:staticcheck // SA1019
 		w.(http.CloseNotifier).CloseNotify()
 		w.(http.Flusher).Flush()
 
@@ -116,7 +116,7 @@ func TestWithHTTP2(t *testing.T) {
 		// so each decorator is expected to tick the count by one for each method.
 		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 0})
 
-		//lint:ignore SA1019 backward compatibility
+		//nolint:staticcheck // SA1019
 		w.(http.CloseNotifier).CloseNotify()
 		w.(http.Flusher).Flush()
 
@@ -242,7 +242,7 @@ func assertCloseNotifierFlusherHijacker(t *testing.T, hijackableExpected bool, w
 		t.Errorf("Expected the http.ResponseWriter object to implement http.Flusher")
 	}
 
-	//lint:ignore SA1019 backward compatibility
+	//nolint:staticcheck // SA1019
 	if _, ok := w.(http.CloseNotifier); !ok {
 		t.Errorf("Expected the http.ResponseWriter object to implement http.CloseNotifier")
 	}
@@ -293,6 +293,6 @@ func (fw *fakeResponseWriterDecorator) CloseNotify() <-chan bool {
 	if fw.counter != nil {
 		fw.counter.CloseNotifyInvoked++
 	}
-	//lint:ignore SA1019 backward compatibility
+	//nolint:staticcheck // SA1019
 	return fw.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
