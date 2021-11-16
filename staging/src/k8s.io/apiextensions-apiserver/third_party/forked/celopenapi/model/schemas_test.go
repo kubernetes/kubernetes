@@ -21,12 +21,13 @@ import (
 	"github.com/google/cel-go/common/types"
 
 	"google.golang.org/protobuf/proto"
+
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestSchemaDeclType(t *testing.T) {
 	ts := testSchema()
-	cust := SchemaDeclType(ts)
+	cust := SchemaDeclType(ts, false)
 	if cust.TypeName() != "object" {
 		t.Errorf("incorrect type name, got %v, wanted object", cust.TypeName())
 	}
@@ -82,7 +83,8 @@ func TestSchemaDeclType(t *testing.T) {
 
 func TestSchemaDeclTypes(t *testing.T) {
 	ts := testSchema()
-	cust, typeMap := SchemaDeclTypes(ts, "CustomObject")
+	cust := SchemaDeclType(ts, true).MaybeAssignTypeName("CustomObject")
+	typeMap := FieldTypeMap("CustomObject", cust)
 	nested, _ := cust.FindField("nested")
 	metadata, _ := cust.FindField("metadata")
 	expectedObjTypeMap := map[string]*DeclType{

@@ -24,9 +24,9 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
 
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
@@ -306,14 +306,18 @@ func (f *DeclField) EnumValues() []ref.Val {
 // NewRuleTypes returns an Open API Schema-based type-system which is CEL compatible.
 func NewRuleTypes(kind string,
 	schema *schema.Structural,
+	isResourceRoot bool,
 	res Resolver) (*RuleTypes, error) {
 	// Note, if the schema indicates that it's actually based on another proto
 	// then prefer the proto definition. For expressions in the proto, a new field
 	// annotation will be needed to indicate the expected environment and type of
 	// the expression.
-	schemaTypes, err := newSchemaTypeProvider(kind, schema)
+	schemaTypes, err := newSchemaTypeProvider(kind, schema, isResourceRoot)
 	if err != nil {
 		return nil, err
+	}
+	if schemaTypes == nil {
+		return nil, nil
 	}
 	return &RuleTypes{
 		Schema:              schema,
@@ -467,7 +471,6 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 			dyn.SetValue(obj)
 			return dyn
 		}
-		// TODO: handle complex map types which have non-string keys.
 		fieldType := declType.ElemType
 		for _, f := range v.fieldMap {
 			f.Ref = rt.convertToCustomType(f.Ref, fieldType)
@@ -485,8 +488,12 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 	}
 }
 
-func newSchemaTypeProvider(kind string, schema *schema.Structural) (*schemaTypeProvider, error) {
-	root := SchemaDeclType(schema).MaybeAssignTypeName(kind)
+func newSchemaTypeProvider(kind string, schema *schema.Structural, isResourceRoot bool) (*schemaTypeProvider, error) {
+	delType := SchemaDeclType(schema, isResourceRoot)
+	if delType == nil {
+		return nil, nil
+	}
+	root := delType.MaybeAssignTypeName(kind)
 	types := FieldTypeMap(kind, root)
 	return &schemaTypeProvider{
 		root:  root,

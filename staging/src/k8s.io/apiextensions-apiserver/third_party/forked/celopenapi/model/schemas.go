@@ -18,45 +18,61 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-
-// SchemaDeclTypes constructs a top-down set of DeclType instances whose name is derived from the root
-// type name provided on the call, if not set to a custom type.
-func SchemaDeclTypes(s *schema.Structural, maybeRootType string) (*DeclType, map[string]*DeclType) {
-	root := SchemaDeclType(s).MaybeAssignTypeName(maybeRootType)
-	types := FieldTypeMap(maybeRootType, root)
-	return root, types
-}
-
-// SchemaDeclType returns the cel type name associated with the schema element.
-func SchemaDeclType(s *schema.Structural) *DeclType {
+// SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
+// the structural schema should not be exposed in CEL expressions.
+// Set isResourceRoot to true for the root of a custom resource or embedded resource.
+//
+// Schemas with XPreserveUnknownFields not exposed unless they are objects. Array and "maps" schemas
+// are not exposed if their items or additionalProperties schemas are not exposed. Object Properties are not exposed
+// if their schema is not exposed.
+//
+// The CEL declaration for objects with XPreserveUnknownFields does not expose unknown fields.
+func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 	if s == nil {
 		return nil
 	}
 	if s.XIntOrString {
-		// schemas using this extension are not required to have a type, so they must be handled before type lookup
-		return intOrStringType
-	}
-	declType, found := openAPISchemaTypes[s.Type]
-	if !found {
-		return nil
+		// schemas using XIntOrString are not required to have a type.
+
+		// intOrStringType represents the x-kubernetes-int-or-string union type in CEL expressions.
+		// In CEL, the type is represented as dynamic value, which can be thought of as a union type of all types.
+		// All type checking for XIntOrString is deferred to runtime, so all access to values of this type must
+		// be guarded with a type check, e.g.:
+		//
+		// To require that the string representation be a percentage:
+		//  `type(intOrStringField) == string && intOrStringField.matches(r'(\d+(\.\d+)?%)')`
+		// To validate requirements on both the int and string representation:
+		//  `type(intOrStringField) == int ? intOrStringField < 5 : double(intOrStringField.replace('%', '')) < 0.5
+		//
+		return DynType
 	}
 
 	// We ignore XPreserveUnknownFields since we don't support validation rules on
 	// data that we don't have schema information for.
 
-	if s.XEmbeddedResource {
-		// 'apiVersion', 'kind', 'metadata.name' and 'metadata.generateName' are always accessible
-		// to validation rules since this part of the schema is well known and validated when CRDs
-		// are created and updated.
+	if isResourceRoot {
+		// 'apiVersion', 'kind', 'metadata.name' and 'metadata.generateName' are always accessible to validator rules
+		// at the root of resources, even if not specified in the schema.
+		// This includes the root of a custom resource and the root of XEmbeddedResource objects.
 		s = WithTypeAndObjectMeta(s)
 	}
 
-	switch declType.TypeName() {
-	case ListType.TypeName():
-		return NewListType(SchemaDeclType(s.Items))
-	case MapType.TypeName():
+	switch s.Type {
+	case "array":
+		if s.Items != nil {
+			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
+			if itemsType != nil {
+				return NewListType(itemsType)
+			}
+		}
+		return nil
+	case "object":
 		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
-			return NewMapType(StringType, SchemaDeclType(s.AdditionalProperties.Structural))
+			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
+			if propsType != nil {
+				return NewMapType(StringType, propsType)
+			}
+			return nil
 		}
 		fields := make(map[string]*DeclField, len(s.Properties))
 
@@ -73,23 +89,23 @@ func SchemaDeclType(s *schema.Structural) *DeclType {
 					enumValues = append(enumValues, e.Object)
 				}
 			}
-			if fieldType := SchemaDeclType(&prop); fieldType != nil {
-				fields[Escape(name)] = &DeclField{
-					Name:         Escape(name),
-					Required:     required[name],
-					Type:         fieldType,
-					defaultValue: prop.Default.Object,
-					enumValues:   enumValues, // Enum values are represented as strings in CEL
+			if fieldType := SchemaDeclType(&prop, prop.XEmbeddedResource); fieldType != nil {
+				if propName, ok := Escape(name); ok {
+					fields[propName] = &DeclField{
+						Name:         propName,
+						Required:     required[name],
+						Type:         fieldType,
+						defaultValue: prop.Default.Object,
+						enumValues:   enumValues, // Enum values are represented as strings in CEL
+					}
 				}
 			}
 		}
 		return NewObjectType("object", fields)
-	case StringType.TypeName():
+	case "string":
 		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "byte":
-				return StringType // OpenAPIv3 byte format represents base64 encoded string
-			case "binary":
 				return BytesType
 			case "duration":
 				return DurationType
@@ -97,38 +113,16 @@ func SchemaDeclType(s *schema.Structural) *DeclType {
 				return TimestampType
 			}
 		}
+		return StringType
+	case "boolean":
+		return BoolType
+	case "number":
+		return DoubleType
+	case "integer":
+		return IntType
 	}
-	return declType
+	return nil
 }
-
-var (
-	openAPISchemaTypes = map[string]*DeclType{
-		"boolean":         BoolType,
-		"number":          DoubleType,
-		"integer":         IntType,
-		"null":            NullType,
-		"string":          StringType,
-		"date":            DateType,
-		"array":           ListType,
-		"object":          MapType,
-	}
-
-	// intOrStringType represents the x-kubernetes-int-or-string union type in CEL expressions.
-	// In CEL, the type is represented as an object where either the srtVal
-	// or intVal field is set. In CEL, this allows for typesafe expressions like:
-	//
-	// require that the string representation be a percentage:
-	//  `has(intOrStringField.strVal) && intOrStringField.strVal.matches(r'(\d+(\.\d+)?%)')`
-	// validate requirements on both the int and string representation:
-	//  `has(intOrStringField.intVal) ? intOrStringField.intVal < 5 : double(intOrStringField.strVal.replace('%', '')) < 0.5
-	//
-	intOrStringType = NewObjectType("intOrString", map[string]*DeclField{
-		"strVal": {Name: "strVal", Type: StringType},
-		"intVal": {Name: "intVal", Type: IntType},
-	})
-)
-
-// TODO: embedded objects should have objectMeta only, and name and generateName are both optional
 
 // WithTypeAndObjectMeta ensures the kind, apiVersion and
 // metadata.name and metadata.generateName properties are specified, making a shallow copy of the provided schema if needed.
