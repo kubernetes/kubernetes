@@ -1415,7 +1415,6 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 		} else {
 			w.Write(LEVEL_2, "%s\n", line)
 		}
-		i++
 	}
 }
 
@@ -5111,7 +5110,6 @@ func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
-		i++
 	}
 }
 
@@ -5345,7 +5343,6 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		} else {
 			w.Write(LEVEL_0, "%s: %s\n", key, value)
 		}
-		i++
 	}
 }
 
