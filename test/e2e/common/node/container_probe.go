@@ -700,8 +700,12 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		// adding pod and container status to know more why exec request is timing out
+		framework.Logf("@@ad pod status %s", &pod.Status)
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
-		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+		containerStatus := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName)
+		framework.Logf("@@ad container status %v", containerStatus)
+		restartCount := containerStatus.RestartCount
 		if restartCount != lastRestartCount {
 			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))

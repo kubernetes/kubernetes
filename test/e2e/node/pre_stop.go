@@ -167,10 +167,11 @@ var _ = SIGDescribe("PreStop", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("pod termination should not wait for prestop hook completion after terminationGraceperiod is over", func() {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())
+		// create a pod with never completing prestop hook
 		pod := getPodWithpreStopLifeCycle(name)
 
 		ginkgo.By("submitting the pod to kubernetes")
@@ -184,7 +185,10 @@ var _ = SIGDescribe("PreStop", func() {
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
+		framework.Logf("made deletion request for pod")
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		framework.Logf("got reply from pod deletion request")
+
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		// wait for less than the gracePeriod termination ensuring the
@@ -195,16 +199,23 @@ var _ = SIGDescribe("PreStop", func() {
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
+			framework.Logf("made pod get request ")
 			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)
 			framework.ExpectNoError(err, "failed to parse the pods of the node")
 
 			for _, kubeletPod := range result.Items {
+				// Adding the temporary log to know pod status when test flakes
+				framework.Logf("pod %s is in status %s", kubeletPod.Name, kubeletPod.Status.Phase)
 				if pod.Name != kubeletPod.Name {
 					continue
-				} else if kubeletPod.Status.Phase == v1.PodRunning {
-					framework.Logf("pod is running")
-					return true, err
+				} else {
+					// trying some other ways to verify rather than checking for running status
+					framework.Logf("deletion timestamp for pod %s", kubeletPod.DeletionTimestamp)
+					if kubeletPod.Status.Phase == v1.PodRunning {
+						framework.Logf("pod is running")
+						return true, err
+					}
 				}
 			}
 			return false, err
