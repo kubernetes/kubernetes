@@ -49,8 +49,8 @@ const (
 	// https://docs.microsoft.com/en-us/azure/virtual-machines/premium-storage-performance#disk-caching
 	diskCachingLimit = 4096 // GiB
 
-	maxLUN               = 64 // max number of LUNs per VM
-	errLeaseFailed       = "AcquireDiskLeaseFailed"
+	maxLUN               = 64                       // max number of LUNs per VM
+	errLeaseFailed       = "AcquireDiskLeaseFailed" //nolint:unused
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
 	errStatusCode400     = "statuscode=400"
