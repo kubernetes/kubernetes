@@ -371,6 +371,8 @@ type Image struct {
 	Size int64
 	// ImageSpec for the image which include annotations.
 	Spec ImageSpec
+	// Pin for preventing garbage collection
+	Pinned bool
 }
 
 // EnvVar represents the environment variable.
