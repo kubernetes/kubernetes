@@ -314,6 +314,11 @@ func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)
 }
 
+// ExpectContains expects actual array contains an item element
+func ExpectContains(actual interface{}, item interface{}, explain ...interface{}) {
+	gomega.ExpectWithOffset(1, actual).To(gomega.ContainElement(item), explain...)
+}
+
 // ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
 func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {

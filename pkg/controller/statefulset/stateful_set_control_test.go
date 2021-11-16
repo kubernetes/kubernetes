@@ -832,11 +832,11 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	testFn := func(test *testcase, t *testing.T) {
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		spc := NewStatefulPodControlFromManager(newFakeObjectManager(informerFactory), &noopRecorder{})
+		om := newFakeObjectManager(informerFactory)
+		spc := NewStatefulPodControlFromManager(om, &noopRecorder{})
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 		recorder := &noopRecorder{}
 		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
-
 		stop := make(chan struct{})
 		defer close(stop)
 		informerFactory.Start(stop)
@@ -846,6 +846,10 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 		)
+		if test.set.Spec.UpdateStrategy.Type != apps.RollingUpdateStatefulSetStrategyType {
+			t.Fatal("stateful set is not RollingUpdate type")
+		}
+
 		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
 			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
@@ -854,7 +858,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+
+		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions, nil)
 		if err != nil {
 			t.Fatalf("error getting statefulset revisions:%v", err)
 		}
@@ -946,6 +951,168 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 				testFn(&tests[i], t)
 			}
 		})
+}
+
+func createPodsAndRevisionForSet(set *apps.StatefulSet, revision int64) (retRev *apps.ControllerRevision, retPods []*v1.Pod) {
+	retRev = newRevisionOrDie(set, revision)
+	replicaCount := int(*set.Spec.Replicas)
+	for i := 0; i < replicaCount; i++ {
+		pod := newStatefulSetPod(set, i)
+		setPodRevision(pod, retRev.Name)
+		retPods = append(retPods, pod)
+	}
+	return
+}
+
+func runForOnDeletePodScenarios(t *testing.T,
+	testFn func(*testing.T, *apps.ControllerRevision, *apps.StatefulSet, []*v1.Pod, []*apps.ControllerRevision),
+) {
+	type testCase struct {
+		name      string
+		expected  *apps.ControllerRevision
+		set       *apps.StatefulSet
+		pods      []*v1.Pod
+		revisions []*apps.ControllerRevision
+	}
+
+	cases := []testCase{}
+
+	//Test case: stable statefulset
+	set := newStatefulSet(3)
+	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+		Type: apps.OnDeleteStatefulSetStrategyType,
+	}
+	set.Status.CollisionCount = new(int32)
+	rev0, pods0 := createPodsAndRevisionForSet(set, 1)
+	set.Status.CurrentRevision = rev0.Name
+	set.Status.UpdateRevision = rev0.Name
+	cases = append(cases, testCase{
+		name:      "StableRevision",
+		expected:  rev0,
+		set:       set,
+		pods:      pods0,
+		revisions: []*apps.ControllerRevision{rev0},
+	})
+
+	// Test case: unsorted pods
+	cases = append(cases, testCase{
+		name:      "StableRevisionUnsortedPods",
+		expected:  rev0,
+		set:       set,
+		pods:      []*v1.Pod{pods0[1], pods0[2], pods0[0]},
+		revisions: []*apps.ControllerRevision{rev0},
+	})
+
+	//Test case: new revision with one new pod
+	set1 := set.DeepCopy()
+	set1.Spec.Template.Spec.Containers[0].Image = "foo"
+	set1.Status.CurrentRevision = rev0.Name
+	set1.Status.CollisionCount = new(int32)
+	rev1, pods1 := createPodsAndRevisionForSet(set1, 2)
+	set1.Status.UpdateRevision = rev1.Name
+	cases = append(cases, testCase{
+		name:      "OneNewRevision",
+		expected:  rev0,
+		set:       set1,
+		pods:      []*v1.Pod{pods1[0], pods0[1], pods0[2]},
+		revisions: []*apps.ControllerRevision{rev0, rev1},
+	})
+
+	//Test case: pods spread across three revisions
+	set2 := set1.DeepCopy()
+	set2.Spec.Template.Spec.Containers[0].Image = "bar"
+	set2.Status.CurrentRevision = rev0.Name
+	set2.Status.CollisionCount = new(int32)
+	rev2, pods2 := createPodsAndRevisionForSet(set2, 3)
+	set2.Status.UpdateRevision = rev2.Name
+	cases = append(cases, testCase{
+		name:      "TwoNewRevisions",
+		expected:  rev0,
+		set:       set2,
+		pods:      []*v1.Pod{pods1[0], pods2[1], pods0[2]},
+		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
+	})
+
+	//Test case: remove pod with current revision
+	cases = append(cases, testCase{
+		name:      "RemoveOldestRevisionPod",
+		expected:  rev1,
+		set:       set2,
+		pods:      []*v1.Pod{pods1[0], pods2[1], pods2[2]},
+		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
+	})
+
+	// Remove pod with current revision and unsorted pods
+	cases = append(cases, testCase{
+		name:      "RemoveOldestRevisionPodUnsorted",
+		expected:  rev1,
+		set:       set2,
+		pods:      []*v1.Pod{pods2[2], pods1[0], pods2[1]},
+		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
+	})
+
+	// No revisions for existing pods
+	// Remove pod with current revision and unsorted pods
+	cases = append(cases, testCase{
+		name:      "PodRevisionsDoNotExist",
+		expected:  nil,
+		set:       set2,
+		pods:      []*v1.Pod{pods1[0], pods2[1], pods2[2]},
+		revisions: []*apps.ControllerRevision{rev0},
+	})
+
+	//Test case: pods only have latest revision
+	// This being the case we don't expect the current revision to change as
+	// the update status will take care of this
+	cases = append(cases, testCase{
+		name:      "AllNewRevision",
+		expected:  rev0,
+		set:       set2,
+		pods:      pods2,
+		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
+	})
+
+	for _, testCase := range cases {
+		testName := fmt.Sprintf("OnDeleteTest/%s", testCase.name)
+		t.Run(testName, func(t *testing.T) {
+			testFn(
+				t,
+				testCase.expected,
+				testCase.set,
+				testCase.pods,
+				testCase.revisions,
+			)
+		})
+	}
+}
+
+func TestStatefulSetControl_getCurrentRevision(t *testing.T) {
+	testFn := func(
+		t *testing.T,
+		expected *apps.ControllerRevision,
+		set *apps.StatefulSet,
+		pods []*v1.Pod,
+		revisions []*apps.ControllerRevision,
+	) {
+		history.SortControllerRevisions(revisions)
+		currentRevision := getCurrentRevision(set, revisions, pods)
+
+		if !history.EqualRevision(currentRevision, expected) {
+			t.Errorf("for current want %v got %v", expected, currentRevision)
+		}
+		if expected == nil {
+			if currentRevision != nil {
+				t.Errorf("for current revision wanted nil got %v", currentRevision)
+			}
+			// Break here to avoid nil pointer errors
+			return
+		}
+		if expected.Revision != currentRevision.Revision {
+			t.Errorf("for current revision want %d got %d", expected.Revision, currentRevision.Revision)
+		}
+	}
+
+	runForOnDeletePodScenarios(t, testFn)
 }
 
 func setupPodManagementPolicy(podManagementPolicy apps.PodManagementPolicyType, set *apps.StatefulSet) *apps.StatefulSet {

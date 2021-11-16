@@ -581,18 +581,90 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 
-// completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated
-// to the updateRevision. status's currentRevision is set to updateRevision and its' updateRevision
-// is set to the empty string. status's currentReplicas is set to updateReplicas and its updateReplicas
+// completeUpdate completes an update when all of set's replica Pods have been updated
+// to the updateRevision. status's currentRevision is set to updateRevision.
+// status's currentReplicas is set to updateReplicas and its updateReplicas
 // are set to 0.
-func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		status.UpdatedReplicas == *set.Spec.Replicas &&
-		status.ReadyReplicas == *set.Spec.Replicas &&
-		status.Replicas == *set.Spec.Replicas {
+func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
+	if status.UpdatedReplicas == status.Replicas &&
+		status.ReadyReplicas == status.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}
+}
+
+// getCurrentRevision gets checks the currentRevision of the statefulset and gets
+// that revision.  If the statefulset has OnDelete update strategy, and there are
+// no longer any pods with the current revision it will get updated if it hasn't
+// completed being rolled out.  The revisions array must be sorted.
+func getCurrentRevision(
+	set *apps.StatefulSet,
+	revisions []*apps.ControllerRevision,
+	pods []*v1.Pod,
+) *apps.ControllerRevision {
+	//If current revision isn't set then we can just return nil
+	if set.Status.CurrentRevision == "" {
+		return nil
+	}
+
+	revisionMap := map[string]*apps.ControllerRevision{}
+
+	// Build a map of revisions for future use
+	for _, revision := range revisions {
+		revisionMap[revision.Name] = revision
+	}
+
+	switch set.Spec.UpdateStrategy.Type {
+	case apps.RollingUpdateStatefulSetStrategyType:
+		if rev, ok := revisionMap[set.Status.CurrentRevision]; ok {
+			return rev
+		}
+	case apps.OnDeleteStatefulSetStrategyType:
+		return getOnDeleteRevision(set, revisionMap, revisions, pods)
+	}
+
+	return nil
+}
+
+func getOnDeleteRevision(
+	set *apps.StatefulSet,
+	revisionMap map[string]*apps.ControllerRevision,
+	revisions []*apps.ControllerRevision,
+	pods []*v1.Pod,
+) *apps.ControllerRevision {
+	revisionsToCheck := map[string]interface{}{}
+
+	for _, pod := range pods {
+		if !isTerminating(pod) {
+			podRevision := getPodRevision(pod)
+			if podRevision == set.Status.CurrentRevision {
+				if rev, ok := revisionMap[set.Status.CurrentRevision]; ok {
+					return rev
+				}
+				return nil
+			}
+			if podRevision != set.Status.UpdateRevision {
+				revisionsToCheck[podRevision] = nil
+			}
+		}
+	}
+
+	// if all of the pods are on the update revision we just return the current revision
+	// and let the complete function update the status
+	if len(revisionsToCheck) == 0 {
+		if rev, ok := revisionMap[set.Status.CurrentRevision]; ok {
+			return rev
+		}
+		return nil
+	}
+
+	// revisions must be sorted
+	for _, revision := range revisions {
+		if _, ok := revisionsToCheck[revision.Name]; ok {
+			return revision
+		}
+	}
+	return nil
 }
 
 // ascendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
