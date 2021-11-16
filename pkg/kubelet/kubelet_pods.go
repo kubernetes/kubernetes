@@ -983,21 +983,35 @@ func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 		}
 
 		// terminal pods are considered inactive UNLESS they are actively terminating
-		isTerminal := p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed
-		if !isTerminal {
-			// a pod that has been marked terminal within the Kubelet is considered
-			// inactive (may have been rejected by Kubelet admision)
-			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
-				isTerminal = status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed
-			}
-		}
-		if isTerminal && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
+		if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
 			continue
 		}
 
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
+}
+
+// isAdmittedPodTerminal returns true if the provided config source pod is in
+// a terminal phase, or if the Kubelet has already indicated the pod has reached
+// a terminal phase but the config source has not accepted it yet. This method
+// should only be used within the pod configuration loops that notify the pod
+// worker, other components should treat the pod worker as authoritative.
+func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
+	// pods are considered inactive if the config source has observed a
+	// terminal phase (if the Kubelet recorded that the pod reached a terminal
+	// phase the pod should never be restarted)
+	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return true
+	}
+	// a pod that has been marked terminal within the Kubelet is considered
+	// inactive (may have been rejected by Kubelet admision)
+	if status, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
+		if status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed {
+			return true
+		}
+	}
+	return false
 }
 
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
@@ -1081,13 +1095,16 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// cleanup of pod cgroups.
 	runningPods := make(map[types.UID]sets.Empty)
 	possiblyRunningPods := make(map[types.UID]sets.Empty)
+	restartablePods := make(map[types.UID]sets.Empty)
 	for uid, sync := range workingPods {
 		switch sync {
-		case SyncPodWork:
+		case SyncPod:
 			runningPods[uid] = struct{}{}
 			possiblyRunningPods[uid] = struct{}{}
-		case TerminatingPodWork:
+		case TerminatingPod:
 			possiblyRunningPods[uid] = struct{}{}
+		case TerminatedAndRecreatedPod:
+			restartablePods[uid] = struct{}{}
 		}
 	}
 
@@ -1103,8 +1120,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		return err
 	}
 	for _, runningPod := range runningRuntimePods {
-		switch workType, ok := workingPods[runningPod.ID]; {
-		case ok && workType == SyncPodWork, ok && workType == TerminatingPodWork:
+		switch workerState, ok := workingPods[runningPod.ID]; {
+		case ok && workerState == SyncPod, ok && workerState == TerminatingPod:
 			// if the pod worker is already in charge of this pod, we don't need to do anything
 			continue
 		default:
@@ -1171,6 +1188,32 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 
 	kl.backOff.GC()
+
+	// If two pods with the same UID are observed in rapid succession, we need to
+	// resynchronize the pod worker after the first pod completes and decide whether
+	// to restart the pod. This happens last to avoid confusing the desired state
+	// in other components and to increase the likelihood transient OS failures during
+	// container start are mitigated. In general only static pods will ever reuse UIDs
+	// since the apiserver uses randomly generated UUIDv4 UIDs with a very low
+	// probability of collision.
+	for uid := range restartablePods {
+		pod, ok := allPodsByUID[uid]
+		if !ok {
+			continue
+		}
+		if kl.isAdmittedPodTerminal(pod) {
+			klog.V(3).InfoS("Pod is restartable after termination due to UID reuse, but pod phase is terminal", "pod", klog.KObj(pod), "podUID", pod.UID)
+			continue
+		}
+		start := kl.clock.Now()
+		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+		klog.V(3).InfoS("Pod is restartable after termination due to UID reuse", "pod", klog.KObj(pod), "podUID", pod.UID)
+		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
+		// TODO: move inside syncPod and make reentrant
+		// https://github.com/kubernetes/kubernetes/issues/105014
+		kl.probeManager.AddPod(pod)
+	}
+
 	return nil
 }
 

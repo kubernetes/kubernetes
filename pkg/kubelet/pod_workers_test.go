@@ -82,7 +82,7 @@ func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 }
 
-func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkType {
+func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkerState {
 	return nil
 }
 
