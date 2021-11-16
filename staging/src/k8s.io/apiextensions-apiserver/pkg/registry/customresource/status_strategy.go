@@ -81,7 +81,19 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, obj, old, a.scale)
+	var errs field.ErrorList
+	errs = append(errs, a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, obj, old, a.scale)...)
+
+	// validate embedded resources
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		v := obj.GetObjectKind().GroupVersionKind().Version
+
+		// validate x-kubernetes-validations rules
+		if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
+			errs = append(errs, celValidator.Validate(nil, a.customResourceStrategy.structuralSchemas[v], u.Object)...)
+		}
+	}
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
