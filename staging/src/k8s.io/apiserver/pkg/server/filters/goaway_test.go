@@ -107,7 +107,7 @@ var (
 
 	// responseBodySize is the size of response body which test GOAWAY server sent for watch request,
 	// used to check if watch request was broken by GOAWAY frame.
-	responseBodySize = len(responseBody)
+	responseBodySize = len(responseBody) //nolint:unused
 
 	// requestPostBody is the request body which client must send to test GOAWAY server for POST method,
 	// otherwise, test GOAWAY server will respond 400 HTTP status code.
