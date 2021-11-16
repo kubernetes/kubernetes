@@ -73,20 +73,10 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "failed to query for limitRanges")
 		framework.ExpectEqual(len(limitRanges.Items), 0)
 
-		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = selector.String()
 				limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), options)
-				if err == nil {
-					select {
-					case listCompleted <- true:
-						framework.Logf("observed the limitRanges list")
-						return limitRanges, err
-					default:
-						framework.Logf("channel blocked")
-					}
-				}
 				return limitRanges, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -94,7 +84,7 @@ var _ = SIGDescribe("LimitRange", func() {
 				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(context.TODO(), options)
 			},
 		}
-		_, _, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
 		defer w.Stop()
 
 		ginkgo.By("Submitting a LimitRange")
@@ -103,17 +93,19 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		ginkgo.By("Verifying LimitRange creation was observed")
 		select {
-		case <-listCompleted:
-			select {
-			case event, _ := <-w.ResultChan():
-				if event.Type != watch.Added {
-					framework.Failf("Failed to observe limitRange creation : %v", event)
-				}
-			case <-time.After(e2eservice.RespondingTimeout):
-				framework.Failf("Timeout while waiting for LimitRange creation")
-			}
 		case <-time.After(e2eservice.RespondingTimeout):
 			framework.Failf("Timeout while waiting for LimitRange list complete")
+		default:
+			if informer.HasSynced() {
+				select {
+				case event, _ := <-w.ResultChan():
+					if event.Type != watch.Added {
+						framework.Failf("Failed to observe limitRange creation : %v", event)
+					}
+				case <-time.After(e2eservice.RespondingTimeout):
+					framework.Failf("Timeout while waiting for LimitRange creation")
+				}
+			}
 		}
 
 		ginkgo.By("Fetching the LimitRange to ensure it has proper values")
