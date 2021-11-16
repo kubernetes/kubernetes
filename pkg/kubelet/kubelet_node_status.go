@@ -84,7 +84,8 @@ func (kl *Kubelet) registerWithAPIServer() {
 // value of the annotation for controller-managed attach-detach of attachable
 // persistent volumes for the node.
 func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
-	_, err := kl.kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	var err error
+	kl.node, err = kl.kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err == nil {
 		return true
 	}
@@ -121,6 +122,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 			return false
 		}
 	}
+	kl.node = originalNode
 
 	return true
 }
@@ -354,11 +356,10 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		})
 	}
 
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
 	if kl.enableControllerAttachDetach {
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-
 		klog.V(2).InfoS("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
@@ -366,9 +367,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	}
 
 	if kl.keepTerminatedPodVolumes {
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
 		klog.V(2).InfoS("Setting node annotation to keep pod volumes of terminated pods attached to the node")
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
@@ -394,7 +392,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		// TODO: We can't assume that the node has credentials to talk to the
 		// cloudprovider from arbitrary nodes. At most, we should talk to a
 		// local metadata server here.
-		var err error
 		if node.Spec.ProviderID == "" {
 			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
 			if err != nil {

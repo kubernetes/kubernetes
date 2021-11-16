@@ -477,14 +477,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		serviceHasSynced = func() bool { return true }
 	}
 
-	// construct a node reference used for events
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      string(nodeName),
-		UID:       types.UID(nodeName),
-		Namespace: "",
-	}
-
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
 		if libcontaineruserns.RunningInUserNS() {
@@ -526,7 +518,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode:                            registerNode,
 		registerWithTaints:                      registerWithTaints,
 		registerSchedulable:                     registerSchedulable,
-		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                           serviceLister,
 		serviceHasSynced:                        serviceHasSynced,
 		nodeLister:                              nodeLister,
@@ -538,7 +529,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cloud:                                   kubeDeps.Cloud,
 		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
 		providerID:                              providerID,
-		nodeRef:                                 nodeRef,
 		nodeLabels:                              nodeLabels,
 		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
 		nodeStatusReportFrequency:               kubeCfg.NodeStatusReportFrequency.Duration,
@@ -567,6 +557,26 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
 		lastContainerStartedTime:                newTimeCache(),
 	}
+
+	// fix: https://github.com/kubernetes/kubernetes/issues/100236
+	nodeUid := types.UID(nodeName)
+	if klet.kubeClient != nil {
+		// obtain the node UID by registering the node in advance
+		klet.registerWithAPIServer()
+		if klet.node != nil {
+			nodeUid = klet.node.UID
+		}
+	}
+
+	// construct a node reference used for events
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string(nodeName),
+		UID:       nodeUid,
+		Namespace: "",
+	}
+	klet.nodeRef = nodeRef
+	klet.dnsConfigurer = dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig)
 
 	if klet.cloud != nil {
 		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
@@ -1223,6 +1233,9 @@ type Kubelet struct {
 
 	// Handles node shutdown events for the Node.
 	shutdownManager nodeshutdown.Manager
+
+	// node when registering with apiserver
+	node *v1.Node
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
