@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -483,34 +482,5 @@ func TestItemsProperty(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestCompileAndValidate is a placeholder test of CEL validation that will be removed when the actual functionality
-// is wired in.
-func TestCompileAndValidate(t *testing.T) {
-	s := &schema.Structural{
-		Generic: schema.Generic{
-			Type: "object",
-		},
-		Properties: map[string]schema.Structural{
-			"name": {
-				Generic: schema.Generic{
-					Type: "string",
-				},
-			},
-		},
-	}
-	bindings := map[string]interface{}{
-		"self": map[string]interface{}{
-			"name": "kube",
-		},
-	}
-	result, err := CompileAndValidate(s, bindings, "self.name == 'kube'")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result {
-		t.Error("Expected expression to evaluate to true")
 	}
 }
