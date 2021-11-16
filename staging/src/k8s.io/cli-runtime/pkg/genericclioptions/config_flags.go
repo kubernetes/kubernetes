@@ -120,6 +120,9 @@ type ConfigFlags struct {
 	// Allows increasing burst used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryBurst int
+	// Allows increasing qps used for discovery, this is useful
+	// in clusters with many registered resources
+	discoveryQPS float32
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -269,6 +272,7 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	}
 
 	config.Burst = f.discoveryBurst
+	config.QPS = f.discoveryQPS
 
 	cacheDir := defaultCacheDir
 
@@ -390,6 +394,12 @@ func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
 // WithDiscoveryBurst sets the RESTClient burst for discovery.
 func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 	f.discoveryBurst = discoveryBurst
+	return f
+}
+
+// WithDiscoveryBurst sets the RESTClient burst for discovery.
+func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
+	f.discoveryQPS = discoveryQPS
 	return f
 }
 
