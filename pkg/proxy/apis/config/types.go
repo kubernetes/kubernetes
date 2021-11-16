@@ -203,8 +203,8 @@ const (
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
-// UDP datagrams to real servers.  Scheduling algorithms are imple-
-//wanted as kernel modules. Ten are shipped with the Linux Virtual Server.
+// UDP datagrams to real servers. Scheduling algorithms are implemented as kernel modules.
+// Ten are shipped with the Linux Virtual Server.
 type IPVSSchedulerMethod string
 
 const (
