@@ -46,7 +46,7 @@ type CustomResourceDefinitionSpec struct {
 	// names specify the resource and kind names for the custom resource.
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
 	// scope indicates whether the defined custom resource is cluster- or namespace-scoped.
-	// Allowed values are `Cluster` and `Namespaced`.
+	// Allowed values are "Cluster" and "Namespaced".
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
 	// versions is the list of all API versions of the defined custom resource.
 	// Version names are used to compute the order in which served versions are listed in API discovery.
@@ -74,8 +74,8 @@ type CustomResourceDefinitionSpec struct {
 // CustomResourceConversion describes how to convert different versions of a CR.
 type CustomResourceConversion struct {
 	// strategy specifies how custom resources are converted between versions. Allowed values are:
-	// - `None`: The converter only change the apiVersion and would not touch any other field in the custom resource.
-	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
+	// - "None": The converter only change the apiVersion and would not touch any other field in the custom resource.
+	// - "Webhook": API Server will call to an external webhook to do the conversion. Additional information
 	//   is needed for this option. This requires spec.preserveUnknownFields to be false, and spec.conversion.webhook to be set.
 	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
 
@@ -86,7 +86,7 @@ type CustomResourceConversion struct {
 
 // WebhookConversion describes how to call a conversion webhook
 type WebhookConversion struct {
-	// clientConfig is the instructions for how to call the webhook if strategy is `Webhook`.
+	// clientConfig is the instructions for how to call the webhook if strategy is "Webhook".
 	// +optional
 	ClientConfig *WebhookClientConfig `json:"clientConfig,omitempty" protobuf:"bytes,2,name=clientConfig"`
 
@@ -309,10 +309,10 @@ const (
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// type is the type of the condition. Types include Established, NamesAccepted and Terminating.
+	// type is the type of the condition. Types include "Established", "NamesAccepted" and "Terminating".
 	Type CustomResourceDefinitionConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`
 	// status is the status of the condition.
-	// Can be True, False, Unknown.
+	// Can be "True", "False", "Unknown".
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// lastTransitionTime last time the condition transitioned from one status to another.
 	// +optional

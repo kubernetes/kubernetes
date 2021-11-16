@@ -158,7 +158,7 @@ type Policy struct {
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
-	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
+	// The default audit level is "None", but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 

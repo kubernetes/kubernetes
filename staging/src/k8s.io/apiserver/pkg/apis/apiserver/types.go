@@ -75,7 +75,7 @@ type Connection struct {
 	ProxyProtocol ProtocolType
 
 	// Transport defines the transport configurations we use to dial to the konnectivity server.
-	// This is required if ProxyProtocol is HTTPConnect or GRPC.
+	// This is required if ProxyProtocol is "HTTPConnect" or "GRPC".
 	// +optional
 	Transport *Transport
 }

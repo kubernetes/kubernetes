@@ -356,7 +356,7 @@ type CSIDriverSpec struct {
 	//
 	// This field is immutable.
 	//
-	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
+	// Defaults to "ReadWriteOnceWithFSType", which will examine each volume
 	// to determine if Kubernetes should modify ownership and permissions of the volume.
 	// With the default policy the defined fsGroup will only be applied
 	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.

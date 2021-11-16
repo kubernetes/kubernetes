@@ -80,7 +80,7 @@ const (
 // necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategy struct {
 	// Type indicates the type of the StatefulSetUpdateStrategy.
-	// Default is RollingUpdate.
+	// Default is "RollingUpdate".
 	// +optional
 	Type StatefulSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetStrategyType"`
 	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
@@ -156,10 +156,10 @@ type StatefulSetSpec struct {
 
 	// podManagementPolicy controls how pods are created during initial scale up,
 	// when replacing pods on nodes, or when scaling down. The default policy is
-	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// "OrderedReady", where pods are created in increasing order (pod-0, then
 	// pod-1, etc) and the controller will wait until each pod is ready before
 	// continuing. When scaling down, the pods are removed in the opposite order.
-	// The alternative policy is `Parallel` which will create pods in parallel
+	// The alternative policy is "Parallel" which will create pods in parallel
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
@@ -339,12 +339,12 @@ const (
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
-	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is "RollingUpdate".
 	// +optional
 	Type DeploymentStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DeploymentStrategyType"`
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
-	// RollingUpdate.
+	// "RollingUpdate".
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
@@ -480,7 +480,7 @@ type DeploymentList struct {
 
 // DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
 type DaemonSetUpdateStrategy struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
+	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is "RollingUpdate".
 	// +optional
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 

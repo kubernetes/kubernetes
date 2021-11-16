@@ -148,7 +148,7 @@ type JobSpec struct {
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
-	// execution (either Complete or Failed). If this field is set,
+	// execution (either "Complete" or "Failed"). If this field is set,
 	// ttlSecondsAfterFinished after the Job finishes, it is eligible to be
 	// automatically deleted. When the Job is being deleted, its lifecycle
 	// guarantees (e.g. finalizers) will be honored. If this field is unset,
@@ -158,18 +158,18 @@ type JobSpec struct {
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
 	// CompletionMode specifies how Pod completions are tracked. It can be
-	// `NonIndexed` (default) or `Indexed`.
+	// "NonIndexed" (default) or "Indexed".
 	//
-	// `NonIndexed` means that the Job is considered complete when there have
+	// "NonIndexed" means that the Job is considered complete when there have
 	// been .spec.completions successfully completed Pods. Each Pod completion is
 	// homologous to each other.
 	//
-	// `Indexed` means that the Pods of a
+	// "Indexed" means that the Pods of a
 	// Job get an associated completion index from 0 to (.spec.completions - 1),
 	// available in the annotation batch.kubernetes.io/job-completion-index.
 	// The Job is considered complete when there is one successfully completed Pod
 	// for each index.
-	// When value is `Indexed`, .spec.completions must be specified and
+	// When value is "Indexed", .spec.completions must be specified and
 	// `.spec.parallelism` must be less than or equal to 10^5.
 	// In addition, The Pod name takes the form
 	// `$(job-name)-$(index)-$(random-string)`,
@@ -233,7 +233,7 @@ type JobStatus struct {
 	// +optional
 	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
-	// The number of pods which reached phase Failed.
+	// The number of pods which reached phase "Failed".
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
@@ -302,7 +302,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// Type of job condition, "Complete" or "Failed".
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`

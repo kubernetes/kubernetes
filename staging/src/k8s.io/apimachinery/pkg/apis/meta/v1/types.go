@@ -506,9 +506,9 @@ type DeleteOptions struct {
 	// Either this field or OrphanDependents may be set, but not both.
 	// The default policy is decided by the existing finalizer set in the
 	// metadata.finalizers and the resource-specific default policy.
-	// Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
+	// Acceptable values are: "Orphan" - orphan the dependents; "Background" -
 	// allow the garbage collector to delete the dependents in the background;
-	// 'Foreground' - a cascading policy that deletes all dependents in the
+	// "Foreground" - a cascading policy that deletes all dependents in the
 	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
@@ -517,7 +517,7 @@ type DeleteOptions struct {
 	// persisted. An invalid or unrecognized dryRun directive will
 	// result in an error response and no further processing of the
 	// request. Valid values are:
-	// - All: all dry run stages will be processed
+	// - "All": all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
 }
@@ -533,7 +533,7 @@ type CreateOptions struct {
 	// persisted. An invalid or unrecognized dryRun directive will
 	// result in an error response and no further processing of the
 	// request. Valid values are:
-	// - All: all dry run stages will be processed
+	// - "All": all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 	// +k8s:deprecated=includeUninitialized,protobuf=2
@@ -558,7 +558,7 @@ type PatchOptions struct {
 	// persisted. An invalid or unrecognized dryRun directive will
 	// result in an error response and no further processing of the
 	// request. Valid values are:
-	// - All: all dry run stages will be processed
+	// - "All": all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 
@@ -590,7 +590,7 @@ type ApplyOptions struct {
 	// persisted. An invalid or unrecognized dryRun directive will
 	// result in an error response and no further processing of the
 	// request. Valid values are:
-	// - All: all dry run stages will be processed
+	// - "All": all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 
@@ -622,7 +622,7 @@ type UpdateOptions struct {
 	// persisted. An invalid or unrecognized dryRun directive will
 	// result in an error response and no further processing of the
 	// request. Valid values are:
-	// - All: all dry run stages will be processed
+	// - "All": all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 
@@ -1274,7 +1274,7 @@ type TableRow struct {
 	Cells []interface{} `json:"cells"`
 	// conditions describe additional status of a row that are relevant for a human user. These conditions
 	// apply to the row, not to the object, and will be specific to table output. The only defined
-	// condition type is 'Completed', for a row that indicates a resource that has run to completion and
+	// condition type is "Completed", for a row that indicates a resource that has run to completion and
 	// can be given less visual priority.
 	// +optional
 	Conditions []TableRowCondition `json:"conditions,omitempty"`
@@ -1406,7 +1406,7 @@ type Condition struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
-	// status of the condition, one of True, False, Unknown.
+	// status of the condition, one of "True", "False", "Unknown".
 	// +required
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=True;False;Unknown
