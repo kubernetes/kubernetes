@@ -4432,15 +4432,15 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
+-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -4463,7 +4463,6 @@ COMMIT
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -4473,10 +4472,14 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
+:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
+-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `,
