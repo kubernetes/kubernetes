@@ -457,6 +457,9 @@ function kube::release::package_kube_manifests_tarball() {
   if [[ -e "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
     cp "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi
+  if [[ -e "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-node-reg-checker.sh" ]]; then
+    cp "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-node-reg-checker.sh" "${dst_dir}/node-registration-checker.sh"
+  fi
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/networkd-monitor.sh" "${dst_dir}/networkd-monitor.sh"
   cp -r "${KUBE_ROOT}/gke/cluster/gce/gci/sysctl/" "${dst_dir}/sysctl/"

@@ -782,3 +782,36 @@ EOF
   systemctl daemon-reload
   systemctl restart google-osconfig-agent
 }
+
+function install-node-registration-checker {
+  if [[ "${KUBERNETES_MASTER:-false}" == "true" ]]; then
+      echo "Skipping installation of Node Registration Checker. This is a master node"
+      return
+  elif [[ "${ENABLE_NODE_REGISTRATION_CHECKER:-false}" == "false"  ]]; then
+      echo "Skipping installation of Node Registration Checker. Node Registration Checker is not enabled for this version"
+      return
+  elif [[ ! -e ${KUBE_BIN}/node-registration-checker.sh ]]; then
+      echo "Skipping installation of Node Registration Checker. Node Registration Checker script is not present"
+      return
+  fi
+
+  chmod 544 "${KUBE_BIN}/node-registration-checker.sh"
+
+  echo "Installing Node Registration Checker service"
+  # Write the systemd service file for node registration checker.
+  cat <<EOF >/etc/systemd/system/gke-node-reg-checker.service
+[Unit]
+Description=Check node registration with API server
+
+[Service]
+Type=simple
+ExecStart=${KUBE_BIN}/node-registration-checker.sh
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl start gke-node-reg-checker.service
+}
