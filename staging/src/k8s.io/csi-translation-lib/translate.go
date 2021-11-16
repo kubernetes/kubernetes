@@ -33,6 +33,7 @@ var (
 		plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
 		plugins.AzureFileDriverName: plugins.NewAzureFileCSITranslator(),
 		plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
+		plugins.RBDDriverName:       plugins.NewRBDCSITranslator(),
 	}
 )
 

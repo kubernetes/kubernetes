@@ -1025,6 +1025,8 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 	case csiplugins.CinderInTreePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+	case csiplugins.RBDVolumePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 	}
 	return false
 }
