@@ -172,7 +172,7 @@ if [ "${remote}" = true ] ; then
   go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
     --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
     --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
-    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime_config="${runtime_config}" \
+    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
