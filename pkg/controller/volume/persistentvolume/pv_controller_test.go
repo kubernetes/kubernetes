@@ -567,6 +567,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 		claimAnnotations     map[string]string
 		expClaimAnnotations  map[string]string
 		migratedDriverGates  []featuregate.Feature
+		disabledDriverGates  []featuregate.Feature
 	}{
 		{
 			name:                 "migration on for GCE",
@@ -575,6 +576,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "migration on for GCE with Beta storage provisioner annontation",
@@ -583,6 +585,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "migration off for GCE",
@@ -591,6 +594,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration off for GCE removes migrated to (rollback)",
@@ -599,6 +603,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration off for GCE removes migrated to (rollback) with Beta storage provisioner annontation",
@@ -607,6 +612,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration on for GCE other plugin not affected",
@@ -615,6 +621,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "not dynamically provisioned migration off for GCE",
@@ -623,6 +630,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{},
 			expClaimAnnotations:  map[string]string{},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "not dynamically provisioned migration on for GCE",
@@ -631,6 +639,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{},
 			expClaimAnnotations:  map[string]string{},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "nil annotations migration off for GCE",
@@ -639,6 +648,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     nil,
 			expClaimAnnotations:  nil,
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "nil annotations migration on for GCE",
@@ -647,6 +657,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     nil,
 			expClaimAnnotations:  nil,
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 	}
 
@@ -657,6 +668,9 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, f := range tc.migratedDriverGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+			}
+			for _, f := range tc.disabledDriverGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, false)()
 			}
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
