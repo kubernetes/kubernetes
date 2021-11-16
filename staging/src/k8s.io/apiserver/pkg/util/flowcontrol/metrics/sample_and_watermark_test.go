@@ -81,7 +81,7 @@ func TestSampler(t *testing.T) {
 			dt = diff
 		}
 		clk.SetTime(t1)
-		saw.Set(1)
+		saw.Observe(1)
 		expectedCount := int64(dt / samplingPeriod)
 		actualCount, err := getHistogramCount(regs, samplesHistName)
 		if err != nil {

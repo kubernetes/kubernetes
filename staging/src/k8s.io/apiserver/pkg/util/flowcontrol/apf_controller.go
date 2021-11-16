@@ -102,8 +102,8 @@ type configController struct {
 	name                  string // varies in tests of fighting controllers
 	clock                 clock.PassiveClock
 	queueSetFactory       fq.QueueSetFactory
-	reqsObsPairGenerator  metrics.TimedObserverPairGenerator
-	execSeatsObsGenerator metrics.TimedObserverGenerator
+	reqsObsPairGenerator  metrics.RatioedChangeObserverPairGenerator
+	execSeatsObsGenerator metrics.RatioedChangeObserverGenerator
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -193,10 +193,10 @@ type priorityLevelState struct {
 	numPending int
 
 	// Observers tracking number of requests waiting, executing
-	reqsObsPair metrics.TimedObserverPair
+	reqsObsPair metrics.RatioedChangeObserverPair
 
 	// Observer of number of seats occupied throughout execution
-	execSeatsObs metrics.TimedObserver
+	execSeatsObs metrics.RatioedChangeObserver
 }
 
 // NewTestableController is extra flexible to facilitate testing
@@ -693,7 +693,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // given priority level configuration.  Returns nil if that config
 // does not call for limiting.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.TimedObserverPair, execSeatsObs metrics.TimedObserver) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
 		return nil, errors.New("broken union structure at the top")
 	}
