@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1434,51 +1433,6 @@ func TestRequestStream(t *testing.T) {
 			}
 		})
 	}
-}
-
-//nolint:unused
-type fakeUpgradeConnection struct{}
-
-//nolint:unused
-func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	return nil, nil
-}
-
-//nolint:unused
-func (c *fakeUpgradeConnection) Close() error {
-	return nil
-}
-
-//nolint:unused
-func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
-	return make(chan bool)
-}
-
-//nolint:unused
-func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
-}
-
-//nolint:unused
-type fakeUpgradeRoundTripper struct {
-	req  *http.Request
-	conn httpstream.Connection
-}
-
-//nolint:unused
-func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	f.req = req
-	b := []byte{}
-	body := ioutil.NopCloser(bytes.NewReader(b))
-	resp := &http.Response{
-		StatusCode: http.StatusSwitchingProtocols,
-		Body:       body,
-	}
-	return resp, nil
-}
-
-//nolint:unused
-func (f *fakeUpgradeRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
-	return f.conn, nil
 }
 
 func TestRequestDo(t *testing.T) {
