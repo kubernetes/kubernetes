@@ -2663,6 +2663,25 @@
           }
         }
       },
+      "io.k8s.api.core.v1.GRPCAction": {
+        "type": "object",
+        "required": [
+          "port"
+        ],
+        "properties": {
+          "port": {
+            "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "service": {
+            "description": "Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).\n\nIf this is not specified, the default behavior is defined by gRPC.",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "io.k8s.api.core.v1.GitRepoVolumeSource": {
         "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
         "type": "object",
@@ -3716,6 +3735,10 @@
             "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
             "type": "integer",
             "format": "int32"
+          },
+          "gRPC": {
+            "description": "GRPC specifies an action involving a GRPC port. This is an alpha field and requires enabling GRPCContainerProbe feature gate.",
+            "$ref": "#/components/schemas/io.k8s.api.core.v1.GRPCAction"
           },
           "httpGet": {
             "description": "HTTPGet specifies the http request to perform.",
