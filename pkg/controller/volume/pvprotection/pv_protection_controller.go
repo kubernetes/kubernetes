@@ -180,12 +180,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, pv *v1.PersistentVolum
 func (c *Controller) isBeingUsed(pv *v1.PersistentVolume) bool {
 	// check if PV is being bound to a PVC by its status
 	// the status will be updated by PV controller
-	if pv.Status.Phase == v1.VolumeBound {
-		// the PV is being used now
-		return true
-	}
-
-	return false
+	return pv.Status.Phase == v1.VolumeBound
 }
 
 // pvAddedUpdated reacts to pv added/updated events

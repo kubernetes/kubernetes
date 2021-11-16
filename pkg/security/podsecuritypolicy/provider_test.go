@@ -1517,7 +1517,7 @@ func TestValidateProjectedVolume(t *testing.T) {
 			if test.wantAllow {
 				assert.Empty(t, errs, "projected volumes are allowed")
 			} else {
-				assert.Contains(t, errs.ToAggregate().Error(), fmt.Sprintf("projected volumes are not allowed to be used"), "did not find the expected error")
+				assert.Contains(t, errs.ToAggregate().Error(), "projected volumes are not allowed to be used", "did not find the expected error")
 			}
 		})
 	}

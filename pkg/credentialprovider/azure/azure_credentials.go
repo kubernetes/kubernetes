@@ -320,7 +320,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 }
 
 func getLoginServer(registry containerregistry.Registry) string {
-	return *(*registry.RegistryProperties).LoginServer
+	return *registry.RegistryProperties.LoginServer
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {

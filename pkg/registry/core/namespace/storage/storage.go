@@ -266,7 +266,8 @@ func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalize
 func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
 	//nolint:staticcheck // SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
-		return *options.OrphanDependents == false
+		//lint:ignore SA1019 backwards compatibility
+		return !*options.OrphanDependents
 	}
 	if options.PropagationPolicy != nil {
 		return *options.PropagationPolicy == metav1.DeletePropagationForeground

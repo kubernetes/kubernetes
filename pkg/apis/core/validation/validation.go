@@ -1868,7 +1868,6 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	if pvSpec.AzureFile != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("azureFile"), "may not specify more than 1 volume type"))
-
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateAzureFilePV(pvSpec.AzureFile, fldPath.Child("azureFile"))...)
@@ -2205,7 +2204,6 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 				}
 			}
 		}
-
 	} else {
 		// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 		// no-op updates pass validation.
@@ -3236,10 +3234,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 		}
 		for i, search := range dnsConfig.Searches {
 			// it is fine to have a trailing dot
-			if strings.HasSuffix(search, ".") {
-				search = search[0 : len(search)-1]
-			}
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(strings.TrimSuffix(search, "."), fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -5685,7 +5680,6 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	reqContainsHugePages := false
 	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	for resourceName, quantity := range requirements.Limits {
-
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
@@ -5732,7 +5726,6 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		if supportedQoSComputeResources.Has(string(resourceName)) {
 			reqContainsCPUOrMemory = true
 		}
-
 	}
 	if !limContainsCPUOrMemory && !reqContainsCPUOrMemory && (reqContainsHugePages || limContainsHugePages) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "HugePages require cpu or memory"))
@@ -6169,7 +6162,6 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		if err := ValidateProcMountType(fldPath.Child("procMount"), *sc.ProcMount); err != nil {
 			allErrs = append(allErrs, err)
 		}
-
 	}
 	allErrs = append(allErrs, validateSeccompProfileField(sc.SeccompProfile, fldPath.Child("seccompProfile"))...)
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
@@ -6377,7 +6369,7 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 		}
 
 		// At present Windows Pods which contain HostProcess containers must also set HostNetwork.
-		if hostNetwork != true {
+		if !hostNetwork {
 			errMsg := "hostNetwork must be true if pod contains any hostProcess containers"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("hostNetwork"), hostNetwork, errMsg))
 		}

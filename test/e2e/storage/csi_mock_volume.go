@@ -1289,7 +1289,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 							break loop
 						case watch.Error:
 							watchFailed = true
-							break
 						}
 					case <-ctx.Done():
 						framework.Failf("Timeout while waiting to observe PVC list")

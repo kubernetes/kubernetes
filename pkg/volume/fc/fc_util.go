@@ -215,7 +215,7 @@ func searchDisk(b fcDiskMounter) (string, error) {
 	// two-phase search:
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
-	for true {
+	for {
 		for _, diskID := range diskIDs {
 			if len(wwns) != 0 {
 				disk, dm = findDisk(diskID, lun, io, b.deviceUtil)

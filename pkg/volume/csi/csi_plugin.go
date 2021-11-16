@@ -365,7 +365,6 @@ func (p *csiPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
-
 	volSrc, pvSrc, err := getSourceFromSpec(spec)
 	if err != nil {
 		return nil, err
@@ -811,7 +810,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		}
 		return false, err
 	}
-	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
+	if csiDriver.Spec.AttachRequired != nil && !*csiDriver.Spec.AttachRequired {
 		return true, nil
 	}
 	return false, nil
@@ -991,7 +990,7 @@ func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
 	}
 
 	// if PodInfoOnMount is not set or false we do not set pod attributes
-	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
+	if csiDriver.Spec.PodInfoOnMount == nil || !*csiDriver.Spec.PodInfoOnMount {
 		klog.V(4).Infof(log("CSIDriver %q does not require pod information", driverName))
 		return false, nil
 	}

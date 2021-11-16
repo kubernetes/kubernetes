@@ -186,6 +186,6 @@ func (est *EndpointSliceTracker) GenerationsForSliceUnsafe(endpointSlice *discov
 // getServiceNN returns a namespaced name for the Service corresponding to the
 // provided EndpointSlice.
 func getServiceNN(endpointSlice *discovery.EndpointSlice) types.NamespacedName {
-	serviceName, _ := endpointSlice.Labels[discovery.LabelServiceName]
+	serviceName := endpointSlice.Labels[discovery.LabelServiceName]
 	return types.NamespacedName{Name: serviceName, Namespace: endpointSlice.Namespace}
 }

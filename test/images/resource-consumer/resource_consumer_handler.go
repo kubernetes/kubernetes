@@ -140,11 +140,7 @@ func (handler *ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
 
 func (handler *ResourceConsumerHandler) bumpMetric(metric string, delta float64, duration time.Duration) {
 	handler.metricsLock.Lock()
-	if _, ok := handler.metrics[metric]; ok {
-		handler.metrics[metric] += delta
-	} else {
-		handler.metrics[metric] = delta
-	}
+	handler.metrics[metric] += delta
 	handler.metricsLock.Unlock()
 
 	time.Sleep(duration)

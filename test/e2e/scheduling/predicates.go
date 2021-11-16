@@ -145,9 +145,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 
 		var podsNeededForSaturation int
-		var ephemeralStoragePerPod int64
-
-		ephemeralStoragePerPod = nodeMaxAllocatable / maxNumberOfPods
+		ephemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
 
 		framework.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
@@ -986,7 +984,7 @@ func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 
 // CreateHostPortPods creates RC with host port 4321
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
-	ginkgo.By(fmt.Sprintf("Running RC which reserves host port"))
+	ginkgo.By("Running RC which reserves host port")
 	config := &testutils.RCConfig{
 		Client:    f.ClientSet,
 		Name:      id,
@@ -1004,7 +1002,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 
 // CreateNodeSelectorPods creates RC with host port 4321 and defines node selector
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) error {
-	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
+	ginkgo.By("Running RC which reserves host port and defines node selector")
 
 	config := &testutils.RCConfig{
 		Client:       f.ClientSet,

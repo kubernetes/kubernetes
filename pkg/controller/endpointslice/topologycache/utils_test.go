@@ -76,7 +76,7 @@ func Test_redistributeHints(t *testing.T) {
 			}
 
 			for zone, expectedNum := range tc.expectedRedistributions {
-				actualNum, _ := actualRedistributions[zone]
+				actualNum := actualRedistributions[zone]
 				if actualNum != expectedNum {
 					t.Errorf("Expected redistribution of %d for zone %s, got %d", expectedNum, zone, actualNum)
 				}

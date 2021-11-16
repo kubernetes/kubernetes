@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -27,7 +26,7 @@ func TestMetricCollection(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	fakePlugin := cache.PluginInfo{
-		SocketPath: fmt.Sprintf("fake/path/plugin.sock"),
+		SocketPath: "fake/path/plugin.sock",
 	}
 	// Add one plugin to DesiredStateOfWorld
 	err := dsw.AddOrUpdatePlugin(fakePlugin.SocketPath)

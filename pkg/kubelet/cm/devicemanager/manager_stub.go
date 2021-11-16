@@ -94,6 +94,4 @@ func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 }
 
 // UpdateAllocatedDevices returns nothing
-func (h *ManagerStub) UpdateAllocatedDevices() {
-	return
-}
+func (h *ManagerStub) UpdateAllocatedDevices() {}

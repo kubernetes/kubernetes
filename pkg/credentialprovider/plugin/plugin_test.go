@@ -18,13 +18,13 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -300,7 +300,6 @@ func Test_ProvideParallel(t *testing.T) {
 				}(&wg)
 			}
 			wg.Wait()
-
 		})
 	}
 }
@@ -811,8 +810,8 @@ func Test_ExecPluginEnvVars(t *testing.T) {
 
 func validate(expected, actual []string) error {
 	if len(actual) != len(expected) {
-		return errors.New(fmt.Sprintf("actual env var length [%d] and expected env var length [%d] don't match",
-			len(actual), len(expected)))
+		return fmt.Errorf("actual env var length [%d] and expected env var length [%d] don't match",
+			len(actual), len(expected))
 	}
 
 	for i := range actual {

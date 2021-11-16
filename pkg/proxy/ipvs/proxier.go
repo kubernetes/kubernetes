@@ -298,7 +298,6 @@ type realIPGetter struct {
 //  * Addresses on the created dummy device `kube-ipvs0`
 //
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
-
 	nodeAddress, err := r.nl.GetAllLocalAddresses()
 	if err != nil {
 		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
@@ -524,7 +523,6 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
 ) (proxy.Provider, error) {
-
 	safeIpset := newSafeIpset(ipset)
 
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
@@ -1604,10 +1602,10 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Write(proxier.filterChains.Bytes())
 	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
-	klog.V(5).InfoS("Restoring iptables", "rules", string(proxier.iptablesData.Bytes()))
+	klog.V(5).InfoS("Restoring iptables", "rules", proxier.iptablesData.String())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		klog.ErrorS(err, "Failed to execute iptables-restore", "rules", string(proxier.iptablesData.Bytes()))
+		klog.ErrorS(err, "Failed to execute iptables-restore", "rules", proxier.iptablesData.String())
 		metrics.IptablesRestoreFailuresTotal.Inc()
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
@@ -1919,7 +1917,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 			klog.ErrorS(err, "Failed to ensure chain jumps", "table", jc.table, "srcChain", jc.from, "dstChain", jc.to)
 		}
 	}
-
 }
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.

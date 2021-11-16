@@ -232,11 +232,7 @@ func shouldIgnore(a admission.Attributes) bool {
 		return true
 	}
 	_, ok := obj.(*api.Pod)
-	if !ok {
-		return true
-	}
-
-	return false
+	return !ok
 }
 
 func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {

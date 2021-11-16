@@ -47,7 +47,7 @@ func (s *nonRoot) Validate(scPath *field.Path, _ *api.Pod, _ *api.Container, run
 		allErrs = append(allErrs, field.Required(scPath.Child("runAsNonRoot"), "must be true"))
 		return allErrs
 	}
-	if runAsNonRoot != nil && *runAsNonRoot == false {
+	if runAsNonRoot != nil && !*runAsNonRoot {
 		allErrs = append(allErrs, field.Invalid(scPath.Child("runAsNonRoot"), *runAsNonRoot, "must be true"))
 		return allErrs
 	}

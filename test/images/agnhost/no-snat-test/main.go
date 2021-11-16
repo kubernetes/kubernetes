@@ -146,7 +146,7 @@ func check(ip string, pip string, nip string) error {
 		return err
 	}
 	rips := strings.Split(string(body), ":")
-	if rips == nil || len(rips) == 0 {
+	if len(rips) == 0 {
 		return fmt.Errorf("Invalid returned ip %q from %q", string(body), url)
 	}
 	rip := rips[0]

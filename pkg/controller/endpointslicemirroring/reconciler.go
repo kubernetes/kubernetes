@@ -152,9 +152,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	// the corresponding endpoint slices for deletion.
 	for portKey, existingSlices := range existingSlicesByKey {
 		if _, ok := d.endpointsByKey[portKey]; !ok {
-			for _, existingSlice := range existingSlices {
-				slices.toDelete = append(slices.toDelete, existingSlice)
-			}
+			slices.toDelete = append(slices.toDelete, existingSlices...)
 		}
 	}
 

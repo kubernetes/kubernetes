@@ -19,7 +19,7 @@ package topologycache
 import (
 	"math"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/klog/v2"
 )
@@ -124,7 +124,7 @@ func getGivingAndReceivingZones(allocations map[string]Allocation, allocatedHint
 	receivingZonesDesired := map[string]float64{}
 
 	for zone, allocation := range allocations {
-		allocatedHints, _ := allocatedHintsByZone[zone]
+		allocatedHints := allocatedHintsByZone[zone]
 		target := allocation.Desired
 		if float64(allocatedHints) > target {
 			givingZonesDesired[zone] = float64(allocatedHints) - target
@@ -199,7 +199,7 @@ func getHintsByZone(slice *discovery.EndpointSlice, allocatedHintsByZone Endpoin
 	}
 
 	for zone, numHints := range hintsByZone {
-		alreadyAllocated, _ := allocatedHintsByZone[zone]
+		alreadyAllocated := allocatedHintsByZone[zone]
 		allocation, ok := allocations[zone]
 		if !ok || (numHints+alreadyAllocated) > allocation.Maximum {
 			return nil

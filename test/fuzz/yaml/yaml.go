@@ -44,7 +44,7 @@ func FuzzDurationStrict(b []byte) int {
 	}
 	// Result is in the format "d: <duration>\n", so strip off the trailing
 	// newline and convert durationHolder.D to the expected format.
-	resultStr := strings.TrimSpace(string(result[:]))
+	resultStr := strings.TrimSpace(string(result))
 	inputStr := fmt.Sprintf("d: %s", durationHolder.D.Duration)
 	if resultStr != inputStr {
 		panic(fmt.Sprintf("result(%v) != input(%v)", resultStr, inputStr))
@@ -69,7 +69,7 @@ func FuzzMicroTimeStrict(b []byte) int {
 	// Result is in the format "t: <time>\n", so strip off the trailing
 	// newline and convert microTimeHolder.T to the expected format. If
 	// time is zero, the value is marshaled to "null".
-	resultStr := strings.TrimSpace(string(result[:]))
+	resultStr := strings.TrimSpace(string(result))
 	var inputStr string
 	if microTimeHolder.T.Time.IsZero() {
 		inputStr = "t: null"
@@ -113,7 +113,7 @@ func FuzzTimeStrict(b []byte) int {
 	// Result is in the format "t: <time>\n", so strip off the trailing
 	// newline and convert timeHolder.T to the expected format. If time is
 	// zero, the value is marshaled to "null".
-	resultStr := strings.TrimSpace(string(result[:]))
+	resultStr := strings.TrimSpace(string(result))
 	var inputStr string
 	if timeHolder.T.Time.IsZero() {
 		inputStr = "t: null"

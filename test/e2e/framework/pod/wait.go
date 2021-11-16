@@ -497,7 +497,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			}
 			current = 0
 			for _, pod := range pods.Items {
-				if flag, err := testutils.PodRunningReady(&pod); err == nil && flag == true {
+				if flag, err := testutils.PodRunningReady(&pod); err == nil && flag {
 					current++
 				}
 			}

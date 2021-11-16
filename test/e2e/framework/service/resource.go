@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -133,7 +132,7 @@ func CreateServiceForSimpleAppWithPods(c clientset.Interface, contPort int, svcP
 // CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
 func CreateServiceForSimpleApp(c clientset.Interface, contPort, svcPort int, namespace, appName string) *v1.Service {
 	if appName == "" {
-		panic(fmt.Sprintf("no app name provided"))
+		panic("no app name provided")
 	}
 
 	serviceSelector := map[string]string{

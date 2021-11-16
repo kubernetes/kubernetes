@@ -1625,7 +1625,7 @@ func namedToBeMutatedConfigMap(name string, f *framework.Framework) *v1.ConfigMa
 }
 
 func nonCompliantConfigMapPatch() string {
-	return fmt.Sprint(`{"data":{"webhook-e2e-test":"webhook-disallow"}}`)
+	return `{"data":{"webhook-e2e-test":"webhook-disallow"}}`
 }
 
 type updateConfigMapFn func(cm *v1.ConfigMap)
@@ -1889,7 +1889,6 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	ginkgo.By("Deleting the updated custom resource should be successful")
 	err = customResourceClient.Delete(context.TODO(), crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
-
 }
 
 func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
@@ -1969,7 +1968,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 	framework.ExpectNoError(err, "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
-	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
+	crDummyPatch := `[{ "op": "add", "path": "/dummy", "value": "test" }]`
 	mutatedCR, err := testcrd.DynamicClients["v2"].Patch(context.TODO(), crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{

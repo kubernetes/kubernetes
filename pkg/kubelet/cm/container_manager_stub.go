@@ -127,9 +127,7 @@ func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	return topologymanager.NewFakeManager()
 }
 
-func (cm *containerManagerStub) UpdateAllocatedDevices() {
-	return
-}
+func (cm *containerManagerStub) UpdateAllocatedDevices() {}
 
 func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
 	return nil

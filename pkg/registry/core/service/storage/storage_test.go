@@ -93,7 +93,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if pods != nil && len(pods) > 0 {
+	if len(pods) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
@@ -111,7 +111,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if endpoints != nil && len(endpoints) > 0 {
+	if len(endpoints) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range endpoints {
 			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
@@ -419,7 +419,6 @@ func TestNormalizeClusterIPs(t *testing.T) {
 			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
 				if clusterIP != tc.expectedClusterIPs[idx] {
 					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
-
 				}
 			}
 		})
@@ -1419,7 +1418,6 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 
 			if createdSvc.Spec.ClusterIP == "" {
 				t.Errorf("expected ClusterIP to be set")
-
 			}
 			if tc.svc.Spec.ClusterIP != "" {
 				if want, got := tc.svc.Spec.ClusterIP, createdSvc.Spec.ClusterIP; want != got {
@@ -5861,7 +5859,6 @@ func TestCreateInitIPFields(t *testing.T) {
 
 	for _, otc := range testCases {
 		t.Run(otc.name, func(t *testing.T) {
-
 			// Do this in the outer loop for performance.
 			storage, _, server := newStorage(t, otc.clusterFamilies)
 			defer server.Terminate(t)
@@ -6718,7 +6715,6 @@ func TestDeleteDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			storage, _, server := newStorage(t, tc.svc.Spec.IPFamilies)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
@@ -11676,7 +11672,6 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error creating service %q: %v", name, err)
 		}
-
 	}
 	_, err := storage.Create(ctx,
 		svctest.MakeService("named",

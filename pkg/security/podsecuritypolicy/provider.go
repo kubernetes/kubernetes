@@ -114,10 +114,7 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
 		retErr = s.mutateContainer(pod, c)
-		if retErr != nil {
-			return false
-		}
-		return true
+		return retErr == nil
 	})
 
 	return retErr
@@ -270,7 +267,7 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 				if !allows {
 					allErrs = append(allErrs, field.Invalid(
 						field.NewPath("spec", "volumes").Index(i).Child("hostPath", "pathPrefix"), v.HostPath.Path,
-						fmt.Sprintf("is not allowed to be used")))
+						"is not allowed to be used"))
 				} else if mustBeReadOnly {
 					// Ensure all the VolumeMounts that use this volume are read-only
 					pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {

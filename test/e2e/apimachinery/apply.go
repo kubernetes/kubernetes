@@ -255,7 +255,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 						break
 					}
 				}
-				if myStatusFound == false {
+				if !myStatusFound {
 					framework.Failf("Expected pod to have applied status")
 				}
 			}

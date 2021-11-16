@@ -96,7 +96,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -128,7 +128,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *
 	// Arrange
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -220,7 +220,7 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -244,7 +244,7 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletesWithExpBackoff(t 
 	// Arrange
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -268,7 +268,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -312,7 +312,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *t
 	// Arrange
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
@@ -395,7 +395,7 @@ func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(operationName, operation1)
 	if err != nil {
@@ -424,7 +424,7 @@ func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
 	operationName := "operation-name"
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(operationName, operation1)
 	if err != nil {
@@ -452,7 +452,7 @@ func Test_NewGoRoutineMap_WaitForCompletionWithExpBackoff(t *testing.T) {
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
 	operationName := "operation-err"
 
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateErrorFunc(operation1DoneCh)
 	err := grm.Run(operationName, operation1)
 	if err != nil {

@@ -124,7 +124,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var reason string
 		var message string
 		if len(reasons) == 0 {
-			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			message = "GeneralPredicates failed due to unknown reason, which is unexpected."
 			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,

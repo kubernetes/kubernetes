@@ -112,7 +112,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		return true, nil
 	})
 	if pvcPollErr != nil {
-		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
+		errList = append(errList, "Timeout waiting for pvc deletion.")
 	}
 
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
@@ -134,7 +134,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		return false, nil
 	})
 	if pollErr != nil {
-		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
+		errList = append(errList, "Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs.")
 	}
 	if len(errList) != 0 {
 		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))

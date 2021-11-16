@@ -65,7 +65,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	}
 
 	if len(tokenReview.Spec.Token) == 0 {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("token is required for TokenReview in authentication"))
+		return nil, apierrors.NewBadRequest("token is required for TokenReview in authentication")
 	}
 
 	if createValidation != nil {

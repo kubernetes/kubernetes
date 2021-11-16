@@ -473,7 +473,6 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	devInstances2, ok := allocatableDevs[resourceName2]
 	as.True(ok)
 	checkAllocatableDevicesConsistsOf(as, devInstances2, []string{"R2Device1"})
-
 }
 
 func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
@@ -531,9 +530,7 @@ func checkAllocatableDevicesConsistsOf(as *assert.Assertions, devInstances Devic
 
 func constructDevices(devices []string) checkpoint.DevicesPerNUMA {
 	ret := checkpoint.DevicesPerNUMA{}
-	for _, dev := range devices {
-		ret[0] = append(ret[0], dev)
-	}
+	ret[0] = append(ret[0], devices...)
 	return ret
 }
 
@@ -760,7 +757,6 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 			}
 		}
 		testManager.allDevices[res.resourceName] = makeDevice(res.devs, res.topology)
-
 	}
 	return testManager, nil
 }
@@ -956,7 +952,6 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
-
 }
 
 func TestInitContainerDeviceAllocation(t *testing.T) {

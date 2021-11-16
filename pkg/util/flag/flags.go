@@ -52,7 +52,6 @@ type IPVar struct {
 // Set sets the flag value
 func (v *IPVar) Set(s string) error {
 	if len(s) == 0 {
-		v.Val = nil
 		return nil
 	}
 	if netutils.ParseIPSloppy(s) == nil {
@@ -87,7 +86,6 @@ type IPPortVar struct {
 // Set sets the flag value
 func (v *IPPortVar) Set(s string) error {
 	if len(s) == 0 {
-		v.Val = nil
 		return nil
 	}
 

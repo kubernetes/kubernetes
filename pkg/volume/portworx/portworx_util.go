@@ -77,7 +77,7 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	// Pass all parameters as volume labels for Portworx server-side processing
 	if spec.VolumeLabels == nil {
-		spec.VolumeLabels = make(map[string]string, 0)
+		spec.VolumeLabels = make(map[string]string)
 	}
 
 	for k, v := range p.options.Parameters {

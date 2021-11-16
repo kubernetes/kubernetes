@@ -191,9 +191,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_limit")
 
-		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("2\n"),
-		})
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{"2\n"})
 	})
 
 	/*
@@ -205,9 +203,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
-		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("67108864\n"),
-		})
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{"67108864\n"})
 	})
 
 	/*
@@ -219,9 +215,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_request")
 
-		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("1\n"),
-		})
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{"1\n"})
 	})
 
 	/*
@@ -233,9 +227,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_request")
 
-		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("33554432\n"),
-		})
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{"33554432\n"})
 	})
 
 	/*

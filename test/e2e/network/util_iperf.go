@@ -147,7 +147,7 @@ func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults
 		}
 		parsedResults = append(parsedResults, parsed)
 	}
-	if parsedResults == nil || len(parsedResults) == 0 {
+	if len(parsedResults) == 0 {
 		return nil, fmt.Errorf("no results parsed from iperf2 output")
 	}
 	// format:

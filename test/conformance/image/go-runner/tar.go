@@ -64,7 +64,7 @@ func tarDir(dir, outpath string) error {
 		}
 
 		// Update the name to correctly reflect the desired destination when untaring.
-		header.Name = strings.TrimPrefix(strings.Replace(file, dir, "", -1), string(filepath.Separator))
+		header.Name = strings.TrimPrefix(strings.ReplaceAll(file, dir, ""), string(filepath.Separator))
 		if err := tw.WriteHeader(header); err != nil {
 			return fmt.Errorf("writing header for tarball %v: %w", header.Name, err)
 		}

@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -66,7 +66,7 @@ func makeEnvVariableName(str string) string {
 	// will need two tweaks:
 	//   1) Handle leading digits
 	//   2) Handle dots
-	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
+	return strings.ToUpper(strings.ReplaceAll(str, "-", "_"))
 }
 
 func makeLinkVariables(service *v1.Service) []v1.EnvVar {

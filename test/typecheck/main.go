@@ -265,7 +265,7 @@ func main() {
 		log.Fatalf("Error walking: %v", err)
 	}
 
-	plats := crossPlatforms[:]
+	plats := crossPlatforms
 	if *platforms != "" {
 		plats = strings.Split(*platforms, ",")
 	} else if !*cross {

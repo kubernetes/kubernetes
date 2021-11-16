@@ -873,7 +873,6 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			}
 		default:
 			t.Errorf("Unexpected action %+v", a)
-			break
 		}
 	}
 	if gets != 1 || updates != 2 {
@@ -904,7 +903,6 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
 	for _, replicas := range []int32{int32(numReplicas), 0} {
-
 		*(rsSpec.Spec.Replicas) = replicas
 		informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 

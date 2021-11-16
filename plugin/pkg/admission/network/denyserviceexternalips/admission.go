@@ -106,7 +106,7 @@ func isSubset(newSvc, oldSvc *core.Service) bool {
 	}
 	// Every IP in newSvc must be in oldSvc
 	for _, ip := range newSvc.Spec.ExternalIPs {
-		if oldIPs[ip] == false {
+		if !oldIPs[ip] {
 			return false
 		}
 	}

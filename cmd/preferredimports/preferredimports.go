@@ -90,7 +90,7 @@ func (a *analyzer) collect(dir string) {
 			replacements := make(map[string]string)
 			pathToFile := a.fset.File(file.Pos()).Name()
 			for _, imp := range file.Imports {
-				importPath := strings.Replace(imp.Path.Value, "\"", "", -1)
+				importPath := strings.ReplaceAll(imp.Path.Value, "\"", "")
 				pathSegments := strings.Split(importPath, "/")
 				importName := pathSegments[len(pathSegments)-1]
 				if imp.Name != nil {

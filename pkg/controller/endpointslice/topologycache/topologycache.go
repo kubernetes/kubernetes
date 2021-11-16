@@ -96,9 +96,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	allocatedHintsByZone := si.getAllocatedHintsByZone(allocations)
 
 	allocatableSlices := si.ToCreate
-	for _, slice := range si.ToUpdate {
-		allocatableSlices = append(allocatableSlices, slice)
-	}
+	allocatableSlices = append(allocatableSlices, si.ToUpdate...)
 
 	// step 1: assign same-zone hints for all endpoints as a starting point.
 	for _, slice := range allocatableSlices {
@@ -211,7 +209,6 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 		t.sufficientNodeInfo = false
 		t.cpuByZone = nil
 		t.cpuRatiosByZone = nil
-
 	} else {
 		t.sufficientNodeInfo = sufficientNodeInfo
 		t.cpuByZone = cpuByZone

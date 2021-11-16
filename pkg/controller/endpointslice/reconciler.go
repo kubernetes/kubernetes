@@ -129,7 +129,6 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 // slices (by address type) for the given service. It creates, updates, or deletes endpoint slices
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time, addressType discovery.AddressType) error {
-
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
@@ -209,9 +208,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// the corresponding endpoint slices for deletion.
 	for portMap, existingSlices := range existingSlicesByPortMap {
 		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
-			for _, existingSlice := range existingSlices {
-				slicesToDelete = append(slicesToDelete, existingSlice)
-			}
+			slicesToDelete = append(slicesToDelete, existingSlices...)
 		}
 	}
 

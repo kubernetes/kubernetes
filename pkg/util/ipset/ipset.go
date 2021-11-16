@@ -386,7 +386,7 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 		return nil, fmt.Errorf("error listing set: %s, error: %v", set, err)
 	}
 	memberMatcher := regexp.MustCompile(EntryMemberPattern)
-	list := memberMatcher.ReplaceAllString(string(out[:]), "")
+	list := memberMatcher.ReplaceAllString(string(out), "")
 	strs := strings.Split(list, "\n")
 	results := make([]string, 0)
 	for i := range strs {

@@ -57,7 +57,7 @@ func (cp checkpointDataV1) checksum() checksum.Checksum {
 
 	object := printer.Sprintf("%#v", cp)
 	object = strings.Replace(object, "checkpointDataV1", "checkpointData", 1)
-	object = strings.Replace(object, "PodDevicesEntryV1", "PodDevicesEntry", -1)
+	object = strings.ReplaceAll(object, "PodDevicesEntryV1", "PodDevicesEntry")
 	hash := fnv.New32a()
 	printer.Fprintf(hash, "%v", object)
 	return checksum.Checksum(hash.Sum32())

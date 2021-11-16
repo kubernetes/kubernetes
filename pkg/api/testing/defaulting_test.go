@@ -232,7 +232,7 @@ func TestDefaulting(t *testing.T) {
 
 			// get internal
 			withDefaults := src.DeepCopyObject()
-			scheme.Default(withDefaults.(runtime.Object))
+			scheme.Default(withDefaults)
 
 			if !reflect.DeepEqual(original, withDefaults) {
 				changedOnce = true

@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -113,7 +113,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		ginkgo.By(fmt.Sprintf("Restoring initial size of the cluster"))
+		ginkgo.By("Restoring initial size of the cluster")
 		setMigSizes(originalSizes)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount, scaleDownTimeout))
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
@@ -466,7 +466,7 @@ func addAnnotation(f *framework.Framework, nodes []v1.Node, key, value string) e
 }
 
 func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, port, megabytes int, timeout time.Duration) func() error {
-	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and memory"))
+	ginkgo.By("Running RC which reserves host port and memory")
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
 		Client:     f.ClientSet,

@@ -492,7 +492,7 @@ func (r *ResourceMonitor) Start() {
 	if err != nil {
 		framework.Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}
-	r.collectors = make(map[string]*resourceCollector, 0)
+	r.collectors = make(map[string]*resourceCollector)
 	for _, node := range nodes.Items {
 		collector := newResourceCollector(r.client, node.Name, r.containers, r.pollingInterval)
 		r.collectors[node.Name] = collector

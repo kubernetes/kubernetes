@@ -461,7 +461,6 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 
 		_, err = roleBindingClient.Create(context.TODO(), binding, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
-
 	}
 }
 
@@ -469,10 +468,7 @@ func isSudoPresent(nodeIP string, provider string) bool {
 	framework.Logf("Checking if sudo command is present")
 	sshResult, err := e2essh.SSH("sudo --version", nodeIP, provider)
 	framework.ExpectNoError(err, "SSH to %q errored.", nodeIP)
-	if !strings.Contains(sshResult.Stderr, "command not found") {
-		return true
-	}
-	return false
+	return !strings.Contains(sshResult.Stderr, "command not found")
 }
 
 // CheckReadWriteToPath check that path can b e read and written

@@ -322,8 +322,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		defer cleanup()
 
 		// Create the directory
-		var command string
-		command = fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
+		command := fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
 		setInitCommand(l.pod, command)
 		testPodContainerRestart(f, l.pod)
 	})
@@ -650,7 +649,6 @@ func setWriteCommand(file string, container *v1.Container) {
 	if !framework.NodeOSDistroIs("windows") {
 		container.Args = append(container.Args, fmt.Sprintf("--file_mode=%v", file))
 	}
-
 }
 
 func addSubpathVolumeContainer(container *v1.Container, volumeMount v1.VolumeMount) {
@@ -957,7 +955,6 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 			framework.ExpectNoError(err, "while fixing liveness probe")
 		},
 	})
-
 }
 
 func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, pod *v1.Pod, forceDelete bool) {

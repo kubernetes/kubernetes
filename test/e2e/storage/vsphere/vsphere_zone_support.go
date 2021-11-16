@@ -237,7 +237,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	})
 
 	ginkgo.It("Verify PVC creation fails if no zones are specified in the storage class (No shared datastores exist among all the nodes)", func() {
-		ginkgo.By(fmt.Sprintf("Creating storage class with no zones"))
+		ginkgo.By("Creating storage class with no zones")
 		err := verifyPVCCreationFails(client, namespace, nil, nil, "")
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {

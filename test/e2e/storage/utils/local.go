@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -160,7 +160,6 @@ func (l *ltrMgr) teardownLoopDevice(dir string, node *v1.Node) {
 	losetupDeleteCmd := fmt.Sprintf("losetup -d %s", loopDev)
 	err := l.hostExec.IssueCommand(losetupDeleteCmd, node)
 	framework.ExpectNoError(err)
-	return
 }
 
 func (l *ltrMgr) cleanupLocalVolumeBlock(ltr *LocalTestResource) {
@@ -356,5 +355,4 @@ func (l *ltrMgr) Remove(ltr *LocalTestResource) {
 	default:
 		framework.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
 	}
-	return
 }

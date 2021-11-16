@@ -86,7 +86,7 @@ func (w *podSecurityContextWrapper) HostNetwork() bool {
 	return w.podSC.HostNetwork
 }
 func (w *podSecurityContextWrapper) SetHostNetwork(v bool) {
-	if w.podSC == nil && v == false {
+	if w.podSC == nil && !v {
 		return
 	}
 	w.ensurePodSC()
@@ -99,7 +99,7 @@ func (w *podSecurityContextWrapper) HostPID() bool {
 	return w.podSC.HostPID
 }
 func (w *podSecurityContextWrapper) SetHostPID(v bool) {
-	if w.podSC == nil && v == false {
+	if w.podSC == nil && !v {
 		return
 	}
 	w.ensurePodSC()
@@ -112,7 +112,7 @@ func (w *podSecurityContextWrapper) HostIPC() bool {
 	return w.podSC.HostIPC
 }
 func (w *podSecurityContextWrapper) SetHostIPC(v bool) {
-	if w.podSC == nil && v == false {
+	if w.podSC == nil && !v {
 		return
 	}
 	w.ensurePodSC()

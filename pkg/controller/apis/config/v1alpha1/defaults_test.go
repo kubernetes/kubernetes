@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
@@ -57,7 +57,7 @@ func convertObjToConfigMap(name string, obj runtime.Object) (*v1.ConfigMap, erro
 			Name: name,
 		},
 		Data: map[string]string{
-			name: string(eJSONBytes[:]),
+			name: string(eJSONBytes),
 		},
 	}
 	return cm, nil

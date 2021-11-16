@@ -102,7 +102,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 		e2elog.Logf("Error indenting: %v", err)
 		return ""
 	}
-	return string(formatted.Bytes())
+	return formatted.String()
 }
 
 // PrintJSON returns e2e metrics with JSON format.

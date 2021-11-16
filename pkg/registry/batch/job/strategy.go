@@ -167,7 +167,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	// TODO: move UID generation earlier and do this in defaulting logic?
-	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
+	if job.Spec.ManualSelector == nil || !*job.Spec.ManualSelector {
 		generateSelector(job)
 	}
 	opts := validationOptionsForJob(job, nil)
@@ -198,7 +198,6 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidation
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = utilfeature.DefaultFeatureGate.Enabled(features.JobMutableNodeSchedulingDirectives) &&
 			suspended && notStarted
-
 	}
 
 	return opts

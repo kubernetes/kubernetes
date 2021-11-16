@@ -74,7 +74,6 @@ func main() {
 	if err := runCommand(ginkgo, args...); err != nil {
 		klog.Exitf("Test failed: %v", err)
 	}
-	return
 }
 
 func runCommand(name string, args ...string) error {

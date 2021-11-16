@@ -157,10 +157,8 @@ func (m *manager) Start() {
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
-
-	//nolint:staticcheck // SA1015 Ticker can leak since this is only called once and doesn't handle termination.
-	syncTicker := time.NewTicker(syncPeriod).C
-
+	syncTicker := time.NewTicker(syncPeriod)
+	defer syncTicker.Stop()
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
 		for {
@@ -171,7 +169,7 @@ func (m *manager) Start() {
 					"statusVersion", syncRequest.status.version,
 					"status", syncRequest.status.status)
 				m.syncPod(syncRequest.podUID, syncRequest.status)
-			case <-syncTicker:
+			case <-syncTicker.C:
 				klog.V(5).InfoS("Status Manager: syncing batch")
 				// remove any entries in the status channel since the batch will handle them
 				for i := len(m.podStatusChannel); i > 0; i-- {
@@ -321,7 +319,6 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 	}
 
 	return nil, false, false
-
 }
 
 func (m *manager) TerminatePod(pod *v1.Pod) {

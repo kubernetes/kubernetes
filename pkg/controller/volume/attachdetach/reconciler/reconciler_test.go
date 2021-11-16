@@ -596,7 +596,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
-
 }
 
 func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
@@ -759,7 +758,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
-
 }
 
 func Test_ReportMultiAttachError(t *testing.T) {
@@ -1094,7 +1092,6 @@ func waitForAttachedToNodesCount(
 	expectedNodeCount int,
 	volumeName v1.UniqueVolumeName,
 	asw cache.ActualStateOfWorld) {
-
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
@@ -1126,7 +1123,6 @@ func verifyNewAttacherCallCount(
 	t *testing.T,
 	expectZeroNewAttacherCallCount bool,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-
 	if expectZeroNewAttacherCallCount &&
 		fakePlugin.GetNewAttacherCallCount() != 0 {
 		t.Fatalf(
@@ -1140,7 +1136,6 @@ func waitForVolumeAttachedToNode(
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld) {
-
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
@@ -1171,7 +1166,6 @@ func waitForVolumeAddedToNode(
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld) {
-
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
@@ -1203,7 +1197,6 @@ func waitForVolumeRemovedFromNode(
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld) {
-
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
@@ -1223,7 +1216,6 @@ func waitForVolumeRemovedFromNode(
 				return false, nil
 			}
 			return true, nil
-
 		},
 	)
 
@@ -1275,7 +1267,6 @@ func verifyVolumeReportedAsAttachedToNode(
 		nodeName,
 		result,
 		isAttached)
-
 }
 
 func verifyVolumeNoStatusUpdateNeeded(
@@ -1298,7 +1289,6 @@ func verifyNewDetacherCallCount(
 	t *testing.T,
 	expectZeroNewDetacherCallCount bool,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-
 	if expectZeroNewDetacherCallCount &&
 		fakePlugin.GetNewDetacherCallCount() != 0 {
 		t.Fatalf("Wrong NewDetacherCallCount. Expected: <0> Actual: <%v>",

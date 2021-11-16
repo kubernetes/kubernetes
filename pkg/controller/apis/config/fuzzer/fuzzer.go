@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"fmt"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -35,7 +35,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Generic.LeaderElection.ResourceLock == "" {
 				obj.Generic.LeaderElection.ResourceLock = "endpoints"
 			}
-			obj.Generic.Controllers = []string{fmt.Sprintf("%s", c.RandString())}
+			obj.Generic.Controllers = []string{c.RandString()}
 			if obj.KubeCloudShared.ClusterName == "" {
 				obj.KubeCloudShared.ClusterName = "kubernetes"
 			}

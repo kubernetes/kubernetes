@@ -318,7 +318,7 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 	return fmt.Errorf("unable to write project files: %v", err)
 }
 
-func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
+func createProjectID(path string, id common.QuotaID) (common.QuotaID, error) {
 	quotaIDLock.Lock()
 	defer quotaIDLock.Unlock()
 	fProjects, fProjid, err := openAndLockProjectFiles()
@@ -326,19 +326,19 @@ func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
 		defer closeProjectFiles(fProjects, fProjid)
 		list := readProjectFiles(fProjects, fProjid)
 		var writeProjid bool
-		ID, writeProjid, err = addDirToProject(path, ID, &list)
-		if err == nil && ID != common.BadQuotaID {
+		id, writeProjid, err = addDirToProject(path, id, &list)
+		if err == nil && id != common.BadQuotaID {
 			if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {
-				return ID, nil
+				return id, nil
 			}
 		}
 	}
-	return common.BadQuotaID, fmt.Errorf("createProjectID %s %v failed %v", path, ID, err)
+	return common.BadQuotaID, fmt.Errorf("createProjectID %s %v failed %v", path, id, err)
 }
 
-func removeProjectID(path string, ID common.QuotaID) error {
-	if ID == common.BadQuotaID {
-		return fmt.Errorf("attempting to remove invalid quota ID %v", ID)
+func removeProjectID(path string, id common.QuotaID) error {
+	if id == common.BadQuotaID {
+		return fmt.Errorf("attempting to remove invalid quota ID %v", id)
 	}
 	quotaIDLock.Lock()
 	defer quotaIDLock.Unlock()
@@ -347,12 +347,12 @@ func removeProjectID(path string, ID common.QuotaID) error {
 		defer closeProjectFiles(fProjects, fProjid)
 		list := readProjectFiles(fProjects, fProjid)
 		var writeProjid bool
-		writeProjid, err = removeDirFromProject(path, ID, &list)
+		writeProjid, err = removeDirFromProject(path, id, &list)
 		if err == nil {
 			if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {
 				return nil
 			}
 		}
 	}
-	return fmt.Errorf("removeProjectID %s %v failed %v", path, ID, err)
+	return fmt.Errorf("removeProjectID %s %v failed %v", path, id, err)
 }

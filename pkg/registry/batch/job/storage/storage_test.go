@@ -190,7 +190,6 @@ type dummyRecorder struct {
 func (r *dummyRecorder) AddWarning(agent, text string) {
 	r.agent = agent
 	r.text = text
-	return
 }
 
 func (r *dummyRecorder) getWarning() string {

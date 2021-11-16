@@ -26,17 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func convertExampleCRD(Object *unstructured.Unstructured, toVersion string) (*unstructured.Unstructured, metav1.Status) {
+func convertExampleCRD(object *unstructured.Unstructured, toVersion string) (*unstructured.Unstructured, metav1.Status) {
 	klog.V(2).Info("converting crd")
 
-	convertedObject := Object.DeepCopy()
-	fromVersion := Object.GetAPIVersion()
+	convertedObject := object.DeepCopy()
+	fromVersion := object.GetAPIVersion()
 
 	if toVersion == fromVersion {
 		return nil, statusErrorWithMessage("conversion from a version to itself should not call the webhook: %s", toVersion)
 	}
 
-	switch Object.GetAPIVersion() {
+	switch object.GetAPIVersion() {
 	case "stable.example.com/v1":
 		switch toVersion {
 		case "stable.example.com/v2":

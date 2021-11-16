@@ -335,7 +335,6 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
 	framework.Logf("encountered error during dial (%v)", returnMsg)
 	return returnMsg
-
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.
@@ -844,7 +843,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	createdPods := make([]*v1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
-		hostname, _ := n.Labels["kubernetes.io/hostname"]
+		hostname := n.Labels["kubernetes.io/hostname"]
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		pod.Spec.HostNetwork = config.EndpointsHostNetwork

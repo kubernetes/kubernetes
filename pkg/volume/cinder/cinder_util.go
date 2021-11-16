@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -228,7 +228,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
-	if IgnoreVolumeAZ == false {
+	if !IgnoreVolumeAZ {
 		if volumeAZ != "" {
 			volumeLabels[v1.LabelTopologyZone] = volumeAZ
 		}

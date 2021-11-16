@@ -229,7 +229,7 @@ func endpointsControllerKey(endpointSlice *discovery.EndpointSlice) (string, err
 // skipMirror return true if the LabelSkipMirror label has been set to
 // "true".
 func skipMirror(labels map[string]string) bool {
-	skipMirror, _ := labels[discovery.LabelSkipMirror]
+	skipMirror := labels[discovery.LabelSkipMirror]
 	return skipMirror == "true"
 }
 
@@ -268,6 +268,6 @@ func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) b
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == controllerName
 }

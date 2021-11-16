@@ -404,6 +404,6 @@ func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) b
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == controllerName
 }

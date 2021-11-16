@@ -330,7 +330,6 @@ func createTooManyRequestsError(name string) error {
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1.PodDisruptionBudget, dryRun bool) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
-
 		return createTooManyRequestsError(pdb.Name)
 	}
 	if pdb.Status.DisruptionsAllowed < 0 {
@@ -351,7 +350,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	// If this is a dry-run, we don't need to go any further than that.
-	if dryRun == true {
+	if dryRun {
 		return nil
 	}
 

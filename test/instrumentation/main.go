@@ -212,7 +212,7 @@ func localImportPath(importExpr string) (string, error) {
 		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
 	} // ToDo: support non go mod
 
-	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), -1)
+	crossPlatformImportExpr := strings.ReplaceAll(importExpr, "/", string(os.PathSeparator))
 	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(crossPlatformImportExpr, "\"")}, string(os.PathSeparator))
 
 	return importDirectory, nil
@@ -273,17 +273,11 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 				importK := strings.Join([]string{importAlias, k}, ".")
 				if _, ok := localVariables[importK]; !ok {
 					localVariables[importK] = v
-				} else {
-					// cross-platform file that gets included in the correct OS build via OS build tags
-					// use whatever matches GOOS
-
-					if strings.Contains(file.Name(), GOOS) {
-						// assume at some point we will find the correct OS version of this file
-						// if we are running on an OS that does not have an OS specific file for something then we will include a constant we shouldn't
-						// TODO: should we include/exclude based on the build tags?
-						localVariables[importK] = v
-					}
-
+				} else if strings.Contains(file.Name(), GOOS) { // cross-platform file that gets included in the correct OS build via OS build tags, use whatever matches GOOS
+					// assume at some point we will find the correct OS version of this file
+					// if we are running on an OS that does not have an OS specific file for something then we will include a constant we shouldn't
+					// TODO: should we include/exclude based on the build tags?
+					localVariables[importK] = v
 				}
 			}
 		}

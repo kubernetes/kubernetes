@@ -19,7 +19,7 @@ package sysctl
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // convertSysctlVariableToDotsSeparator can return sysctl variables in dots separator format.
@@ -59,5 +59,4 @@ func ConvertPodSysctlsVariableToDotsSeparator(securityContext *v1.PodSecurityCon
 	for i, sysctl := range securityContext.Sysctls {
 		securityContext.Sysctls[i].Name = convertSysctlVariableToDotsSeparator(sysctl.Name)
 	}
-	return
 }

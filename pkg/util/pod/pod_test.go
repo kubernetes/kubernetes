@@ -18,7 +18,6 @@ package pod
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"reflect"
@@ -51,7 +50,7 @@ func TestPatchPodStatus(t *testing.T) {
 			"no change",
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			true,
-			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"}}`)),
+			[]byte(`{"metadata":{"uid":"myuid"}}`),
 		},
 		{
 			"message change",
@@ -60,7 +59,7 @@ func TestPatchPodStatus(t *testing.T) {
 				return input
 			},
 			false,
-			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"message":"random message"}}`)),
+			[]byte(`{"metadata":{"uid":"myuid"},"status":{"message":"random message"}}`),
 		},
 		{
 			"pod condition change",
@@ -69,7 +68,7 @@ func TestPatchPodStatus(t *testing.T) {
 				return input
 			},
 			false,
-			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`)),
+			[]byte(`{"metadata":{"uid":"myuid"},"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`),
 		},
 		{
 			"additional init container condition",
@@ -83,7 +82,7 @@ func TestPatchPodStatus(t *testing.T) {
 				return input
 			},
 			false,
-			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
+			[]byte(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`),
 		},
 	}
 	for _, tc := range testCases {

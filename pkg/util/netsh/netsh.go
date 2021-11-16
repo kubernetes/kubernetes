@@ -113,7 +113,7 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 	ipToCheck := ip.String()
 
 	exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner)
-	if exists == true {
+	if exists {
 		klog.V(4).InfoS("Not adding IP address, as it already exists", "IP", ipToCheck)
 		return true, nil
 	}
@@ -184,7 +184,7 @@ func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error
 	if err != nil {
 		return false, err
 	}
-	ipAddressString := string(ipAddress[:])
+	ipAddressString := string(ipAddress)
 	klog.V(3).InfoS("Searching for IP in IP dump", "IP", ipToCheck, "IPDump", ipAddressString)
 	showAddressArray := strings.Split(ipAddressString, "\n")
 	for _, showAddress := range showAddressArray {

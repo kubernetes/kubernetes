@@ -31,11 +31,11 @@ import (
 type mockOsIOHandler struct{}
 
 func (handler *mockOsIOHandler) ReadFile(filename string) ([]byte, error) {
-	portPattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/connection\\d:0/iscsi_connection/connection\\d:0/(?:persistent_)?port$")
+	portPattern := regexp.MustCompile(`^/sys/class/iscsi_host/(host\d)/device/session\d/connection\d:0/iscsi_connection/connection\d:0/(?:persistent_)?port$`)
 	if portPattern.MatchString(filename) {
 		return []byte("3260"), nil
 	}
-	addressPattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/connection\\d:0/iscsi_connection/connection\\d:0/(?:persistent_)?address$")
+	addressPattern := regexp.MustCompile(`^/sys/class/iscsi_host/(host\d)/device/session\d/connection\d:0/iscsi_connection/connection\d:0/(?:persistent_)?address$`)
 	matches := addressPattern.FindStringSubmatch(filename)
 	if nil != matches {
 		switch matches[1] {
@@ -45,7 +45,7 @@ func (handler *mockOsIOHandler) ReadFile(filename string) ([]byte, error) {
 			return []byte("10.0.0.2"), nil
 		}
 	}
-	targetNamePattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/iscsi_session/session\\d/targetname$")
+	targetNamePattern := regexp.MustCompile(`^/sys/class/iscsi_host/(host\d)/device/session\d/iscsi_session/session\d/targetname$`)
 	matches = targetNamePattern.FindStringSubmatch(filename)
 	if nil != matches {
 		switch matches[1] {
@@ -241,7 +241,6 @@ func TestFindDeviceForPath(t *testing.T) {
 	if err == nil {
 		t.Fatalf("path shouldn't exist but still doesn't give an error")
 	}
-
 }
 
 func TestFindSlaveDevicesOnMultipath(t *testing.T) {

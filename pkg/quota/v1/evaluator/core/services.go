@@ -136,7 +136,7 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		// We need to look at the intent.
 		if feature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) &&
 			svc.Spec.AllocateLoadBalancerNodePorts != nil &&
-			*svc.Spec.AllocateLoadBalancerNodePorts == false {
+			!*svc.Spec.AllocateLoadBalancerNodePorts {
 			result[corev1.ResourceServicesNodePorts] = *portsWithNodePorts(svc)
 		} else {
 			value := resource.NewQuantity(int64(ports), resource.DecimalSI)

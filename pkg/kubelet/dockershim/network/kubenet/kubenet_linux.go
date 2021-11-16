@@ -497,7 +497,6 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	if err := plugin.delContainerFromNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		klog.InfoS("Failed to delete loopback network", "err", err)
 		errList = append(errList, err)
-
 	}
 
 	// no ip dependent actions
@@ -523,7 +522,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	for _, ip := range iplist {
 		isV6 := netutils.IsIPv6String(ip)
 		klog.V(5).InfoS("Removing pod port mappings from the IP", "IP", ip)
-		if portMappings != nil && len(portMappings) > 0 {
+		if len(portMappings) > 0 {
 			if isV6 {
 				if err = plugin.hostportManagerv6.Remove(id.ID, &hostport.PodPortMapping{
 					Namespace:    namespace,
@@ -789,7 +788,6 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 		if err != nil {
 			klog.ErrorS(err, "Failed to ensure packets from cbr0 gateway to be accepted with error", "gateway", gw.String())
 			return
-
 		}
 		_, err = plugin.ebtables.EnsureRule(utilebtables.Append, utilebtables.TableFilter, dedupChain, append(commonArgs, ipSrc, podCIDRs[idx].String(), "-j", "DROP")...)
 		if err != nil {

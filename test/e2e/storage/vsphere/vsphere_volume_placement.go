@@ -226,8 +226,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	*/
 	ginkgo.It("should create and delete pod with multiple volumes from different datastore", func() {
 		ginkgo.By("creating another vmdk on non default shared datastore")
-		var volumeOptions *VolumeOptions
-		volumeOptions = new(VolumeOptions)
+		volumeOptions := new(VolumeOptions)
 		volumeOptions.CapacityKB = 2097152
 		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 		volumeOptions.Datastore = GetAndExpectStringEnvVar(SecondSharedDatastore)

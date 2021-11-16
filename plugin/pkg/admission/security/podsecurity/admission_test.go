@@ -311,7 +311,6 @@ func (r *dummyRecorder) AddWarning(agent, text string) {
 	r.count++
 	r.agent = agent
 	r.text = text
-	return
 }
 
 var _ warning.Recorder = &dummyRecorder{}

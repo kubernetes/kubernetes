@@ -576,7 +576,6 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 			// Block: write content
 			deviceName := fmt.Sprintf("/opt/%d", i)
 			commands = append(commands, generateWriteBlockCmd(test.ExpectedContent, deviceName)...)
-
 		} else {
 			// Filesystem: write content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -593,16 +592,12 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
 func generateWriteCmd(content, path string) []string {
-	var commands []string
-	commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
-	return commands
+	return []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
 }
 
 // generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
 func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
-	var commands []string
-	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
-	return commands
+	return []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
 }
 
 // generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
@@ -612,9 +607,7 @@ func generateWriteBlockCmd(content, fullPath string) []string {
 
 // GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
 func GenerateReadFileCmd(fullPath string) []string {
-	var commands []string
-	commands = []string{"cat", fullPath}
-	return commands
+	return []string{"cat", fullPath}
 }
 
 // generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
@@ -652,7 +645,6 @@ func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
 	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
-
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,

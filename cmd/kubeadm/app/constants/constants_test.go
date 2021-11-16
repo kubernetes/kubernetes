@@ -221,14 +221,12 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 				}
 			} else if !rt.expectedError && actualError != nil {
 				t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected no error, but got: %v", actualError)
-			} else {
-				if actual.String() != rt.expected {
-					t.Errorf(
-						"failed GetKubernetesServiceCIDR:\n\texpected: %s\n\t  actual: %s",
-						rt.expected,
-						actual.String(),
-					)
-				}
+			} else if actual.String() != rt.expected {
+				t.Errorf(
+					"failed GetKubernetesServiceCIDR:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					actual.String(),
+				)
 			}
 		})
 	}

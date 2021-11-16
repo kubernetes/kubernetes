@@ -110,7 +110,7 @@ func (rt *realTimer) Now() time.Time {
 }
 
 func (rt *realTimer) Remaining() time.Duration {
-	return rt.next.Sub(time.Now())
+	return time.Until(rt.next)
 }
 
 func (rt *realTimer) Since(t time.Time) time.Duration {

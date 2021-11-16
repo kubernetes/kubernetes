@@ -355,7 +355,6 @@ func (f *fakeKubeletVolumeHost) SetKubeletError(err error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 	f.kubeletErr = err
-	return
 }
 
 func (f *fakeKubeletVolumeHost) GetInformerFactory() informers.SharedInformerFactory {

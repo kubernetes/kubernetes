@@ -58,7 +58,7 @@ const (
 
 // TODO support other ports besides 80
 var (
-	portForwardRegexp = regexp.MustCompile("Forwarding from (127.0.0.1|\\[::1\\]):([0-9]+) -> 80")
+	portForwardRegexp = regexp.MustCompile(`Forwarding from (127.0.0.1|\[::1\]):([0-9]+) -> 80`)
 )
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bindAddress string) *v1.Pod {
@@ -208,7 +208,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 
 func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
-	pod := pfPod("", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
+	pod := pfPod("", "10", "10", "100", bindAddress)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
@@ -256,7 +256,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
-	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
+	pod := pfPod("abc", "1", "1", "1", bindAddress)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
@@ -293,7 +293,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
-	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
+	pod := pfPod("abc", "10", "10", "100", bindAddress)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
@@ -363,7 +363,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	framework.ExpectNoError(err, "unable to get base config")
 
 	ginkgo.By("Creating the pod")
-	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
+	pod := pfPod("def", "10", "10", "100", bindAddress)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}

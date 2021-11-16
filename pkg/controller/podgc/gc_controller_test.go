@@ -54,10 +54,7 @@ func compareStringSetToList(set sets.String, list []string) bool {
 			return false
 		}
 	}
-	if len(list) != len(set) {
-		return false
-	}
-	return true
+	return len(list) == len(set)
 }
 
 func TestGCTerminated(t *testing.T) {

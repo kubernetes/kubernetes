@@ -186,7 +186,7 @@ func newWorkspaceDir() string {
 // Kubelet) so that they can be matched to each other.
 func GetTimestampFromWorkspaceDir(dir string) string {
 	dirTimestamp := strings.TrimPrefix(filepath.Base(dir), workspaceDirPrefix)
-	re := regexp.MustCompile("^\\d{8}T\\d{6}$")
+	re := regexp.MustCompile(`^\d{8}T\d{6}$`)
 	if re.MatchString(dirTimestamp) {
 		return dirTimestamp
 	}

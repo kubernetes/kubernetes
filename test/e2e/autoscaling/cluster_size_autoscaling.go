@@ -135,7 +135,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.AfterEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
-		ginkgo.By(fmt.Sprintf("Restoring initial size of the cluster"))
+		ginkgo.By("Restoring initial size of the cluster")
 		setMigSizes(originalSizes)
 		expectedNodes := 0
 		for _, size := range originalSizes {
@@ -1057,10 +1057,7 @@ func getGkeAPIEndpoint() string {
 	if gkeAPIEndpoint == "" {
 		gkeAPIEndpoint = "https://test-container.sandbox.googleapis.com"
 	}
-	if strings.HasSuffix(gkeAPIEndpoint, "/") {
-		gkeAPIEndpoint = gkeAPIEndpoint[:len(gkeAPIEndpoint)-1]
-	}
-	return gkeAPIEndpoint
+	return strings.TrimSuffix(gkeAPIEndpoint, "/")
 }
 
 func getGKEURL(apiVersion string, suffix string) string {
@@ -1497,7 +1494,7 @@ func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
 type CriticalAddonsOnlyError struct{}
 
 func (CriticalAddonsOnlyError) Error() string {
-	return fmt.Sprintf("CriticalAddonsOnly taint found on node")
+	return "CriticalAddonsOnly taint found on node"
 }
 
 func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAddonsOnly bool) error {
@@ -1787,7 +1784,7 @@ type scaleUpStatus struct {
 // Try to get timestamp from status.
 // Status configmap is not parsing-friendly, so evil regexpery follows.
 func getStatusTimestamp(status string) (time.Time, error) {
-	timestampMatcher, err := regexp.Compile("Cluster-autoscaler status at \\s*([0-9\\-]+ [0-9]+:[0-9]+:[0-9]+\\.[0-9]+ \\+[0-9]+ [A-Za-z]+)")
+	timestampMatcher, err := regexp.Compile(`Cluster-autoscaler status at \s*([0-9\-]+ [0-9]+:[0-9]+:[0-9]+\.[0-9]+ \+[0-9]+ [A-Za-z]+)`)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -1821,7 +1818,7 @@ func getScaleUpStatus(c clientset.Interface) (*scaleUpStatus, error) {
 		return nil, err
 	}
 
-	matcher, err := regexp.Compile("s*ScaleUp:\\s*([A-Za-z]+)\\s*\\(ready=([0-9]+)\\s*cloudProviderTarget=([0-9]+)\\s*\\)")
+	matcher, err := regexp.Compile(`s*ScaleUp:\s*([A-Za-z]+)\s*\(ready=([0-9]+)\s*cloudProviderTarget=([0-9]+)\s*\)`)
 	if err != nil {
 		return nil, err
 	}

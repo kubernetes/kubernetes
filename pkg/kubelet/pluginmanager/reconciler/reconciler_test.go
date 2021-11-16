@@ -189,7 +189,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
-	pluginName := fmt.Sprintf("example-plugin")
+	pluginName := "example-plugin"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
@@ -235,7 +235,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	go reconciler.Run(stopChan)
 
 	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
-	pluginName := fmt.Sprintf("example-plugin")
+	pluginName := "example-plugin"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
@@ -291,7 +291,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	go reconciler.Run(stopChan)
 
 	socketPath := fmt.Sprintf("%s/plugin2.sock", socketDir)
-	pluginName := fmt.Sprintf("example-plugin2")
+	pluginName := "example-plugin2"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
@@ -301,7 +301,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	timeStampBeforeReRegistration := time.Now()
 	// Add the plugin again to update the timestamp
 	dsw.AddOrUpdatePlugin(socketPath)
-	// This should trigger a deregistration and a regitration
+	// This should trigger a deregistration and a registration
 	// The process of unregistration and reregistration can happen so fast that
 	// we are not able to catch it with waitForUnregistration, so here we are checking
 	// the plugin has an updated timestamp.

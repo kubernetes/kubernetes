@@ -401,7 +401,6 @@ func callGubernator(gubernator bool) {
 		}
 		fmt.Printf("%s", output)
 	}
-	return
 }
 
 func (a *Archive) getArchive() (string, error) {
@@ -647,7 +646,6 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				errs = append(errs, fmt.Sprintf("%+v", insertErr))
 			}
 			return "", fmt.Errorf("could not create instance %s: %+v", name, errs)
-
 		}
 		insertionOperationName = op.Name
 	}

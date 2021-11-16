@@ -1896,7 +1896,6 @@ func checkKubectlOutputWithRetry(namespace string, required [][]string, args ...
 	if pollErr != nil {
 		framework.Failf("%v", pollErr)
 	}
-	return
 }
 
 func checkContainersImage(containers []v1.Container, expectImage string) bool {
@@ -2088,7 +2087,6 @@ func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
 // For example, if you send "kitten.jpg", this function verifies that the image jpg = kitten.jpg
 // in the container's json field.
 func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) error {
-
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c clientset.Interface, podID string) error {
 		framework.Logf("validating pod %s", podID)

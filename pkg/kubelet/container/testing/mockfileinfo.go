@@ -99,9 +99,7 @@ func (_mr *_MockFileInfoRecorder) Size() *gomock.Call {
 }
 
 func (_m *MockFileInfo) Sys() interface{} {
-	ret := _m.ctrl.Call(_m, "Sys")
-	ret0, _ := ret[0].(interface{})
-	return ret0
+	return _m.ctrl.Call(_m, "Sys")
 }
 
 func (_mr *_MockFileInfoRecorder) Sys() *gomock.Call {

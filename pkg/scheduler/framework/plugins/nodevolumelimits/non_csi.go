@@ -417,10 +417,7 @@ var ebsVolumeFilter = VolumeFilter{
 	},
 
 	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.AWSEBSInTreePluginName {
-			return true
-		}
-		return false
+		return sc.Provisioner == csilibplugins.AWSEBSInTreePluginName
 	},
 
 	IsMigrated: func(csiNode *storage.CSINode) bool {
@@ -445,10 +442,7 @@ var gcePDVolumeFilter = VolumeFilter{
 	},
 
 	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.GCEPDInTreePluginName {
-			return true
-		}
-		return false
+		return sc.Provisioner == csilibplugins.GCEPDInTreePluginName
 	},
 
 	IsMigrated: func(csiNode *storage.CSINode) bool {
@@ -473,10 +467,7 @@ var azureDiskVolumeFilter = VolumeFilter{
 	},
 
 	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.AzureDiskInTreePluginName {
-			return true
-		}
-		return false
+		return sc.Provisioner == csilibplugins.AzureDiskInTreePluginName
 	},
 
 	IsMigrated: func(csiNode *storage.CSINode) bool {
@@ -502,10 +493,7 @@ var cinderVolumeFilter = VolumeFilter{
 	},
 
 	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.CinderInTreePluginName {
-			return true
-		}
-		return false
+		return sc.Provisioner == csilibplugins.CinderInTreePluginName
 	},
 
 	IsMigrated: func(csiNode *storage.CSINode) bool {

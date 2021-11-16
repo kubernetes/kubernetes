@@ -1330,7 +1330,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 		Logf("Error indenting: %v", err)
 		return ""
 	}
-	return string(formatted.Bytes())
+	return formatted.String()
 }
 
 // taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
@@ -1395,7 +1395,7 @@ retriesLoop:
 					break actualWatchEventsLoop
 				}
 			}
-			if foundExpectedWatchEvent == false {
+			if !foundExpectedWatchEvent {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
 			}
 			totalValidWatchEvents++

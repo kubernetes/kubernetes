@@ -576,7 +576,7 @@ func startUDPServer(address string, udpPort int) {
 	}()
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
-		assertNoError(err, fmt.Sprintf("failed accepting UDP connections"))
+		assertNoError(err, "failed accepting UDP connections")
 		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
 		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
@@ -619,7 +619,7 @@ func startSCTPServer(sctpPort int) {
 	}()
 	for {
 		conn, err := listener.AcceptSCTP()
-		assertNoError(err, fmt.Sprintf("failed accepting SCTP connections"))
+		assertNoError(err, "failed accepting SCTP connections")
 		clientAddress := conn.RemoteAddr().String()
 		n, err := conn.Read(buf)
 		assertNoError(err, fmt.Sprintf("failed to read from SCTP client %s", clientAddress))

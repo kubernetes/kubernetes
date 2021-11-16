@@ -137,9 +137,9 @@ func (w *walker) firstArg(n *ast.CallExpr) string {
 			panic(err)
 		}
 		if strings.Contains(v, "%") {
-			v = strings.Replace(v, "%d", "*", -1)
-			v = strings.Replace(v, "%v", "*", -1)
-			v = strings.Replace(v, "%s", "*", -1)
+			v = strings.ReplaceAll(v, "%d", "*")
+			v = strings.ReplaceAll(v, "%v", "*")
+			v = strings.ReplaceAll(v, "%s", "*")
 		}
 		return v
 	}

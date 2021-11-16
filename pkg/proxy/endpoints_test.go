@@ -155,7 +155,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: false, Serving: true, Terminating: true},
 			},
 		},
-		expected: make(map[types.NamespacedName]sets.String, 0),
+		expected: make(map[types.NamespacedName]sets.String),
 	}}
 
 	for tci, tc := range testCases {
@@ -451,7 +451,6 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-
 			epTracker := NewEndpointChangeTracker("test-hostname", nil, tc.ipFamily, nil, nil)
 
 			// outputs

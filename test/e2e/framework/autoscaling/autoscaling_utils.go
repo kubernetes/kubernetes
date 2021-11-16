@@ -502,7 +502,7 @@ func runServiceAndSidecarForResourceConsumer(c clientset.Interface, ns, name str
 	_, err := createService(c, sidecarName, ns, serviceAnnotations, serviceSelectors, port, sidecarTargetPort)
 	framework.ExpectNoError(err)
 
-	ginkgo.By(fmt.Sprintf("Running controller for sidecar"))
+	ginkgo.By("Running controller for sidecar")
 	controllerName := sidecarName + "-ctrl"
 	_, err = createService(c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
 	framework.ExpectNoError(err)
@@ -566,7 +566,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		framework.Failf(invalidKind)
 	}
 
-	ginkgo.By(fmt.Sprintf("Running controller"))
+	ginkgo.By("Running controller")
 	controllerName := name + "-ctrl"
 	_, err = createService(c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
 	framework.ExpectNoError(err)

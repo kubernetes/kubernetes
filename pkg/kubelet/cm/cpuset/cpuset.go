@@ -178,14 +178,14 @@ func (s CPUSet) UnionAll(s2 []CPUSet) CPUSet {
 // that are present in both this set and the supplied set, without mutating
 // either source set.
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
-	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.Filter(s2.Contains)
 }
 
 // Difference returns a new CPU set that contains all of the elements that
 // are present in this set and not the supplied set, without mutating either
 // source set.
 func (s CPUSet) Difference(s2 CPUSet) CPUSet {
-	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.FilterNot(s2.Contains)
 }
 
 // ToSlice returns a slice of integers that contains all elements from

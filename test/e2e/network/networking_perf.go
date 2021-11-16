@@ -138,7 +138,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
 
-	ginkgo.It(fmt.Sprintf("should run iperf2"), func() {
+	ginkgo.It("should run iperf2", func() {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 

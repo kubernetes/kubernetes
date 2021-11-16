@@ -203,7 +203,7 @@ func checkAffinity(cs clientset.Interface, execPod *v1.Pod, serviceIP string, se
 			return false
 		}
 		if !trackerFulfilled {
-			checkAffinityFailed(tracker, fmt.Sprintf("Connection timed out or not enough responses."))
+			checkAffinityFailed(tracker, "Connection timed out or not enough responses.")
 		}
 		if shouldHold {
 			checkAffinityFailed(tracker, "Affinity should hold but didn't.")

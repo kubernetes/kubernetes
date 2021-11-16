@@ -103,7 +103,6 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 })
 
 func invokeTest(f *framework.Framework, client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, diskFormat string) {
-
 	framework.Logf("Invoking Test for DiskFomat: %s", diskFormat)
 	scParameters := make(map[string]string)
 	scParameters["diskformat"] = diskFormat
@@ -161,7 +160,6 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 	ginkgo.By("Delete pod and wait for volume to be detached from node")
 	deletePodAndWaitForVolumeToDetach(f, client, pod, nodeName, volumePaths)
-
 }
 
 func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath string, diskFormat string) bool {
@@ -199,15 +197,15 @@ func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath 
 	framework.ExpectEqual(diskFound, true, "Failed to find disk")
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
-		if eagerlyScrub == true && thinProvisioned == false {
+		if eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "zeroedthick" {
-		if eagerlyScrub == false && thinProvisioned == false {
+		if !eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "thin" {
-		if eagerlyScrub == false && thinProvisioned == true {
+		if !eagerlyScrub && thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	}

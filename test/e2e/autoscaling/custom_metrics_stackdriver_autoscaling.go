@@ -416,8 +416,7 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 		},
 	}
 	for metric, target := range metricTargets {
-		var metricSpec as.MetricSpec
-		metricSpec = as.MetricSpec{
+		metricSpec := as.MetricSpec{
 			Type: as.ExternalMetricSourceType,
 			External: &as.ExternalMetricSource{
 				Metric: as.MetricIdentifier{

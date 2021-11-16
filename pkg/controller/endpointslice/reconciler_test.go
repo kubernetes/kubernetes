@@ -1571,7 +1571,7 @@ func TestReconcileTopology(t *testing.T) {
 			}
 
 			for zone, expectedNum := range tc.expectedHints {
-				actualNum, _ := actualHints[zone]
+				actualNum := actualHints[zone]
 				if actualNum != expectedNum {
 					t.Errorf("Expected %d hints for %s zone, got %d", expectedNum, zone, actualNum)
 				}

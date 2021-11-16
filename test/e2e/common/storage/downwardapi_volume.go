@@ -192,7 +192,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_limit")
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("2\n"),
+			"2\n",
 		})
 	})
 
@@ -206,7 +206,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("67108864\n"),
+			"67108864\n",
 		})
 	})
 
@@ -220,7 +220,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_request")
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("1\n"),
+			"1\n",
 		})
 	})
 
@@ -234,7 +234,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_request")
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("33554432\n"),
+			"33554432\n",
 		})
 	})
 
@@ -347,7 +347,6 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
@@ -364,7 +363,6 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *v1.Pod {

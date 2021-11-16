@@ -1052,7 +1052,7 @@ func createWriteCmd(testDir string, testFile string, writeTestFileContent string
 		writeTestFileCmd := fmt.Sprintf("mkdir -p %s; echo %s > %s", testFileDir, writeTestFileContent, testFilePath)
 		// sudo is needed when using ssh exec to node.
 		// sudo is not needed and does not exist in some containers (e.g. busybox), when using pod exec.
-		sudoCmd := fmt.Sprintf("SUDO_CMD=$(which sudo); echo ${SUDO_CMD}")
+		sudoCmd := "SUDO_CMD=$(which sudo); echo ${SUDO_CMD}"
 		// Write the testFileContent into the block device.
 		writeBlockCmd := fmt.Sprintf("${SUDO_CMD} dd if=%s of=%s bs=512 count=100", testFilePath, testDir)
 		// Cleanup the file containing testFileContent.

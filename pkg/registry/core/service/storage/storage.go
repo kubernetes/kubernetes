@@ -85,7 +85,6 @@ func NewREST(
 	endpoints EndpointsStorage,
 	pods PodStorage,
 	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
-
 	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
 	store := &genericregistry.Store{
@@ -607,10 +606,7 @@ func patchAllocatedValues(after After, before Before) {
 }
 
 func needsClusterIP(svc *api.Service) bool {
-	if svc.Spec.Type == api.ServiceTypeExternalName {
-		return false
-	}
-	return true
+	return svc.Spec.Type != api.ServiceTypeExternalName
 }
 
 func needsNodePort(svc *api.Service) bool {

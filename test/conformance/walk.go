@@ -190,7 +190,7 @@ func getConformanceDataFromStackTrace(fullstackstrace string) (*ConformanceData,
 	// The full stacktrace to parse from ginkgo is of the form:
 	// k8s.io/kubernetes/test/e2e/storage/utils.SIGDescribe(0x51f4c4f, 0xf, 0x53a0dd8, 0xc000ab6e01)\n\ttest/e2e/storage/utils/framework.go:23 +0x75\n ... ...
 	// So we need to split it into lines, remove whitespace, and then grab the files/lines.
-	stack := strings.Replace(fullstackstrace, "\t", "", -1)
+	stack := strings.ReplaceAll(fullstackstrace, "\t", "")
 	calls := strings.Split(stack, "\n")
 	frames := []frame{}
 	i := 0
@@ -303,17 +303,17 @@ func commentToConformanceData(comment string) *ConformanceData {
 		if len(line) == 0 {
 			continue
 		}
-		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Testname\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Testname"
 			cd.TestName = sline[1]
 			continue
 		}
-		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Release\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Release"
 			cd.Release = sline[1]
 			continue
 		}
-		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Description\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Description"
 			descLines = append(descLines, sline[1])
 			continue

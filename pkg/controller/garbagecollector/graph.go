@@ -74,9 +74,7 @@ func (n *node) clone() *node {
 	for dep := range n.dependents {
 		c.dependents[dep] = struct{}{}
 	}
-	for _, owner := range n.owners {
-		c.owners = append(c.owners, owner)
-	}
+	c.owners = append(c.owners, n.owners...)
 	return c
 }
 

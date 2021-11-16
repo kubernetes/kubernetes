@@ -56,7 +56,7 @@ func convertObjToConfigMap(name string, obj runtime.Object) (*v1.ConfigMap, erro
 			Name: name,
 		},
 		Data: map[string]string{
-			name: string(eJSONBytes[:]),
+			name: string(eJSONBytes),
 		},
 	}
 	return cm, nil
