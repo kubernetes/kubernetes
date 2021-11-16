@@ -39,6 +39,64 @@ func seccompLocalhostPath(profileName string) string {
 	return "localhost/" + seccompLocalhostRef(profileName)
 }
 
+func TestIsInitContainerFailed(t *testing.T) {
+	tests := []struct {
+		status      *kubecontainer.Status
+		isFailed    bool
+		description string
+	}{
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			isFailed:    true,
+			description: "Init container in exited state and non-zero exit code should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateUnknown,
+			},
+			isFailed:    true,
+			description: "Init container in unknown state should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				Reason:   "OOMKilled",
+				ExitCode: 0,
+			},
+			isFailed:    true,
+			description: "Init container which reason is OOMKilled should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			isFailed:    false,
+			description: "Init container in exited state and zero exit code should return false",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateRunning,
+			},
+			isFailed:    false,
+			description: "Init container in running state should return false",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateCreated,
+			},
+			isFailed:    false,
+			description: "Init container in created state should return false",
+		},
+	}
+	for i, test := range tests {
+		isFailed := isInitContainerFailed(test.status)
+		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]: %s", i, test.description)
+	}
+}
+
 func TestStableKey(t *testing.T) {
 	container := &v1.Container{
 		Name:  "test_container",
