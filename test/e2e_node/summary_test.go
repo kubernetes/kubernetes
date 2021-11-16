@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/onsi/ginkgo"
@@ -40,6 +41,7 @@ import (
 
 var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {

@@ -22,10 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 

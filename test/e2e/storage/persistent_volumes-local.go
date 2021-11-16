@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"math/rand"
 	"path/filepath"
 	"strconv"
@@ -149,6 +150,7 @@ var (
 
 var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		config *localTestConfig

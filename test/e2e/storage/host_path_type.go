@@ -31,12 +31,14 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-directory")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -103,6 +105,7 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-file")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -171,6 +174,7 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-socket")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -236,6 +240,7 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-char-dev")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns            string
@@ -305,6 +310,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-block-dev")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns             string
