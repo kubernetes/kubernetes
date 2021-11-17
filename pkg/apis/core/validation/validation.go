@@ -2725,6 +2725,7 @@ type commonHandler struct {
 	Exec      *core.ExecAction
 	HTTPGet   *core.HTTPGetAction
 	TCPSocket *core.TCPSocketAction
+	GRPC      *core.GRPCAction
 }
 
 func handlerFromProbe(ph *core.ProbeHandler) commonHandler {
@@ -2732,6 +2733,7 @@ func handlerFromProbe(ph *core.ProbeHandler) commonHandler {
 		Exec:      ph.Exec,
 		HTTPGet:   ph.HTTPGet,
 		TCPSocket: ph.TCPSocket,
+		GRPC:      ph.GRPC,
 	}
 }
 
@@ -2848,7 +2850,9 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
-
+func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
+	return ValidatePortNumOrName(intstr.FromInt(int(grpc.Port)), fldPath.Child("port"))
+}
 func validateHandler(handler commonHandler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
@@ -2874,6 +2878,14 @@ func validateHandler(handler commonHandler, fldPath *field.Path) field.ErrorList
 		} else {
 			numHandlers++
 			allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket, fldPath.Child("tcpSocket"))...)
+		}
+	}
+	if handler.GRPC != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("gRPC"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("gRPC"))...)
 		}
 	}
 	if numHandlers == 0 {

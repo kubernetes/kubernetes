@@ -1942,6 +1942,9 @@ func DescribeProbe(probe *corev1.Probe) string {
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
 		return fmt.Sprintf("tcp-socket %s:%s %s", probe.TCPSocket.Host, probe.TCPSocket.Port.String(), attrs)
+
+	case probe.GRPC != nil:
+		return fmt.Sprintf("grpc <pod>:%d %s %s", probe.GRPC.Port, *(probe.GRPC.Service), attrs)
 	}
 	return fmt.Sprintf("unknown %s", attrs)
 }
