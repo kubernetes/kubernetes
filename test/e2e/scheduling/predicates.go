@@ -126,7 +126,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
-			framework.ExpectEqual(found, true)
+			if !found {
+				framework.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceEphemeralStorage)
+			}
 			nodeToAllocatableMap[node.Name] = allocatable.Value()
 			if nodeMaxAllocatable < allocatable.Value() {
 				nodeMaxAllocatable = allocatable.Value()
@@ -145,9 +147,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 
 		var podsNeededForSaturation int
-		var ephemeralStoragePerPod int64
-
-		ephemeralStoragePerPod = nodeMaxAllocatable / maxNumberOfPods
+		ephemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
 
 		framework.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
@@ -267,7 +267,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		})
 
 		ginkgo.It("verify pod overhead is accounted for", func() {
-			framework.ExpectEqual(testNodeName != "", true)
+			if testNodeName == "" {
+				framework.Fail("unable to find a node which can run a pod")
+			}
 
 			ginkgo.By("Starting Pod to consume most of the node's resource.")
 
@@ -339,7 +341,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			// Find allocatable amount of CPU.
 			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-			framework.ExpectEqual(found, true)
+			if !found {
+				framework.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceCPU)
+			}
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
 				nodeMaxAllocatable = allocatable.MilliValue()
@@ -934,9 +938,14 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podN
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
-	success, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
+	observed, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(success, true)
+	if expectSuccess && !observed {
+		framework.Failf("Did not observe success event after performing the supplied action for pod %v", podName)
+	}
+	if !expectSuccess && !observed {
+		framework.Failf("Did not observe failed event after performing the supplied action for pod %v", podName)
+	}
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
@@ -986,7 +995,7 @@ func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 
 // CreateHostPortPods creates RC with host port 4321
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
-	ginkgo.By(fmt.Sprintf("Running RC which reserves host port"))
+	ginkgo.By("Running RC which reserves host port")
 	config := &testutils.RCConfig{
 		Client:    f.ClientSet,
 		Name:      id,
@@ -1004,7 +1013,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 
 // CreateNodeSelectorPods creates RC with host port 4321 and defines node selector
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) error {
-	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
+	ginkgo.By("Running RC which reserves host port and defines node selector")
 
 	config := &testutils.RCConfig{
 		Client:       f.ClientSet,
@@ -1074,11 +1083,13 @@ func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods,
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
 			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-			framework.ExpectEqual(scheduledCondition != nil, true)
-			if scheduledCondition != nil {
-				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
-				scheduledPods = append(scheduledPods, pod)
+			if scheduledCondition == nil {
+				framework.Failf("Did not find 'scheduled' condition for pod %+v", podName)
 			}
+			if scheduledCondition.Status != v1.ConditionTrue {
+				framework.Failf("PodStatus isn't 'true' for pod %+v", podName)
+			}
+			scheduledPods = append(scheduledPods, pod)
 		} else if pod.Spec.NodeName == "" {
 			notScheduledPods = append(notScheduledPods, pod)
 		}

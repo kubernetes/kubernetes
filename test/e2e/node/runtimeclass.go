@@ -58,8 +58,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			labelFooName: "bar",
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
+		if !apierrors.IsForbidden(err) {
+			framework.Failf("expected 'forbidden' as error, got instead: %v", err)
+		}
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
