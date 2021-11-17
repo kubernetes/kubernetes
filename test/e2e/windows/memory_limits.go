@@ -18,9 +18,14 @@ package windows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
+
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -184,12 +188,14 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
-
 	status := nodeList.Items[0].Status
-
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := e2ekubelet.GetCurrentKubeletConfig(nodeName, f.Namespace.Name, true)
+	framework.Logf("Getting configuration details for node %s", nodeName)
+	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz")
+	rawbytes, err := request.DoRaw(context.Background())
+	framework.ExpectNoError(err)
+	kubeletConfig, err := decodeConfigz(rawbytes)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -241,4 +247,33 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 	}
 
 	return totalAllocatable
+}
+
+// modified from https://github.com/kubernetes/kubernetes/blob/master/test/e2e/framework/kubelet/config.go#L110
+// the proxy version was causing and non proxy used a value that isn't set by e2e
+func decodeConfigz(contentsBytes []byte) (*kubeletconfig.KubeletConfiguration, error) {
+	// This hack because /configz reports the following structure:
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
+	type configzWrapper struct {
+		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
+	}
+
+	configz := configzWrapper{}
+	kubeCfg := kubeletconfig.KubeletConfiguration{}
+
+	err := json.Unmarshal(contentsBytes, &configz)
+	if err != nil {
+		return nil, err
+	}
+
+	scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	err = scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeCfg, nil
 }
