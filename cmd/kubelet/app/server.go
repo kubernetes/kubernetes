@@ -22,6 +22,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	goioutil "io/ioutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"math"
 	"net"
 	"net/http"
@@ -153,6 +156,11 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		// `args` arg to Run, without Cobra's interference.
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
+			// HACK: pass "experimental-watch-progress-notify-interval" to etcd for tests that run inside CI and use kind
+			if err := setProgressNotificationFlagForEtcd(); err != nil {
+				klog.ErrorS(err, "Failed to set progress notification flag")
+			}
+
 			// initial flag parse, since we disable cobra's flag parsing
 			if err := cleanFlagSet.Parse(args); err != nil {
 				klog.ErrorS(err, "Failed to parse kubelet flag")
@@ -1372,4 +1380,47 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %w", err)
 	}
 	return kc, c, nil
+}
+
+func setProgressNotificationFlagForEtcd() error {
+	etcdManifest := "/etc/kubernetes/manifests/etcd.yaml"
+	coreScheme := runtime.NewScheme()
+	coreCodecs := serializer.NewCodecFactory(coreScheme)
+	if err := corev1.AddToScheme(coreScheme); err != nil {
+		return err
+	}
+
+	for i := 0; i < 10; i++ {
+		podBytes, err := goioutil.ReadFile(etcdManifest)
+		if err != nil {
+			klog.ErrorS(fmt.Errorf("failed to read %v due to %v, will retry", etcdManifest, err), "")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		rawPod, err := runtime.Decode(coreCodecs.UniversalDecoder(corev1.SchemeGroupVersion), podBytes)
+		if err != nil {
+			return err
+		}
+		etcdPod := rawPod.(*corev1.Pod)
+		if len(etcdPod.Spec.Containers) < 1 {
+			return fmt.Errorf("didn't find a container in etcd manifest")
+		}
+
+		etcdContainer := etcdPod.Spec.Containers[0]
+		for _, arg := range etcdContainer.Args {
+			if strings.Contains(arg, "experimental-watch-progress-notify-interval") {
+				return nil
+			}
+		}
+		etcdContainer.Args = append(etcdContainer.Args, "--experimental-watch-progress-notify-interval=5s")
+		etcdPod.Spec.Containers[0] = etcdContainer
+		newEtcdPod, err := runtime.Encode(coreCodecs.LegacyCodec(corev1.SchemeGroupVersion), etcdPod)
+		if err != nil {
+			return err
+		}
+		klog.InfoS("writing modified", "etcd manifest to", etcdManifest)
+		return goioutil.WriteFile(etcdManifest, newEtcdPod, 0644)
+	}
+	return nil
 }
