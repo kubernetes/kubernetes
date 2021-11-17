@@ -104,7 +104,7 @@ type Endpoint struct {
 	//   endpoint is located. This should match the corresponding node label.
 	// * topology.kubernetes.io/region: the value indicates the region where the
 	//   endpoint is located. This should match the corresponding node label.
-	// This field is deprecated and will be removed in future api versions.
+	// Deprecated: This field is deprecated and will be removed in future api versions.
 	// +optional
 	Topology map[string]string `json:"topology,omitempty" protobuf:"bytes,5,opt,name=topology"`
 	// nodeName represents the name of the Node hosting this endpoint. This can

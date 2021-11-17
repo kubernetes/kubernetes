@@ -90,7 +90,7 @@ type Scale struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,StatefulSet
 
-// DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for
+// DEPRECATED: This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for
 // more information.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
@@ -323,7 +323,7 @@ type StatefulSetList struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
 
-// DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
+// DEPRECATED: This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -719,7 +719,7 @@ type DaemonSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DaemonSet
 
-// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for
+// DEPRECATED: This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
@@ -775,7 +775,7 @@ type DaemonSetList struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSet
 
-// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
+// DEPRECATED: This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSet struct {
@@ -911,7 +911,7 @@ type ReplicaSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ControllerRevision
 
-// DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1/ControllerRevision. See the
+// DEPRECATED: This group version of ControllerRevision is deprecated by apps/v1/ControllerRevision. See the
 // release notes for more information.
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain

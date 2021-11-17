@@ -81,7 +81,7 @@ type Scale struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
 
-// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// DEPRECATED: This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -521,7 +521,7 @@ type DaemonSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DaemonSet
 
-// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// DEPRECATED: This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
@@ -587,7 +587,7 @@ type DaemonSetList struct {
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
-// DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
+// DEPRECATED: This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -844,7 +844,7 @@ type IngressBackend struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSet
 
-// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
+// DEPRECATED: This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSet struct {
@@ -1364,7 +1364,7 @@ type PodSecurityPolicyList struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1,NetworkPolicy
 
-// DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy.
+// DEPRECATED: This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy. (remove version = 1.9)
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1378,7 +1378,7 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// DEPRECATED 1.9 - This group version of PolicyType is deprecated by networking/v1/PolicyType.
+// DEPRECATED: This group version of PolicyType is deprecated by networking/v1/PolicyType.(remove version = 1.9)
 // Policy Type string describes the NetworkPolicy type
 // This type is beta-level in 1.8
 type PolicyType string
@@ -1390,7 +1390,7 @@ const (
 	PolicyTypeEgress PolicyType = "Egress"
 )
 
-// DEPRECATED 1.9 - This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec.
+// DEPRECATED: This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec. (remove version = 1.9)
 type NetworkPolicySpec struct {
 	// Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
 	// is applied to any pods selected by this field. Multiple network policies can select the
@@ -1433,7 +1433,7 @@ type NetworkPolicySpec struct {
 	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
 }
 
-// DEPRECATED 1.9 - This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule.
+// DEPRECATED: This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule. (remove version = 1.9)
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
 type NetworkPolicyIngressRule struct {
 	// List of ports which should be made accessible on the pods selected for this rule.
@@ -1453,7 +1453,7 @@ type NetworkPolicyIngressRule struct {
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
-// DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
+// DEPRECATED: This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule. (remove version = 1.9)
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
 // This type is beta-level in 1.8
@@ -1475,7 +1475,7 @@ type NetworkPolicyEgressRule struct {
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
-// DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
+// DEPRECATED: This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort. (remove version = 1.9)
 type NetworkPolicyPort struct {
 	// Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match.
 	// If not specified, this field defaults to TCP.
@@ -1499,7 +1499,7 @@ type NetworkPolicyPort struct {
 	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 
-// DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
+// DEPRECATED: This group version of IPBlock is deprecated by networking/v1/IPBlock. (remove version = 1.9)
 // IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
@@ -1514,7 +1514,7 @@ type IPBlock struct {
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
 }
 
-// DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.
+// DEPRECATED: This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer. (remove version = 1.9)
 type NetworkPolicyPeer struct {
 	// This is a label selector which selects Pods. This field follows standard label
 	// selector semantics; if present but empty, it selects all pods.
@@ -1546,7 +1546,7 @@ type NetworkPolicyPeer struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1,NetworkPolicyList
 
-// DEPRECATED 1.9 - This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList.
+// DEPRECATED: This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList. (remove version = 1.9)
 // Network Policy List is a list of NetworkPolicy objects.
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`

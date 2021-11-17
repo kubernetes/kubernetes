@@ -78,7 +78,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:deprecated=1.21
 // +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,Event
 
-// DEPRECATED - This group version of Event is deprecated by audit.k8s.io/v1/Event. See the release notes for
+// DEPRECATED: This group version of Event is deprecated by audit.k8s.io/v1/Event. See the release notes for
 // more information.
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
@@ -171,7 +171,7 @@ type EventList struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.21
 // +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,Policy
 
-// DEPRECATED - This group version of Policy is deprecated by audit.k8s.io/v1/Policy. See the release notes for
+// DEPRECATED: This group version of Policy is deprecated by audit.k8s.io/v1/Policy. See the release notes for
 // more information.
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.

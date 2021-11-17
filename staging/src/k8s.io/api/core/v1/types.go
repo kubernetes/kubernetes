@@ -40,7 +40,7 @@ type Volume struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// VolumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
-	// This implied behavior is deprecated and will be removed in a future version.
+	// Deprecated: This implied behavior is deprecated and will be removed in a future version.
 	VolumeSource `json:",inline" protobuf:"bytes,2,opt,name=volumeSource"`
 }
 
@@ -968,7 +968,7 @@ type CephFSPersistentVolumeSource struct {
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
 	// Name of the dataset stored as metadata -> name on the dataset for Flocker
-	// should be considered as deprecated
+	// Deprecated: This field should be considered as deprecated
 	// +optional
 	DatasetName string `json:"datasetName,omitempty" protobuf:"bytes,1,opt,name=datasetName"`
 	// UUID of the dataset. This is unique identifier of a Flocker dataset
@@ -4768,7 +4768,7 @@ type NodeSpec struct {
 
 	// Deprecated. If specified, the source of the node's configuration.
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field.
-	// This field is deprecated as of 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
+	// Deprecated: This field is deprecated as of 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 	// +optional
 	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
 
@@ -4779,7 +4779,7 @@ type NodeSpec struct {
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
-// This API is deprecated since 1.22
+// Deprecated: This API is deprecated since 1.22
 type NodeConfigSource struct {
 	// For historical context, regarding the below kind, apiVersion, and configMapRef deprecation tags:
 	// 1. kind/apiVersion were used by the kubelet to persist this struct to disk (they had no protobuf tags)
@@ -4797,7 +4797,7 @@ type NodeConfigSource struct {
 }
 
 // ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
-// This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
+// Deprecated: This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.
@@ -4928,7 +4928,7 @@ type NodeStatus struct {
 	Allocatable ResourceList `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=ResourceList,castkey=ResourceName"`
 	// NodePhase is the recently observed lifecycle phase of the node.
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#phase
-	// The field is never populated, and now is deprecated.
+	// Deprecated: The field is never populated, and now is deprecated.
 	// +optional
 	Phase NodePhase `json:"phase,omitempty" protobuf:"bytes,3,opt,name=phase,casttype=NodePhase"`
 	// Conditions is an array of current observed node conditions.

@@ -89,16 +89,16 @@ type Event struct {
 	// +optional
 	Type string `json:"type,omitempty" protobuf:"bytes,11,opt,name=type"`
 
-	// deprecatedSource is the deprecated field assuring backward compatibility with core.v1 Event type.
+	// Deprecated: deprecatedSource is the deprecated field assuring backward compatibility with core.v1 Event type.
 	// +optional
 	DeprecatedSource corev1.EventSource `json:"deprecatedSource,omitempty" protobuf:"bytes,12,opt,name=deprecatedSource"`
-	// deprecatedFirstTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type.
+	// Deprecated: deprecatedFirstTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type.
 	// +optional
 	DeprecatedFirstTimestamp metav1.Time `json:"deprecatedFirstTimestamp,omitempty" protobuf:"bytes,13,opt,name=deprecatedFirstTimestamp"`
-	// deprecatedLastTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type.
+	// Deprecated: deprecatedLastTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type.
 	// +optional
 	DeprecatedLastTimestamp metav1.Time `json:"deprecatedLastTimestamp,omitempty" protobuf:"bytes,14,opt,name=deprecatedLastTimestamp"`
-	// deprecatedCount is the deprecated field assuring backward compatibility with core.v1 Event type.
+	// Deprecated: deprecatedCount is the deprecated field assuring backward compatibility with core.v1 Event type.
 	// +optional
 	DeprecatedCount int32 `json:"deprecatedCount,omitempty" protobuf:"varint,15,opt,name=deprecatedCount"`
 }

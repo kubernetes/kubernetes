@@ -48,7 +48,7 @@ type Volume struct {
 	Name string
 	// The VolumeSource represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
-	// This implied behavior is deprecated and will be removed in a future version.
+	// Deprecated: This implied behavior is deprecated and will be removed in a future version.
 	// +optional
 	VolumeSource
 }
@@ -276,7 +276,7 @@ type PersistentVolumeClaimVolumeSource struct {
 
 const (
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
-	// It's deprecated and will be removed in a future release. (#51440)
+	// Deprecated: It's deprecated and will be removed in a future release. (#51440)
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
@@ -1239,7 +1239,7 @@ type CephFSPersistentVolumeSource struct {
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
 	// Name of the dataset stored as metadata -> name on the dataset for Flocker
-	// should be considered as deprecated
+	// Deprecated: This field should be considered as deprecated
 	// +optional
 	DatasetName string
 	// UUID of the dataset. This is unique identifier of a Flocker dataset

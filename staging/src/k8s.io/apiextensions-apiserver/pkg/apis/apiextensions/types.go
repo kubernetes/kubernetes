@@ -177,7 +177,7 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
-	// deprecated indicates this version of the custom resource API is deprecated.
+	// Deprecated: this version of the custom resource API is deprecated.
 	// When set to true, API requests to this version receive a warning header in the server response.
 	// Defaults to false.
 	Deprecated bool
