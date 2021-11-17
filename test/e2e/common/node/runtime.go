@@ -188,11 +188,8 @@ while true; do sleep 1; done
 				Release: v1.15
 				Testname: Container Runtime, TerminationMessagePath, non-root user and non-default path
 				Description: Create a pod with a container to run it as a non-root user with a custom TerminationMessagePath set. Pod redirects the output to the provided path successfully. When the container is terminated, the termination message MUST match the expected output logged in the provided custom path.
-				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
-				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
-				// container runtime on Windows
+			framework.ConformanceIt("should report termination message if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},

@@ -406,10 +406,15 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 		probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search %s)" && test -n "$$check" && echo OK > /results/%s;`, lookup, fileName)
 	}
 
+	hostEntryCmd := `test -n "$$(getent hosts %s)" && echo OK > /results/%s;`
+	if framework.NodeOSDistroIs("windows") {
+		// We don't have getent on Windows, but we can still check the hosts file.
+		hostEntryCmd = `test -n "$$(grep '%s' C:/Windows/System32/drivers/etc/hosts)" && echo OK > /results/%s;`
+	}
 	for _, name := range hostEntries {
 		fileName := fmt.Sprintf("%s_hosts@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(getent hosts %s)" && echo OK > /results/%s;`, name, fileName)
+		probeCmd += fmt.Sprintf(hostEntryCmd, name, fileName)
 	}
 
 	if len(ptrLookupIP) > 0 {
