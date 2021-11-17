@@ -32,9 +32,12 @@ const (
 	etcHostsPodName            = "test-pod"
 	etcHostsHostNetworkPodName = "test-host-network-pod"
 	etcHostsPartialContent     = "# Kubernetes-managed hosts file."
-	etcHostsPath               = "/etc/hosts"
+	etcHostsPathLinux          = "/etc/hosts"
+	etcHostsPathWindows        = `C:\Windows\System32\drivers\etc\hosts`
 	etcHostsOriginalPath       = "/etc/hosts-original"
 )
+
+var etcHostsPath string
 
 // KubeletManagedHostConfig defines the types for running managed etc hosts test cases
 type KubeletManagedHostConfig struct {
@@ -44,6 +47,12 @@ type KubeletManagedHostConfig struct {
 }
 
 var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
+	// We can't initialize this on init(), since the test arguments are not treated yet.
+	etcHostsPath = etcHostsPathLinux
+	if framework.NodeOSDistroIs("windows") {
+		etcHostsPath = etcHostsPathWindows
+	}
+
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
 	config := &KubeletManagedHostConfig{
 		f: f,
@@ -52,13 +61,12 @@ var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 	/*
 		Release: v1.9
 		Testname: Kubelet, managed etc hosts
-		Description: Create a Pod with containers with hostNetwork set to false, one of the containers mounts the /etc/hosts file form the host. Create a second Pod with hostNetwork set to true.
+		Description: Create a Pod with containers with hostNetwork set to false, one of the containers mounts the /etc/hosts (or C:\Windows\System32\drivers\etc\hosts for Windows containers) file form the host. Create a second Pod with hostNetwork set to true.
 			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.
 			2. The Pod with hostNetwork=false but the container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be managed by the Kubelet.
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
-		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
 		ginkgo.By("Setting up the test")
 		config.setup()
 
@@ -224,6 +232,9 @@ func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName str
 				},
 			},
 		},
+	}
+	if framework.NodeOSDistroIs("windows") {
+		e2epod.WithWindowsHostProcess(pod, "")
 	}
 	return pod
 }

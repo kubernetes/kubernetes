@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -141,48 +142,32 @@ var _ = SIGDescribe("Kubelet", func() {
 			Release: v1.13
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
-			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
 		*/
-		framework.ConformanceIt("should write entries to /etc/hosts [LinuxOnly] [NodeConformance]", func() {
-			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: podName,
+		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func() {
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "etc-hosts")
+			// Don't restart the Pod since it is expected to exit
+			pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			pod.Spec.HostAliases = []v1.HostAlias{
+				{
+					IP:        "123.45.67.89",
+					Hostnames: []string{"foo", "bar"},
 				},
-				Spec: v1.PodSpec{
-					// Don't restart the Pod since it is expected to exit
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image:   framework.BusyBoxImage,
-							Name:    podName,
-							Command: []string{"/bin/sh", "-c", "cat /etc/hosts; sleep 6000"},
-						},
-					},
-					HostAliases: []v1.HostAlias{
-						{
-							IP:        "123.45.67.89",
-							Hostnames: []string{"foo", "bar"},
-						},
-					},
-				},
-			})
+			}
 
-			gomega.Eventually(func() error {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
-				if err != nil {
-					return err
-				}
-				defer rc.Close()
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(rc)
-				hostsFileContent := buf.String()
+			pod = podClient.Create(pod)
+			ginkgo.By("Waiting for pod completion")
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
 
-				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") {
-					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
-				}
+			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
+			framework.ExpectNoError(err)
+			defer rc.Close()
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(rc)
+			hostsFileContent := buf.String()
 
-				return nil
-			}, time.Minute, time.Second*4).Should(gomega.BeNil())
+			errMsg := fmt.Sprintf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+			framework.ExpectEqual(true, strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar"), errMsg)
 		})
 	})
 	ginkgo.Context("when scheduling a read only busybox container", func() {

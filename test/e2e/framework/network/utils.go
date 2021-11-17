@@ -848,6 +848,11 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		pod.Spec.HostNetwork = config.EndpointsHostNetwork
+
+		// NOTE(claudiub): In order to use HostNetwork on Windows, we need to use Privileged Containers.
+		if pod.Spec.HostNetwork && framework.NodeOSDistroIs("windows") {
+			e2epod.WithWindowsHostProcess(pod, "")
+		}
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}

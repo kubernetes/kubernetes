@@ -576,6 +576,28 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	return execPod
 }
 
+// WithWindowsHostProcess sets the Pod's Windows HostProcess option to true. When this option is set,
+// HostNetwork can be enabled.
+// Containers running as HostProcess will require certain usernames to be set, otherwise the Pod will
+// not start: NT AUTHORITY\SYSTEM, NT AUTHORITY\Local service, NT AUTHORITY\NetworkService.
+// If the given username is empty, NT AUTHORITY\SYSTEM will be used instead.
+// See: https://kubernetes.io/docs/tasks/configure-pod-container/create-hostprocess-pod/
+func WithWindowsHostProcess(pod *v1.Pod, username string) {
+	if pod.Spec.SecurityContext == nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+	}
+	if pod.Spec.SecurityContext.WindowsOptions == nil {
+		pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+	}
+
+	trueVar := true
+	if username == "" {
+		username = "NT AUTHORITY\\SYSTEM"
+	}
+	pod.Spec.SecurityContext.WindowsOptions.HostProcess = &trueVar
+	pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = &username
+}
+
 // CheckPodsRunningReady returns whether all pods whose names are listed in
 // podNames in namespace ns are running and ready, using c and waiting at most
 // timeout.
