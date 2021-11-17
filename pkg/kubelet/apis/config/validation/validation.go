@@ -68,7 +68,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: healthzPort (--healthz-port) %v must be between 1 and 65535, inclusive", kc.HealthzPort))
 	}
 	if !localFeatureGate.Enabled(features.CPUCFSQuotaPeriod) && kc.CPUCFSQuotaPeriod != defaultCFSQuota {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cpuCFSQuotaPeriod %v requires feature gate CustomCPUCFSQuotaPeriod", kc.CPUCFSQuotaPeriod))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) %v requires feature gate CustomCPUCFSQuotaPeriod", kc.CPUCFSQuotaPeriod))
 	}
 	if localFeatureGate.Enabled(features.CPUCFSQuotaPeriod) && utilvalidation.IsInRange(int(kc.CPUCFSQuotaPeriod.Duration), int(1*time.Microsecond), int(time.Second)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) %v must be between 1usec and 1sec, inclusive", kc.CPUCFSQuotaPeriod))
@@ -95,7 +95,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeAPIQPS (--kube-api-qps) %v must not be a negative number", kc.KubeAPIQPS))
 	}
 	if kc.NodeStatusMaxImages < -1 {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeStatusMaxImages (--node-status-max-images) must be -1 or greater"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeStatusMaxImages (--node-status-max-images) %v must be -1 or greater", kc.NodeStatusMaxImages))
 	}
 	if kc.MaxOpenFiles < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: maxOpenFiles (--max-open-files) %v must not be a negative number", kc.MaxOpenFiles))
@@ -143,28 +143,31 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	case kubeletconfig.RestrictedTopologyManagerPolicy:
 	case kubeletconfig.SingleNumaNodeTopologyManagerPolicy:
 	default:
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy non-allowable value: %v", kc.TopologyManagerPolicy))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy (--topology-manager-policy) %q must be one of: %q", kc.TopologyManagerPolicy, []string{kubeletconfig.NoneTopologyManagerPolicy, kubeletconfig.BestEffortTopologyManagerPolicy, kubeletconfig.RestrictedTopologyManagerPolicy, kubeletconfig.SingleNumaNodeTopologyManagerPolicy}))
 	}
 	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && !localFeatureGate.Enabled(features.TopologyManager) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope %v requires feature gate TopologyManager", kc.TopologyManagerScope))
 	}
-	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && kc.TopologyManagerScope != kubeletconfig.PodTopologyManagerScope {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope non-allowable value: %v", kc.TopologyManagerScope))
+	switch kc.TopologyManagerScope {
+	case kubeletconfig.ContainerTopologyManagerScope:
+	case kubeletconfig.PodTopologyManagerScope:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope (--topology-manager-scope) %q must be one of: %q, or %q", kc.TopologyManagerScope, kubeletconfig.ContainerTopologyManagerScope, kubeletconfig.PodTopologyManagerScope))
 	}
 
 	if localFeatureGate.Enabled(features.GracefulNodeShutdown) {
-		if kc.ShutdownGracePeriod.Duration < 0 || kc.ShutdownGracePeriodCriticalPods.Duration < 0 || kc.ShutdownGracePeriodCriticalPods.Duration > kc.ShutdownGracePeriod.Duration {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriod %v must be >= 0, ShutdownGracePeriodCriticalPods %v must be >= 0, and ShutdownGracePeriodCriticalPods %v must be <= ShutdownGracePeriod %v", kc.ShutdownGracePeriod, kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriod))
+		if kc.ShutdownGracePeriodCriticalPods.Duration > kc.ShutdownGracePeriod.Duration {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriodCriticalPods %v must be <= shutdownGracePeriod %v", kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriod))
 		}
-		if kc.ShutdownGracePeriod.Duration > 0 && kc.ShutdownGracePeriod.Duration < time.Duration(time.Second) {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriod %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriod))
+		if kc.ShutdownGracePeriod.Duration < 0 || (kc.ShutdownGracePeriod.Duration > 0 && kc.ShutdownGracePeriod.Duration < time.Second) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriod %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriod))
 		}
-		if kc.ShutdownGracePeriodCriticalPods.Duration > 0 && kc.ShutdownGracePeriodCriticalPods.Duration < time.Duration(time.Second) {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriodCriticalPods %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriodCriticalPods))
+		if kc.ShutdownGracePeriodCriticalPods.Duration < 0 || (kc.ShutdownGracePeriodCriticalPods.Duration > 0 && kc.ShutdownGracePeriodCriticalPods.Duration < time.Second) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriodCriticalPods %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriodCriticalPods))
 		}
 	}
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
 	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
@@ -177,12 +180,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		}
 	}
 	if localFeatureGate.Enabled(features.NodeSwap) {
-		if kc.MemorySwap.SwapBehavior != "" && kc.MemorySwap.SwapBehavior != kubetypes.LimitedSwap && kc.MemorySwap.SwapBehavior != kubetypes.UnlimitedSwap {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
+		switch kc.MemorySwap.SwapBehavior {
+		case "":
+		case kubetypes.LimitedSwap:
+		case kubetypes.UnlimitedSwap:
+		default:
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q, or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.UnlimitedSwap))
 		}
 	}
 	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwap feature flag is disabled"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
@@ -190,15 +197,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		case kubetypes.NodeAllocatableEnforcementKey:
 		case kubetypes.SystemReservedEnforcementKey:
 			if kc.SystemReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when 'system-reserved' contained in enforceNodeAllocatable (--enforce-node-allocatable)"))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey))
 			}
 		case kubetypes.KubeReservedEnforcementKey:
 			if kc.KubeReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when 'kube-reserved' contained in enforceNodeAllocatable (--enforce-node-allocatable)"))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey))
 			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when '%s' is specified", kubetypes.NodeAllocatableNoneKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when %q is specified", kubetypes.NodeAllocatableNoneKey))
 			}
 		default:
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, or %q",
@@ -216,10 +223,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.ReservedSystemCPUs != "" {
 		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup
 		if kc.SystemReservedCgroup != "" || kc.KubeReservedCgroup != "" {
-			allErrors = append(allErrors, fmt.Errorf("can't use reservedSystemCPUs (--reserved-cpus) with systemReservedCgroup (--system-reserved-cgroup) or kubeReservedCgroup (--kube-reserved-cgroup)"))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: can't use reservedSystemCPUs (--reserved-cpus) with systemReservedCgroup (--system-reserved-cgroup) or kubeReservedCgroup (--kube-reserved-cgroup)"))
 		}
 		if _, err := cpuset.Parse(kc.ReservedSystemCPUs); err != nil {
-			allErrors = append(allErrors, fmt.Errorf("unable to parse reservedSystemCPUs (--reserved-cpus), error: %v", err))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: unable to parse reservedSystemCPUs (--reserved-cpus) %v, error: %w", kc.ReservedSystemCPUs, err))
 		}
 	}
 
@@ -238,7 +245,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor is required when MemoryQoS feature flag is enabled"))
 	}
 	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", kc.MemoryThrottlingFactor))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
 	}
 
 	return utilerrors.NewAggregate(allErrors)
