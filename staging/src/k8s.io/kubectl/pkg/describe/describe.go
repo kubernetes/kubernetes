@@ -1415,7 +1415,6 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 		} else {
 			w.Write(LEVEL_2, "%s\n", line)
 		}
-		i++
 	}
 }
 
@@ -1943,6 +1942,9 @@ func DescribeProbe(probe *corev1.Probe) string {
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
 		return fmt.Sprintf("tcp-socket %s:%s %s", probe.TCPSocket.Host, probe.TCPSocket.Port.String(), attrs)
+
+	case probe.GRPC != nil:
+		return fmt.Sprintf("grpc <pod>:%d %s %s", probe.GRPC.Port, *(probe.GRPC.Service), attrs)
 	}
 	return fmt.Sprintf("unknown %s", attrs)
 }
@@ -5111,7 +5113,6 @@ func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
-		i++
 	}
 }
 
@@ -5345,7 +5346,6 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		} else {
 			w.Write(LEVEL_0, "%s: %s\n", key, value)
 		}
-		i++
 	}
 }
 

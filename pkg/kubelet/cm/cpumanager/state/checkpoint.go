@@ -53,7 +53,7 @@ type CPUManagerCheckpointV2 = CPUManagerCheckpoint
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
 func NewCPUManagerCheckpoint() *CPUManagerCheckpoint {
-	//lint:ignore unexported-type-in-api user-facing error message
+	//nolint:staticcheck // unexported-type-in-api user-facing error message
 	return newCPUManagerCheckpointV2()
 }
 

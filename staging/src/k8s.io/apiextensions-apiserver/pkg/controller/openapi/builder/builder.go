@@ -55,7 +55,6 @@ const (
 	objectMetaSchemaRef = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 	listMetaSchemaRef   = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
 
-	listMetaType   = "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"
 	typeMetaType   = "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"
 	objectMetaType = "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"
 
