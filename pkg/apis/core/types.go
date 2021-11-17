@@ -2241,6 +2241,12 @@ type ProbeHandler struct {
 	// TCPSocket specifies an action involving a TCP port.
 	// +optional
 	TCPSocket *TCPSocketAction
+
+	// GRPC specifies an action involving a GRPC port.
+	// This is an alpha field and requires enabling GRPCContainerProbe feature gate.
+	// +featureGate=GRPCContainerProbe
+	// +optional
+	GRPC *GRPCAction
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
@@ -2257,6 +2263,19 @@ type LifecycleHandler struct {
 	// lifecycle hooks will fail in runtime when tcp handler is specified.
 	// +optional
 	TCPSocket *TCPSocketAction
+}
+
+type GRPCAction struct {
+	// Port number of the gRPC service.
+	// Note: Number must be in the range 1 to 65535.
+	Port int32
+
+	// Service is the name of the service to place in the gRPC HealthCheckRequest
+	// (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+	//
+	// If this is not specified, the default behavior is to probe the server's overall health status.
+	// +optional
+	Service *string
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle

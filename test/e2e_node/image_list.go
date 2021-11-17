@@ -63,6 +63,7 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
 	imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
+	imageutils.GetE2EImage(imageutils.Etcd),
 )
 
 // updateImageAllowList updates the framework.ImagePrePullList with
