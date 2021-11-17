@@ -26,7 +26,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -125,6 +124,4 @@ func main(cmd *cobra.Command, args []string) {
 	signal.Notify(signals, syscall.SIGTERM)
 	sig := <-signals
 	log.Printf("Shutting down after receiving signal: %s.\n", sig)
-	log.Printf("Awaiting pod deletion.\n")
-	time.Sleep(60 * time.Second)
 }
