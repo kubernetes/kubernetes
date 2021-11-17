@@ -21,70 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-
-	"github.com/spf13/pflag"
+	v1 "k8s.io/api/core/v1"
 )
-
-func TestTaintsVar(t *testing.T) {
-	cases := []struct {
-		f   string
-		err bool
-		t   []api.Taint
-	}{
-		{
-			f: "",
-			t: []api.Taint(nil),
-		},
-		{
-			f: "--t=foo=bar:NoSchedule",
-			t: []api.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}},
-		},
-		{
-			f: "--t=baz:NoSchedule",
-			t: []api.Taint{{Key: "baz", Value: "", Effect: "NoSchedule"}},
-		},
-		{
-			f: "--t=foo=bar:NoSchedule,baz:NoSchedule,bing=bang:PreferNoSchedule,qux=:NoSchedule",
-			t: []api.Taint{
-				{Key: "foo", Value: "bar", Effect: api.TaintEffectNoSchedule},
-				{Key: "baz", Value: "", Effect: "NoSchedule"},
-				{Key: "bing", Value: "bang", Effect: api.TaintEffectPreferNoSchedule},
-				{Key: "qux", Value: "", Effect: "NoSchedule"},
-			},
-		},
-		{
-			f: "--t=dedicated-for=user1:NoExecute,baz:NoSchedule,foo-bar=:NoSchedule",
-			t: []api.Taint{
-				{Key: "dedicated-for", Value: "user1", Effect: "NoExecute"},
-				{Key: "baz", Value: "", Effect: "NoSchedule"},
-				{Key: "foo-bar", Value: "", Effect: "NoSchedule"},
-			},
-		},
-	}
-
-	for i, c := range cases {
-		args := append([]string{"test"}, strings.Fields(c.f)...)
-		cli := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		var taints []api.Taint
-		cli.Var(NewTaintsVar(&taints), "t", "bar")
-
-		err := cli.Parse(args)
-		if err == nil && c.err {
-			t.Errorf("[%v] expected error", i)
-			continue
-		}
-		if err != nil && !c.err {
-			t.Errorf("[%v] unexpected error: %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(c.t, taints) {
-			t.Errorf("[%v] unexpected taints:\n\texpected:\n\t\t%#v\n\tgot:\n\t\t%#v", i, c.t, taints)
-		}
-	}
-
-}
 
 func TestAddOrUpdateTaint(t *testing.T) {
 	node := &v1.Node{}
@@ -754,6 +692,53 @@ func TestParseTaints(t *testing.T) {
 		}
 		if !reflect.DeepEqual(c.expectedTaintsToRemove, taintsToRemove) {
 			t.Errorf("[%s] expected return taints to be removed as %v, but got: %v", c.name, c.expectedTaintsToRemove, taintsToRemove)
+		}
+	}
+}
+
+func TestValidateTaint(t *testing.T) {
+	cases := []struct {
+		name          string
+		taintsToCheck v1.Taint
+		expectedErr   bool
+	}{
+		{
+			name:          "taint invalid key",
+			taintsToCheck: v1.Taint{Key: "", Value: "bar_1", Effect: v1.TaintEffectNoExecute},
+			expectedErr:   true,
+		},
+		{
+			name:          "taint invalid value",
+			taintsToCheck: v1.Taint{Key: "foo_1", Value: strings.Repeat("a", 64), Effect: v1.TaintEffectNoExecute},
+			expectedErr:   true,
+		},
+		{
+			name:          "taint invalid effect",
+			taintsToCheck: v1.Taint{Key: "foo_2", Value: "bar_2", Effect: "no_such_effect"},
+			expectedErr:   true,
+		},
+		{
+			name:          "valid taint",
+			taintsToCheck: v1.Taint{Key: "foo_3", Value: "bar_3", Effect: v1.TaintEffectNoExecute},
+			expectedErr:   false,
+		},
+		{
+			name:          "valid taint",
+			taintsToCheck: v1.Taint{Key: "foo_4", Effect: v1.TaintEffectNoExecute},
+			expectedErr:   false,
+		},
+		{
+			name:          "valid taint",
+			taintsToCheck: v1.Taint{Key: "foo_5", Value: "bar_5"},
+			expectedErr:   false,
+		},
+	}
+
+	for _, c := range cases {
+		err := CheckTaintValidation(c.taintsToCheck)
+
+		if c.expectedErr && err == nil {
+			t.Errorf("[%s] expected error for spec %+v, but got nothing", c.name, c.taintsToCheck)
 		}
 	}
 }

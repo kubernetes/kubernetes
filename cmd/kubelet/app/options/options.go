@@ -32,7 +32,6 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -40,7 +39,6 @@ import (
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 const defaultRootDir = "/var/lib/kubelet"
@@ -96,14 +94,6 @@ type KubeletFlags struct {
 	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
-
-	// registerNode enables automatic registration with the apiserver.
-	RegisterNode bool
-
-	// registerWithTaints are an array of taints to add to a node object when
-	// the kubelet registers itself. This only takes effect when registerNode
-	// is true and upon the initial registration of the node.
-	RegisterWithTaints []core.Taint
 
 	// WindowsService should be set to true if kubelet is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds.
@@ -188,7 +178,6 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterSchedulable:     true,
 		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
 		NodeLabels:              make(map[string]string),
-		RegisterNode:            true,
 	}
 }
 
@@ -338,9 +327,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. The DynamicKubeletConfig feature gate must be enabled to pass this flag.")
 	fs.MarkDeprecated("dynamic-config-dir", "Feature DynamicKubeletConfig is deprecated in 1.22 and will not move to GA. It is planned to be removed from Kubernetes in the version 1.23. Please use alternative ways to update kubelet configuration.")
-
-	fs.BoolVar(&f.RegisterNode, "register-node", f.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
-	fs.Var(utiltaints.NewTaintsVar(&f.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 
 	// EXPERIMENTAL FLAGS
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "[Experimental] The endpoint of remote runtime service. Currently unix socket endpoint is supported on Linux, while npipe and tcp endpoints are supported on windows. Note: When using docker as container runtime this specifies the dockershim socket location which kubelet itself creates.  Examples:'unix:///var/run/dockershim.sock', 'npipe:////./pipe/dockershim'")
@@ -556,4 +542,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	// Memory Manager Flags
 	fs.StringVar(&c.MemoryManagerPolicy, "memory-manager-policy", c.MemoryManagerPolicy, "Memory Manager policy to use. Possible values: 'None', 'Static'.")
 	fs.Var(&utilflag.ReservedMemoryVar{Value: &c.ReservedMemory}, "reserved-memory", "A comma separated list of memory reservations for NUMA nodes. (e.g. --reserved-memory 0:memory=1Gi,hugepages-1M=2Gi --reserved-memory 1:memory=2Gi). The total sum for each memory type should be equal to the sum of kube-reserved, system-reserved and eviction-threshold. See https://kubernetes.io/docs/tasks/administer-cluster/memory-manager/#reserved-memory-flag for more details.")
+
+	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
+
+	fs.Var(&utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 }

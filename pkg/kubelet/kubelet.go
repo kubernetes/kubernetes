@@ -62,7 +62,6 @@ import (
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -360,7 +359,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	registerNode bool,
-	registerWithTaints []api.Taint,
+	registerWithTaints []v1.Taint,
 	allowedUnsafeSysctls []string,
 	experimentalMounterPath string,
 	kernelMemcgNotification bool,
@@ -944,7 +943,7 @@ type Kubelet struct {
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
 	// List of taints to add to a node object when the kubelet registers itself.
-	registerWithTaints []api.Taint
+	registerWithTaints []v1.Taint
 	// Set to true to have the node register itself as schedulable.
 	registerSchedulable bool
 	// for internal book keeping; access only from within registerWithApiserver
