@@ -67,7 +67,9 @@ type testRESTMapper struct {
 	meta.RESTMapper
 }
 
-func (*testRESTMapper) Reset() {}
+func (m *testRESTMapper) Reset() {
+	meta.MaybeResetRESTMapper(m.RESTMapper)
+}
 
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
