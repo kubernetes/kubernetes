@@ -32,6 +32,9 @@ import (
 // The namespace under which crio aliases are unique.
 const CrioNamespace = "crio"
 
+// The namespace systemd runs components under.
+const SystemdNamespace = "system-systemd"
+
 // Regexp that identifies CRI-O cgroups
 var crioCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
@@ -115,6 +118,9 @@ func (f *crioFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	}
 	if !strings.HasPrefix(path.Base(name), CrioNamespace) {
 		return false, false, nil
+	}
+	if strings.HasPrefix(path.Base(name), SystemdNamespace) {
+		return true, false, nil
 	}
 	// if the container is not associated with CRI-O, we can't handle it or accept it.
 	if !isContainerName(name) {

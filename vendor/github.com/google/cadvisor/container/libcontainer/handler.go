@@ -54,7 +54,10 @@ type Handler struct {
 	rootFs          string
 	pid             int
 	includedMetrics container.MetricSet
+	// pidMetricsCache holds CPU scheduler stats for existing processes (map key is PID) between calls to schedulerStatsFromProcs.
 	pidMetricsCache map[int]*info.CpuSchedstat
+	// pidMetricsSaved holds accumulated CPU scheduler stats for processes that no longer exist.
+	pidMetricsSaved info.CpuSchedstat
 	cycles          uint64
 }
 
@@ -93,14 +96,9 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	stats := newContainerStats(libcontainerStats, h.includedMetrics)
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
-		pids, err := h.cgroupManager.GetAllPids()
+		stats.Cpu.Schedstat, err = h.schedulerStatsFromProcs()
 		if err != nil {
-			klog.V(4).Infof("Could not get PIDs for container %d: %v", h.pid, err)
-		} else {
-			stats.Cpu.Schedstat, err = schedulerStatsFromProcs(h.rootFs, pids, h.pidMetricsCache)
-			if err != nil {
-				klog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
-			}
+			klog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
 		}
 	}
 
@@ -314,9 +312,14 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 	return processStats, nil
 }
 
-func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]*info.CpuSchedstat) (info.CpuSchedstat, error) {
+func (h *Handler) schedulerStatsFromProcs() (info.CpuSchedstat, error) {
+	pids, err := h.cgroupManager.GetAllPids()
+	if err != nil {
+		return info.CpuSchedstat{}, fmt.Errorf("Could not get PIDs for container %d: %w", h.pid, err)
+	}
+	alivePids := make(map[int]struct{}, len(pids))
 	for _, pid := range pids {
-		f, err := os.Open(path.Join(rootFs, "proc", strconv.Itoa(pid), "schedstat"))
+		f, err := os.Open(path.Join(h.rootFs, "proc", strconv.Itoa(pid), "schedstat"))
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't open scheduler statistics for process %d: %v", pid, err)
 		}
@@ -325,14 +328,15 @@ func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't read scheduler statistics for process %d: %v", pid, err)
 		}
+		alivePids[pid] = struct{}{}
 		rawMetrics := bytes.Split(bytes.TrimRight(contents, "\n"), []byte(" "))
 		if len(rawMetrics) != 3 {
 			return info.CpuSchedstat{}, fmt.Errorf("unexpected number of metrics in schedstat file for process %d", pid)
 		}
-		cacheEntry, ok := pidMetricsCache[pid]
+		cacheEntry, ok := h.pidMetricsCache[pid]
 		if !ok {
 			cacheEntry = &info.CpuSchedstat{}
-			pidMetricsCache[pid] = cacheEntry
+			h.pidMetricsCache[pid] = cacheEntry
 		}
 		for i, rawMetric := range rawMetrics {
 			metric, err := strconv.ParseUint(string(rawMetric), 10, 64)
@@ -349,11 +353,20 @@ func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]
 			}
 		}
 	}
-	schedstats := info.CpuSchedstat{}
-	for _, v := range pidMetricsCache {
+	schedstats := h.pidMetricsSaved // copy
+	for p, v := range h.pidMetricsCache {
 		schedstats.RunPeriods += v.RunPeriods
 		schedstats.RunqueueTime += v.RunqueueTime
 		schedstats.RunTime += v.RunTime
+		if _, alive := alivePids[p]; !alive {
+			// PID p is gone: accumulate its stats ...
+			h.pidMetricsSaved.RunPeriods += v.RunPeriods
+			h.pidMetricsSaved.RunqueueTime += v.RunqueueTime
+			h.pidMetricsSaved.RunTime += v.RunTime
+			// ... and remove its cache entry, to prevent
+			// pidMetricsCache from growing.
+			delete(h.pidMetricsCache, p)
+		}
 	}
 	return schedstats, nil
 }
