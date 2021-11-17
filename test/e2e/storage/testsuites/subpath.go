@@ -159,9 +159,10 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
 		e2epod.SetNodeSelection(&l.formatPod.Spec, l.config.ClientNodeSelection)
 
-		l.subPathDir = filepath.Join(volumePath, subPath)
-		l.filePathInSubpath = filepath.Join(volumePath, fileName)
-		l.filePathInVolume = filepath.Join(l.subPathDir, fileName)
+		l.subPathDir = volumePath
+		localVolumePath := filepath.Join(volumePath, subPath)
+		l.filePathInSubpath = filepath.Join(l.subPathDir, fileName)
+		l.filePathInVolume = filepath.Join(localVolumePath, fileName)
 	}
 
 	cleanup := func() {
