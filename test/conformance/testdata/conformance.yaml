@@ -1191,8 +1191,7 @@
   release: v1.20
   file: test/e2e/instrumentation/core_events.go
 - testname: DNS, cluster
-  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
@@ -1206,8 +1205,7 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, resolve the hostname
-  codename: '[sig-network] DNS should provide DNS for pods for Hostname [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for pods for Hostname [Conformance]'
   description: Create a headless service with label. Create a Pod with label to match
     service's label, with hostname and a subdomain same as service name. Pod MUST
     be able to resolve its fully qualified domain name as well as hostname by serving
@@ -1358,7 +1356,7 @@
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: http [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: http [NodeConformance] [Conformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1366,13 +1364,12 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: udp [NodeConformance] [Conformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1380,8 +1377,7 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Proxy, validate Proxy responses
@@ -1690,18 +1686,6 @@
     server pod to validate that the pre-stop is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
-- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
-    path
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] if TerminationMessagePath is set as non-root
-    user and at a non-default path [NodeConformance] [Conformance]'
-  description: 'Create a pod with a container to run it as a non-root user with a
-    custom TerminationMessagePath set. Pod redirects the output to the provided path
-    successfully. When the container is terminated, the termination message MUST match
-    the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
-    due to use of ''uid'' and unable to mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message as empty when pod succeeds and TerminationMessagePolicy
@@ -1728,6 +1712,17 @@
   description: Create a pod with an container. Container's output is recorded in log
     and container exits with an error. When container is terminated, termination message
     MUST match the expected output recorded from container's log.
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
+    path
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message if TerminationMessagePath is set as non-root user and
+    at a non-default path [NodeConformance] [Conformance]'
+  description: Create a pod with a container to run it as a non-root user with a custom
+    TerminationMessagePath set. Pod redirects the output to the provided path successfully.
+    When the container is terminated, the termination message MUST match the expected
+    output logged in the provided custom path.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
