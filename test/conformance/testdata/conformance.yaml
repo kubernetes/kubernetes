@@ -1788,16 +1788,6 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
-- testname: Pod events, verify event from Scheduler and Kubelet
-  codename: '[sig-node] Events should be sent by kubelets and the scheduler about
-    pods scheduling and running  [Conformance]'
-  description: Create a Pod, make sure that the Pod can be queried. Create a event
-    selector for the kind=Pod and the source is the Scheduler. List of the events
-    MUST be at least one. Create a event selector for kind=Pod and the source is the
-    Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST
-    send events when scheduling and running a Pod.
-  release: v1.9
-  file: test/e2e/node/events.go
 - testname: init-container-starts-app-restartalways-pod
   codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
     on a RestartAlways pod [Conformance]'
