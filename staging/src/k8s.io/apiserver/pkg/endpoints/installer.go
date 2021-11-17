@@ -217,7 +217,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	isSubresource := len(subresource) > 0
 
 	// If there is a subresource, namespace scoping is defined by the parent resource
-	namespaceScoped := true
+	var namespaceScoped bool
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
 		if !ok {

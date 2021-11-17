@@ -50,7 +50,7 @@ type IPVar struct {
 }
 
 // Set sets the flag value
-func (v IPVar) Set(s string) error {
+func (v *IPVar) Set(s string) error {
 	if len(s) == 0 {
 		v.Val = nil
 		return nil
@@ -67,7 +67,7 @@ func (v IPVar) Set(s string) error {
 }
 
 // String returns the flag value
-func (v IPVar) String() string {
+func (v *IPVar) String() string {
 	if v.Val == nil {
 		return ""
 	}
@@ -75,7 +75,7 @@ func (v IPVar) String() string {
 }
 
 // Type gets the flag type
-func (v IPVar) Type() string {
+func (v *IPVar) Type() string {
 	return "ip"
 }
 
@@ -85,7 +85,7 @@ type IPPortVar struct {
 }
 
 // Set sets the flag value
-func (v IPPortVar) Set(s string) error {
+func (v *IPPortVar) Set(s string) error {
 	if len(s) == 0 {
 		v.Val = nil
 		return nil
@@ -119,7 +119,7 @@ func (v IPPortVar) Set(s string) error {
 }
 
 // String returns the flag value
-func (v IPPortVar) String() string {
+func (v *IPPortVar) String() string {
 	if v.Val == nil {
 		return ""
 	}
@@ -127,7 +127,7 @@ func (v IPPortVar) String() string {
 }
 
 // Type gets the flag type
-func (v IPPortVar) Type() string {
+func (v *IPPortVar) Type() string {
 	return "ipport"
 }
 

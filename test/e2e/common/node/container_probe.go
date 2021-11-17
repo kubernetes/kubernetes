@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"time"
 
@@ -35,10 +36,10 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -512,6 +513,52 @@ var _ = SIGDescribe("Probing container", func() {
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
 		RunLivenessTest(f, pod, 1, time.Second*30)
 	})
+
+	/*
+		Release: v1.23
+		Testname: Pod liveness probe, using grpc call, success
+		Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
+	*/
+	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
+		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+
+		livenessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				GRPC: &v1.GRPCAction{
+					Port:    2379,
+					Service: nil,
+				},
+			},
+			InitialDelaySeconds: probeTestInitialDelaySeconds,
+			FailureThreshold:    1,
+		}
+
+		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
+			Release: v1.23
+			Testname: Pod liveness probe, using grpc call, failure
+			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
+		                 When liveness probe does  fail then the restart count should +1.
+	*/
+	ginkgo.It("should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
+		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+		service := "etcd_health"
+		livenessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				GRPC: &v1.GRPCAction{
+					Port:    2379 + 1, // this port is wrong
+					Service: &service,
+				},
+			},
+			InitialDelaySeconds: probeTestInitialDelaySeconds * 4,
+			FailureThreshold:    1,
+		}
+		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
 })
 
 // GetContainerStartedTime returns the time when the given container started and error if any
@@ -756,5 +803,33 @@ func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil tim
 
 		framework.Logf("pod %s/%s is not ready (%v elapsed)",
 			ns, pod.Name, time.Since(start))
+	}
+}
+
+func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
+	etcdLocalhostAddress := "127.0.0.1"
+	if framework.TestContext.ClusterIsIPv6() {
+		etcdLocalhostAddress = "::1"
+	}
+	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  containerName,
+					Image: imageutils.GetE2EImage(imageutils.Etcd),
+					Command: []string{
+						"/usr/local/bin/etcd",
+						"--listen-client-urls",
+						etcdURL,
+						"--advertise-client-urls",
+						etcdURL,
+					},
+					LivenessProbe:  livenessProbe,
+					ReadinessProbe: readinessProbe,
+				},
+			},
+		},
 	}
 }
