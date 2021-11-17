@@ -3533,8 +3533,17 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
-			ref.UID = types.UID(ref.Name)
+			// there are two UIDs for host events:
+			// controller use node.uid
+			// kubelet use node.name
+			// TODO: Uniform use of UID
 			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			ref.UID = types.UID(ref.Name)
+			eventsInvName, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			// Merge the results of two queries
+			events.Items = append(events.Items, eventsInvName.Items...)
 		}
 	}
 
