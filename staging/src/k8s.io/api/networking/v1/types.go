@@ -40,6 +40,7 @@ type NetworkPolicy struct {
 
 // PolicyType string describes the NetworkPolicy type
 // This type is beta-level in 1.8
+// +enum
 type PolicyType string
 
 const (
@@ -373,6 +374,7 @@ type HTTPIngressRuleValue struct {
 }
 
 // PathType represents the type of path referred to by a HTTPIngressPath.
+// +enum
 type PathType string
 
 const (

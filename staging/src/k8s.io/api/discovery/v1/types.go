@@ -55,6 +55,7 @@ type EndpointSlice struct {
 }
 
 // AddressType represents the type of address referred to by an endpoint.
+// +enum
 type AddressType string
 
 const (
