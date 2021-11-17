@@ -397,6 +397,15 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdown
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based
+	// on their associated priority class value.
+	// When a shutdown request is received, the Kubelet will initiate shutdown on all pods
+	// running on the node with a grace period that depends on the priority of the pod,
+	// and then wait for all pods to exit.
+	// Each entry in the array represents the graceful shutdown time a pod with a priority
+	// class value that lies in the range of that value and the next higher entry in the
+	// list when the node is shutting down.
+	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority
 	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
 	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
@@ -593,6 +602,14 @@ type ExecEnvVar struct {
 type MemoryReservation struct {
 	NumaNode int32
 	Limits   v1.ResourceList
+}
+
+// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based on their associated priority class value
+type ShutdownGracePeriodByPodPriority struct {
+	// priority is the priority value associated with the shutdown grace period
+	Priority int32
+	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
+	ShutdownGracePeriodSeconds int64
 }
 
 type MemorySwapConfiguration struct {
