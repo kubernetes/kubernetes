@@ -690,24 +690,24 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
-							QueueSort:  defaults.PluginsV1beta3.QueueSort,
-							PreFilter:  defaults.PluginsV1beta3.PreFilter,
-							Filter:     defaults.PluginsV1beta3.Filter,
-							PostFilter: defaults.PluginsV1beta3.PostFilter,
-							PreScore:   defaults.PluginsV1beta3.PreScore,
-							Score:      defaults.PluginsV1beta3.Score,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 									{Name: "bar"},
+								},
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
 								},
 							},
 							PreBind: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 								},
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
 							},
-							Bind: defaults.PluginsV1beta3.Bind,
+							MultiPoint: defaults.PluginsV1beta3.MultiPoint,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
@@ -918,17 +918,13 @@ profiles:
 					{
 						SchedulerName: "foo-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							QueueSort:  defaults.PluginsV1beta3.QueueSort,
-							PreFilter:  defaults.PluginsV1beta3.PreFilter,
-							Filter:     defaults.PluginsV1beta3.Filter,
-							PostFilter: defaults.PluginsV1beta3.PostFilter,
-							PreScore:   defaults.PluginsV1beta3.PreScore,
-							Score:      defaults.PluginsV1beta3.Score,
-							Bind:       defaults.PluginsV1beta3.Bind,
-							PreBind:    defaults.PluginsV1beta3.PreBind,
+							MultiPoint: defaults.PluginsV1beta3.MultiPoint,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
+									{Name: names.VolumeBinding},
+								},
+								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
 								},
 							},
@@ -938,14 +934,12 @@ profiles:
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							QueueSort:  defaults.PluginsV1beta3.QueueSort,
-							PreFilter:  defaults.PluginsV1beta3.PreFilter,
-							Filter:     defaults.PluginsV1beta3.Filter,
-							PostFilter: defaults.PluginsV1beta3.PostFilter,
-							PreScore:   defaults.PluginsV1beta3.PreScore,
-							Score:      defaults.PluginsV1beta3.Score,
-							Bind:       defaults.PluginsV1beta3.Bind,
-							Reserve:    defaults.PluginsV1beta3.Reserve,
+							MultiPoint: defaults.PluginsV1beta3.MultiPoint,
+							PreBind: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{

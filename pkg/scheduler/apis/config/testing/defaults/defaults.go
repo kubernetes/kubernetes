@@ -151,8 +151,36 @@ var PluginConfigsV1beta2 = []config.PluginConfig{
 	},
 }
 
-// PluginsV1beta3 default set of v1beta3 plugins.
+// PluginsV1beta3 is the set of default v1beta3 plugins (before MultiPoint expansion)
 var PluginsV1beta3 = &config.Plugins{
+	MultiPoint: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.PrioritySort},
+			{Name: names.NodeUnschedulable},
+			{Name: names.NodeName},
+			{Name: names.TaintToleration, Weight: 3},
+			{Name: names.NodeAffinity, Weight: 2},
+			{Name: names.NodePorts},
+			{Name: names.NodeResourcesFit, Weight: 1},
+			{Name: names.VolumeRestrictions},
+			{Name: names.EBSLimits},
+			{Name: names.GCEPDLimits},
+			{Name: names.NodeVolumeLimits},
+			{Name: names.AzureDiskLimits},
+			{Name: names.VolumeBinding},
+			{Name: names.VolumeZone},
+			{Name: names.PodTopologySpread, Weight: 2},
+			{Name: names.InterPodAffinity, Weight: 2},
+			{Name: names.DefaultPreemption},
+			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
+			{Name: names.ImageLocality, Weight: 1},
+			{Name: names.DefaultBinder},
+		},
+	},
+}
+
+// ExpandedPluginsV1beta3 default set of v1beta3 plugins after MultiPoint expansion
+var ExpandedPluginsV1beta3 = &config.Plugins{
 	QueueSort: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.PrioritySort},
@@ -160,13 +188,13 @@ var PluginsV1beta3 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.NodeResourcesFit},
+			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
+			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
+			{Name: names.VolumeBinding},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
-			{Name: names.VolumeBinding},
-			{Name: names.NodeAffinity},
 		},
 	},
 	Filter: config.PluginSet{
@@ -195,32 +223,37 @@ var PluginsV1beta3 = &config.Plugins{
 	},
 	PreScore: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.InterPodAffinity},
-			{Name: names.PodTopologySpread},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
+			{Name: names.PodTopologySpread},
+			{Name: names.InterPodAffinity},
 		},
 	},
 	Score: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
-			{Name: names.ImageLocality, Weight: 1},
-			{Name: names.NodeResourcesFit, Weight: 1},
-			// Weight is doubled because:
+			// Weight is tripled because:
 			// - This is a score coming from user preference.
-			{Name: names.InterPodAffinity, Weight: 2},
+			// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
+			// for many user workloads
+			{Name: names.TaintToleration, Weight: 3},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
 			{Name: names.NodeAffinity, Weight: 2},
-			// Weight is doubled because:
-			// - This is a score coming from user preference.
-			// - It makes its signal comparable to NodeResourcesLeastAllocated.
-			{Name: names.PodTopologySpread, Weight: 2},
+			{Name: names.NodeResourcesFit, Weight: 1},
 			// Weight is tripled because:
 			// - This is a score coming from user preference.
 			// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
 			//	 for many user workloads
-			{Name: names.TaintToleration, Weight: 3},
+			{Name: names.VolumeBinding, Weight: 1},
+			// Weight is doubled because:
+			// - This is a score coming from user preference.
+			// - It makes its signal comparable to NodeResourcesLeastAllocated.
+			{Name: names.PodTopologySpread, Weight: 2},
+			// Weight is doubled because:
+			// - This is a score coming from user preference.
+			{Name: names.InterPodAffinity, Weight: 2},
+			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
+			{Name: names.ImageLocality, Weight: 1},
 		},
 	},
 	Reserve: config.PluginSet{

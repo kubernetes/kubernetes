@@ -325,30 +325,15 @@ func TestSchedulerDefaults(t *testing.T) {
 					{
 						SchedulerName: pointer.StringPtr("custom-scheduler"),
 						Plugins: &v1beta3.Plugins{
-							QueueSort: v1beta3.PluginSet{
+							MultiPoint: v1beta3.PluginSet{
 								Enabled: []v1beta3.Plugin{
 									{Name: names.PrioritySort},
-								},
-							},
-							PreFilter: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
-									{Name: names.NodeResourcesFit},
-									{Name: names.NodePorts},
-									{Name: names.VolumeRestrictions},
-									{Name: names.PodTopologySpread},
-									{Name: names.InterPodAffinity},
-									{Name: names.VolumeBinding},
-									{Name: names.NodeAffinity},
-								},
-							},
-							Filter: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
 									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
-									{Name: names.TaintToleration},
-									{Name: names.NodeAffinity},
+									{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+									{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
 									{Name: names.NodePorts},
-									{Name: names.NodeResourcesFit},
+									{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
 									{Name: names.VolumeRestrictions},
 									{Name: names.EBSLimits},
 									{Name: names.GCEPDLimits},
@@ -356,47 +341,20 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.AzureDiskLimits},
 									{Name: names.VolumeBinding},
 									{Name: names.VolumeZone},
-									{Name: names.PodTopologySpread},
-									{Name: names.InterPodAffinity},
-								},
-							},
-							PostFilter: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
+									{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+									{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
 									{Name: names.DefaultPreemption},
-								},
-							},
-							PreScore: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
-									{Name: names.InterPodAffinity},
-									{Name: names.PodTopologySpread},
-									{Name: names.TaintToleration},
-									{Name: names.NodeAffinity},
-								},
-							},
-							Score: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
-									{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-									{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-									{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-									{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(2)},
-									{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(2)},
-									{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-									{Name: names.TaintToleration, Weight: pointer.Int32Ptr(3)},
-								},
-							},
-							Reserve: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
-									{Name: names.VolumeBinding},
-								},
-							},
-							PreBind: v1beta3.PluginSet{
-								Enabled: []v1beta3.Plugin{
-									{Name: names.VolumeBinding},
+									{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+									{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+									{Name: names.DefaultBinder},
 								},
 							},
 							Bind: v1beta3.PluginSet{
 								Enabled: []v1beta3.Plugin{
 									{Name: "BarPlugin"},
+								},
+								Disabled: []v1beta3.Plugin{
+									{Name: names.DefaultBinder},
 								},
 							},
 						},
