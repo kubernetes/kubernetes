@@ -70,6 +70,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			pv        *v1.PersistentVolume
 		)
 		ginkgo.BeforeEach(func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			framework.Logf("Initializing pod and pvcs for test")
 			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
 		})
