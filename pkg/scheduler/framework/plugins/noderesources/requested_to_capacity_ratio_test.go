@@ -255,7 +255,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 		{
 			//  Node1 Score = Node2 Score = 0 as the incoming Pod doesn't request extended resource.
 			pod:            st.MakePod().Obj(),
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResource2), makeNode("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:           "nothing scheduled, nothing requested",
 		},
@@ -272,7 +272,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			//  = 2/4 * maxUtilization = 50 = rawScoringFunction(50)
 			// Node2 Score: 5
 			pod:            &v1.Pod{Spec: extendedResourcePod1},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResource2), makeNode("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 5}},
 			name:           "resources requested, pods scheduled with less resources",
 			pods: []*v1.Pod{
@@ -292,7 +292,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 			pod:            &v1.Pod{Spec: extendedResourcePod1},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResource2), makeNode("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 10}},
 			name:           "resources requested, pods scheduled with resources, on node with existing pod running ",
 			pods: []*v1.Pod{
@@ -312,7 +312,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 			pod:            &v1.Pod{Spec: extendedResourcePod2},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResource2), makeNode("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 10}},
 			name:           "resources requested, pods scheduled with more resources",
 			pods: []*v1.Pod{
@@ -436,7 +436,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// Node2 Score: (0 * 3) + (0 * 5) / 8 = 0
 
 			pod:            st.MakePod().Obj(),
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResources2), makeNode("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:           "nothing scheduled, nothing requested",
 		},
@@ -470,7 +470,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// Node2 Score: (5 * 3) + (2 * 5) / 8 = 3
 
 			pod:            &v1.Pod{Spec: extnededResourcePod1},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResources2), makeNode("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 3}},
 			name:           "resources requested, pods scheduled with less resources",
 			pods: []*v1.Pod{
@@ -506,7 +506,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// Node2 Score: (10 * 3) + (5 * 5) / 8 = 7
 
 			pod:            &v1.Pod{Spec: extnededResourcePod1},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResources2), makeNode("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 7}},
 			name:           "resources requested, pods scheduled with resources, on node with existing pod running ",
 			pods: []*v1.Pod{
@@ -557,7 +557,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// Node2 Score: (10 * 3) + (2 * 5) / 8 = 5
 
 			pod:            &v1.Pod{Spec: extnededResourcePod2},
-			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			nodes:          []*v1.Node{makeNode("machine1", 4000, 10000*1024*1024, extendedResources2), makeNode("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 5}},
 			name:           "resources requested, pods scheduled with more resources",
 			pods: []*v1.Pod{
