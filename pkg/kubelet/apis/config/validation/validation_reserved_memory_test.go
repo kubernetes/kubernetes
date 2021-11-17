@@ -68,7 +68,7 @@ func TestValidateReservedMemoryConfiguration(t *testing.T) {
 					},
 				},
 			},
-			expectedError: fmt.Errorf("the reserved memory has a duplicate value for NUMA node %d and resource %q", 0, v1.ResourceMemory),
+			expectedError: fmt.Errorf("invalid configuration: the reserved memory has a duplicate value for NUMA node %d and resource %q", 0, v1.ResourceMemory),
 		},
 		{
 			description: "The reserved memory has unsupported limit type",
@@ -82,7 +82,7 @@ func TestValidateReservedMemoryConfiguration(t *testing.T) {
 					},
 				},
 			},
-			expectedError: fmt.Errorf("the limit type %q for NUMA node %d is not supported, only [memory hugepages-<HugePageSize>] is accepted", "blabla", 0),
+			expectedError: fmt.Errorf("invalid configuration: the limit type %q for NUMA node %d is not supported, only [memory hugepages-<HugePageSize>] is accepted", "blabla", 0),
 		},
 		{
 			description: "The reserved memory has limit type with zero value",
@@ -96,7 +96,7 @@ func TestValidateReservedMemoryConfiguration(t *testing.T) {
 					},
 				},
 			},
-			expectedError: fmt.Errorf("reserved memory may not be zero for NUMA node %d and resource %q", 0, v1.ResourceMemory),
+			expectedError: fmt.Errorf("invalid configuration: reserved memory may not be zero for NUMA node %d and resource %q", 0, v1.ResourceMemory),
 		},
 	}
 
