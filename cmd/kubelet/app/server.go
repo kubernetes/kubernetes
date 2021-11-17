@@ -135,7 +135,7 @@ various mechanisms (primarily through the apiserver) and ensures that the contai
 described in those PodSpecs are running and healthy. The kubelet doesn't manage
 containers which were not created by Kubernetes.
 
-Other than from an PodSpec from the apiserver, there are three ways that a container
+Other than from a PodSpec from the apiserver, there are three ways that a container
 manifest can be provided to the Kubelet.
 
 File: Path passed as a flag on the command line. Files under this path will be monitored
