@@ -110,7 +110,7 @@ func TestFilterEndpoints(t *testing.T) {
 		name:         "node local endpoints, hints are ignored",
 		hintsEnabled: true,
 		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, hintsAnnotation: "auto"},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
