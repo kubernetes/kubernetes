@@ -99,7 +99,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		claimQueue:                    workqueue.NewNamed("claims"),
-		volumeQueue:                   workqueue.NewNamed("volumes"),
+		volumeQueue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volumes"),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
@@ -194,6 +194,20 @@ func (ctrl *PersistentVolumeController) enqueueWork(queue workqueue.Interface, o
 	}
 	klog.V(5).Infof("enqueued %q for sync", objName)
 	queue.Add(objName)
+}
+
+func (ctrl *PersistentVolumeController) enqueueWorkAfter(queue workqueue.DelayingInterface, obj interface{}, delay time.Duration) {
+	// Beware of "xxx deleted" events
+	if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
+		obj = unknown.Obj
+	}
+	objName, err := controller.KeyFunc(obj)
+	if err != nil {
+		klog.Errorf("failed to get key from object: %v", err)
+		return
+	}
+	klog.V(5).Infof("enqueued %q for sync", objName)
+	queue.AddAfter(objName, delay)
 }
 
 func (ctrl *PersistentVolumeController) storeVolumeUpdate(volume interface{}) (bool, error) {
@@ -297,8 +311,11 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	// sync the volume when its claim is deleted.  Explicitly sync'ing the
 	// volume here in response to claim deletion prevents the volume from
 	// waiting until the next sync period for its Release.
+	// delay queuing the volume to allow some time for nodes to detach the volume from the node.  The time chosen here
+	// is to hopefully be short enough that e2e tests still pass and long enough that most PVs stop hitting the failure
+	// errors.
 	klog.V(5).Infof("deleteClaim[%q]: scheduling sync of volume %s", claimKey, volumeName)
-	ctrl.volumeQueue.Add(volumeName)
+	ctrl.volumeQueue.AddAfter(volumeName, 21*time.Second)
 }
 
 // Run starts all of this controller's control loops
