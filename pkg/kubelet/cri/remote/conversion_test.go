@@ -28,6 +28,93 @@ import (
 	"k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+func TestMemoryEqual(t *testing.T) {
+	testcases := []struct {
+		a interface{}
+		b interface{}
+	}{
+		{runtimeapi.VersionResponse{}, v1alpha2.VersionResponse{}},
+		{runtimeapi.PodSandboxConfig{}, v1alpha2.PodSandboxConfig{}},
+		{runtimeapi.PodSandboxFilter{}, v1alpha2.PodSandboxFilter{}},
+		{runtimeapi.ContainerConfig{}, v1alpha2.ContainerConfig{}},
+		{runtimeapi.ContainerFilter{}, v1alpha2.ContainerFilter{}},
+		{runtimeapi.LinuxContainerResources{}, v1alpha2.LinuxContainerResources{}},
+		{runtimeapi.ExecRequest{}, v1alpha2.ExecRequest{}},
+		{runtimeapi.AttachRequest{}, v1alpha2.AttachRequest{}},
+		{runtimeapi.PortForwardRequest{}, v1alpha2.PortForwardRequest{}},
+		{runtimeapi.RuntimeConfig{}, v1alpha2.RuntimeConfig{}},
+		{runtimeapi.ContainerStatsFilter{}, v1alpha2.ContainerStatsFilter{}},
+		{runtimeapi.PodSandboxStatsFilter{}, v1alpha2.PodSandboxStatsFilter{}},
+		{runtimeapi.ImageFilter{}, v1alpha2.ImageFilter{}},
+		{runtimeapi.ImageSpec{}, v1alpha2.ImageSpec{}},
+		{runtimeapi.AuthConfig{}, v1alpha2.AuthConfig{}},
+	}
+
+	for _, tc := range testcases {
+		aType := reflect.TypeOf(tc.a)
+		bType := reflect.TypeOf(tc.b)
+		t.Run(aType.String(), func(t *testing.T) {
+			assertEqualTypes(t, nil, aType, bType)
+		})
+	}
+}
+
+func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
+	if a == b {
+		return
+	}
+
+	if a.Kind() != b.Kind() {
+		fatalTypeError(t, path, a, b, "mismatched Kind")
+	}
+
+	switch a.Kind() {
+	case reflect.Struct:
+		aFields := a.NumField()
+		bFields := b.NumField()
+		if aFields != bFields {
+			fatalTypeError(t, path, a, b, "mismatched field count")
+		}
+		for i := 0; i < aFields; i++ {
+			aField := a.Field(i)
+			bField := b.Field(i)
+			if aField.Name != bField.Name {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field name %d: %s %s", i, aField.Name, bField.Name))
+			}
+			if aField.Tag != bField.Tag {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field tag %d: %s %s", i, aField.Tag, bField.Tag))
+			}
+			if aField.Offset != bField.Offset {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field offset %d: %v %v", i, aField.Offset, bField.Offset))
+			}
+			if aField.Anonymous != bField.Anonymous {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field anonymous %d: %v %v", i, aField.Anonymous, bField.Anonymous))
+			}
+			if !reflect.DeepEqual(aField.Index, bField.Index) {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field index %d: %v %v", i, aField.Index, bField.Index))
+			}
+			path = append(path, aField.Name)
+			assertEqualTypes(t, path, aField.Type, bField.Type)
+			path = path[:len(path)-1]
+		}
+
+	case reflect.Ptr, reflect.Slice:
+		aElem := a.Elem()
+		bElem := b.Elem()
+		aElemType := reflect.TypeOf(aElem)
+		bElemType := reflect.TypeOf(bElem)
+		assertEqualTypes(t, path, aElemType, bElemType)
+
+	default:
+		fatalTypeError(t, path, a, b, "unhandled kind")
+	}
+}
+
+func fatalTypeError(t *testing.T, path []string, a, b reflect.Type, message string) {
+	t.Helper()
+	t.Fatalf("%s: %s: %s %s", strings.Join(path, ""), message, a, b)
+}
+
 func fillFields(s interface{}) {
 	fillFieldsOffset(s, 0)
 }
