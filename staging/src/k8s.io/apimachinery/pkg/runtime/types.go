@@ -25,7 +25,8 @@ package runtime
 //      runtime.TypeMeta    `json:",inline"`
 //      ... // other fields
 // }
-// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
+// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }
+// func (obj *MyAwesomeAPIObject) GroupVersionKind() *GroupVersionKind
 //
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
@@ -85,8 +86,7 @@ const (
 // The next step is to copy (using pkg/conversion) into the internal struct. The runtime
 // package's DefaultScheme has conversion functions installed which will unpack the
 // JSON stored in RawExtension, turning it into the correct object type, and storing it
-// in the Object. (TODO: In the case where the object is of an unknown type, a
-// runtime.Unknown object will be created and stored.)
+// in the Object.
 //
 // +k8s:deepcopy-gen=true
 // +protobuf=true
