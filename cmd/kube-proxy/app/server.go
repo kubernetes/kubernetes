@@ -475,32 +475,28 @@ Service cluster IPs and ports are currently found through Docker-links-compatibl
 environment variables specifying ports opened by the service proxy. There is an optional
 addon that provides cluster DNS for these cluster IPs. The user must create a service
 with the apiserver API to configure the proxy.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
-				klog.ErrorS(err, "Failed OS init")
-				// ACTION REQUIRED: Exit code changed from 255 to 1
-				os.Exit(1)
+				return fmt.Errorf("failed os init: %w", err)
 			}
 
 			if err := opts.Complete(); err != nil {
-				klog.ErrorS(err, "Failed complete")
-				// ACTION REQUIRED: Exit code changed from 255 to 1
-				os.Exit(1)
+				return fmt.Errorf("failed complete: %w", err)
 			}
 
 			if err := opts.Validate(); err != nil {
-				klog.ErrorS(err, "Failed validate")
-				// ACTION REQUIRED: Exit code changed from 255 to 1
-				os.Exit(1)
+				return fmt.Errorf("failed validate: %w", err)
 			}
 
 			if err := opts.Run(); err != nil {
 				klog.ErrorS(err, "Error running ProxyServer")
-				os.Exit(1)
+				return err
 			}
+
+			return nil
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
