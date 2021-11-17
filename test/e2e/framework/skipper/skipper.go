@@ -118,6 +118,7 @@ func pruneStack(skip int) string {
 // Skipf skips with information about why the test is being skipped.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
+	panic("unreachable")
 }
 
 // SkipUnlessAtLeast skips if the value is less than the minValue.
