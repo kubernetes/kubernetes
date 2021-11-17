@@ -1852,16 +1852,6 @@
     as RestartAlways.
   release: v1.12
   file: test/e2e/common/node/init_container.go
-- testname: Kubelet, hostAliases
-  codename: '[sig-node] Kubelet when scheduling a busybox Pod with hostAliases should
-    write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance]'
-  description: Create a Pod with hostAliases and a container with command to output
-    /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases
-    to the output of /etc/hosts entries. Kubernetes mounts the /etc/hosts file into
-    its containers, however, mounting individual files is not supported on Windows
-    Containers. For this reason, this test is marked LinuxOnly.
-  release: v1.13
-  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, log output, default
   codename: '[sig-node] Kubelet when scheduling a busybox command in a pod should
     print the output to logs [NodeConformance] [Conformance]'
@@ -1890,6 +1880,14 @@
     set to true. The Pod then tries to write to the /file on the root, write operation
     to the root filesystem MUST fail as expected. This test is marked LinuxOnly since
     Windows does not support creating containers with read-only access.
+  release: v1.13
+  file: test/e2e/common/node/kubelet.go
+- testname: Kubelet, hostAliases
+  codename: '[sig-node] Kubelet when scheduling an agnhost Pod with hostAliases should
+    write entries to /etc/hosts [NodeConformance] [Conformance]'
+  description: Create a Pod with hostAliases and a container with command to output
+    /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases
+    to the output of /etc/hosts entries.
   release: v1.13
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, managed etc hosts
