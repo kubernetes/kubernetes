@@ -38,10 +38,15 @@ export GO111MODULE=on
 # Install golangci-lint
 echo 'installing golangci-lint '
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  go mod download
   go install github.com/golangci/golangci-lint/cmd/golangci-lint
 popd >/dev/null
 
 cd "${KUBE_ROOT}"
+
+# This is a bug in golangci-lint wrt ruleguard
+# https://github.com/golangci/golangci-lint/issues/1999
+golangci-lint cache clean
 
 # The config is in ${KUBE_ROOT}/.golangci.yaml
 res=0

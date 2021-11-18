@@ -15,11 +15,18 @@ issues:
 linters:
   disable-all: true
   enable: # please keep this alphabetized
+    - gocritic
     - ineffassign
     - staticcheck
     - unused
 
 linters-settings: # please keep this alphabetized
+  gocritic:
+    enabled-checks:
+      - ruleguard
+    settings:
+      ruleguard:
+        rules: "ruleguard_rules.go"
   staticcheck:
     go: "1.17"
     checks: [
