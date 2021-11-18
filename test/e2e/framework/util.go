@@ -899,7 +899,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
