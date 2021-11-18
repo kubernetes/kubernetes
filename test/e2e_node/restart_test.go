@@ -150,6 +150,10 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			if numCpus < 1 {
 				e2eskipper.Skipf("insufficient CPU available for kubelet restart test")
 			}
+			if numCpus > 18 {
+				// 950m * 19 = 1805 CPUs -> not enough to block the scheduling of another 950m pod
+				e2eskipper.Skipf("test will return false positives on a machine with >18 cores")
+			}
 
 			// create as many restartNever pods as there are allocatable CPU
 			// nodes; if they are not correctly accounted for as terminated
@@ -161,7 +165,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				pod.Spec.RestartPolicy = "Never"
 				pod.Spec.Containers[0].Command = []string{"echo", "hi"}
 				pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
-					v1.ResourceCPU: resource.MustParse("1"),
+					v1.ResourceCPU: resource.MustParse("950m"),  // leave a little room for other workloads
 				}
 			}
 			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
