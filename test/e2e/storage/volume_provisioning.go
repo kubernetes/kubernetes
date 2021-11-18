@@ -669,6 +669,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
 			framework.ExpectNoError(scErr)
