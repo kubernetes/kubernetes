@@ -1141,6 +1141,7 @@ function Configure-GcePdTools {
 # download antrea binaries. It handles both antrea and winbridge as cni
 # provider.
 function Prepare-CniNetworking {
+  Install_Cni_Binaries
   if (Is-Antrea-Enabled $kube_env) {
     # Use the original ethernet name to configure hostdns.conf
     Configure-HostDnsConf -AdapterName Ethernet
@@ -1160,13 +1161,16 @@ function Prepare-CniBridgeNetworking {
     # the runtime.
     Configure_Containerd_CniNetworking
   } else {
-    Install_Cni_Binaries
     Configure_Dockerd_CniNetworking
   }
 }
 
 # Downloads the Windows CNI binaries and puts them in $env:CNI_DIR.
 function Install_Cni_Binaries {
+  # Not to install cni when using containerd and antrea is not enabled.
+  if ((${env:CONTAINER_RUNTIME} -eq "containerd") -and -not (Is-Antrea-Enabled $kube_env)) {
+    return
+  }
   if (-not (ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -and
       -not (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
     return
@@ -2980,14 +2984,18 @@ function Configure-AntreaCniNetworking {
 
 function Prepare-KubeProxyInterfaceForAntrea {
   $interface_alias="HNS Internal NIC"
+  $hns_switch_name = "KubeProxyInternalSwitch"
   $interface_to_add = "vEthernet ($interface_alias)"
   Log-Output "Creating netadapter $interface_to_add for kube-proxy"
   if (Get-NetAdapter -InterfaceAlias $interface_to_add -ErrorAction SilentlyContinue) {
      Log-Output "NetAdapter $interface_to_add exists, exit."
      return
   }
+  if (!(Get-VMSwitch -Name $hns_switch_name -ErrorAction SilentlyContinue)) {
+     Log-Output "Creating internal switch: $hns_switch_name for kube-proxy"
+     New-VMSwitch -name $hns_switch_name -SwitchType Internal
+  }
   [Environment]::SetEnvironmentVariable("INTERFACE_TO_ADD_SERVICE_IP", $interface_to_add, [System.EnvironmentVariableTarget]::Machine)
-  $hns_switch_name = $(Get-VMSwitch -SwitchType Internal).Name
   Add-VMNetworkAdapter -ManagementOS -Name $interface_alias -SwitchName $hns_switch_name
   Set-NetIPInterface -ifAlias $interface_to_add -Forwarding Enabled
 }
