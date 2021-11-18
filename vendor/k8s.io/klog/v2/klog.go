@@ -918,6 +918,13 @@ func LogToStderr(stderr bool) {
 // output writes the data to the log files and releases the buffer.
 func (l *loggingT) output(s severity, log *logr.Logger, buf *buffer, depth int, file string, line int, alsoToStderr bool) {
 	l.mu.Lock()
+	defer func() {
+		if err := recover(); err != nil {
+			l.mu.Unlock() // Make sure to do `Unlock` if panic occurs below (eg: #L938 Error)
+			os.Stderr.Write([]byte("panic observed in loggingT.output")) // Make sure the message appears somewhere.
+		}
+	}()
+	
 	if l.traceLocation.isSet() {
 		if l.traceLocation.match(file, line) {
 			buf.Write(stacks(false))
@@ -945,6 +952,7 @@ func (l *loggingT) output(s severity, log *logr.Logger, buf *buffer, depth int, 
 			if l.file[infoLog] == nil {
 				if err := l.createFiles(infoLog); err != nil {
 					os.Stderr.Write(data) // Make sure the message appears somewhere.
+					l.mu.Unlock() // At this point `logExitFunc` is nil (checked in #L1068), so `Unlock` needed.
 					l.exit(err)
 				}
 			}
@@ -953,6 +961,7 @@ func (l *loggingT) output(s severity, log *logr.Logger, buf *buffer, depth int, 
 			if l.file[s] == nil {
 				if err := l.createFiles(s); err != nil {
 					os.Stderr.Write(data) // Make sure the message appears somewhere.
+					l.mu.Unlock() // At this point `logExitFunc` is nil (checked in #L1068), so `Unlock` needed.
 					l.exit(err)
 				}
 			}
