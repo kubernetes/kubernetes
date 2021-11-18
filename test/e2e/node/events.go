@@ -95,7 +95,7 @@ var _ = SIGDescribe("Events", func() {
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
-		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUID.UID),
@@ -115,7 +115,7 @@ var _ = SIGDescribe("Events", func() {
 		}))
 		// Check for kubelet event about the pod.
 		ginkgo.By("checking for kubelet event about the pod")
-		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.kind":      "Pod",
