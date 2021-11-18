@@ -197,6 +197,14 @@ func TestProxyTransport(t *testing.T) {
 			contentType:  "text/html",
 			forwardedURI: "/proxy/node/node1:10250/logs/log.log",
 		},
+		"forwarded URI must be escaped": {
+			input:        "<html></html>",
+			sourceURL:    "http://mynode.com/logs/log.log%00<script>alert(1)</script>",
+			transport:    testTransport,
+			output:       "<html></html>",
+			contentType:  "text/html",
+			forwardedURI: "/proxy/node/node1:10250/logs/log.log%00%3Cscript%3Ealert%281%29%3C/script%3E",
+		},
 	}
 
 	testItem := func(name string, item *Item) {

@@ -83,7 +83,7 @@ type Transport struct {
 // RoundTrip implements the http.RoundTripper interface
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Add reverse proxy headers.
-	forwardedURI := path.Join(t.PathPrepend, req.URL.Path)
+	forwardedURI := path.Join(t.PathPrepend, req.URL.EscapedPath())
 	if strings.HasSuffix(req.URL.Path, "/") {
 		forwardedURI = forwardedURI + "/"
 	}
