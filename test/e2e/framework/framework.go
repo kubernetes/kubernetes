@@ -525,9 +525,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		labels = make(map[string]string)
 	}
 
-	// if unset, create privileged namespaces by default.
-	// This should be flipped to "restricted" starting from 1.24.
-	enforceLevel := admissionapi.LevelPrivileged
+	enforceLevel := admissionapi.LevelBaseline
 	if f.NamespacePodSecurityEnforceLevel != "" {
 		enforceLevel = f.NamespacePodSecurityEnforceLevel
 	}
