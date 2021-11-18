@@ -989,6 +989,35 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdown
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
+	// shutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based
+	// on their associated priority class value.
+	// When a shutdown request is received, the Kubelet will initiate shutdown on all pods
+	// running on the node with a grace period that depends on the priority of the pod,
+	// and then wait for all pods to exit.
+	// Each entry in the array represents the graceful shutdown time a pod with a priority
+	// class value that lies in the range of that value and the next higher entry in the
+	// list when the node is shutting down.
+	// For example, to allow critical pods 10s to shutdown, priority>=10000 pods 20s to
+	// shutdown, and all remaining pods 30s to shutdown.
+	//
+	// shutdownGracePeriodByPodPriority:
+	//   - priority: 2000000000
+	//     shutdownGracePeriodSeconds: 10
+	//   - priority: 10000
+	//     shutdownGracePeriodSeconds: 20
+	//   - priority: 0
+	//     shutdownGracePeriodSeconds: 30
+	//
+	// The time the Kubelet will wait before exiting will at most be the maximum of all
+	// shutdownGracePeriodSeconds for each priority class range represented on the node.
+	// When all pods have exited or reached their grace periods, the Kubelet will release
+	// the shutdown inhibit lock.
+	// Requires the GracefulNodeShutdown feature gate to be enabled.
+	// This configuration must be empty if either ShutdownGracePeriod or ShutdownGracePeriodCriticalPods is set.
+	// Default: nil
+	// +featureGate=GracefulNodeShutdownBasedOnPodPriority
+	// +optional
+	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority `json:"shutdownGracePeriodByPodPriority,omitempty"`
 	// reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature.
 	// The memory manager will not allocate reserved memory for container workloads.
@@ -1134,6 +1163,14 @@ type SerializedNodeConfigSource struct {
 type MemoryReservation struct {
 	NumaNode int32           `json:"numaNode"`
 	Limits   v1.ResourceList `json:"limits"`
+}
+
+// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based on their associated priority class value
+type ShutdownGracePeriodByPodPriority struct {
+	// priority is the priority value associated with the shutdown grace period
+	Priority int32 `json:"priority"`
+	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
+	ShutdownGracePeriodSeconds int64 `json:"shutdownGracePeriodSeconds"`
 }
 
 type MemorySwapConfiguration struct {

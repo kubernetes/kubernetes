@@ -22,6 +22,7 @@ package nodeshutdown
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -29,13 +30,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/clock"
 )
 
@@ -66,8 +68,7 @@ type managerImpl struct {
 	nodeRef      *v1.ObjectReference
 	probeManager prober.Manager
 
-	shutdownGracePeriodRequested    time.Duration
-	shutdownGracePeriodCriticalPods time.Duration
+	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 
 	getPods        eviction.ActivePodsFunc
 	killPodFunc    eviction.KillPodFunc
@@ -84,28 +85,46 @@ type managerImpl struct {
 
 // NewManager returns a new node shutdown manager.
 func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) ||
-		(conf.ShutdownGracePeriodRequested == 0 && conf.ShutdownGracePeriodCriticalPods == 0) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
 		return m, m
 	}
+
+	shutdownGracePeriodByPodPriority := conf.ShutdownGracePeriodByPodPriority
+	// Migration from the original configuration
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) ||
+		len(shutdownGracePeriodByPodPriority) == 0 {
+		shutdownGracePeriodByPodPriority = migrateConfig(conf.ShutdownGracePeriodRequested, conf.ShutdownGracePeriodCriticalPods)
+	}
+
+	// Disable if the configuration is empty
+	if len(shutdownGracePeriodByPodPriority) == 0 {
+		m := managerStub{}
+		return m, m
+	}
+
+	// Sort by priority from low to high
+	sort.Slice(shutdownGracePeriodByPodPriority, func(i, j int) bool {
+		return shutdownGracePeriodByPodPriority[i].Priority < shutdownGracePeriodByPodPriority[j].Priority
+	})
+
 	if conf.Clock == nil {
 		conf.Clock = clock.RealClock{}
 	}
 	manager := &managerImpl{
-		probeManager:                    conf.ProbeManager,
-		recorder:                        conf.Recorder,
-		nodeRef:                         conf.NodeRef,
-		getPods:                         conf.GetPodsFunc,
-		killPodFunc:                     conf.KillPodFunc,
-		syncNodeStatus:                  conf.SyncNodeStatusFunc,
-		shutdownGracePeriodRequested:    conf.ShutdownGracePeriodRequested,
-		shutdownGracePeriodCriticalPods: conf.ShutdownGracePeriodCriticalPods,
-		clock:                           conf.Clock,
+		probeManager:                     conf.ProbeManager,
+		recorder:                         conf.Recorder,
+		nodeRef:                          conf.NodeRef,
+		getPods:                          conf.GetPodsFunc,
+		killPodFunc:                      conf.KillPodFunc,
+		syncNodeStatus:                   conf.SyncNodeStatusFunc,
+		shutdownGracePeriodByPodPriority: shutdownGracePeriodByPodPriority,
+		clock:                            conf.Clock,
 	}
 	klog.InfoS("Creating node shutdown manager",
 		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
 		"shutdownGracePeriodCriticalPods", conf.ShutdownGracePeriodCriticalPods,
+		"shutdownGracePeriodByPodPriority", shutdownGracePeriodByPodPriority,
 	)
 	return manager, manager
 }
@@ -159,9 +178,9 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, err
 	}
 
-	// If the logind's InhibitDelayMaxUSec as configured in (logind.conf) is less than shutdownGracePeriodRequested, attempt to update the value to shutdownGracePeriodRequested.
-	if m.shutdownGracePeriodRequested > currentInhibitDelay {
-		err := m.dbusCon.OverrideInhibitDelay(m.shutdownGracePeriodRequested)
+	// If the logind's InhibitDelayMaxUSec as configured in (logind.conf) is less than periodRequested, attempt to update the value to periodRequested.
+	if periodRequested := m.periodRequested(); periodRequested > currentInhibitDelay {
+		err := m.dbusCon.OverrideInhibitDelay(periodRequested)
 		if err != nil {
 			return nil, fmt.Errorf("unable to override inhibit delay by shutdown manager: %v", err)
 		}
@@ -177,8 +196,8 @@ func (m *managerImpl) start() (chan struct{}, error) {
 			return nil, err
 		}
 
-		if m.shutdownGracePeriodRequested > updatedInhibitDelay {
-			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", m.shutdownGracePeriodRequested, updatedInhibitDelay)
+		if periodRequested > updatedInhibitDelay {
+			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", periodRequested, updatedInhibitDelay)
 		}
 	}
 
@@ -270,58 +289,133 @@ func (m *managerImpl) processShutdownEvent() error {
 	klog.V(1).InfoS("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
-	nonCriticalPodGracePeriod := m.shutdownGracePeriodRequested - m.shutdownGracePeriodCriticalPods
+	groups := groupByPriority(m.shutdownGracePeriodByPodPriority, activePods)
+	for _, group := range groups {
+		// If there are no pods in a particular range,
+		// then do not wait for pods in that priority range.
+		if len(group.Pods) == 0 {
+			continue
+		}
 
-	var wg sync.WaitGroup
-	wg.Add(len(activePods))
-	for _, pod := range activePods {
-		go func(pod *v1.Pod) {
-			defer wg.Done()
+		var wg sync.WaitGroup
+		wg.Add(len(group.Pods))
+		for _, pod := range group.Pods {
+			go func(pod *v1.Pod, group podShutdownGroup) {
+				defer wg.Done()
 
-			var gracePeriodOverride int64
-			if kubelettypes.IsCriticalPod(pod) {
-				gracePeriodOverride = int64(m.shutdownGracePeriodCriticalPods.Seconds())
-				m.clock.Sleep(nonCriticalPodGracePeriod)
-			} else {
-				gracePeriodOverride = int64(nonCriticalPodGracePeriod.Seconds())
-			}
+				gracePeriodOverride := group.ShutdownGracePeriodSeconds
 
-			// Stop probes for the pod
-			m.probeManager.RemovePod(pod)
+				// Stop probes for the pod
+				m.probeManager.RemovePod(pod)
 
-			// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
-			if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {
-				gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
-			}
+				// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
+				if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {
+					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+				}
 
-			klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
-			if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
-				status.Message = nodeShutdownMessage
-				status.Reason = nodeShutdownReason
-			}); err != nil {
-				klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
-			} else {
-				klog.V(1).InfoS("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
-			}
-		}(pod)
-	}
+				klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
-	c := make(chan struct{})
-	go func() {
-		defer close(c)
-		wg.Wait()
-	}()
+				if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
+					status.Message = nodeShutdownMessage
+					status.Reason = nodeShutdownReason
+				}); err != nil {
+					klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
+				} else {
+					klog.V(1).InfoS("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
+				}
+			}(pod, group)
+		}
 
-	// We want to ensure that inhibitLock is released, so only wait up to the shutdownGracePeriodRequested timeout.
-	select {
-	case <-c:
-		break
-	case <-time.After(m.shutdownGracePeriodRequested):
-		klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", m.shutdownGracePeriodRequested)
+		c := make(chan struct{})
+		go func() {
+			defer close(c)
+			wg.Wait()
+		}()
+
+		select {
+		case <-c:
+		case <-time.After(time.Duration(group.ShutdownGracePeriodSeconds) * time.Second):
+			klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
+		}
 	}
 
 	m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 	klog.V(1).InfoS("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 
 	return nil
+}
+
+func (m *managerImpl) periodRequested() time.Duration {
+	var sum int64
+	for _, period := range m.shutdownGracePeriodByPodPriority {
+		sum += period.ShutdownGracePeriodSeconds
+	}
+	return time.Duration(sum) * time.Second
+}
+
+func migrateConfig(shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) []kubeletconfig.ShutdownGracePeriodByPodPriority {
+	if shutdownGracePeriodRequested == 0 {
+		return nil
+	}
+	defaultPriority := shutdownGracePeriodRequested - shutdownGracePeriodCriticalPods
+	if defaultPriority < 0 {
+		return nil
+	}
+	criticalPriority := shutdownGracePeriodRequested - defaultPriority
+	if criticalPriority < 0 {
+		return nil
+	}
+	return []kubeletconfig.ShutdownGracePeriodByPodPriority{
+		{
+			Priority:                   scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			ShutdownGracePeriodSeconds: int64(defaultPriority / time.Second),
+		},
+		{
+			Priority:                   scheduling.SystemCriticalPriority,
+			ShutdownGracePeriodSeconds: int64(criticalPriority / time.Second),
+		},
+	}
+}
+
+func groupByPriority(shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority, pods []*v1.Pod) []podShutdownGroup {
+	groups := make([]podShutdownGroup, 0, len(shutdownGracePeriodByPodPriority))
+	for _, period := range shutdownGracePeriodByPodPriority {
+		groups = append(groups, podShutdownGroup{
+			ShutdownGracePeriodByPodPriority: period,
+		})
+	}
+
+	for _, pod := range pods {
+		var priority int32
+		if pod.Spec.Priority != nil {
+			priority = *pod.Spec.Priority
+		}
+
+		// Find the group index according to the priority.
+		index := sort.Search(len(groups), func(i int) bool {
+			return groups[i].Priority >= priority
+		})
+
+		// 1. Those higher than the highest priority default to the highest priority
+		// 2. Those lower than the lowest priority default to the lowest priority
+		// 3. Those boundary priority default to the lower priority
+		// if priority of pod is:
+		//   groups[index-1].Priority <= pod priority < groups[index].Priority
+		// in which case we want to pick lower one (i.e index-1)
+		if index == len(groups) {
+			index = len(groups) - 1
+		} else if index < 0 {
+			index = 0
+		} else if index > 0 && groups[index].Priority > priority {
+			index--
+		}
+
+		groups[index].Pods = append(groups[index].Pods, pod)
+	}
+	return groups
+}
+
+type podShutdownGroup struct {
+	kubeletconfig.ShutdownGracePeriodByPodPriority
+	Pods []*v1.Pod
 }

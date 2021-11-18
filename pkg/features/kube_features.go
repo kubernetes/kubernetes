@@ -585,6 +585,12 @@ const (
 	// Adds support for kubelet to detect node shutdown and gracefully terminate pods prior to the node being shutdown.
 	GracefulNodeShutdown featuregate.Feature = "GracefulNodeShutdown"
 
+	// owner: @wzshiming
+	// alpha: v1.23
+	//
+	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
+	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
+
 	// owner: @andrewsykim @uablrek
 	// kep: http://kep.k8s.io/1864
 	// alpha: v1.20
@@ -927,6 +933,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: true, PreRelease: featuregate.Beta},
+	GracefulNodeShutdownBasedOnPodPriority:         {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: true, PreRelease: featuregate.Beta},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},

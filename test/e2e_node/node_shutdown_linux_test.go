@@ -35,13 +35,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown]", func() {
+var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	ginkgo.Context("when gracefully shutting down", func() {
 
@@ -54,6 +56,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		)
 
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.GracefulNodeShutdown):                   true,
+				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+			}
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
 		})
@@ -77,10 +83,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 			// Define test pods
 			pods := []*v1.Pod{
-				getGracePeriodOverrideTestPod("period-120", nodeName, 120, false),
-				getGracePeriodOverrideTestPod("period-5", nodeName, 5, false),
-				getGracePeriodOverrideTestPod("period-critical-120", nodeName, 120, true),
-				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, true),
+				getGracePeriodOverrideTestPod("period-120", nodeName, 120, ""),
+				getGracePeriodOverrideTestPod("period-5", nodeName, 5, ""),
+				getGracePeriodOverrideTestPod("period-critical-120", nodeName, 120, scheduling.SystemNodeCritical),
+				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, scheduling.SystemNodeCritical),
 			}
 
 			ginkgo.By("Creating batch pods")
@@ -117,12 +123,12 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				for _, pod := range list.Items {
 					if kubelettypes.IsCriticalPod(&pod) {
 						if isPodShutdown(&pod) {
-							framework.Logf("Expecting critcal pod to be running, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
+							framework.Logf("Expecting critical pod to be running, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 							return fmt.Errorf("critical pod should not be shutdown, phase: %s", pod.Status.Phase)
 						}
 					} else {
 						if !isPodShutdown(&pod) {
-							framework.Logf("Expecting non-critcal pod to be shutdown, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
+							framework.Logf("Expecting non-critical pod to be shutdown, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 							return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 						}
 					}
@@ -207,9 +213,185 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 		})
 	})
+
+	ginkgo.Context("when gracefully shutting down with Pod priority", func() {
+
+		const (
+			pollInterval           = 1 * time.Second
+			podStatusUpdateTimeout = 10 * time.Second
+		)
+
+		var (
+			customClassA = getPriorityClass("custom-class-a", 100000)
+			customClassB = getPriorityClass("custom-class-b", 10000)
+			customClassC = getPriorityClass("custom-class-c", 1000)
+		)
+
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.GracefulNodeShutdown):                   true,
+				string(features.GracefulNodeShutdownBasedOnPodPriority): true,
+			}
+			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
+				{
+					Priority:                   scheduling.SystemCriticalPriority,
+					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
+				},
+				{
+					Priority:                   customClassA.Value,
+					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
+				},
+				{
+					Priority:                   customClassB.Value,
+					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
+				},
+				{
+					Priority:                   customClassC.Value,
+					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
+				},
+				{
+					Priority:                   scheduling.DefaultPriorityWhenNoDefaultClassExists,
+					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
+				},
+			}
+
+		})
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady()
+
+			for _, customClass := range []*schedulingv1.PriorityClass{customClassA, customClassB, customClassC} {
+				_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.Background(), customClass, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err := emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func() {
+			nodeName := getNodeName(f)
+			nodeSelector := fields.Set{
+				"spec.nodeName": nodeName,
+			}.AsSelector().String()
+
+			// Define test pods
+			pods := []*v1.Pod{
+				getGracePeriodOverrideTestPod("period-5", nodeName, 5, ""),
+				getGracePeriodOverrideTestPod("period-c-5", nodeName, 5, customClassC.Name),
+				getGracePeriodOverrideTestPod("period-b-5", nodeName, 5, customClassB.Name),
+				getGracePeriodOverrideTestPod("period-a-5", nodeName, 5, customClassA.Name),
+				getGracePeriodOverrideTestPod("period-critical-5", nodeName, 5, scheduling.SystemNodeCritical),
+			}
+
+			// Expected down steps
+			downSteps := [][]string{
+				{
+					"period-5",
+				},
+				{
+					"period-5",
+					"period-c-5",
+				},
+				{
+					"period-5",
+					"period-c-5",
+					"period-b-5",
+				},
+				{
+					"period-5",
+					"period-c-5",
+					"period-b-5",
+					"period-a-5",
+				},
+				{
+					"period-5",
+					"period-c-5",
+					"period-b-5",
+					"period-a-5",
+					"period-critical-5",
+				},
+			}
+
+			ginkgo.By("Creating batch pods")
+			f.PodClient().CreateBatch(pods)
+
+			list, err := f.PodClient().List(context.TODO(), metav1.ListOptions{
+				FieldSelector: nodeSelector,
+			})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+
+			ginkgo.By("Verifying batch pods are running")
+			for _, pod := range list.Items {
+				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
+					framework.Failf("Failed to start batch pod: %v", pod.Name)
+				}
+			}
+
+			ginkgo.By("Emitting shutdown signal")
+			err = emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying that pods are shutdown")
+
+			for _, step := range downSteps {
+				gomega.Eventually(func() error {
+					list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
+						FieldSelector: nodeSelector,
+					})
+					if err != nil {
+						return err
+					}
+					framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+					for _, pod := range list.Items {
+						shouldShutdown := false
+						for _, podName := range step {
+							if podName == pod.Name {
+								shouldShutdown = true
+								break
+							}
+						}
+						if !shouldShutdown {
+							if pod.Status.Phase != v1.PodRunning {
+								framework.Logf("Expecting pod to be running, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+								return fmt.Errorf("pod should not be shutdown, phase: %s, reason: %s", pod.Status.Phase, pod.Status.Reason)
+							}
+						} else {
+							if pod.Status.Reason != podShutdownReason {
+								framework.Logf("Expecting pod to be shutdown, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
+								for _, item := range list.Items {
+									framework.Logf("DEBUG %s, %s, %s", item.Name, item.Status.Phase, pod.Status.Reason)
+								}
+								return fmt.Errorf("pod should be shutdown, reason: %s", pod.Status.Reason)
+							}
+						}
+					}
+					return nil
+				}, podStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
+			}
+		})
+	})
 })
 
-func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, critical bool) *v1.Pod {
+func getPriorityClass(name string, value int32) *schedulingv1.PriorityClass {
+	priority := &schedulingv1.PriorityClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PriorityClass",
+			APIVersion: "scheduling.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Value: value,
+	}
+	return priority
+}
+func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, priorityClassName string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -238,14 +420,14 @@ while true; do sleep 5; done
 			NodeName:                      node,
 		},
 	}
-	if critical {
+	if priorityClassName == scheduling.SystemNodeCritical {
 		pod.ObjectMeta.Annotations = map[string]string{
 			kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 		}
-		pod.Spec.PriorityClassName = scheduling.SystemNodeCritical
-
+		pod.Spec.PriorityClassName = priorityClassName
 		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
 	} else {
+		pod.Spec.PriorityClassName = priorityClassName
 		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
 	}
 	return pod
