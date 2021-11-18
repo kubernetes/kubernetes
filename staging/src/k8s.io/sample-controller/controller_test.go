@@ -236,9 +236,7 @@ func (f *fixture) expectUpdateDeploymentAction(d *apps.Deployment) {
 }
 
 func (f *fixture) expectUpdateFooStatusAction(foo *samplecontroller.Foo) {
-	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "foos"}, foo.Namespace, foo)
-	// TODO: Until #38113 is merged, we can't use Subresource
-	//action.Subresource = "status"
+	action := core.NewUpdateSubresourceAction(schema.GroupVersionResource{Resource: "foos"}, "status", foo.Namespace, foo)
 	f.actions = append(f.actions, action)
 }
 
