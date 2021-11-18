@@ -83,7 +83,7 @@ type Config struct {
 	// operation if no indexer found.
 	Indexers *cache.Indexers
 
-	// NewFunc is a function that creates a new empty object
+	// NewFunc creates a new empty object
 	NewFunc func() runtime.Object
 
 	// NewList is a function that creates new empty object storing a list of
