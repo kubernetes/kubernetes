@@ -18,6 +18,7 @@ package editor
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,9 +26,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestHashOnLineBreak(t *testing.T) {
@@ -273,6 +277,244 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 			}
 			if test.managedFields != nil && !reflect.DeepEqual(test.managedFields, o.managedFields) {
 				t.Errorf("mismatched managedFields %#v vs %#v", test.managedFields, o.managedFields)
+			}
+		})
+	}
+}
+
+type testVisitor struct {
+	updatedInfos []*resource.Info
+}
+
+func (tv *testVisitor) Visit(f resource.VisitorFunc) error {
+	var err error
+	for _, ui := range tv.updatedInfos {
+		err = f(ui, err)
+	}
+	return err
+}
+
+var unregMapping = &meta.RESTMapping{
+	Resource: schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "b",
+		Resource: "c",
+	},
+	GroupVersionKind: schema.GroupVersionKind{
+		Group:   "a",
+		Version: "b",
+		Kind:    "d",
+	},
+}
+
+func TestEditOptions_visitToPatch(t *testing.T) {
+
+	expectedErr := func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "At least one of apiVersion, kind and name was changed")
+	}
+
+	type fields struct {
+		FilenameOptions     resource.FilenameOptions
+		RecordFlags         *genericclioptions.RecordFlags
+		PrintFlags          *genericclioptions.PrintFlags
+		ToPrinter           func(string) (printers.ResourcePrinter, error)
+		OutputPatch         bool
+		WindowsLineEndings  bool
+		ValidateOptions     cmdutil.ValidateOptions
+		OriginalResult      *resource.Result
+		EditMode            EditMode
+		CmdNamespace        string
+		ApplyAnnotation     bool
+		ChangeCause         string
+		managedFields       map[types.UID][]metav1.ManagedFieldsEntry
+		IOStreams           genericclioptions.IOStreams
+		Recorder            genericclioptions.Recorder
+		f                   cmdutil.Factory
+		editPrinterOptions  *editPrinterOptions
+		updatedResultGetter func(data []byte) *resource.Result
+		FieldManager        string
+	}
+	type args struct {
+		originalInfos []*resource.Info
+		patchVisitor  resource.Visitor
+		results       *editResults
+	}
+	tests := []struct {
+		name     string
+		fields   fields
+		args     args
+		checkErr func(err error) bool
+	}{
+		{
+			name:   "name-diff",
+			fields: fields{},
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "before",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "before",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "after",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1",
+									"kind":       "Thingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "after",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+		{
+			name:   "kind-diff",
+			fields: fields{},
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "myname",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "myname",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "myname",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1",
+									"kind":       "OtherThingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "myname",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+		{
+			name:   "apiver-diff",
+			fields: fields{},
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "myname",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "myname",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "myname",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1alpha1",
+									"kind":       "Thingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "myname",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &EditOptions{
+				FilenameOptions:     tt.fields.FilenameOptions,
+				RecordFlags:         tt.fields.RecordFlags,
+				PrintFlags:          tt.fields.PrintFlags,
+				ToPrinter:           tt.fields.ToPrinter,
+				OutputPatch:         tt.fields.OutputPatch,
+				WindowsLineEndings:  tt.fields.WindowsLineEndings,
+				ValidateOptions:     tt.fields.ValidateOptions,
+				OriginalResult:      tt.fields.OriginalResult,
+				EditMode:            tt.fields.EditMode,
+				CmdNamespace:        tt.fields.CmdNamespace,
+				ApplyAnnotation:     tt.fields.ApplyAnnotation,
+				ChangeCause:         tt.fields.ChangeCause,
+				managedFields:       tt.fields.managedFields,
+				IOStreams:           tt.fields.IOStreams,
+				Recorder:            tt.fields.Recorder,
+				f:                   tt.fields.f,
+				editPrinterOptions:  tt.fields.editPrinterOptions,
+				updatedResultGetter: tt.fields.updatedResultGetter,
+				FieldManager:        tt.fields.FieldManager,
+			}
+			if err := o.visitToPatch(tt.args.originalInfos, tt.args.patchVisitor, tt.args.results); !tt.checkErr(err) {
+				t.Errorf("EditOptions.visitToPatch() %s error = %v", tt.name, err)
 			}
 		})
 	}
