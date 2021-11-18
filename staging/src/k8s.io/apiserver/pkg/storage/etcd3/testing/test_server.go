@@ -17,12 +17,10 @@ limitations under the License.
 package testing
 
 import (
-	"testing"
-
 	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"testing"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing

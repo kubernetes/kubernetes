@@ -87,6 +87,9 @@ func RunEtcd(t *testing.T, cfg *embed.Config) *clientv3.Client {
 	if cfg == nil {
 		cfg = NewTestConfig(t)
 	}
+	if cfg.ExperimentalWatchProgressNotifyInterval == time.Duration(0) {
+		cfg.ExperimentalWatchProgressNotifyInterval = 5 * time.Second
+	}
 
 	e, err := embed.StartEtcd(cfg)
 	if err != nil {
