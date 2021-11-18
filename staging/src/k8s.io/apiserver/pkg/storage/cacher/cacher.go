@@ -1,9 +1,12 @@
 /*
 Copyright 2015 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -265,9 +268,8 @@ type Cacher struct {
 	indexedTrigger *indexedTriggerFunc
 	
 	watcherIdx int
-	// watchers is mapping from both watcherIdx and value of trigger function that a watcher is interested in to the watchers,
-	// when triggerSupported is true by the indexedTrigger. 
-	// If triggerSupported is false, mapping exists between watcherIdx and the watcher that the index identifies.
+	// watchers is mapping from both watcherIdx and value of trigger function that a watcher is interested in to the watchers.
+	// Else, mapping exists between watcherIdx and the watcher that the index identifies.
 	watchers indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
