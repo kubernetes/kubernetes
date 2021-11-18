@@ -253,6 +253,16 @@ var (
 		[]string{"source", "status"},
 	)
 
+	responseWriteLatencies = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_response_write_duration_seconds",
+			Help:           "Response write latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
+			Buckets:        []float64{0.0001, 0.0004, 0.0008, 0.001, 0.1, 0.2, 0.4, 0.8, 1.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -273,6 +283,7 @@ var (
 		requestFilterDuration,
 		requestAbortsTotal,
 		requestPostTimeoutTotal,
+		responseWriteLatencies,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -486,6 +497,12 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		sloLatency := elapsedSeconds - (wd.AdmitTracker.GetLatency() + wd.ValidateTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
 	}
+
+	if tracker := request.ResponseWriteLatencyTrackerFrom(req.Context()); tracker != nil {
+		writeLatency := tracker.GetMaxPerByteDuration().Seconds()
+		responseWriteLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(writeLatency)
+	}
+
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
