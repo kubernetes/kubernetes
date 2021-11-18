@@ -181,7 +181,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// short-circuit on verflag
 			verflag.PrintAndExitIfRequested()
-			cliflag.PrintFlags(cleanFlagSet)
 
 			// set feature gates from initial flags-based config
 			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
@@ -266,6 +265,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.ErrorS(err, "Failed to initialize logging")
 				os.Exit(1)
 			}
+			cliflag.PrintFlags(cleanFlagSet)
 
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
