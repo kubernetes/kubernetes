@@ -6,6 +6,7 @@ go 1.16
 
 require (
 	github.com/gogo/protobuf v1.3.2
+	github.com/quasilyte/go-ruleguard/dsl v0.3.10
 	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

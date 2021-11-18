@@ -21,6 +21,7 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/mitchellh/mapstructure v1.4.1
+	github.com/quasilyte/go-ruleguard/dsl v0.3.10
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0

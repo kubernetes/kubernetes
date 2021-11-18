@@ -12,6 +12,7 @@ require (
 	github.com/googleapis/gnostic v0.5.5
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/quasilyte/go-ruleguard/dsl v0.3.10
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/net v0.0.0-20210825183410-e898025ed96a // indirect
