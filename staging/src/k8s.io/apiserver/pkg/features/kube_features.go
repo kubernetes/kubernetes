@@ -224,7 +224,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemoveSelfLink:                      {Default: true, PreRelease: featuregate.Beta},
 	SelectorIndex:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	WarningHeaders:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.Beta},
+	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.GA},
 	APIServerIdentity:                   {Default: false, PreRelease: featuregate.Alpha},
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},
