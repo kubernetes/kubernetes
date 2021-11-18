@@ -54,7 +54,7 @@ type StatefulSetControlInterface interface {
 // to update the status of StatefulSets. You should use an instance returned from NewRealStatefulPodControl() for any
 // scenario other than testing.
 func NewDefaultStatefulSetControl(
-	podControl StatefulPodControlInterface,
+	podControl *StatefulPodControl,
 	statusUpdater StatefulSetStatusUpdaterInterface,
 	controllerHistory history.Interface,
 	recorder record.EventRecorder) StatefulSetControlInterface {
@@ -62,7 +62,7 @@ func NewDefaultStatefulSetControl(
 }
 
 type defaultStatefulSetControl struct {
-	podControl        StatefulPodControlInterface
+	podControl        *StatefulPodControl
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
@@ -333,7 +333,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			// if the ordinal of the pod is within the range of the current number of replicas,
 			// insert it at the indirection of its ordinal
 			replicas[ord] = pods[i]
-
 		} else if ord >= replicaCount {
 			// if the ordinal is greater than the number of replicas add it to the condemned list
 			condemned = append(condemned, pods[i])
@@ -418,6 +417,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+				if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
+					return &status, err
+				} else if isStale {
+					// If a pod has a stale PVC, no more work can be done this round.
+					return &status, err
+				}
+			}
 			if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
 				return &status, err
 			}
@@ -428,7 +435,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
-
 			// if the set does not allow bursting, return immediately
 			if monotonic {
 				return &status, nil
@@ -471,13 +477,35 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
+		retentionMatch := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+			var err error
+			retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, replicas[i])
+			// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
+			if err != nil {
+				retentionMatch = true
+			}
+		}
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
 		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
 			return &status, err
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		// Ensure ownerRefs are set correctly for the condemned pods.
+		for i := range condemned {
+			if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, condemned[i]); err != nil {
+				return &status, err
+			} else if !matchPolicy {
+				if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(updateSet, condemned[i]); err != nil {
+					return &status, err
+				}
+			}
 		}
 	}
 

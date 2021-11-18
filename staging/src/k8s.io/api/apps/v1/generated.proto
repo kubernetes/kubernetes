@@ -611,6 +611,23 @@ message StatefulSetList {
   repeated StatefulSet items = 2;
 }
 
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
+message StatefulSetPersistentVolumeClaimRetentionPolicy {
+  // WhenDeleted specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+  // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+  // `Delete` policy causes those PVCs to be deleted.
+  optional string whenDeleted = 1;
+
+  // WhenScaled specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is scaled down. The default
+  // policy of `Retain` causes PVCs to not be affected by a scaledown. The
+  // `Delete` policy causes the associated PVCs for any excess pods above
+  // the replica count to be deleted.
+  optional string whenScaled = 2;
+}
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 message StatefulSetSpec {
   // replicas is the desired number of replicas of the given Template.
@@ -677,6 +694,15 @@ message StatefulSetSpec {
   // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
   // +optional
   optional int32 minReadySeconds = 9;
+
+  // persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+  // volume claims created from volumeClaimTemplates. By default, all persistent
+  // volume claims are created as needed and retained until manually deleted. This
+  // policy allows the lifecycle to be altered, for example by deleting persistent
+  // volume claims when their stateful set is deleted, or when their pod is scaled
+  // down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
+  // which is alpha.  +optional
+  optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
