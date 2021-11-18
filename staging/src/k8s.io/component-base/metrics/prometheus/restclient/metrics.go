@@ -29,24 +29,24 @@ import (
 )
 
 var (
-	// requestLatency is a Prometheus Summary metric type partitioned by
-	// "verb" and "url" labels. It is used for the rest client latency metrics.
+	// requestLatency is a Prometheus Histogram metric type partitioned by
+	// "verb", and "host" labels. It is used for the rest client latency metrics.
 	requestLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:    "rest_client_request_duration_seconds",
-			Help:    "Request latency in seconds. Broken down by verb and URL.",
+			Help:    "Request latency in seconds. Broken down by verb, and host.",
 			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
 	)
 
 	rateLimiterLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:    "rest_client_rate_limiter_duration_seconds",
-			Help:    "Client side rate limiter latency in seconds. Broken down by verb and URL.",
+			Help:    "Client side rate limiter latency in seconds. Broken down by verb, and host.",
 			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
 	)
 
 	requestResult = k8smetrics.NewCounterVec(
@@ -140,7 +140,7 @@ type latencyAdapter struct {
 }
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
-	l.m.WithContext(ctx).WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {
