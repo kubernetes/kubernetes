@@ -871,6 +871,13 @@ func (s *store) WatchList(ctx context.Context, key string, opts storage.ListOpti
 }
 
 func (s *store) watch(ctx context.Context, key string, opts storage.ListOptions, recursive bool) (watch.Interface, error) {
+	if opts.Predicate.ConsistentWatchCache {
+		// if we got here that means the request is from an informer that supports streaming (LIST)
+		// however the resource this storage deals with does not - the resource is not served from the watch cache.
+		// usually that means the server doesn't support caching or caching has been deliberately disabled form this particular resource.
+		// in that case we return a well known error to instruct the reflector/informer to fall back to the previous mode
+		return nil, apierrors.NewMethodNotSupported(s.groupResource, "do not set consistentWatchCache query option")
+	}
 	rev, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
