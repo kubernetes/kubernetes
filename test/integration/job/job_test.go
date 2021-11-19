@@ -61,7 +61,7 @@ func TestNonParallelJob(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer func() {
 				cancel()
 			}()
@@ -79,7 +79,7 @@ func TestNonParallelJob(t *testing.T) {
 
 			// Restarting controller.
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 
 			// Failed Pod is replaced.
 			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
@@ -92,7 +92,7 @@ func TestNonParallelJob(t *testing.T) {
 
 			// Restarting controller.
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 
 			// No more Pods are created after the Pod succeeds.
 			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
@@ -132,7 +132,7 @@ func TestParallelJob(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "parallel")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer cancel()
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -220,7 +220,7 @@ func TestParallelJobParallelism(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "parallel")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer cancel()
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -296,7 +296,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.enableReadyPods)()
 			closeFn, restConfig, clientSet, ns := setup(t, "completions")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer cancel()
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -377,7 +377,7 @@ func TestIndexedJob(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer func() {
 				cancel()
 			}()
@@ -414,7 +414,7 @@ func TestIndexedJob(t *testing.T) {
 			// Disable feature gate and restart controller.
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, false)()
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 			events, err := clientSet.EventsV1().Events(ns.Name).Watch(ctx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatal(err)
@@ -433,7 +433,7 @@ func TestIndexedJob(t *testing.T) {
 			// Re-enable feature gate and restart controller. Failed Pod should be recreated now.
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, true)()
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active:    3,
@@ -468,7 +468,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
-	ctx, cancel := startJobController(restConfig, clientSet)
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 	defer func() {
 		cancel()
 	}()
@@ -498,7 +498,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 	}
 
 	// Restart controller.
-	ctx, cancel = startJobController(restConfig, clientSet)
+	ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 
 	// Ensure Job continues to be tracked and finalizers are removed.
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -524,7 +524,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 	}
 
 	// Restart controller.
-	ctx, cancel = startJobController(restConfig, clientSet)
+	ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 
 	// Ensure Job continues to be tracked and finalizers are removed.
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
@@ -540,7 +540,7 @@ func TestOrphanPodsFinalizersCleared(t *testing.T) {
 
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
-	ctx, cancel := startJobController(restConfig, clientSet)
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 	defer func() {
 		cancel()
 	}()
@@ -571,7 +571,7 @@ func TestOrphanPodsFinalizersCleared(t *testing.T) {
 	}
 
 	// Restart controller.
-	ctx, cancel = startJobController(restConfig, clientSet)
+	ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -635,7 +635,7 @@ func TestSuspendJob(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer cancel()
 			events, err := clientSet.EventsV1().Events(ns.Name).Watch(ctx, metav1.ListOptions{})
 			if err != nil {
@@ -687,7 +687,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 	defer closeFn()
-	ctx, cancel := startJobController(restConfig, clientSet)
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 	defer func() {
 		cancel()
 	}()
@@ -709,7 +709,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	// Disable feature gate and restart controller to test that pods get created.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, false)()
 	cancel()
-	ctx, cancel = startJobController(restConfig, clientSet)
+	ctx, cancel = startJobControllerAndWaitForCaches(restConfig, clientSet)
 	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get Job: %v", err)
@@ -729,7 +729,7 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 			defer closeFn()
-			ctx, cancel := startJobController(restConfig, clientSet)
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig, clientSet)
 			defer cancel()
 
 			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{Spec: batchv1.JobSpec{
@@ -1095,13 +1095,19 @@ func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Co
 	return closeFn, &config, clientSet, ns
 }
 
-func startJobController(restConfig *restclient.Config, clientSet clientset.Interface) (context.Context, context.CancelFunc) {
+func startJobControllerAndWaitForCaches(restConfig *restclient.Config, clientSet clientset.Interface) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "cronjob-informers")), resyncPeriod)
 	jc := jobcontroller.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	informerSet.Start(ctx.Done())
 	go jc.Run(ctx, 1)
+
+	// since this method starts the controller in a separate goroutine
+	// and the tests don't check /readyz there is no way
+	// the tests can tell it is safe to call the server and requests won't be rejected
+	// thus we wait until caches have synced
+	informerSet.WaitForCacheSync(context.TODO().Done())
 	return ctx, cancel
 }
 
