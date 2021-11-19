@@ -52,8 +52,8 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 // should be disabled.
 func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 	return map[schema.GroupResource]int{
-		//{Resource: "events"}:                         0,
-		//{Group: "events.k8s.io", Resource: "events"}: 0,
+		{Resource: "events"}:                         0,
+		{Group: "events.k8s.io", Resource: "events"}: 0,
 	}
 }
 
