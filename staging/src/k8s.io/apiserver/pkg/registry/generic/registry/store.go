@@ -685,8 +685,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 // create-on-update path.
 func newCreateOptionsFromUpdateOptions(in *metav1.UpdateOptions) *metav1.CreateOptions {
 	co := &metav1.CreateOptions{
-		DryRun:       in.DryRun,
-		FieldManager: in.FieldManager,
+		DryRun:          in.DryRun,
+		FieldManager:    in.FieldManager,
+		FieldValidation: in.FieldValidation,
 	}
 	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
 	return co

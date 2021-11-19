@@ -347,6 +347,10 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)
 	}
 
+	var disabledParams []string
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
+		disabledParams = []string{"fieldValidation"}
+	}
 	// Build option parameters
 	switch actionVerb {
 	case "get":
@@ -356,9 +360,9 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
 	case "put", "patch":
 		// TODO: PatchOption added in feature branch but not in master yet
-		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
+		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{}, disabledParams...)
 	case "post":
-		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
+		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{}, disabledParams...)
 	case "delete":
 		endpoints.AddObjectParams(b.ws, route, &metav1.DeleteOptions{})
 		route.Reads(&metav1.DeleteOptions{}).ParameterNamed("body").Required(false)
