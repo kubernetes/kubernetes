@@ -59,6 +59,8 @@ func NewDockerKeyring() DockerKeyring {
 		Providers: make([]DockerConfigProvider, 0),
 	}
 
+	providersMutex.Lock()
+	defer providersMutex.Unlock()
 	keys := reflect.ValueOf(providers).MapKeys()
 	stringKeys := make([]string, len(keys))
 	for ix := range keys {
