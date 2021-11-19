@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -257,6 +259,11 @@ func setupSuite() {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
+	if framework.TestContext.PrepullImages {
+		framework.Logf("Pre-pulling images so that they are cached for the tests.")
+		prepullImages(c)
+	}
+
 	// Log the version of the server and this client.
 	framework.Logf("e2e test version: %s", version.Get().GitVersion)
 
@@ -399,4 +406,43 @@ func setupSuitePerGinkgoNode() {
 	}
 	framework.TestContext.IPFamily = getDefaultClusterIPFamily(c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
+}
+
+func prepullImages(c clientset.Interface) {
+	namespace, err := framework.CreateTestingNS("img-puller", c, map[string]string{
+		"e2e-framework": "img-puller",
+	})
+	framework.ExpectNoError(err)
+	ns := namespace.Name
+	defer c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+
+	images := commontest.PrePulledImages
+	if framework.NodeOSDistroIs("windows") {
+		images = commontest.WindowsPrePulledImages
+	}
+
+	label := map[string]string{"app": "prepull-daemonset"}
+	var imgPullers []*appsv1.DaemonSet
+	for _, img := range images.List() {
+		dsName := fmt.Sprintf("img-pull-%s", strings.ReplaceAll(strings.ReplaceAll(img, "/", "-"), ":", "-"))
+
+		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
+		ds, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), dsSpec, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		imgPullers = append(imgPullers, ds)
+	}
+
+	// this should not be a multiple of 5, because node status updates
+	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
+	dsRetryPeriod := 9 * time.Second
+	dsRetryTimeout := 5 * time.Minute
+
+	for _, imgPuller := range imgPullers {
+		checkDaemonset := func() (bool, error) {
+			return daemonset.CheckPresentOnNodes(c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
+		}
+		framework.Logf("Waiting for %s", imgPuller.Name)
+		err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		framework.ExpectNoError(err, "error waiting for image to be pulled")
+	}
 }

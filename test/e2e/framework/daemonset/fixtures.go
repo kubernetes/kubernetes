@@ -67,6 +67,18 @@ func CheckRunningOnAllNodes(f *framework.Framework, ds *appsv1.DaemonSet) (bool,
 	return CheckDaemonPodOnNodes(f, ds, nodeNames)()
 }
 
+// CheckPresentOnNodes will check that the daemonset will be present on at least the given number of
+// schedulable nodes.
+func CheckPresentOnNodes(c clientset.Interface, ds *appsv1.DaemonSet, ns string, numNodes int) (bool, error) {
+	nodeNames := SchedulableNodes(c, ds)
+	if len(nodeNames) < numNodes {
+		return false, nil
+	}
+	return checkDaemonPodStateOnNodes(c, ds, ns, nodeNames, func(pod *v1.Pod) bool {
+		return pod.Status.Phase != v1.PodPending
+	})
+}
+
 func SchedulableNodes(c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
@@ -90,41 +102,47 @@ func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 
 func CheckDaemonPodOnNodes(f *framework.Framework, ds *appsv1.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			framework.Logf("could not get the pod list: %v", err)
+		return checkDaemonPodStateOnNodes(f.ClientSet, ds, f.Namespace.Name, nodeNames, func(pod *v1.Pod) bool {
+			return podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now())
+		})
+	}
+}
+
+func checkDaemonPodStateOnNodes(c clientset.Interface, ds *appsv1.DaemonSet, ns string, nodeNames []string, stateChecker func(*v1.Pod) bool) (bool, error) {
+	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		framework.Logf("could not get the pod list: %v", err)
+		return false, nil
+	}
+	pods := podList.Items
+
+	nodesToPodCount := make(map[string]int)
+	for _, pod := range pods {
+		if !metav1.IsControlledBy(&pod, ds) {
+			continue
+		}
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+		if stateChecker(&pod) {
+			nodesToPodCount[pod.Spec.NodeName]++
+		}
+	}
+	framework.Logf("Number of nodes with available pods controlled by daemonset %s: %d", ds.Name, len(nodesToPodCount))
+
+	// Ensure that exactly 1 pod is running on all nodes in nodeNames.
+	for _, nodeName := range nodeNames {
+		if nodesToPodCount[nodeName] != 1 {
+			framework.Logf("Node %s is running %d daemon pod, expected 1", nodeName, nodesToPodCount[nodeName])
 			return false, nil
 		}
-		pods := podList.Items
-
-		nodesToPodCount := make(map[string]int)
-		for _, pod := range pods {
-			if !metav1.IsControlledBy(&pod, ds) {
-				continue
-			}
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-			if podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
-				nodesToPodCount[pod.Spec.NodeName]++
-			}
-		}
-		framework.Logf("Number of nodes with available pods: %d", len(nodesToPodCount))
-
-		// Ensure that exactly 1 pod is running on all nodes in nodeNames.
-		for _, nodeName := range nodeNames {
-			if nodesToPodCount[nodeName] != 1 {
-				framework.Logf("Node %s is running %d daemon pod, expected 1", nodeName, nodesToPodCount[nodeName])
-				return false, nil
-			}
-		}
-
-		framework.Logf("Number of running nodes: %d, number of available pods: %d", len(nodeNames), len(nodesToPodCount))
-		// Ensure that sizes of the lists are the same. We've verified that every element of nodeNames is in
-		// nodesToPodCount, so verifying the lengths are equal ensures that there aren't pods running on any
-		// other nodes.
-		return len(nodesToPodCount) == len(nodeNames), nil
 	}
+
+	framework.Logf("Number of running nodes: %d, number of available pods: %d in daemonset %s", len(nodeNames), len(nodesToPodCount), ds.Name)
+	// Ensure that sizes of the lists are the same. We've verified that every element of nodeNames is in
+	// nodesToPodCount, so verifying the lengths are equal ensures that there aren't pods running on any
+	// other nodes.
+	return len(nodesToPodCount) == len(nodeNames), nil
 }
 
 func CheckDaemonStatus(f *framework.Framework, dsName string) error {
