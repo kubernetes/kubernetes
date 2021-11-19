@@ -61,7 +61,7 @@ const (
 )
 
 func TestServiceAccountAutoCreate(t *testing.T) {
-	c, _, stopFunc, err := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -98,7 +98,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 }
 
 func TestServiceAccountTokenAutoCreate(t *testing.T) {
-	c, _, stopFunc, err := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -196,7 +196,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 }
 
 func TestServiceAccountTokenAutoMount(t *testing.T) {
-	c, _, stopFunc, err := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -238,7 +238,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 }
 
 func TestServiceAccountTokenAuthentication(t *testing.T) {
-	c, config, stopFunc, err := startServiceAccountTestServer(t)
+	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -318,9 +318,9 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	doServiceAccountAPIRequests(t, defaultClient, myns, true, false, false)
 }
 
-// startServiceAccountTestServer returns a started server
+// startServiceAccountTestServerAndWaitForCaches returns a started server
 // It is the responsibility of the caller to ensure the returned stopFunc is called
-func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
+func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
 	// Listener
 	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -443,6 +443,11 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	externalInformers.Start(ctx.Done())
 	go serviceAccountController.Run(ctx, 5)
 
+	// since this method starts the controllers in a separate goroutine
+	// and the tests don't check /readyz there is no way
+	// the tests can tell it is safe to call the server and requests won't be rejected
+	// thus we wait until caches have synced
+	informers.WaitForCacheSync(ctx.Done())
 	return rootClientset, clientConfig, stop, nil
 }
 
