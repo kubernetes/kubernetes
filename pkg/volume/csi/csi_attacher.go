@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -65,6 +66,9 @@ var _ volume.Attacher = &csiAttacher{}
 var _ volume.Detacher = &csiAttacher{}
 
 var _ volume.DeviceMounter = &csiAttacher{}
+
+// Mathes VolumeAttachment.Names, which have format "csi-<sha256>", e.g. "csi-fad16dffa58f425ddde44ab16f5feff6610e27aaa7798209b8960c02552e3e4e".
+var attachmentNameRegexp = regexp.MustCompile("^csi-[0-9a-f]*$")
 
 func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	if spec == nil {
@@ -645,7 +649,7 @@ func getAttachmentName(volName, csiDriverName, nodeName string) string {
 // and false otherwise
 func isAttachmentName(unknownString string) bool {
 	// 68 == "csi-" + len(sha256hash)
-	return strings.HasPrefix(unknownString, "csi-") && len(unknownString) == 68
+	return len(unknownString) == 68 && attachmentNameRegexp.MatchString(unknownString)
 }
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {

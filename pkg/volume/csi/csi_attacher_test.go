@@ -1749,3 +1749,31 @@ func getCsiAttacherFromDeviceUnmounter(deviceUnmounter volume.DeviceUnmounter, w
 	csiAttacher.watchTimeout = watchTimeout
 	return csiAttacher
 }
+
+func TestIsAttachmentName(t *testing.T) {
+	tests := []struct {
+		volumeID       string
+		expectAttachID bool
+	}{
+		{
+			// Unique volume name
+			"kubernetes.io/csi/rbd.csi.ceph.com^0001-0011-site1-0000000000000001-63bd3b07-4939-11ec-b6a4-0a580a810033",
+			false,
+		}, {
+			// Attachment name
+			"csi-fad16dffa58f425ddde44ab16f5feff6610e27aaa7798209b8960c02552e3e4e",
+			true,
+		}, {
+			// Unique volume name that looks like attachment id (has the right prefix + length)
+			"csi-driver.foo.com^id-with-68-characters-as-sha256-would-have-000001",
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		ret := isAttachmentName(test.volumeID)
+		if ret != test.expectAttachID {
+			t.Errorf("Expected isAttachmentName(%q) to be %t, but got %t", test.volumeID, test.expectAttachID, ret)
+		}
+	}
+}
