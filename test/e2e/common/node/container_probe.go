@@ -520,7 +520,8 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
 	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+		// TODO(SergeyKanzhelev): it is unclear when feature gates are not working as expected.
+		//e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
 
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -530,6 +531,7 @@ var _ = SIGDescribe("Probing container", func() {
 				},
 			},
 			InitialDelaySeconds: probeTestInitialDelaySeconds,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 
@@ -544,16 +546,17 @@ var _ = SIGDescribe("Probing container", func() {
 		                 When liveness probe does  fail then the restart count should +1.
 	*/
 	ginkgo.It("should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
-		service := "etcd_health"
+		// TODO(SergeyKanzhelev): it is unclear when feature gates are not working as expected.
+		//e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port:    2379 + 1, // this port is wrong
-					Service: &service,
+					Port: 2333, // this port is wrong
 				},
 			},
 			InitialDelaySeconds: probeTestInitialDelaySeconds * 4,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
@@ -822,10 +825,12 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 					Command: []string{
 						"/usr/local/bin/etcd",
 						"--listen-client-urls",
-						etcdURL,
+						"http://0.0.0.0:2379", //should listen on all addresses
 						"--advertise-client-urls",
 						etcdURL,
 					},
+					// 2380 is an automatic peer URL
+					Ports:          []v1.ContainerPort{{ContainerPort: int32(2379)}, {ContainerPort: int32(2380)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},
