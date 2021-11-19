@@ -33,7 +33,7 @@ type Factory func(config io.Reader) (Interface, error)
 
 // All registered cloud providers.
 var (
-	providersMutex           sync.Mutex
+	providersMutex           sync.RWMutex
 	providers                = make(map[string]Factory)
 	deprecatedCloudProviders = []struct {
 		name     string
@@ -65,8 +65,8 @@ func RegisterCloudProvider(name string, cloud Factory) {
 // IsCloudProvider returns true if name corresponds to an already registered
 // cloud provider.
 func IsCloudProvider(name string) bool {
-	providersMutex.Lock()
-	defer providersMutex.Unlock()
+	providersMutex.RLock()
+	defer providersMutex.RUnlock()
 	_, found := providers[name]
 	return found
 }
@@ -77,8 +77,8 @@ func IsCloudProvider(name string) bool {
 // io.Reader handler of the configuration file for the cloud provider, or nil
 // for no configuration.
 func GetCloudProvider(name string, config io.Reader) (Interface, error) {
-	providersMutex.Lock()
-	defer providersMutex.Unlock()
+	providersMutex.RLock()
+	defer providersMutex.RUnlock()
 	f, found := providers[name]
 	if !found {
 		return nil, nil
