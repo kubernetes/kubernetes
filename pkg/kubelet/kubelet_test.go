@@ -2410,9 +2410,12 @@ func TestSyncLabels(t *testing.T) {
 						}
 						for _, action := range actions {
 							if action.GetVerb() == "patch" {
-								patchAction := action.(core.PatchActionImpl)
-								var err error
-								savedNode, err = applyNodeStatusPatch(test.existingNode, patchAction.GetPatch())
+								var (
+									err          error
+									patchAction  = action.(core.PatchActionImpl)
+									patchContent = patchAction.GetPatch()
+								)
+								savedNode, err = applyNodeStatusPatch(test.existingNode, patchContent)
 								if err != nil {
 									t.Logf("node patching failed, %v", err)
 									return false, nil
@@ -2421,6 +2424,10 @@ func TestSyncLabels(t *testing.T) {
 						}
 					} else {
 						savedNode = test.existingNode
+					}
+					if savedNode == nil || savedNode.Labels == nil {
+						t.Logf("savedNode.Labels should not be nil")
+						return false, nil
 					}
 					val, ok := savedNode.Labels[v1.LabelOSStable]
 					if !ok {
