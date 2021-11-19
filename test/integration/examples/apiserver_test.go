@@ -141,22 +141,44 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 	// TODO figure out how to turn on enough of services and dns to run more
 
+	// Since ClientCAs are provided by "client-ca::kube-system::extension-apiserver-authentication::client-ca-file" controller
+	// we need to wait until it picks up the configmap otherwise the response will contain an empty result
+	// the following code waits up to 5 seconds for ClientCA to show up otherwise it fails
+	// maybe in the future this could be wired into the /readyz EP
+
 	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
-	firstKubeCANames, err := cert.GetClientCANamesForURL(kubeClientConfig.Host)
+	var firstKubeCANames []string
+	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		firstKubeCANames, err = cert.GetClientCANamesForURL(kubeClientConfig.Host)
+		if err != nil {
+			return false, err
+		}
+		return len(firstKubeCANames) != 0, nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(firstKubeCANames)
-	firstWardleCANames, err := cert.GetClientCANamesForURL(directWardleClientConfig.Host)
+
+	var firstWardleCANames []string
+	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		firstWardleCANames, err = cert.GetClientCANamesForURL(directWardleClientConfig.Host)
+		if err != nil {
+			return false, err
+		}
+		return len(firstWardleCANames) != 0, nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(firstWardleCANames)
+	t.Log(firstKubeCANames)
+
+	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
 	if !reflect.DeepEqual(firstKubeCANames, firstWardleCANames) {
 		t.Fatal("names don't match")
 	}
 
-	// now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
+	// Now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
 	// and then the wardle server will detect and update too.
 	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
 		t.Fatal(err)
