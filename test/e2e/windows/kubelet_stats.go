@@ -77,17 +77,20 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 						}
 						statsChecked = statsChecked + 1
 
-						framework.ExpectEqual(*podStats.CPU.UsageCoreNanoSeconds > 0, true, "Pod stats should not report 0 cpu usage")
-						framework.ExpectEqual(*podStats.Memory.WorkingSetBytes > 0, true, "Pod stats should not report 0 bytes for memory working set ")
-
-						framework.ExpectEqual(podStats.Network != nil, true, "Pod stats should report network stats")
-						framework.ExpectEqual(podStats.Network.Name != "", true, "Pod stats should report network name")
-						framework.ExpectEqual(*podStats.Network.TxBytes > 0, true, "Pod stats should report network Tx stats")
-						framework.ExpectEqual(len(podStats.Network.Interfaces) > 0, true, "Pod Stats should report individual interfaces stats")
+						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+						}
+						if *podStats.Memory.WorkingSetBytes <= 0 {
+							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+						}
 
 						for _, containerStats := range podStats.Containers {
-							framework.ExpectEqual(containerStats.Logs != nil, true, "Pod stats should have container log stats")
-							framework.ExpectEqual(*containerStats.Logs.AvailableBytes > 0, true, "container log stats should not report 0 bytes for AvailableBytes")
+							if containerStats.Logs == nil {
+								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+							}
+							if *containerStats.Logs.AvailableBytes <= 0 {
+								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+							}
 						}
 					}
 					framework.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
@@ -99,7 +102,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 
 				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
 				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
-				framework.ExpectEqual(durationMatch, true, "Collecting kubelet stats should not take longer than 10 seconds")
+				if !durationMatch {
+					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+				}
 			})
 		})
 	})
@@ -146,12 +151,20 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 						}
 						statsChecked = statsChecked + 1
 
-						framework.ExpectEqual(*podStats.CPU.UsageCoreNanoSeconds > 0, true, "Pod stats should not report 0 cpu usage")
-						framework.ExpectEqual(*podStats.Memory.WorkingSetBytes > 0, true, "Pod stats should not report 0 bytes for memory working set ")
+						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+						}
+						if *podStats.Memory.WorkingSetBytes <= 0 {
+							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+						}
 
 						for _, containerStats := range podStats.Containers {
-							framework.ExpectEqual(containerStats.Logs != nil, true, "Pod stats should have container log stats")
-							framework.ExpectEqual(*containerStats.Logs.AvailableBytes > 0, true, "container log stats should not report 0 bytes for AvailableBytes")
+							if containerStats.Logs == nil {
+								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+							}
+							if *containerStats.Logs.AvailableBytes <= 0 {
+								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+							}
 						}
 					}
 					framework.ExpectEqual(statsChecked, 3, "Should find stats for 10 pods in kubelet stats")
@@ -163,7 +176,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 
 				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
 				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
-				framework.ExpectEqual(durationMatch, true, "Collecting kubelet stats should not take longer than 10 seconds")
+				if !durationMatch {
+					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+				}
 			})
 		})
 	})
