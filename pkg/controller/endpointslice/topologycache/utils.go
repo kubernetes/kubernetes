@@ -19,9 +19,10 @@ package topologycache
 import (
 	"math"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/klog/v2"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // RemoveHintsFromSlices removes topology hints on EndpointSlices and returns
@@ -75,6 +76,10 @@ func redistributeHints(slices []*discovery.EndpointSlice, givingZones, receiving
 
 	for _, slice := range slices {
 		for i, endpoint := range slice.Endpoints {
+			if !endpointsliceutil.EndpointReady(endpoint) {
+				endpoint.Hints = nil
+				continue
+			}
 			if len(givingZones) == 0 || len(receivingZones) == 0 {
 				return redistributions
 			}
@@ -185,6 +190,9 @@ func getMost(zones map[string]float64) (string, float64) {
 func getHintsByZone(slice *discovery.EndpointSlice, allocatedHintsByZone EndpointZoneInfo, allocations map[string]Allocation) map[string]int {
 	hintsByZone := map[string]int{}
 	for _, endpoint := range slice.Endpoints {
+		if !endpointsliceutil.EndpointReady(endpoint) {
+			continue
+		}
 		if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
 			return nil
 		}
@@ -247,4 +255,16 @@ func NodeReady(nodeStatus v1.NodeStatus) bool {
 		}
 	}
 	return false
+}
+
+// numReadyEndpoints returns the number of Endpoints that are ready from the
+// specified list.
+func numReadyEndpoints(endpoints []discovery.Endpoint) int {
+	var total int
+	for _, ep := range endpoints {
+		if ep.Conditions.Ready != nil && *ep.Conditions.Ready {
+			total++
+		}
+	}
+	return total
 }
