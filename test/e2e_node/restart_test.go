@@ -73,7 +73,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		podCount            = 100
 		podCreationInterval = 100 * time.Millisecond
 		recoverTimeout      = 5 * time.Minute
-		startTimeout        = 5 * time.Minute
+		startTimeout        = 3 * time.Minute
 		// restartCount is chosen so even with minPods we exhaust the default
 		// allocation of a /24.
 		minPods      = 50
@@ -150,6 +150,10 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			if numCpus < 1 {
 				e2eskipper.Skipf("insufficient CPU available for kubelet restart test")
 			}
+			if numCpus > 18 {
+				// 950m * 19 = 1805 CPUs -> not enough to block the scheduling of another 950m pod
+				e2eskipper.Skipf("test will return false positives on a machine with >18 cores")
+			}
 
 			// create as many restartNever pods as there are allocatable CPU
 			// nodes; if they are not correctly accounted for as terminated
@@ -161,7 +165,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				pod.Spec.RestartPolicy = "Never"
 				pod.Spec.Containers[0].Command = []string{"echo", "hi"}
 				pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
-					v1.ResourceCPU: resource.MustParse("1"),
+					v1.ResourceCPU: resource.MustParse("950m"), // leave a little room for other workloads
 				}
 			}
 			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
@@ -199,9 +203,11 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			// restart may think these old pods are consuming CPU and we
 			// will get an OutOfCpu error.
 			ginkgo.By("verifying restartNever pods succeed and restartAlways pods stay running")
-			postRestartRunningPods := waitForPods(f, numAllPods, recoverTimeout)
-			if len(postRestartRunningPods) < numAllPods {
-				framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
+			for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
+				postRestartRunningPods := waitForPods(f, numAllPods, recoverTimeout)
+				if len(postRestartRunningPods) < numAllPods {
+					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
+				}
 			}
 		})
 	})
