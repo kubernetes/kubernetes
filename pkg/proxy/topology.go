@@ -68,6 +68,9 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 	filteredEndpoints := []Endpoint{}
 
 	for _, endpoint := range endpoints {
+		if !endpoint.IsReady() {
+			continue
+		}
 		if endpoint.GetZoneHints().Len() == 0 {
 			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
 			return endpoints
