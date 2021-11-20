@@ -75,6 +75,8 @@ dependencies:
       match: quay.io/coreos/etcd
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
+    - path: test/utils/image/manifest.go
+      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
     version: 3.5.1
