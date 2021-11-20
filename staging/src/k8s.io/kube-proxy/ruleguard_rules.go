@@ -1,1 +1,1 @@
-../../../../ruleguard_rules.go
+../../../../hack/ruleguard/rules.go
