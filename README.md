@@ -6,7 +6,7 @@
 
 ----
 
-Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
+Kubernetes, also known as K8s, is an open-source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for deployment, maintenance,
 and scaling of applications.
 
@@ -17,7 +17,7 @@ combined with best-of-breed ideas and practices from the community.
 Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
 If your company wants to help shape the evolution of
 technologies that are container-packaged, dynamically scheduled,
-and microservices-oriented, consider joining the CNCF.
+and micro services-oriented, consider joining the CNCF.
 For details about who's involved and how Kubernetes plays a role,
 read the CNCF [announcement].
 
@@ -32,7 +32,7 @@ Try our [interactive tutorial].
 Take a free course on [Scalable Microservices with Kubernetes].
 
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
-Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
+Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries are not supported.
 
 ## To start developing K8s
 
