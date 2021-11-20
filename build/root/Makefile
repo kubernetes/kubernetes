@@ -256,6 +256,7 @@ define TEST_E2E_NODE_HELP_INFO
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
+#  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
