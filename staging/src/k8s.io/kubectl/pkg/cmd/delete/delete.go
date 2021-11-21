@@ -374,9 +374,9 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
-		Printer:     printers.NewDiscardingPrinter(),
-		ConditionFn: cmdwait.IsDeleted,
-		IOStreams:   o.IOStreams,
+		Printer:   printers.NewDiscardingPrinter(),
+		Waiter:    cmdwait.NewDeletionWaiter(o.ErrOut),
+		IOStreams: o.IOStreams,
 	}
 	err = waitOptions.RunWait()
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {

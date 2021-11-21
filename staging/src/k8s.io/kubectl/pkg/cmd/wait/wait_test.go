@@ -25,6 +25,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 
+	"github.com/stretchr/testify/assert"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -278,21 +280,6 @@ func TestWaitForDeletion(t *testing.T) {
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
 					t.Error(spew.Sdump(actions))
-				}
-			},
-		},
-		{
-			name:  "handles no infos",
-			infos: []*resource.Info{},
-			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
-			},
-			timeout:     10 * time.Second,
-			expectedErr: errNoMatchingResources.Error(),
-
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
 				}
 			},
 		},
@@ -588,9 +575,9 @@ func TestWaitForDeletion(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: IsDeleted,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				Printer:   printers.NewDiscardingPrinter(),
+				Waiter:    NewDeletionWaiter(ioutil.Discard),
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -1090,20 +1077,17 @@ func TestWaitForCondition(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				Printer:   printers.NewDiscardingPrinter(),
+				Waiter:    NewConditionalWaiter("the-condition", "status-value", ioutil.Discard),
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
-			switch {
-			case err == nil && len(test.expectedErr) == 0:
-			case err != nil && len(test.expectedErr) == 0:
-				t.Fatal(err)
-			case err == nil && len(test.expectedErr) != 0:
-				t.Fatalf("missing: %q", test.expectedErr)
-			case err != nil && len(test.expectedErr) != 0:
-				if !strings.Contains(err.Error(), test.expectedErr) {
-					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+
+			if test.expectedErr == None {
+				assert.NoError(t, err)
+			} else {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), test.expectedErr)
 				}
 			}
 
@@ -1112,26 +1096,33 @@ func TestWaitForCondition(t *testing.T) {
 	}
 }
 
+// TODO: The DynamicFakeClient supports adding errors, but isn't useful when the ResourceFinder finds no items,
+// such as the case of NotFound errors in the DeletionWaiter (tested below). We likely need to add support for
+// feeding errors into FakeResourceFinder.
+type ResourceFinderNotFound struct{}
+
+type VisitorNotFound struct{}
+
+func (v VisitorNotFound) Visit(visitorFunc resource.VisitorFunc) error {
+	return apierrors.NewNotFound(schema.GroupResource{Group: "foo", Resource: "bar"}, "baz")
+}
+
+func (r ResourceFinderNotFound) Do() resource.Visitor {
+	return VisitorNotFound{}
+}
+
 func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
-	scheme := runtime.NewScheme()
-	listMapping := map[schema.GroupVersionResource]string{
-		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
-	}
-	infos := []*resource.Info{}
-	fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+	fakeClient := dynamicfakeclient.NewSimpleDynamicClient(runtime.NewScheme())
 
 	o := &WaitOptions{
-		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
+		ResourceFinder: ResourceFinderNotFound{},
 		DynamicClient:  fakeClient,
 		Printer:        printers.NewDiscardingPrinter(),
-		ConditionFn:    IsDeleted,
+		Waiter:         NewDeletionWaiter(ioutil.Discard),
 		IOStreams:      genericclioptions.NewTestIOStreamsDiscard(),
-		ForCondition:   "delete",
 	}
 	err := o.RunWait()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 // TestWaitForDifferentJSONPathCondition will run tests on different types of
@@ -1307,25 +1298,18 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        1 * time.Millisecond,
 
-				Printer: printers.NewDiscardingPrinter(),
-				ConditionFn: JSONPathWait{
-					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j,
-					errOut:            ioutil.Discard}.IsJSONPathConditionMet,
+				Printer:   printers.NewDiscardingPrinter(),
+				Waiter:    NewJSONPathWaiter(test.jsonPathCond, j, ioutil.Discard),
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()
 
-			switch {
-			case err == nil && len(test.expectedErr) == 0:
-			case err != nil && len(test.expectedErr) == 0:
-				t.Fatal(err)
-			case err == nil && len(test.expectedErr) != 0:
-				t.Fatalf("missing: %q", test.expectedErr)
-			case err != nil && len(test.expectedErr) != 0:
-				if !strings.Contains(err.Error(), test.expectedErr) {
-					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+			if test.expectedErr == None {
+				assert.NoError(t, err)
+			} else {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), test.expectedErr)
 				}
 			}
 		})
@@ -1660,24 +1644,18 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer: printers.NewDiscardingPrinter(),
-				ConditionFn: JSONPathWait{
-					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j, errOut: ioutil.Discard}.IsJSONPathConditionMet,
+				Printer:   printers.NewDiscardingPrinter(),
+				Waiter:    NewJSONPathWaiter(test.jsonPathCond, j, ioutil.Discard),
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 
 			err := o.RunWait()
 
-			switch {
-			case err == nil && len(test.expectedErr) == 0:
-			case err != nil && len(test.expectedErr) == 0:
-				t.Fatal(err)
-			case err == nil && len(test.expectedErr) != 0:
-				t.Fatalf("missing: %q", test.expectedErr)
-			case err != nil && len(test.expectedErr) != 0:
-				if !strings.Contains(err.Error(), test.expectedErr) {
-					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+			if test.expectedErr == None {
+				assert.NoError(t, err)
+			} else {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), test.expectedErr)
 				}
 			}
 
