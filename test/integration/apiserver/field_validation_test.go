@@ -36,7 +36,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
@@ -355,6 +354,9 @@ func TestFieldValidation(t *testing.T) {
 	}
 	config := server.ClientConfig
 	defer server.TearDownFn()
+
+	// don't log warnings, tests inspect them in the responses directly
+	config.WarningHandler = rest.NoWarnings{}
 
 	schemaCRD := setupCRD(t, config, "schema.example.com", false)
 	schemaGVR := schema.GroupVersionResource{
@@ -1162,7 +1164,6 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			body := []byte(fmt.Sprintf(validBodyJSON, tc.name))
-			klog.Warningf("body: %s\n", string(body))
 			_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 				AbsPath("/apis/apps/v1").
 				Namespace("default").
@@ -1832,7 +1833,6 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 
 			// update the CR as specified by the test case
 			putBody := []byte(fmt.Sprintf(tc.putBody, apiVersion, kind, tc.name, postUnstructured.GetResourceVersion()))
-			klog.Warningf("putBody: %s\n", string(putBody))
 			putReq := rest.Put().
 				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
@@ -1989,7 +1989,6 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 
 			// update the CR as specified by the test case
 			putBody := []byte(fmt.Sprintf(tc.putBody, apiVersion, kind, tc.name, postUnstructured.GetResourceVersion()))
-			klog.Warningf("putBody: %s\n", string(putBody))
 			putReq := rest.Put().
 				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
