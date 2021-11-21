@@ -412,6 +412,9 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, strict
 		}
 
 		patchedJS, retErr = jsonpatch.MergePatch(versionedJS, p.patchBytes)
+		if retErr == jsonpatch.ErrBadJSONPatch {
+			return nil, nil, errors.NewBadRequest(retErr.Error())
+		}
 		return patchedJS, strictErrors, retErr
 	default:
 		// only here as a safety net - go-restful filters content-type
