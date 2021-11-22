@@ -104,6 +104,8 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
+	config.Defaults.Enforce = "restricted"
+	config.Defaults.EnforceVersion = "latest"
 
 	evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
 	if err != nil {
