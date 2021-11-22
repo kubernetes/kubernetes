@@ -788,6 +788,22 @@ func (adc *attachDetachController) CSIDriverLister() storagelistersv1.CSIDriverL
 	return adc.csiDriverLister
 }
 
+// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
+func (adc *attachDetachController) WaitForCacheSync() error {
+	if adc.csiDriversSynced == nil {
+		klog.ErrorS(nil, "CsiDriversSynced not found on AttachDetachController")
+		return fmt.Errorf("csiDriversSynced not found on AttachDetachController")
+	}
+
+	synced := []kcache.InformerSynced{adc.csiDriversSynced}
+	if !kcache.WaitForCacheSync(wait.NeverStop, synced...) {
+		klog.InfoS("Failed to wait for cache sync for CSIDriverLister")
+		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
+	}
+
+	return nil
+}
+
 func (adc *attachDetachController) IsAttachDetachController() bool {
 	return true
 }

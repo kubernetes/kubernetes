@@ -793,6 +793,13 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
+	adcHost, ok := p.host.(volume.AttachDetachVolumeHost)
+	if ok {
+		if err := adcHost.WaitForCacheSync(); err != nil {
+			return false, err
+		}
+	}
+
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
 		if err := kletHost.WaitForCacheSync(); err != nil {

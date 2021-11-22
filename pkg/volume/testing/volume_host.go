@@ -290,6 +290,10 @@ func (f *fakeAttachDetachVolumeHost) CSIDriverLister() storagelistersv1.CSIDrive
 	return f.csiDriverLister
 }
 
+func (f *fakeAttachDetachVolumeHost) WaitForCacheSync() error {
+	return nil
+}
+
 func (f *fakeAttachDetachVolumeHost) VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister {
 	return f.volumeAttachmentLister
 }
