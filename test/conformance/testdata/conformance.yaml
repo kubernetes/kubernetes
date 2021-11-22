@@ -1005,6 +1005,56 @@
     ServiceAccount will be deleted and MUST find a deleted watch event.
   release: v1.19
   file: test/e2e/auth/service_accounts.go
+- testname: 'HPA: ReplicationController scale up.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    ReplicationController light Should scale from 1 pod to 2 pods [Conformance]'
+  description: When an HPA object targets a ReplicaSet whose average CPU utilization
+    is higher than the configured CPU utilization target, the ReplicationController
+    MUST be scaled up.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
+- testname: 'HPA: ReplicationController scale down.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    ReplicationController light Should scale from 2 pods to 1 pod [Slow] [Conformance]'
+  description: When an HPA object targets a ReplicaSet whose average CPU utilization
+    is lower than the configured CPU utilization target, the ReplicationController
+    MUST be scaled down.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
+- testname: 'HPA: Deployment scale up.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    [Serial] [Slow] Deployment Should scale from 1 pod to 3 pods and from 3 to 5 [Conformance]'
+  description: When an HPA object targets a Deployment whose average CPU utilization
+    is higher than the configured CPU utilization target, the Deployment MUST be scaled
+    up.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
+- testname: 'HPA: Deployment scale down.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    [Serial] [Slow] Deployment Should scale from 5 pods to 3 pods and from 3 to 1
+    [Conformance]'
+  description: When an HPA object targets a Deployment whose average CPU utilization
+    is lower than the configured CPU utilization target, the Deployment MUST be scaled
+    down.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
+- testname: 'HPA: ReplicaSet scale up.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    [Serial] [Slow] ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5 [Conformance]'
+  description: When an HPA object targets a ReplicaSet whose average CPU utilization
+    is higher than the configured CPU utilization target, the ReplicaSet MUST be scaled
+    up.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
+- testname: 'HPA: ReplicaSet scale down.'
+  codename: '[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU)
+    [Serial] [Slow] ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1
+    [Conformance]'
+  description: When an HPA object targets a ReplicaSet whose average CPU utilization
+    is lower than the configured CPU utilization target, the ReplicaSet MUST be scaled
+    down.
+  release: v1.23
+  file: test/e2e/autoscaling/horizontal_pod_autoscaling.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'

@@ -28,28 +28,58 @@ import (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
 	ginkgo.Describe("[Serial] [Slow] Deployment", func() {
-		// CPU tests via deployments
-		ginkgo.It(titleUp, func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: Deployment scale up.
+		   Description: When an HPA object targets a
+		   Deployment whose average CPU utilization is higher
+		   than the configured CPU utilization target, the
+		   Deployment MUST be scaled up.
+		*/
+		framework.ConformanceIt(titleUp, func() {
 			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, f)
 		})
-		ginkgo.It(titleDown, func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: Deployment scale down.
+		   Description: When an HPA object targets a
+		   Deployment whose average CPU utilization is lower
+		   than the configured CPU utilization target, the
+		   Deployment MUST be scaled down.
+		*/
+		framework.ConformanceIt(titleDown, func() {
 			scaleDown("test-deployment", e2eautoscaling.KindDeployment, false, f)
 		})
 	})
 
 	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
-		// CPU tests via ReplicaSets
-		ginkgo.It(titleUp, func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: ReplicaSet scale up.
+		   Description: When an HPA object targets a
+		   ReplicaSet whose average CPU utilization is higher
+		   than the configured CPU utilization target, the
+		   ReplicaSet MUST be scaled up.
+		*/
+		framework.ConformanceIt(titleUp, func() {
 			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, f)
 		})
-		ginkgo.It(titleDown, func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: ReplicaSet scale down.
+		   Description: When an HPA object targets a
+		   ReplicaSet whose average CPU utilization is lower
+		   than the configured CPU utilization target, the
+		   ReplicaSet MUST be scaled down.
+		*/
+		framework.ConformanceIt(titleDown, func() {
 			scaleDown("rs", e2eautoscaling.KindReplicaSet, false, f)
 		})
 	})
@@ -66,7 +96,15 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	})
 
 	ginkgo.Describe("ReplicationController light", func() {
-		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: ReplicationController scale up.
+		   Description: When an HPA object targets a
+		   ReplicaSet whose average CPU utilization is higher
+		   than the configured CPU utilization target, the
+		   ReplicationController MUST be scaled up.
+		*/
+		framework.ConformanceIt("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
@@ -78,7 +116,15 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 			}
 			scaleTest.run("rc-light", e2eautoscaling.KindRC, f)
 		})
-		ginkgo.It("Should scale from 2 pods to 1 pod [Slow]", func() {
+		/*
+		   Release: v1.23
+		   Testname: HPA: ReplicationController scale down.
+		   Description: When an HPA object targets a
+		   ReplicaSet whose average CPU utilization is lower
+		   than the configured CPU utilization target, the
+		   ReplicationController MUST be scaled down.
+		*/
+		framework.ConformanceIt("Should scale from 2 pods to 1 pod [Slow]", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
 				totalInitialCPUUsage:        50,
@@ -94,11 +140,13 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 
 	ginkgo.Describe("[Serial] [Slow] ReplicaSet with idle sidecar (ContainerResource use case)", func() {
 		// ContainerResource CPU autoscaling on idle sidecar
+		// TODO: promote to conformance after graduating features to Beta.
 		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func() {
 			scaleOnIdleSideCar("rs", e2eautoscaling.KindReplicaSet, false, f)
 		})
 
 		// ContainerResource CPU autoscaling on busy sidecar
+		// TODO: promote to conformance after graduating features to Beta.
 		ginkgo.It("Should not scale up on a busy sidecar with an idle application", func() {
 			doNotScaleOnBusySidecar("rs", e2eautoscaling.KindReplicaSet, true, f)
 		})
