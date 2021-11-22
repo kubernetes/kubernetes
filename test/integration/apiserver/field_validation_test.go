@@ -28,13 +28,14 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
@@ -344,14 +345,69 @@ spec:
 	`
 )
 
-// TestFieldValidationPost tests POST requests containing unknown fields with
-// strict and non-strict field validation.
-func TestFieldValidationPost(t *testing.T) {
+func TestFieldValidation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 
-	_, client, closeFn := setup(t)
-	defer closeFn()
+	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := server.ClientConfig
+	defer server.TearDownFn()
 
+	// don't log warnings, tests inspect them in the responses directly
+	config.WarningHandler = rest.NoWarnings{}
+
+	schemaCRD := setupCRD(t, config, "schema.example.com", false)
+	schemaGVR := schema.GroupVersionResource{
+		Group:    schemaCRD.Spec.Group,
+		Version:  schemaCRD.Spec.Versions[0].Name,
+		Resource: schemaCRD.Spec.Names.Plural,
+	}
+	schemaGVK := schema.GroupVersionKind{
+		Group:   schemaCRD.Spec.Group,
+		Version: schemaCRD.Spec.Versions[0].Name,
+		Kind:    schemaCRD.Spec.Names.Kind,
+	}
+
+	schemalessCRD := setupCRD(t, config, "schemaless.example.com", true)
+	schemalessGVR := schema.GroupVersionResource{
+		Group:    schemalessCRD.Spec.Group,
+		Version:  schemalessCRD.Spec.Versions[0].Name,
+		Resource: schemalessCRD.Spec.Names.Plural,
+	}
+	schemalessGVK := schema.GroupVersionKind{
+		Group:   schemalessCRD.Spec.Group,
+		Version: schemalessCRD.Spec.Versions[0].Name,
+		Kind:    schemalessCRD.Spec.Names.Kind,
+	}
+
+	client := clientset.NewForConfigOrDie(config)
+	rest := client.Discovery().RESTClient()
+
+	t.Run("Post", func(t *testing.T) { testFieldValidationPost(t, client) })
+	t.Run("Put", func(t *testing.T) { testFieldValidationPut(t, client) })
+	t.Run("PatchTyped", func(t *testing.T) { testFieldValidationPatchTyped(t, client) })
+	t.Run("SMP", func(t *testing.T) { testFieldValidationSMP(t, client) })
+	t.Run("ApplyCreate", func(t *testing.T) { testFieldValidationApplyCreate(t, client) })
+	t.Run("ApplyUpdate", func(t *testing.T) { testFieldValidationApplyUpdate(t, client) })
+
+	t.Run("PostCRD", func(t *testing.T) { testFieldValidationPostCRD(t, rest, schemaGVK, schemaGVR) })
+	t.Run("PutCRD", func(t *testing.T) { testFieldValidationPutCRD(t, rest, schemaGVK, schemaGVR) })
+	t.Run("PatchCRD", func(t *testing.T) { testFieldValidationPatchCRD(t, rest, schemaGVK, schemaGVR) })
+	t.Run("ApplyCreateCRD", func(t *testing.T) { testFieldValidationApplyCreateCRD(t, rest, schemaGVK, schemaGVR) })
+	t.Run("ApplyUpdateCRD", func(t *testing.T) { testFieldValidationApplyUpdateCRD(t, rest, schemaGVK, schemaGVR) })
+
+	t.Run("PostCRDSchemaless", func(t *testing.T) { testFieldValidationPostCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+	t.Run("PutCRDSchemaless", func(t *testing.T) { testFieldValidationPutCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+	t.Run("PatchCRDSchemaless", func(t *testing.T) { testFieldValidationPatchCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+	t.Run("ApplyCreateCRDSchemaless", func(t *testing.T) { testFieldValidationApplyCreateCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+	t.Run("ApplyUpdateCRDSchemaless", func(t *testing.T) { testFieldValidationApplyUpdateCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+}
+
+// testFieldValidationPost tests POST requests containing unknown fields with
+// strict and non-strict field validation.
+func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 	var testcases = []struct {
 		name                   string
 		bodyBase               string
@@ -503,16 +559,11 @@ func TestFieldValidationPost(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPut tests PUT requests
+// testFieldValidationPut tests PUT requests
 // that update existing objects with unknown fields
 // for both strict and non-strict field validation.
-func TestFieldValidationPut(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
-	deployName := "test-deployment"
+func testFieldValidationPut(t *testing.T, client clientset.Interface) {
+	deployName := "test-deployment-put"
 	postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
 
 	if _, err := client.CoreV1().RESTClient().Post().
@@ -676,15 +727,10 @@ func TestFieldValidationPut(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPatchTyped tests merge-patch and json-patch requests containing unknown fields with
+// testFieldValidationPatchTyped tests merge-patch and json-patch requests containing unknown fields with
 // strict and non-strict field validation for typed objects.
-func TestFieldValidationPatchTyped(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
-	deployName := "test-deployment"
+func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
+	deployName := "test-deployment-patch-typed"
 	postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
 
 	if _, err := client.CoreV1().RESTClient().Post().
@@ -929,7 +975,7 @@ func TestFieldValidationPatchTyped(t *testing.T) {
 				AbsPath("/apis/apps/v1").
 				Namespace("default").
 				Resource("deployments").
-				Name("test-deployment").
+				Name(deployName).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
 
@@ -955,16 +1001,10 @@ func TestFieldValidationPatchTyped(t *testing.T) {
 	}
 }
 
-// TestFieldValidationSMP tests that attempting a strategic-merge-patch
+// testFieldValidationSMP tests that attempting a strategic-merge-patch
 // with unknown fields errors out when fieldValidation is strict,
 // but succeeds when fieldValidation is ignored.
-func TestFieldValidationSMP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
+func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 	smpBody := `
 	{
 		"spec": {
@@ -1124,7 +1164,6 @@ func TestFieldValidationSMP(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			body := []byte(fmt.Sprintf(validBodyJSON, tc.name))
-			klog.Warningf("body: %s\n", string(body))
 			_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 				AbsPath("/apis/apps/v1").
 				Namespace("default").
@@ -1172,15 +1211,9 @@ func TestFieldValidationSMP(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyCreate tests apply patch requests containing unknown fields
+// testFieldValidationApplyCreate tests apply patch requests containing unknown fields
 // on newly created objects, with strict and non-strict field validation.
-func TestFieldValidationApplyCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
+func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1262,15 +1295,9 @@ func TestFieldValidationApplyCreate(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyUpdate tests apply patch requests containing unknown fields
+// testFieldValidationApplyUpdate tests apply patch requests containing unknown fields
 // on apply requests to existing objects, with strict and non-strict field validation.
-func TestFieldValidationApplyUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
+func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1320,7 +1347,7 @@ func TestFieldValidationApplyUpdate(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			name := fmt.Sprintf("apply-create-deployment-%s", tc.name)
+			name := fmt.Sprintf("apply-update-deployment-%s", tc.name)
 			createBody := []byte(fmt.Sprintf(validBodyJSON, name))
 			createReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 				AbsPath("/apis/apps/v1").
@@ -1363,14 +1390,9 @@ func TestFieldValidationApplyUpdate(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPostCRD tests that server-side schema validation
+// testFieldValidationPostCRD tests that server-side schema validation
 // works for CRD create requests for CRDs with schemas
-func TestFieldValidationPostCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, false)
-	defer closeFn()
-
+func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1484,13 +1506,13 @@ func TestFieldValidationPostCRD(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
 			jsonBody := []byte(fmt.Sprintf(tc.body, apiVersion, kind, tc.name))
 			req := rest.Post().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(jsonBody)).Do(context.TODO())
@@ -1523,15 +1545,10 @@ func TestFieldValidationPostCRD(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPostCRDSchemaless tests that server-side schema validation
+// testFieldValidationPostCRDSchemaless tests that server-side schema validation
 // works for CRD create requests for CRDs that have schemas
 // with x-kubernetes-preserve-unknown-field set
-func TestFieldValidationPostCRDSchemaless(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, true)
-	defer closeFn()
-
+func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1634,13 +1651,13 @@ func TestFieldValidationPostCRDSchemaless(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
 			jsonBody := []byte(fmt.Sprintf(tc.body, apiVersion, kind, tc.name))
 			req := rest.Post().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(jsonBody)).Do(context.TODO())
@@ -1660,6 +1677,14 @@ func TestFieldValidationPostCRDSchemaless(t *testing.T) {
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
+				t.Logf("expected:")
+				for _, w := range tc.strictDecodingWarnings {
+					t.Logf("\t%v", w)
+				}
+				t.Logf("got:")
+				for _, w := range result.Warnings() {
+					t.Logf("\t%v", w.Text)
+				}
 				t.Fatalf("unexpected number of warnings, expected: %d, got: %d", len(tc.strictDecodingWarnings), len(result.Warnings()))
 			}
 
@@ -1673,14 +1698,9 @@ func TestFieldValidationPostCRDSchemaless(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPutCRD tests that server-side schema validation
+// testFieldValidationPutCRD tests that server-side schema validation
 // works for CRD update requests for CRDs with schemas.
-func TestFieldValidationPutCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, false)
-	defer closeFn()
-
+func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1794,13 +1814,13 @@ func TestFieldValidationPutCRD(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
 			jsonPostBody := []byte(fmt.Sprintf(crdValidBody, apiVersion, kind, tc.name))
 			postReq := rest.Post().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			postResult, err := postReq.Body([]byte(jsonPostBody)).Do(context.TODO()).Raw()
 			if err != nil {
@@ -1813,9 +1833,8 @@ func TestFieldValidationPutCRD(t *testing.T) {
 
 			// update the CR as specified by the test case
 			putBody := []byte(fmt.Sprintf(tc.putBody, apiVersion, kind, tc.name, postUnstructured.GetResourceVersion()))
-			klog.Warningf("putBody: %s\n", string(putBody))
 			putReq := rest.Put().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
@@ -1846,15 +1865,10 @@ func TestFieldValidationPutCRD(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPutCRDSchemaless tests that server-side schema validation
+// testFieldValidationPutCRDSchemaless tests that server-side schema validation
 // works for CRD update requests for CRDs that have schemas
 // with x-kubernetes-preserve-unknown-field set
-func TestFieldValidationPutCRDSchemaless(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, true)
-	defer closeFn()
-
+func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -1956,13 +1970,13 @@ func TestFieldValidationPutCRDSchemaless(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
 			jsonPostBody := []byte(fmt.Sprintf(crdValidBody, apiVersion, kind, tc.name))
 			postReq := rest.Post().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			postResult, err := postReq.Body([]byte(jsonPostBody)).Do(context.TODO()).Raw()
 			if err != nil {
@@ -1975,9 +1989,8 @@ func TestFieldValidationPutCRDSchemaless(t *testing.T) {
 
 			// update the CR as specified by the test case
 			putBody := []byte(fmt.Sprintf(tc.putBody, apiVersion, kind, tc.name, postUnstructured.GetResourceVersion()))
-			klog.Warningf("putBody: %s\n", string(putBody))
 			putReq := rest.Put().
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
@@ -1995,6 +2008,14 @@ func TestFieldValidationPutCRDSchemaless(t *testing.T) {
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
+				t.Logf("expected:")
+				for _, w := range tc.strictDecodingWarnings {
+					t.Logf("\t%v", w)
+				}
+				t.Logf("got:")
+				for _, w := range result.Warnings() {
+					t.Logf("\t%v", w.Text)
+				}
 				t.Fatalf("unexpected number of warnings, expected: %d, got: %d", len(tc.strictDecodingWarnings), len(result.Warnings()))
 			}
 
@@ -2008,15 +2029,10 @@ func TestFieldValidationPutCRDSchemaless(t *testing.T) {
 	}
 }
 
-// TestFieldValidationPatchCRD tests that server-side schema validation
+// testFieldValidationPatchCRD tests that server-side schema validation
 // works for jsonpatch and mergepatch requests
 // for custom resources that have schemas.
-func TestFieldValidationPatchCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, false)
-	defer closeFn()
-
+func testFieldValidationPatchCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	patchYAMLBody := `
 apiVersion: %s
 kind: %s
@@ -2198,12 +2214,12 @@ spec:
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 			// create a CR
 			yamlBody := []byte(fmt.Sprintf(string(patchYAMLBody), apiVersion, kind, tc.name))
 			createResult, err := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				Param("fieldManager", "apply_test").
 				Body(yamlBody).
@@ -2214,7 +2230,7 @@ spec:
 
 			// patch the CR as specified by the test case
 			req := rest.Patch(tc.patchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
@@ -2246,16 +2262,11 @@ spec:
 	}
 }
 
-// TestFieldValidationPatchCRDSchemaless tests that server-side schema validation
+// testFieldValidationPatchCRDSchemaless tests that server-side schema validation
 // works for jsonpatch and mergepatch requests
 // for custom resources that have schemas
 // with x-kubernetes-preserve-unknown-field set
-func TestFieldValidationPatchCRDSchemaless(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	// setup the testerver and install the CRD
-	noxuDefinition, rest, closeFn := setupCRD(t, true)
-	defer closeFn()
-
+func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	mergePatchBody := `
 {
 	"spec": {
@@ -2408,12 +2419,12 @@ func TestFieldValidationPatchCRDSchemaless(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 			// create a CR
 			yamlBody := []byte(fmt.Sprintf(string(patchYAMLBody), apiVersion, kind, tc.name))
 			createResult, err := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				Param("fieldManager", "apply_test").
 				Body(yamlBody).
@@ -2424,7 +2435,7 @@ func TestFieldValidationPatchCRDSchemaless(t *testing.T) {
 
 			// patch the CR as specified by the test case
 			req := rest.Patch(tc.patchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
 				Name(tc.name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
@@ -2456,16 +2467,11 @@ func TestFieldValidationPatchCRDSchemaless(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyCreateCRD tests apply patch requests containing duplicate fields
+// testFieldValidationApplyCreateCRD tests apply patch requests containing duplicate fields
 // on newly created objects, for CRDs that have schemas
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
-func TestFieldValidationApplyCreateCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-	noxuDefinition, rest, closeFn := setupCRD(t, false)
-	defer closeFn()
-
+func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -2515,15 +2521,16 @@ func TestFieldValidationApplyCreateCRD(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
-			applyCreateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, tc.name))
+			name := fmt.Sprintf("apply-create-crd-%s", tc.name)
+			applyCreateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, name))
 
 			req := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(applyCreateBody).Do(context.TODO())
 			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
@@ -2551,17 +2558,12 @@ func TestFieldValidationApplyCreateCRD(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyCreateCRDSchemaless tests apply patch requests containing duplicate fields
+// testFieldValidationApplyCreateCRDSchemaless tests apply patch requests containing duplicate fields
 // on newly created objects, for CRDs that have schemas
 // with x-kubernetes-preserve-unknown-field set
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
-func TestFieldValidationApplyCreateCRDSchemaless(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-	noxuDefinition, rest, closeFn := setupCRD(t, true)
-	defer closeFn()
-
+func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -2611,15 +2613,16 @@ func TestFieldValidationApplyCreateCRDSchemaless(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
-			applyCreateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, tc.name))
+			name := fmt.Sprintf("apply-create-crd-schemaless-%s", tc.name)
+			applyCreateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, name))
 
 			req := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(applyCreateBody).Do(context.TODO())
 			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
@@ -2647,16 +2650,11 @@ func TestFieldValidationApplyCreateCRDSchemaless(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyUpdateCRD tests apply patch requests containing duplicate fields
+// testFieldValidationApplyUpdateCRD tests apply patch requests containing duplicate fields
 // on existing objects, for CRDs with schemas
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
-func TestFieldValidationApplyUpdateCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-	noxuDefinition, rest, closeFn := setupCRD(t, false)
-	defer closeFn()
-
+func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -2706,24 +2704,25 @@ func TestFieldValidationApplyUpdateCRD(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
-			applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, tc.name))
+			name := fmt.Sprintf("apply-update-crd-%s", tc.name)
+			applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, name))
 			createReq := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			createResult := createReq.Body(applyCreateBody).Do(context.TODO())
 			if createResult.Error() != nil {
 				t.Fatalf("unexpected apply create err: %v", createResult.Error())
 			}
 
-			applyUpdateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, tc.name))
+			applyUpdateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, name))
 			updateReq := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := updateReq.Body(applyUpdateBody).Do(context.TODO())
 
@@ -2752,17 +2751,12 @@ func TestFieldValidationApplyUpdateCRD(t *testing.T) {
 	}
 }
 
-// TestFieldValidationApplyUpdateCRDSchemaless tests apply patch requests containing duplicate fields
+// testFieldValidationApplyUpdateCRDSchemaless tests apply patch requests containing duplicate fields
 // on existing objects, for CRDs with schemas
 // with x-kubernetes-preserve-unknown-field set
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
-func TestFieldValidationApplyUpdateCRDSchemaless(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
-	noxuDefinition, rest, closeFn := setupCRD(t, true)
-	defer closeFn()
-
+func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -2812,24 +2806,25 @@ func TestFieldValidationApplyUpdateCRDSchemaless(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind := noxuDefinition.Spec.Names.Kind
-			apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
 
 			// create the CR as specified by the test case
-			applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, tc.name))
+			name := fmt.Sprintf("apply-update-crd-schemaless-%s", tc.name)
+			applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, name))
 			createReq := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			createResult := createReq.Body(applyCreateBody).Do(context.TODO())
 			if createResult.Error() != nil {
 				t.Fatalf("unexpected apply create err: %v", createResult.Error())
 			}
 
-			applyUpdateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, tc.name))
+			applyUpdateBody := []byte(fmt.Sprintf(crdApplyInvalidBody, apiVersion, kind, name))
 			updateReq := rest.Patch(types.ApplyPatchType).
-				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-				Name(tc.name).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := updateReq.Body(applyUpdateBody).Do(context.TODO())
 
@@ -2858,14 +2853,7 @@ func TestFieldValidationApplyUpdateCRDSchemaless(t *testing.T) {
 	}
 }
 
-func setupCRD(t *testing.T, schemaless bool) (*apiextensionsv1.CustomResourceDefinition, rest.Interface, kubeapiservertesting.TearDownFunc) {
-
-	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	config := server.ClientConfig
-
+func setupCRD(t *testing.T, config *rest.Config, apiGroup string, schemaless bool) *apiextensionsv1.CustomResourceDefinition {
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -2882,22 +2870,26 @@ func setupCRD(t *testing.T, schemaless bool) (*apiextensionsv1.CustomResourceDef
 	crdSchema := fmt.Sprintf(crdSchemaBase, preserveUnknownFields)
 
 	// create the CRD
-	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	crd := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+
+	// adjust the API group
+	crd.Name = crd.Spec.Names.Plural + "." + apiGroup
+	crd.Spec.Group = apiGroup
+
 	var c apiextensionsv1.CustomResourceValidation
 	err = json.Unmarshal([]byte(crdSchema), &c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	//noxuDefinition.Spec.PreserveUnknownFields = false
-	for i := range noxuDefinition.Spec.Versions {
-		noxuDefinition.Spec.Versions[i].Schema = &c
+	//crd.Spec.PreserveUnknownFields = false
+	for i := range crd.Spec.Versions {
+		crd.Spec.Versions[i].Schema = &c
 	}
 	// install the CRD
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rest := apiExtensionClient.Discovery().RESTClient()
-	return noxuDefinition, rest, server.TearDownFn
+	return crd
 }
