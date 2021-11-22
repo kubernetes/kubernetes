@@ -77,7 +77,7 @@ func registerFlags(flags *flag.FlagSet, opt *migrateOpts) {
 	flags.Uint64Var(&opts.port, "port", 0,
 		"etcd client port to use during migration operations. "+
 			"This should be a different port than typically used by etcd to avoid clients accidentally connecting during upgrade/downgrade operations. "+
-			"If unset default to 18629 or 18631 depenging on <data-dir>.")
+			"If unset default to 18629 or 18631 depending on <data-dir>.")
 	flags.Uint64Var(&opts.peerPort, "peer-port", 0,
 		"etcd peer port to use during migration operations. If unset defaults to 2380 or 2381 depending on <data-dir>.")
 	flags.StringVar(&opts.peerListenUrls, "listen-peer-urls", "",
