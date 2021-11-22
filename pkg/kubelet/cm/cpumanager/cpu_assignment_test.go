@@ -841,8 +841,14 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize)
-			if tc.expErr != "" && err.Error() != tc.expErr {
-				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			if err != nil {
+				if tc.expErr == "" {
+					t.Errorf("unexpected error [%v]", err)
+				}
+				if tc.expErr != "" && err.Error() != tc.expErr {
+					t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+				}
+				return
 			}
 			if !result.Equals(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
