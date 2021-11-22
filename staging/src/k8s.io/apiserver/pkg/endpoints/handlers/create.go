@@ -215,6 +215,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			status.Code = int32(code)
 		}
 
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
 	}
 }
