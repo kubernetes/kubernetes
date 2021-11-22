@@ -638,9 +638,20 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			// size 'cpuGroupSize'.
 			remainder := numCPUs - (distribution * len(combo))
 
+			// Get a list of NUMA nodes to consider pulling the remainder CPUs
+			// from. This list excludes NUMA nodes that don't have at least
+			// 'cpuGroupSize' CPUs available after being allocated
+			// 'distribution' number of CPUs.
+			var remainderCombo []int
+			for _, numa := range combo {
+				if availableAfterAllocation[numa] >= cpuGroupSize {
+					remainderCombo = append(remainderCombo, numa)
+				}
+			}
+
 			// Declare a set of local variables to help track the "balance
-			// scores" calculated when using different subsets of 'combo' to
-			// allocate remainder CPUs from.
+			// scores" calculated when using different subsets of
+			// 'remainderCombo' to allocate remainder CPUs from.
 			var bestLocalBalance float64 = math.MaxFloat64
 			var bestLocalRemainder []int = nil
 
@@ -653,31 +664,54 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			}
 
 			// Otherwise, find the best "balance score" when allocating the
-			// remainder CPUs across different subsets of NUMA nodes in 'combo'.
+			// remainder CPUs across different subsets of NUMA nodes in 'remainderCombo'.
 			// These remainder CPUs are handed out in groups of size 'cpuGroupSize'.
-			acc.iterateCombinations(combo, remainder/cpuGroupSize, func(subset []int) LoopControl {
-				// Make a local copy of 'availableAfterAllocation'.
-				availableAfterAllocation := availableAfterAllocation.Clone()
+			// We start from k=len(remainderCombo) and walk down to k=1 so that
+			// we continue to distribute CPUs as much as possible across
+			// multiple NUMA nodes.
+			for k := len(remainderCombo); remainder > 0 && k >= 1; k-- {
+				acc.iterateCombinations(remainderCombo, k, func(subset []int) LoopControl {
+					// Make a local copy of 'remainder'.
+					remainder := remainder
 
-				// For all NUMA nodes in 'subset', remove another
-				// 'cpuGroupSize' number of CPUs (to account for any remainder
-				// CPUs that will be allocated on them).
-				for _, numa := range subset {
-					availableAfterAllocation[numa] -= cpuGroupSize
-				}
+					// Make a local copy of 'availableAfterAllocation'.
+					availableAfterAllocation := availableAfterAllocation.Clone()
 
-				// Calculate the "balance score" as the standard deviation of
-				// the number of CPUs available on all NUMA nodes in the system
-				// after the remainder CPUs have been allocated across 'subset'
-				// in groups of size 'cpuGroupSize'.
-				balance := standardDeviation(availableAfterAllocation.Values())
-				if balance < bestLocalBalance {
-					bestLocalBalance = balance
-					bestLocalRemainder = subset
-				}
+					// If this subset is not capable of allocating all
+					// remainder CPUs, continue to the next one.
+					if sum(availableAfterAllocation.Values(subset...)) < remainder {
+						return Continue
+					}
 
-				return Continue
-			})
+					// For all NUMA nodes in 'subset', walk through them,
+					// removing 'cpuGroupSize' number of CPUs from each
+					// until all remainder CPUs have been accounted for.
+					for remainder > 0 {
+						for _, numa := range subset {
+							if remainder == 0 {
+								break
+							}
+							if availableAfterAllocation[numa] < cpuGroupSize {
+								continue
+							}
+							availableAfterAllocation[numa] -= cpuGroupSize
+							remainder -= cpuGroupSize
+						}
+					}
+
+					// Calculate the "balance score" as the standard deviation
+					// of the number of CPUs available on all NUMA nodes in the
+					// system after the remainder CPUs have been allocated
+					// across 'subset' in groups of size 'cpuGroupSize'.
+					balance := standardDeviation(availableAfterAllocation.Values())
+					if balance < bestLocalBalance {
+						bestLocalBalance = balance
+						bestLocalRemainder = subset
+					}
+
+					return Continue
+				})
+			}
 
 			// If the best "balance score" for this combo is less than the
 			// lowest "balance score" of all previous combos, then update this
@@ -709,9 +743,19 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 
 		// Then allocate any remaining CPUs in groups of size 'cpuGroupSize'
 		// from each NUMA node in the remainder set.
-		for _, numa := range bestRemainder {
-			cpus, _ := takeByTopologyNUMAPacked(acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize)
-			acc.take(cpus)
+		remainder := numCPUs - (distribution * len(bestCombo))
+		for remainder > 0 {
+			for _, numa := range bestRemainder {
+				if remainder == 0 {
+					break
+				}
+				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
+					continue
+				}
+				cpus, _ := takeByTopologyNUMAPacked(acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize)
+				acc.take(cpus)
+				remainder -= cpuGroupSize
+			}
 		}
 
 		// If we haven't allocated all of our CPUs at this point, then something
