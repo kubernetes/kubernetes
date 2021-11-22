@@ -176,7 +176,7 @@ func (o *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOpt
 // WithWebHook set default value for web hook authentication
 func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	o.WebHook = &WebHookAuthenticationOptions{
-		Version:      "v1beta1",
+		Version:      "v1",
 		CacheTTL:     2 * time.Minute,
 		RetryBackoff: genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
