@@ -205,6 +205,35 @@ func TestProxyTransport(t *testing.T) {
 			contentType:  "text/html",
 			forwardedURI: "/proxy/node/node1:10250/logs/log.log%00%3Cscript%3Ealert%281%29%3C/script%3E",
 		},
+		"redirect rel must be escaped": {
+			sourceURL:    "http://mynode.com/redirect",
+			transport:    testTransport,
+			redirect:     "/redirected/target/%00<script>alert(1)</script>/",
+			redirectWant: "http://foo.com/proxy/node/node1:10250/redirected/target/%00%3Cscript%3Ealert%281%29%3C/script%3E/",
+			forwardedURI: "/proxy/node/node1:10250/redirect",
+		},
+		"redirect abs same host must be escaped": {
+			sourceURL:    "http://mynode.com/redirect",
+			transport:    testTransport,
+			redirect:     "http://mynode.com/redirected/target/%00<script>alert(1)</script>/",
+			redirectWant: "http://foo.com/proxy/node/node1:10250/redirected/target/%00%3Cscript%3Ealert%281%29%3C/script%3E/",
+			forwardedURI: "/proxy/node/node1:10250/redirect",
+		},
+		"redirect abs other host must be escaped": {
+			sourceURL:    "http://mynode.com/redirect",
+			transport:    testTransport,
+			redirect:     "http://example.com/redirected/target/%00<script>alert(1)</script>/",
+			redirectWant: "http://example.com/redirected/target/%00%3Cscript%3Ealert%281%29%3C/script%3E/",
+			forwardedURI: "/proxy/node/node1:10250/redirect",
+		},
+		"redirect abs use reqHost no host no scheme must be escaped": {
+			sourceURL:    "http://mynode.com/redirect",
+			transport:    emptyHostAndSchemeTransport,
+			redirect:     "http://10.0.0.1:8001/redirected/target/%00<script>alert(1)</script>/",
+			redirectWant: "http://10.0.0.1:8001/proxy/node/node1:10250/redirected/target/%00%3Cscript%3Ealert%281%29%3C/script%3E/",
+			forwardedURI: "/proxy/node/node1:10250/redirect",
+			reqHost:      "10.0.0.1:8001",
+		},
 	}
 
 	testItem := func(name string, item *Item) {
