@@ -16,7 +16,7 @@
 # to run Fluentd with an Elasticsearch plug-in and the
 # provided configuration file.
 # The image acts as an executable for the binary /usr/sbin/td-agent.
-# Note that fluentd is run with root permssion to allow access to
+# Note that fluentd is run with root permission to allow access to
 # log files with root only access under /var/log/containers/*
 
 # 1. Install & configure dependencies.
