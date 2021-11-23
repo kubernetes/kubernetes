@@ -46,6 +46,9 @@ const (
 	imagePullRetryDelay = time.Second
 	// Number of parallel count to pull images.
 	maxParallelImagePullCount = 5
+
+	// SampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
+	SampleDevicePluginDSYAML = "test/e2e/testing-manifests/sample-device-plugin.yaml"
 )
 
 // NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
@@ -89,6 +92,11 @@ func updateImageAllowList() {
 		klog.Errorln(err)
 	} else {
 		framework.ImagePrePullList.Insert(kubeVirtPluginImage)
+	}
+	if samplePluginImage, err := getSampleDevicePluginImage(); err != nil {
+		klog.Errorln(err)
+	} else {
+		framework.ImagePrePullList.Insert(samplePluginImage)
 	}
 }
 
@@ -238,6 +246,23 @@ func getGPUDevicePluginImage() (string, error) {
 	}
 	if len(ds.Spec.Template.Spec.Containers) < 1 {
 		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
+}
+
+func getSampleDevicePluginImage() (string, error) {
+	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the sample plugin yaml: %v", err)
+	}
+
+	ds, err := e2emanifest.DaemonSetFromData(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse daemon set for sample plugin: %v", err)
+	}
+
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		return "", fmt.Errorf("failed to parse the sample plugin image: cannot extract the container from YAML")
 	}
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
