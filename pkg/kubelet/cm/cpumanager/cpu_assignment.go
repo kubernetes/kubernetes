@@ -63,6 +63,14 @@ func (m mapIntInt) Values(keys ...int) []int {
 	return values
 }
 
+func sum(xs []int) int {
+	var s int
+	for _, x := range xs {
+		s += x
+	}
+	return s
+}
+
 func mean(xs []int) float64 {
 	var sum float64
 	for _, x := range xs {
