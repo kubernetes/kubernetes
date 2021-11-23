@@ -4161,6 +4161,7 @@ const (
 )
 
 // for backwards compat
+// +enum
 type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
 
 // ServiceExternalTrafficPolicy describes the type of traffic routing for
@@ -4176,6 +4177,7 @@ const (
 )
 
 // for backwards compat
+// +enum
 type ServiceExternalTrafficPolicyType = ServiceExternalTrafficPolicy
 
 const (
@@ -4270,6 +4272,7 @@ const (
 )
 
 // for backwards compat
+//+enum
 type IPFamilyPolicyType = IPFamilyPolicy
 
 // ServiceSpec describes the attributes that a user creates on a service.
