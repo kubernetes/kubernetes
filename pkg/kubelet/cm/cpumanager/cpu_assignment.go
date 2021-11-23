@@ -65,7 +65,8 @@ func mean(xs []int) float64 {
 	for _, x := range xs {
 		sum += float64(x)
 	}
-	return sum / float64(len(xs))
+	m := sum / float64(len(xs))
+	return math.Round(m*1000) / 1000
 }
 
 func standardDeviation(xs []int) float64 {
@@ -74,7 +75,8 @@ func standardDeviation(xs []int) float64 {
 	for _, x := range xs {
 		sum += (float64(x) - m) * (float64(x) - m)
 	}
-	return math.Sqrt(sum / float64(len(xs)))
+	s := math.Sqrt(sum / float64(len(xs)))
+	return math.Round(s*1000) / 1000
 }
 
 func min(x, y int) int {
