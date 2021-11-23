@@ -649,7 +649,7 @@ func FsUserFrom(pod *v1.Pod) *int64 {
 // Plan to work on better approach to solve this issue.
 func HasMountRefs(mountPath string, mountRefs []string) bool {
 	for _, ref := range mountRefs {
-		if !strings.Contains(ref, mountPath) {
+		if strings.Contains(ref, mountPath) {
 			return true
 		}
 	}
