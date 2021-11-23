@@ -1436,14 +1436,9 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	return testCtx
 }
 
-// TestPreferNominatedNode test when the feature of "PreferNominatedNode" is enabled, the overall scheduling logic is not changed.
-// If the nominated node pass all the filters, then preemptor pod will run on the nominated node, otherwise, it will be scheduled
-// to another node in the cluster that ables to pass all the filters.
-// NOTE: This integration test is not intending to check the logic of preemption, but rather a sanity check when the feature is
-// enabled.
+// TestPreferNominatedNode test that if the nominated node pass all the filters, then preemptor pod will run on the nominated node,
+// otherwise, it will be scheduled to another node in the cluster that ables to pass all the filters.
 func TestPreferNominatedNode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, true)()
-
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
