@@ -52,10 +52,13 @@ func (m mapIntInt) Keys() []int {
 	return keys
 }
 
-func (m mapIntInt) Values() []int {
+func (m mapIntInt) Values(keys ...int) []int {
+	if keys == nil {
+		keys = m.Keys()
+	}
 	var values []int
-	for _, v := range m {
-		values = append(values, v)
+	for _, k := range keys {
+		values = append(values, m[k])
 	}
 	return values
 }
