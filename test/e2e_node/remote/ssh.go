@@ -103,9 +103,12 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(cmd string, args ...string) (string, error) {
-	if *sshKey != "" {
-		args = append([]string{"-i", *sshKey}, args...)
-	} else if key, found := sshDefaultKeyMap[*sshEnv]; found {
+	if key := getPrivateSSHKey(); len(key) != 0 {
+		if _, err := os.Stat(key); err != nil {
+			klog.Errorf("private SSH key (%s) not found. Check if the SSH key is configured properly:, err: %v", key, err)
+			return "", fmt.Errorf("private SSH key (%s) does not exist", key)
+		}
+
 		args = append([]string{"-i", key}, args...)
 	}
 	if env, found := sshOptionsMap[*sshEnv]; found {
@@ -121,4 +124,17 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil
+}
+
+// getPrivateSSHKey returns the path to ssh private key
+func getPrivateSSHKey() string {
+	if *sshKey != "" {
+		return *sshKey
+	}
+
+	if key, found := sshDefaultKeyMap[*sshEnv]; found {
+		return key
+	}
+
+	return ""
 }
