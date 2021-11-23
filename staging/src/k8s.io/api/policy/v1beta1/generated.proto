@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/policy/v1beta1";
 
 // AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
 message AllowedCSIDriver {

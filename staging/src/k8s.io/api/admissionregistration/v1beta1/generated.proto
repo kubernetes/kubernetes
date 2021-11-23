@@ -26,7 +26,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/admissionregistration/v1beta1";
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
 message MutatingWebhook {

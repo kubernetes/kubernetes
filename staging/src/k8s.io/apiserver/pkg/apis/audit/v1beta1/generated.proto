@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/apiserver/pkg/apis/audit/v1beta1";
 
 // DEPRECATED - This group version of Event is deprecated by audit.k8s.io/v1/Event. See the release notes for
 // more information.
