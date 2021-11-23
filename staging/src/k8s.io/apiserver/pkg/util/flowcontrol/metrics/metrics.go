@@ -311,6 +311,19 @@ var (
 		},
 		[]string{priorityLevel, "success"},
 	)
+	apiserverWorkEstimatedSeats = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "work_estimated_seats",
+			Help:      "Number of estimated seats (maximum of initial and final seats) associated with requests in API Priority and Fairness",
+			// the upper bound comes from the maximum number of seats a request
+			// can occupy which is currently set at 10.
+			Buckets:        []float64{1, 2, 4, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
@@ -329,6 +342,7 @@ var (
 		apiserverRequestExecutionSeconds,
 		watchCountSamples,
 		apiserverEpochAdvances,
+		apiserverWorkEstimatedSeats,
 	}.
 		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
 		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
@@ -408,4 +422,9 @@ func ObserveWatchCount(ctx context.Context, priorityLevel, flowSchema string, co
 // AddEpochAdvance notes an advance of the progress meter baseline for a given priority level
 func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
 	apiserverEpochAdvances.WithContext(ctx).WithLabelValues(priorityLevel, strconv.FormatBool(success)).Inc()
+}
+
+// ObserveWorkEstimatedSeats notes a sampling of estimated seats associated with a request
+func ObserveWorkEstimatedSeats(priorityLevel, flowSchema string, seats int) {
+	apiserverWorkEstimatedSeats.WithLabelValues(priorityLevel, flowSchema).Observe(float64(seats))
 }

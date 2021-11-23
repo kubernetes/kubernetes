@@ -111,7 +111,6 @@ func WithPriorityAndFairness(
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
 			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
-<<<<<<< HEAD
 		}
 		// estimateWork is called, if at all, after noteFn
 		estimateWork := func() flowcontrolrequest.WorkEstimate {
@@ -125,6 +124,8 @@ func WithPriorityAndFairness(
 			}
 
 			workEstimate := workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+
+			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimate.MaxSeats())
 			if klog.V(4).Enabled() {
 				httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
 				httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
