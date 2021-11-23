@@ -59,7 +59,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin [Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })
@@ -167,7 +167,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(func() bool {
 				return numberOfSampleResources(getLocalNode(f)) <= 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 15*time.Minute, framework.Poll).Should(gomega.BeTrue())
+
+			ginkgo.By("Waiting for the node to become ready again")
+			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
 		})
 
 		ginkgo.It("Can schedule a pod that requires a device", func() {
@@ -245,7 +248,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
 
 			ginkgo.By("Validating that assignment is kept")
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -254,7 +257,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectEqual(devIDRestart1, devID1)
 		})
 
-		ginkgo.It("Keeps device plugin assignments after the device plugin has been re-registered", func() {
+		// TODO(endocrimes): Validate this test in the 1.24 cycle
+		ginkgo.XIt("Keeps device plugin assignments after the device plugin has been re-registered", func() {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
@@ -268,7 +272,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
 
 			ginkgo.By("Re-Register resources and delete the plugin pod")
 			gp := int64(0)
