@@ -45,7 +45,7 @@ func (m mapIntInt) Clone() mapIntInt {
 }
 
 func (m mapIntInt) Keys() []int {
-	keys := make([]int, len(m))
+	var keys []int
 	for k := range m {
 		keys = append(keys, k)
 	}
@@ -53,7 +53,7 @@ func (m mapIntInt) Keys() []int {
 }
 
 func (m mapIntInt) Values() []int {
-	values := make([]int, len(m))
+	var values []int
 	for _, v := range m {
 		values = append(values, v)
 	}
