@@ -149,13 +149,6 @@ try {
 
   Set-PrerequisiteOptions
 
-  if (Test-IsTestCluster $kube_env) {
-    Log-Output 'Test cluster detected, installing OpenSSH.'
-    FetchAndImport-ModuleFromMetadata 'install-ssh-psm1' 'install-ssh.psm1'
-    InstallAndStart-OpenSsh
-    StartProcess-WriteSshKeys
-  }
-
   Create-Directories
   Download-HelperScripts
 
