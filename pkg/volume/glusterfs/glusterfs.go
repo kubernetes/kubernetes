@@ -834,7 +834,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		// don't log error details from client calls in events
-		klog.V(4).Infof("failed to create volume: %v", err)
+		klog.V(2).Infof("failed to create volume: %v", err)
 		return nil, 0, "", fmt.Errorf("failed to create volume: see kube-controller-manager.log for details")
 	}
 	klog.V(1).Infof("volume with size %d and name %s created", volume.Size, volume.Name)
