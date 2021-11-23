@@ -1322,14 +1322,9 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	return testCtx
 }
 
-// TestPreferNominatedNode test when the feature of "PreferNominatedNode" is enabled, the overall scheduling logic is not changed.
-// If the nominated node pass all the filters, then preemptor pod will run on the nominated node, otherwise, it will be scheduled
-// to another node in the cluster that ables to pass all the filters.
-// NOTE: This integration test is not intending to check the logic of preemption, but rather a sanity check when the feature is
-// enabled.
+// TestPreferNominatedNode test that if the nominated node pass all the filters, then preemptor pod will run on the nominated node,
+// otherwise, it will be scheduled to another node in the cluster that ables to pass all the filters.
 func TestPreferNominatedNode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, true)()
-
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
@@ -1344,7 +1339,7 @@ func TestPreferNominatedNode(t *testing.T) {
 		nodeNames    []string
 		existingPods []*v1.Pod
 		pod          *v1.Pod
-		runnningNode string
+		runningNode  string
 	}{
 		{
 			name:      "nominated node released all resource, preemptor is scheduled to the nominated node",
@@ -1365,7 +1360,7 @@ func TestPreferNominatedNode(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			}),
-			runnningNode: "node-1",
+			runningNode: "node-1",
 		},
 		{
 			name:      "nominated node cannot pass all the filters, preemptor should find a different node",
@@ -1386,7 +1381,7 @@ func TestPreferNominatedNode(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			}),
-			runnningNode: "node-2",
+			runningNode: "node-2",
 		},
 	}
 
@@ -1435,8 +1430,8 @@ func TestPreferNominatedNode(t *testing.T) {
 				t.Errorf("Cannot schedule Pod %v/%v, error: %v", test.pod.Namespace, test.pod.Name, err)
 			}
 			// Make sure the pod has been scheduled to the right node.
-			if preemptor.Spec.NodeName != test.runnningNode {
-				t.Errorf("Expect pod running on %v, got %v.", test.runnningNode, preemptor.Spec.NodeName)
+			if preemptor.Spec.NodeName != test.runningNode {
+				t.Errorf("Expect pod running on %v, got %v.", test.runningNode, preemptor.Spec.NodeName)
 			}
 		})
 	}
