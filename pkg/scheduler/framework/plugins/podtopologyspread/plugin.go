@@ -51,6 +51,7 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
+	systemDefaulted    bool
 	defaultConstraints []v1.TopologySpreadConstraint
 	sharedLister       framework.SharedLister
 	services           corelisters.ServiceLister
@@ -92,6 +93,7 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
+		pl.systemDefaulted = true
 	}
 	if len(pl.defaultConstraints) != 0 {
 		if h.SharedInformerFactory() == nil {
