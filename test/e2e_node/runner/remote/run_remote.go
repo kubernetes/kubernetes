@@ -66,6 +66,7 @@ var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any i
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
+var uploadSSHKey = flag.Bool("upload-ssh-key", false, "If true, upload public SSH key to instances")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
@@ -647,6 +648,19 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 	}
 	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
+
+	if *uploadSSHKey {
+		if path := remote.GetPublicSSHKey(); len(path) != 0 {
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				return "", fmt.Errorf("failed to read public SSH key: path: %v, error: %w", path, err)
+			}
+
+			k := fmt.Sprintf("%s:%s", remote.GetSSHUser(), data)
+			i.Metadata.Items = append(i.Metadata.Items, &compute.MetadataItems{Key: "ssh-keys", Value: &k})
+		}
+	}
+
 	var insertionOperationName string
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()

@@ -74,12 +74,8 @@ func GetHostnameOrIP(hostname string) string {
 		host = ip
 	}
 
-	if *sshUser == "" {
-		*sshUser = os.Getenv("KUBE_SSH_USER")
-	}
-
-	if *sshUser != "" {
-		host = fmt.Sprintf("%s@%s", *sshUser, host)
+	if u := GetSSHUser(); u != "" {
+		host = fmt.Sprintf("%s@%s", u, host)
 	}
 	return host
 }
@@ -103,9 +99,7 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(cmd string, args ...string) (string, error) {
-	if *sshKey != "" {
-		args = append([]string{"-i", *sshKey}, args...)
-	} else if key, found := sshDefaultKeyMap[*sshEnv]; found {
+	if key := getPrivateSSHKey(); len(key) != 0 {
 		args = append([]string{"-i", key}, args...)
 	}
 	if env, found := sshOptionsMap[*sshEnv]; found {
@@ -121,4 +115,35 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil
+}
+
+// GetPublicSSHKey returns the path to ssh public key
+func GetPublicSSHKey() string {
+	if key := getPrivateSSHKey(); len(key) != 0 {
+		return key + ".pub"
+	}
+
+	return ""
+}
+
+// getPrivateSSHKey returns the path to ssh private key
+func getPrivateSSHKey() string {
+	if *sshKey != "" {
+		return *sshKey
+	}
+
+	if key, found := sshDefaultKeyMap[*sshEnv]; found {
+		return key
+	}
+
+	return ""
+}
+
+// GetSSHUser returns the user for ssh
+func GetSSHUser() string {
+	if *sshUser == "" {
+		return os.Getenv("KUBE_SSH_USER")
+	}
+
+	return *sshUser
 }
