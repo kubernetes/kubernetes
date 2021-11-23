@@ -229,6 +229,12 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			klog.ErrorS(nil, "Node not found")
 			continue
 		}
+
+		// filter node who has `node.kubernetes.io/unschedulable:NoSchedule` taint
+		if matchUnSchedulableNodeTaint(node.Spec.Taints) {
+			continue
+		}
+
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
 		// spreading is applied to nodes that pass those filters.
 		// Ignore parsing errors for backwards compatibility.
@@ -236,10 +242,12 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 		if !match {
 			continue
 		}
+
 		// Ensure current node's labels contains all topologyKeys in 'Constraints'.
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			continue
 		}
+
 		for _, c := range constraints {
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			s.TpPairToMatchNum[pair] = new(int32)

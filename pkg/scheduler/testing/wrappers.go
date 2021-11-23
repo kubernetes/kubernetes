@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -474,6 +475,17 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 		n.Labels = make(map[string]string)
 	}
 	n.Labels[k] = v
+	return n
+}
+
+// Taint add a taint to node with the current time.
+func (n *NodeWrapper) Taint(k, v, e string) *NodeWrapper {
+	n.Spec.Taints = append(n.Spec.Taints, v1.Taint{
+		Key:       k,
+		Value:     v,
+		Effect:    v1.TaintEffect(e),
+		TimeAdded: &metav1.Time{Time: time.Now()},
+	})
 	return n
 }
 

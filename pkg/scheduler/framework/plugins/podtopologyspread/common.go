@@ -24,6 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
+var (
+	// unSchedulableNodeTaint is the taint when a node is unschedulable
+	unSchedulableNodeTaint = &v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+)
+
 type topologyPair struct {
 	key   string
 	value string
@@ -96,4 +104,13 @@ func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selec
 		}
 	}
 	return count
+}
+
+func matchUnSchedulableNodeTaint(taints []v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(unSchedulableNodeTaint) {
+			return true
+		}
+	}
+	return false
 }
