@@ -472,8 +472,7 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	var status *apps.StatefulSetStatus
 	var err error
-	// TODO: investigate where we mutate the set during the update as it is not obvious.
-	status, err = ssc.control.UpdateStatefulSet(ctx, set.DeepCopy(), pods)
+	status, err = ssc.control.UpdateStatefulSet(ctx, set, pods)
 	if err != nil {
 		return err
 	}

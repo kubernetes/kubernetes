@@ -2326,7 +2326,6 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 		if err := invariants(set, om); err != nil {
 			return err
 		}
-		//fmt.Printf("Ravig pod conditions %v %v", set.Status.ReadyReplicas, *set.Spec.Replicas)
 	}
 	return invariants(set, om)
 }
