@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: csi-driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.1.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
