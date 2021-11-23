@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
@@ -107,6 +108,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
 		disableResizingOnDriver bool
 		enableSnapshot          bool
+		enableVolumeMountGroup  bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
 		hooks                   *drivers.Hooks
 		tokenRequests           []storagev1.TokenRequest
 		requiresRepublish       *bool
@@ -140,18 +142,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		cs := f.ClientSet
 		var err error
 		driverOpts := drivers.CSIMockDriverOpts{
-			RegisterDriver:      tp.registerDriver,
-			PodInfo:             tp.podInfo,
-			StorageCapacity:     tp.storageCapacity,
-			EnableTopology:      tp.enableTopology,
-			AttachLimit:         tp.attachLimit,
-			DisableAttach:       tp.disableAttach,
-			EnableResizing:      tp.enableResizing,
-			EnableNodeExpansion: tp.enableNodeExpansion,
-			EnableSnapshot:      tp.enableSnapshot,
-			TokenRequests:       tp.tokenRequests,
-			RequiresRepublish:   tp.requiresRepublish,
-			FSGroupPolicy:       tp.fsGroupPolicy,
+			RegisterDriver:         tp.registerDriver,
+			PodInfo:                tp.podInfo,
+			StorageCapacity:        tp.storageCapacity,
+			EnableTopology:         tp.enableTopology,
+			AttachLimit:            tp.attachLimit,
+			DisableAttach:          tp.disableAttach,
+			EnableResizing:         tp.enableResizing,
+			EnableNodeExpansion:    tp.enableNodeExpansion,
+			EnableSnapshot:         tp.enableSnapshot,
+			EnableVolumeMountGroup: tp.enableVolumeMountGroup,
+			TokenRequests:          tp.tokenRequests,
+			RequiresRepublish:      tp.requiresRepublish,
+			FSGroupPolicy:          tp.fsGroupPolicy,
 		}
 
 		// At the moment, only tests which need hooks are
@@ -1715,6 +1718,55 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	})
 
+	ginkgo.Context("Delegate FSGroup to CSI driver [LinuxOnly]", func() {
+		tests := []struct {
+			name                   string
+			enableVolumeMountGroup bool
+		}{
+			{
+				name:                   "should pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP",
+				enableVolumeMountGroup: true,
+			},
+			{
+				name:                   "should not pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP",
+				enableVolumeMountGroup: false,
+			},
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func() {
+				var nodeStageFsGroup, nodePublishFsGroup string
+				if framework.NodeOSDistroIs("windows") {
+					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
+				}
+				init(testParameters{
+					disableAttach:          true,
+					registerDriver:         true,
+					enableVolumeMountGroup: t.enableVolumeMountGroup,
+					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
+				})
+				defer cleanup()
+
+				fsGroupVal := int64(rand.Int63n(20000) + 1024)
+				fsGroup := &fsGroupVal
+				fsGroupStr := strconv.FormatInt(fsGroupVal, 10 /* base */)
+
+				_, _, pod := createPodWithFSGroup(fsGroup) /* persistent volume */
+
+				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "failed to start pod")
+
+				if t.enableVolumeMountGroup {
+					framework.ExpectEqual(nodeStageFsGroup, fsGroupStr, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
+					framework.ExpectEqual(nodePublishFsGroup, fsGroupStr, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
+				} else {
+					framework.ExpectEmpty(nodeStageFsGroup, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to be empty; got: %q", nodeStageFsGroup)
+					framework.ExpectEmpty(nodePublishFsGroup, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to empty; got: %q", nodePublishFsGroup)
+				}
+			})
+		}
+	})
+
 	ginkgo.Context("CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource]", func() {
 
 		var (
@@ -2457,6 +2509,30 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 				return nil, nil
 			}
 		}(),
+	}
+}
+
+// createFSGroupRequestPreHook creates a hook that records the fsGroup passed in
+// through NodeStageVolume and NodePublishVolume calls.
+func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *drivers.Hooks {
+	return &drivers.Hooks{
+		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
+			nodeStageRequest, ok := request.(csipbv1.NodeStageVolumeRequest)
+			if ok {
+				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodeStageFsGroup = mountVolume.VolumeMountGroup
+				}
+			}
+			nodePublishRequest, ok := request.(csipbv1.NodePublishVolumeRequest)
+			if ok {
+				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodePublishFsGroup = mountVolume.VolumeMountGroup
+				}
+			}
+			return nil, nil
+		},
 	}
 }
 
