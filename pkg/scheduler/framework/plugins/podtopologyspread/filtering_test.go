@@ -503,7 +503,7 @@ func TestPreFilterState(t *testing.T) {
 			name: "default soft constraints and a service",
 			pod:  st.MakePod().Name("p").Label("foo", "bar").Obj(),
 			defaultConstraints: []v1.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "node", WhenUnsatisfiable: v1.ScheduleAnyway},
+				{MaxSkew: 2, TopologyKey: "node", WhenUnsatisfiable: v1.ScheduleAnyway},
 			},
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": "bar"}}},
