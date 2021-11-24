@@ -94,7 +94,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 
 	// The below code is necessary because while KubeProxy may be defined, the user may not
 	// have defined any feature-gates, thus FeatureGates will be nil and the later insertion
-	// of any feature-gates (e.g. IPv6DualStack) will cause a panic.
+	// of any feature-gates will cause a panic.
 	if kp.config.FeatureGates == nil {
 		kp.config.FeatureGates = map[string]bool{}
 	}
