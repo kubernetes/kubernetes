@@ -149,7 +149,7 @@ func (pl *PodTopologySpread) PreScore(
 			return
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
-		// (2) All topologyKeys need to be present in `node`
+		// (2) all topologyKeys need to be present in `node`
 		// (3) `node` doesn't have `node.kubernetes.io/unschedulable:NoSchedule` taint
 		match, _ := requiredNodeAffinity.Match(node)
 		if !match ||

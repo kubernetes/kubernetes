@@ -223,7 +223,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				DefaultingType: config.ListDefaulting,
 			},
 			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("planet", "mars").Label("zone", "andromeda").Obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
 			},
 			objs: []runtime.Object{
 				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
