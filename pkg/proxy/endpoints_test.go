@@ -493,6 +493,17 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			}},
 		}}
 	}
+	unnamedPortSCTP := func(ept *v1.Endpoints) {
+		ept.Subsets = []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{
+				IP: "1.1.1.1",
+			}},
+			Ports: []v1.EndpointPort{{
+				Port:     11,
+				Protocol: v1.ProtocolSCTP,
+			}},
+		}}
+	}
 	unnamedPortLocal := func(ept *v1.Endpoints) {
 		ept.Subsets = []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{
@@ -1309,6 +1320,25 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleEndpoints: []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
+		},
+		expectedHealthchecks: map[types.NamespacedName]int{},
+	}, {
+		name: "change from 0 endpoint address to 1 unnamed port SCTP",
+		previousEndpoints: []*v1.Endpoints{
+			makeTestEndpoints("ns1", "ep1", emptyEndpoint),
+		},
+		currentEndpoints: []*v1.Endpoints{
+			makeTestEndpoints("ns1", "ep1", unnamedPortSCTP),
+		},
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolSCTP): {
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			},
+		},
+		expectedStaleEndpoints: []ServiceEndpoint{},
+		expectedStaleServiceNames: map[ServicePortName]bool{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolSCTP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	},

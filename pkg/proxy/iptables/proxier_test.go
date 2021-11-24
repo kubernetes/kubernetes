@@ -2427,9 +2427,9 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 
 	// Remove some stuff
@@ -2458,11 +2458,11 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
 	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
-	if len(result.UDPStaleClusterIP) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.UDPStaleClusterIP.UnsortedList())
+	if len(result.StaleClusterIPProtocol) != len(expectedStaleUDPServices) {
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.StaleClusterIPProtocol)
 	}
 	for _, ip := range expectedStaleUDPServices {
-		if !result.UDPStaleClusterIP.Has(ip) {
+		if _, ok := result.StaleClusterIPProtocol[ip]; !ok {
 			t.Errorf("expected stale UDP service service %s", ip)
 		}
 	}
@@ -2495,8 +2495,8 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 		t.Errorf("expected healthcheck ports length 0, got %d", len(result.HCServiceNodePorts))
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 }
 
@@ -2521,8 +2521,8 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP)
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 }
 
@@ -2560,9 +2560,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 
 	// Change service to load-balancer
@@ -2574,8 +2574,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 1 {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 
 	// No change; make sure the service map stays the same and there are
@@ -2588,8 +2588,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 1 {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 
 	// And back to ClusterIP
@@ -2601,9 +2601,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 }
 
@@ -3807,137 +3807,146 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 	}
 }
 
-func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{}
-	fexec := fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+func TestProxierDeleteNodePortStale(t *testing.T) {
+	testcases := []v1.Protocol{
+		v1.ProtocolSCTP,
+		v1.ProtocolUDP,
 	}
-	execFunc := func(cmd string, args ...string) exec.Cmd {
-		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
-	}
-	cmdOutput := "1 flow entries have been deleted"
-	cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, nil }
+	for _, tc := range testcases {
+		t.Run(string(tc), func(t *testing.T) {
 
-	// Delete ClusterIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete ExternalIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete LoadBalancerIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete NodePort entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
+			fcmd := fakeexec.FakeCmd{}
+			fexec := fakeexec.FakeExec{
+				LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+			}
+			execFunc := func(cmd string, args ...string) exec.Cmd {
+				return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
+			}
+			cmdOutput := "1 flow entries have been deleted"
+			cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, nil }
 
-	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
-	fp.exec = &fexec
+			// Delete ClusterIP entries
+			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+			fexec.CommandScript = append(fexec.CommandScript, execFunc)
+			// Delete ExternalIP entries
+			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+			fexec.CommandScript = append(fexec.CommandScript, execFunc)
+			// Delete LoadBalancerIP entries
+			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+			fexec.CommandScript = append(fexec.CommandScript, execFunc)
+			// Delete NodePort entries
+			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+			fexec.CommandScript = append(fexec.CommandScript, execFunc)
 
-	svcIP := "10.20.30.41"
-	extIP := "1.1.1.1"
-	lbIngressIP := "2.2.2.2"
-	svcPort := 80
-	nodePort := 31201
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-		Protocol:       v1.ProtocolUDP,
-	}
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.exec = &fexec
 
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.ExternalIPs = []string{extIP}
-			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolUDP,
-				NodePort: int32(nodePort),
-			}}
-			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
-				IP: lbIngressIP,
-			}}
-		}),
-	)
+			svcIP := "10.20.30.41"
+			extIP := "1.1.1.1"
+			lbIngressIP := "2.2.2.2"
+			svcPort := 80
+			nodePort := 31201
+			svcPortName := proxy.ServicePortName{
+				NamespacedName: makeNSN("ns1", "svc1"),
+				Port:           "p80",
+				Protocol:       tc,
+			}
 
-	fp.syncProxyRules()
-	if fexec.CommandCalls != 0 {
-		t.Fatalf("Created service without endpoints must not clear conntrack entries")
-	}
+			makeServiceMap(fp,
+				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+					svc.Spec.ClusterIP = svcIP
+					svc.Spec.ExternalIPs = []string{extIP}
+					svc.Spec.Type = "LoadBalancer"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: tc,
+						NodePort: int32(nodePort),
+					}}
+					svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+						IP: lbIngressIP,
+					}}
+				}),
+			)
 
-	epIP := "10.180.0.1"
-	udpProtocol := v1.ProtocolUDP
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.Bool(false),
-				},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
-				Protocol: &udpProtocol,
-			}}
-		}),
-	)
+			fp.syncProxyRules()
+			if fexec.CommandCalls != 0 {
+				t.Fatalf("Created service without endpoints must not clear conntrack entries")
+			}
 
-	fp.syncProxyRules()
+			epIP := "10.180.0.1"
+			udpProtocol := tc
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{epIP},
+						Conditions: discovery.EndpointConditions{
+							Ready: utilpointer.Bool(false),
+						},
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     utilpointer.StringPtr(svcPortName.Port),
+						Port:     utilpointer.Int32(int32(svcPort)),
+						Protocol: &udpProtocol,
+					}}
+				}),
+			)
 
-	if fexec.CommandCalls != 0 {
-		t.Fatalf("Updated UDP service with not ready endpoints must not clear UDP entries")
-	}
+			fp.syncProxyRules()
 
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.Bool(true),
-				},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
-				Protocol: &udpProtocol,
-			}}
-		}),
-	)
+			if fexec.CommandCalls != 0 {
+				t.Fatalf("Updated UDP service with not ready endpoints must not clear UDP entries")
+			}
 
-	fp.syncProxyRules()
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{epIP},
+						Conditions: discovery.EndpointConditions{
+							Ready: utilpointer.Bool(true),
+						},
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     utilpointer.StringPtr(svcPortName.Port),
+						Port:     utilpointer.Int32(int32(svcPort)),
+						Protocol: &udpProtocol,
+					}}
+				}),
+			)
 
-	if fexec.CommandCalls != 4 {
-		t.Fatalf("Updated UDP service with new endpoints must clear UDP entries 4 times: ClusterIP, NodePort, ExternalIP and LB")
-	}
+			fp.syncProxyRules()
 
-	// the order is not guaranteed so we have to compare the strings in any order
-	expectedCommands := []string{
-		// Delete ClusterIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete ExternalIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", extIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete LoadBalancerIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", lbIngressIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete NodePort Conntrack entrie
-		fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort),
-	}
-	actualCommands := []string{
-		strings.Join(fcmd.CombinedOutputLog[0], " "),
-		strings.Join(fcmd.CombinedOutputLog[1], " "),
-		strings.Join(fcmd.CombinedOutputLog[2], " "),
-		strings.Join(fcmd.CombinedOutputLog[3], " "),
-	}
-	sort.Strings(expectedCommands)
-	sort.Strings(actualCommands)
+			if fexec.CommandCalls != 4 {
+				t.Fatalf("Updated UDP service with new endpoints must clear UDP entries 4 times: ClusterIP, NodePort, ExternalIP and LB")
+			}
 
-	if !reflect.DeepEqual(expectedCommands, actualCommands) {
-		t.Errorf("Expected commands: %v, but executed %v", expectedCommands, actualCommands)
+			// the order is not guaranteed so we have to compare the strings in any order
+			expectedCommands := []string{
+				// Delete ClusterIP Conntrack entries
+				fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((tc)))),
+				// Delete ExternalIP Conntrack entries
+				fmt.Sprintf("conntrack -D --orig-dst %s -p %s", extIP, strings.ToLower(string((tc)))),
+				// Delete LoadBalancerIP Conntrack entries
+				fmt.Sprintf("conntrack -D --orig-dst %s -p %s", lbIngressIP, strings.ToLower(string((tc)))),
+				// Delete NodePort Conntrack entrie
+				fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((tc))), nodePort),
+			}
+			actualCommands := []string{
+				strings.Join(fcmd.CombinedOutputLog[0], " "),
+				strings.Join(fcmd.CombinedOutputLog[1], " "),
+				strings.Join(fcmd.CombinedOutputLog[2], " "),
+				strings.Join(fcmd.CombinedOutputLog[3], " "),
+			}
+			sort.Strings(expectedCommands)
+			sort.Strings(actualCommands)
+
+			if !reflect.DeepEqual(expectedCommands, actualCommands) {
+				t.Errorf("Expected commands: %v, but executed %v", expectedCommands, actualCommands)
+			}
+		})
 	}
 }
 

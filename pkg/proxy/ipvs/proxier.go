@@ -1014,17 +1014,17 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
+	staleServices := serviceUpdateResult.StaleClusterIPProtocol
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			staleServices.Insert(svcInfo.ClusterIP().String())
+			staleServices[svcInfo.ClusterIP().String()] = svcInfo.Protocol()
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				staleServices.Insert(extIP)
+				staleServices[extIP] = svcInfo.Protocol()
 			}
 			for _, extIP := range svcInfo.LoadBalancerIPStrings() {
-				staleServices.Insert(extIP)
+				staleServices[extIP] = svcInfo.Protocol()
 			}
 		}
 	}
@@ -1665,8 +1665,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+	for svcIP, protocol := range staleServices {
+		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, protocol); err != nil {
 			klog.ErrorS(err, "Failed to delete stale service IP connections", "IP", svcIP)
 		}
 	}

@@ -2509,9 +2509,9 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 
 	// Remove some stuff
@@ -2540,11 +2540,11 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
 	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
-	if len(result.UDPStaleClusterIP) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.UDPStaleClusterIP.List())
+	if len(result.StaleClusterIPProtocol) != len(expectedStaleUDPServices) {
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.StaleClusterIPProtocol)
 	}
 	for _, ip := range expectedStaleUDPServices {
-		if !result.UDPStaleClusterIP.Has(ip) {
+		if _, ok := result.StaleClusterIPProtocol[ip]; !ok {
 			t.Errorf("expected stale UDP service service %s", ip)
 		}
 	}
@@ -2584,8 +2584,8 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 		t.Errorf("expected healthcheck ports length 0, got %d", len(result.HCServiceNodePorts))
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 }
 
@@ -2612,8 +2612,8 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP)
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 }
 
@@ -2653,9 +2653,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 
 	// Change service to load-balancer
@@ -2667,8 +2667,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 1 {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.List())
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 
 	// No change; make sure the service map stays the same and there are
@@ -2681,8 +2681,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 1 {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.List())
+	if len(result.StaleClusterIPProtocol) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.StaleClusterIPProtocol)
 	}
 
 	// And back to ClusterIP
@@ -2694,9 +2694,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.HCServiceNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.StaleClusterIPProtocol) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.StaleClusterIPProtocol))
 	}
 }
 

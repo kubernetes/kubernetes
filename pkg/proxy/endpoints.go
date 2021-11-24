@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -541,7 +542,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 	// Detect stale endpoints: an endpoint can have stale conntrack entries if it was receiving traffic
 	// and then goes unready or changes its IP address.
 	for svcPortName, epList := range oldEndpointsMap {
-		if svcPortName.Protocol != v1.ProtocolUDP {
+		if !conntrack.IsClearConntrackNeeded(svcPortName.Protocol) {
 			continue
 		}
 
@@ -561,17 +562,17 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep)
+				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep, "protocol", svcPortName.Protocol)
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}
 	}
 
 	// Detect stale services
-	// For udp service, if its backend changes from 0 to non-0 ready endpoints.
+	// For udp and sctp services, if its backend changes from 0 to non-0 ready endpoints.
 	// There may exist a conntrack entry that could blackhole traffic to the service.
 	for svcPortName, epList := range newEndpointsMap {
-		if svcPortName.Protocol != v1.ProtocolUDP {
+		if !conntrack.IsClearConntrackNeeded(svcPortName.Protocol) {
 			continue
 		}
 
@@ -590,6 +591,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 		}
 
 		if epReady > 0 && oldEpReady == 0 {
+			klog.V(4).InfoS("Stale service", "portName", svcPortName, "protocol", svcPortName.Protocol)
 			*staleServiceNames = append(*staleServiceNames, svcPortName)
 		}
 	}

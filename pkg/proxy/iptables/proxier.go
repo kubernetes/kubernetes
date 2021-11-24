@@ -36,7 +36,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
@@ -802,24 +801,24 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// We need to detect stale connections to UDP Services so we
 	// can clean dangling conntrack entries that can blackhole traffic.
-	conntrackCleanupServiceIPs := serviceUpdateResult.UDPStaleClusterIP
-	conntrackCleanupServiceNodePorts := sets.NewInt()
+	conntrackCleanupServiceIPs := serviceUpdateResult.StaleClusterIPProtocol
+	conntrackCleanupServiceNodePorts := map[int]v1.Protocol{}
 	// merge stale services gathered from updateEndpointsMap
 	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
+			conntrackCleanupServiceIPs[svcInfo.ClusterIP().String()] = svcInfo.Protocol()
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				conntrackCleanupServiceIPs.Insert(extIP)
+				conntrackCleanupServiceIPs[extIP] = svcInfo.Protocol()
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				conntrackCleanupServiceIPs.Insert(lbIP)
+				conntrackCleanupServiceIPs[lbIP] = svcInfo.Protocol()
 			}
 			nodePort := svcInfo.NodePort()
-			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
+			if nodePort != 0 {
 				klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "nodePort", nodePort)
-				conntrackCleanupServiceNodePorts.Insert(nodePort)
+				conntrackCleanupServiceNodePorts[nodePort] = svcInfo.Protocol()
 			}
 		}
 	}
@@ -1558,17 +1557,18 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finish housekeeping.
 	// Clear stale conntrack entries for UDP Services, this has to be done AFTER the iptables rules are programmed.
 	// TODO: these could be made more consistent.
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
-	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
+	for svcIP, protocol := range conntrackCleanupServiceIPs {
+		klog.V(4).InfoS("Deleting conntrack stale entries for service", "IP", svcIP, "protocol", protocol)
+		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, protocol); err != nil {
+			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP, "protocol", protocol)
 		}
 	}
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
-	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
-		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, v1.ProtocolUDP)
+
+	for nodePort, protocol := range conntrackCleanupServiceNodePorts {
+		klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePort", nodePort, "protocol", protocol)
+		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, protocol)
 		if err != nil {
-			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
+			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort, "protocol", protocol)
 		}
 	}
 	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.StaleEndpoints)

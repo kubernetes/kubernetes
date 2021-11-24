@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/util/async"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	netutils "k8s.io/utils/net"
 )
 
@@ -1003,12 +1004,12 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
+	staleServices := serviceUpdateResult.StaleClusterIPProtocol
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).InfoS("Stale udp service", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			staleServices.Insert(svcInfo.ClusterIP().String())
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+			klog.V(2).InfoS("Stale service", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "protocol", svcInfo.Protocol())
+			staleServices[svcInfo.ClusterIP().String()] = svcInfo.Protocol()
 		}
 	}
 
@@ -1324,9 +1325,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
+	for svcIP, protocol := range staleServices {
 		// TODO : Check if this is required to cleanup stale services here
-		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP)
+		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP, "protocol", protocol)
 	}
 
 	// remove stale endpoint refcount entries

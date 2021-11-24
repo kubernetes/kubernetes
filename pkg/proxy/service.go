@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 )
 
 // BaseServiceInfo contains base information that defines a service.
@@ -312,15 +313,15 @@ type UpdateServiceMapResult struct {
 	// HCServiceNodePorts is a map of Service names to node port numbers which indicate the health of that Service on this Node.
 	// The value(uint16) of HCServices map is the service health check node port.
 	HCServiceNodePorts map[types.NamespacedName]uint16
-	// UDPStaleClusterIP holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
+	// StaleClusterIPProtocol holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
 	// Callers can use this to abort timeout-waits or clear connection-tracking information.
-	UDPStaleClusterIP sets.String
+	StaleClusterIPProtocol map[string]v1.Protocol
 }
 
 // Update updates ServiceMap base on the given changes.
 func (sm ServiceMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
-	result.UDPStaleClusterIP = sets.NewString()
-	sm.apply(changes, result.UDPStaleClusterIP)
+	result.StaleClusterIPProtocol = map[string]v1.Protocol{}
+	sm.apply(changes, result.StaleClusterIPProtocol)
 
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to serviceMap.
@@ -369,10 +370,10 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	return serviceMap
 }
 
-// apply the changes to ServiceMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
+// apply the changes to ServiceMap and update the stale udp cluster IP set. The StaleClusterIPProtocol argument is passed in to store the
 // udp protocol service cluster ip when service is deleted from the ServiceMap.
 // apply triggers processServiceMapChange on every change.
-func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
+func (sm *ServiceMap) apply(changes *ServiceChangeTracker, StaleClusterIPProtocol map[string]v1.Protocol) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
@@ -383,7 +384,7 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
 		// skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous, UDPStaleClusterIP)
+		sm.unmerge(change.previous, StaleClusterIPProtocol)
 	}
 	// clear changes after applying them to ServiceMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
@@ -435,15 +436,15 @@ func (sm *ServiceMap) filter(other ServiceMap) {
 	}
 }
 
-// unmerge deletes all other ServiceMap's elements from current ServiceMap.  We pass in the UDPStaleClusterIP strings sets
-// for storing the stale udp service cluster IPs. We will clear stale udp connection base on UDPStaleClusterIP later
-func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
+// unmerge deletes all other ServiceMap's elements from current ServiceMap.  We pass in the StaleClusterIPProtocol strings sets
+// for storing the stale udp service cluster IPs. We will clear stale udp connection base on StaleClusterIPProtocol later
+func (sm *ServiceMap) unmerge(other ServiceMap, StaleClusterIPProtocol map[string]v1.Protocol) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
-			klog.V(1).InfoS("Removing service port", "portName", svcPortName)
-			if info.Protocol() == v1.ProtocolUDP {
-				UDPStaleClusterIP.Insert(info.ClusterIP().String())
+			klog.V(1).InfoS("Removing service port", "portName", svcPortName, "protocol", info.Protocol())
+			if conntrack.IsClearConntrackNeeded(info.Protocol()) {
+				StaleClusterIPProtocol[info.ClusterIP().String()] = info.Protocol()
 			}
 			delete(*sm, svcPortName)
 		} else {
