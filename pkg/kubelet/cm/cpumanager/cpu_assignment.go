@@ -534,6 +534,14 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
 func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int) (cpuset.CPUSet, error) {
+	// If the number of CPUs requested cannot be handed out in chunks of
+	// 'cpuGroupSize', then we just call out the packing algorithm since we
+	// can't distribute CPUs in this chunk size.
+	if (numCPUs % cpuGroupSize) != 0 {
+		return takeByTopologyNUMAPacked(topo, availableCPUs, numCPUs)
+	}
+
+	// Otherwise build an accumulator to start allocating CPUs from.
 	acc := newCPUAccumulator(topo, availableCPUs, numCPUs)
 	if acc.isSatisfied() {
 		return acc.result, nil
