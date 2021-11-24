@@ -845,6 +845,15 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-3,10-13,20-23,30-34,40-43,50-53,60-63,70-74"),
 		},
+		{
+			"ensure previous failure encountered on live machine has been fixed (1/1)",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			mustParseCPUSet(t, "0,128,30,31,158,159,43-47,171-175,62,63,190,191,75-79,203-207,94,96,222,223,101-111,229-239,126,127,254,255"),
+			28,
+			1,
+			"",
+			mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
+		},
 	}...)
 
 	for _, tc := range testCases {
