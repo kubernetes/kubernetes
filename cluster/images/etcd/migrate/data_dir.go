@@ -144,12 +144,36 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 	return vp, nil
 }
 
+// equals returns true iff VersionFile exists and contains given EtcdVersionPair.
+func (v *VersionFile) equals(vp *EtcdVersionPair) (bool, error) {
+	exists, err := v.Exists()
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	cvp, err := v.Read()
+	if err != nil {
+		return false, err
+	}
+	return vp.Equals(cvp), nil
+}
+
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
+	// We do write only if file content differs from given EtcdVersionPair.
+	isUpToDate, err := v.equals(vp)
+	if err != nil {
+		return fmt.Errorf("failed to to check if version file %s should be changed: %v", v.path, err)
+	}
+	if isUpToDate {
+		return nil
+	}
 	// We do write + rename instead of just write to protect from version.txt
 	// corruption under full disk condition.
 	// See https://github.com/kubernetes/kubernetes/issues/98989.
-	err := ioutil.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
+	err = ioutil.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
 	if err != nil {
 		return fmt.Errorf("failed to write new version file %s: %v", v.nextPath(), err)
 	}
