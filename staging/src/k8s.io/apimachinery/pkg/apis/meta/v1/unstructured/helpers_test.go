@@ -165,3 +165,23 @@ func TestNestedFieldCopy(t *testing.T) {
 func TestCacheableObject(t *testing.T) {
 	runtimetesting.CacheableObjectTest(t, UnstructuredJSONScheme)
 }
+
+func TestSetNestedField(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
+		},
+	}
+	err := SetNestedField(obj, int64(2), "x", "y")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 2)
+	assert.Equal(t, obj["x"].(map[string]interface{})["y"], int64(2))
+	err = SetNestedField(obj, "bar", "x", "a")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 2)
+	assert.Equal(t, obj["x"].(map[string]interface{})["a"], "bar")
+	// omitting fields should report error instead of panicking
+	err = SetNestedField(obj, "strvalue")
+	assert.Error(t, err)
+}

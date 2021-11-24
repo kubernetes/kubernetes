@@ -210,6 +210,10 @@ func SetNestedField(obj map[string]interface{}, value interface{}, fields ...str
 }
 
 func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields ...string) error {
+	if len(fields) == 0 {
+		return fmt.Errorf("fields required")
+	}
+
 	m := obj
 
 	for i, field := range fields[:len(fields)-1] {
