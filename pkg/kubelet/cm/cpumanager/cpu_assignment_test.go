@@ -836,6 +836,15 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
 		},
+		{
+			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
+			34,
+			1,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-34,40-43,50-53,60-63,70-74"),
+		},
 	}...)
 
 	for _, tc := range testCases {
