@@ -574,14 +574,6 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 			cpuset.NewCPUSet(2, 6),
 		},
 		{
-			"take one cpu from dual socket with HT - core from Socket 0",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
-			1,
-			"",
-			cpuset.NewCPUSet(2),
-		},
-		{
 			"take a socket of cpus from dual socket with HT",
 			topoDualSocketHT,
 			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -635,6 +627,14 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	testCases := commonTakeByTopologyTestCases(t)
 	testCases = append(testCases, []takeByTopologyTestCase{
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			"",
+			cpuset.NewCPUSet(2),
+		},
 		{
 			"allocate 4 full cores with 3 coming from the first NUMA node (filling it up) and 1 coming from the second NUMA node",
 			topoDualSocketHT,
@@ -764,6 +764,24 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	testCases := commonTakeByTopologyExtendedTestCases(t)
 	testCases = append(testCases, []takeByTopologyExtendedTestCase{
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			1,
+			"",
+			cpuset.NewCPUSet(1),
+		},
+		{
+			"take one cpu from dual socket with HT - core from Socket 0 - cpuGroupSize 2",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			2,
+			"",
+			cpuset.NewCPUSet(2),
+		},
 		{
 			"allocate 13 full cores distributed across the first 2 NUMA nodes",
 			topoDualSocketMultiNumaPerSocketHT,
