@@ -72,61 +72,6 @@ spec:
             memory: {{hollow_kubelet_mem_Ki}}Ki
         securityContext:
           privileged: true
-      - name: hollow-proxy
-        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        command: [
-          "/go-runner",
-          "-log-file=/var/log/kubeproxy-$(NODE_NAME).log",
-          "/kubemark",
-          "--morph=proxy",
-          "--name=$(NODE_NAME)",
-          "--kubeconfig=/kubeconfig/kubeproxy.kubeconfig",
-          {{hollow_proxy_params}}
-        ]
-        volumeMounts:
-        - name: kubeconfig-volume
-          mountPath: /kubeconfig
-          readOnly: true
-        - name: logs-volume
-          mountPath: /var/log
-        resources:
-          requests:
-            cpu: {{hollow_proxy_millicpu}}m
-            memory: {{hollow_proxy_mem_Ki}}Ki
-      - name: hollow-node-problem-detector
-        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.9
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        command:
-        - /bin/sh
-        - -c
-        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
-        volumeMounts:
-        - name: kubeconfig-volume
-          mountPath: /kubeconfig
-          readOnly: true
-        - name: kernelmonitorconfig-volume
-          mountPath: /config
-          readOnly: true
-        - name: no-serviceaccount-access-to-real-master
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-          readOnly: true
-        - name: logs-volume
-          mountPath: /var/log
-        resources:
-          requests:
-            cpu: {{npd_millicpu}}m
-            memory: {{npd_mem_Ki}}Ki
-        securityContext:
-          privileged: true
       # Keep the pod running on unreachable node for 15 minutes.
       # This time should be sufficient for a VM reboot and should
       # avoid recreating a new hollow node.
