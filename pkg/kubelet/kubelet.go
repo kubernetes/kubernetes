@@ -1758,6 +1758,25 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 // returns without error, the pod's local state can be safely cleaned up. If runningPod is passed,
 // we perform no status updates.
 func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+	var err error
+	done := make(chan struct{})
+	go func() {
+		err = kl.syncTerminatingPodWithoutContext(pod, podStatus, runningPod, gracePeriod, podStatusFn)
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return err
+	}
+}
+
+// syncTerminatingPodWithoutContext is expected to terminate all running containers in a pod. Once this method
+// returns without error, the pod's local state can be safely cleaned up. If runningPod is passed,
+// we perform no status updates.
+// TODO: Merge with syncTerminatingPod after terminating process support context.Context
+func (kl *Kubelet) syncTerminatingPodWithoutContext(pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 	klog.V(4).InfoS("syncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("syncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
