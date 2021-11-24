@@ -299,21 +299,22 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo          storageframework.DriverInfo
-	manifests           []string
-	podInfo             *bool
-	storageCapacity     *bool
-	attachable          bool
-	attachLimit         int
-	enableTopology      bool
-	enableNodeExpansion bool
-	hooks               Hooks
-	tokenRequests       []storagev1.TokenRequest
-	requiresRepublish   *bool
-	fsGroupPolicy       *storagev1.FSGroupPolicy
-	embedded            bool
-	calls               MockCSICalls
-	embeddedCSIDriver   *mockdriver.CSIDriver
+	driverInfo             storageframework.DriverInfo
+	manifests              []string
+	podInfo                *bool
+	storageCapacity        *bool
+	attachable             bool
+	attachLimit            int
+	enableTopology         bool
+	enableNodeExpansion    bool
+	hooks                  Hooks
+	tokenRequests          []storagev1.TokenRequest
+	requiresRepublish      *bool
+	fsGroupPolicy          *storagev1.FSGroupPolicy
+	enableVolumeMountGroup bool
+	embedded               bool
+	calls                  MockCSICalls
+	embeddedCSIDriver      *mockdriver.CSIDriver
 
 	// Additional values set during PrepareTest
 	clientSet       kubernetes.Interface
@@ -347,18 +348,19 @@ type MockCSITestDriver interface {
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver      bool
-	DisableAttach       bool
-	PodInfo             *bool
-	StorageCapacity     *bool
-	AttachLimit         int
-	EnableTopology      bool
-	EnableResizing      bool
-	EnableNodeExpansion bool
-	EnableSnapshot      bool
-	TokenRequests       []storagev1.TokenRequest
-	RequiresRepublish   *bool
-	FSGroupPolicy       *storagev1.FSGroupPolicy
+	RegisterDriver         bool
+	DisableAttach          bool
+	PodInfo                *bool
+	StorageCapacity        *bool
+	AttachLimit            int
+	EnableTopology         bool
+	EnableResizing         bool
+	EnableNodeExpansion    bool
+	EnableSnapshot         bool
+	EnableVolumeMountGroup bool
+	TokenRequests          []storagev1.TokenRequest
+	RequiresRepublish      *bool
+	FSGroupPolicy          *storagev1.FSGroupPolicy
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -499,18 +501,19 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				storageframework.CapVolumeLimits: true,
 			},
 		},
-		manifests:           driverManifests,
-		podInfo:             driverOpts.PodInfo,
-		storageCapacity:     driverOpts.StorageCapacity,
-		enableTopology:      driverOpts.EnableTopology,
-		attachable:          !driverOpts.DisableAttach,
-		attachLimit:         driverOpts.AttachLimit,
-		enableNodeExpansion: driverOpts.EnableNodeExpansion,
-		tokenRequests:       driverOpts.TokenRequests,
-		requiresRepublish:   driverOpts.RequiresRepublish,
-		fsGroupPolicy:       driverOpts.FSGroupPolicy,
-		embedded:            driverOpts.Embedded,
-		hooks:               driverOpts.Hooks,
+		manifests:              driverManifests,
+		podInfo:                driverOpts.PodInfo,
+		storageCapacity:        driverOpts.StorageCapacity,
+		enableTopology:         driverOpts.EnableTopology,
+		attachable:             !driverOpts.DisableAttach,
+		attachLimit:            driverOpts.AttachLimit,
+		enableNodeExpansion:    driverOpts.EnableNodeExpansion,
+		tokenRequests:          driverOpts.TokenRequests,
+		requiresRepublish:      driverOpts.RequiresRepublish,
+		fsGroupPolicy:          driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup: driverOpts.EnableVolumeMountGroup,
+		embedded:               driverOpts.Embedded,
+		hooks:                  driverOpts.Hooks,
 	}
 }
 
@@ -573,11 +576,12 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		containername := "mock"
 		ctx, cancel := context.WithCancel(context.Background())
 		serviceConfig := mockservice.Config{
-			DisableAttach:         !m.attachable,
-			DriverName:            "csi-mock-" + f.UniqueName,
-			AttachLimit:           int64(m.attachLimit),
-			NodeExpansionRequired: m.enableNodeExpansion,
-			EnableTopology:        m.enableTopology,
+			DisableAttach:            !m.attachable,
+			DriverName:               "csi-mock-" + f.UniqueName,
+			AttachLimit:              int64(m.attachLimit),
+			NodeExpansionRequired:    m.enableNodeExpansion,
+			VolumeMountGroupRequired: m.enableVolumeMountGroup,
+			EnableTopology:           m.enableTopology,
 			IO: proxy.PodDirIO{
 				F:             f,
 				Namespace:     m.driverNamespace.Name,
