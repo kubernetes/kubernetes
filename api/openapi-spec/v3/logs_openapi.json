@@ -1,32 +1,33 @@
 {
-  "openapi": "3.0.0",
+  "components": {},
   "info": {
     "title": "Kubernetes",
-    "version": "v1.23.0"
+    "version": "unversioned"
   },
+  "openapi": "3.0.0",
   "paths": {
     "/logs/": {
       "get": {
+        "operationId": "logFileListHandler",
+        "responses": {},
         "tags": [
           "logs"
-        ],
-        "operationId": "logFileListHandler",
-        "responses": {}
+        ]
       }
     },
     "/logs/{logpath}": {
       "get": {
+        "operationId": "logFileHandler",
+        "responses": {},
         "tags": [
           "logs"
-        ],
-        "operationId": "logFileHandler",
-        "responses": {}
+        ]
       },
       "parameters": [
         {
-          "name": "logpath",
-          "in": "path",
           "description": "path to the log",
+          "in": "path",
+          "name": "logpath",
           "required": true,
           "schema": {
             "type": "string",
@@ -35,6 +36,5 @@
         }
       ]
     }
-  },
-  "components": {}
+  }
 }
