@@ -108,7 +108,7 @@ curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:$
     OPENAPI_FILENAME="${group}_openapi.json"
     OPENAPI_FILENAME_ESCAPED="${OPENAPI_FILENAME//\//__}"
     OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
-    curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" | jq . > "$OPENAPI_PATH"
+    curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" | jq -S '.info.version="unversioned"' > "$OPENAPI_PATH"
 done
 
 kube::log::status "SUCCESS"
