@@ -289,6 +289,11 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
 
+	if matchUnSchedulableNodeTaint(node.Spec.Taints) {
+		klog.V(5).InfoS("Node is unSchedulable", "node", klog.KObj(node))
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeUnschedulable)
+	}
+
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -299,29 +304,31 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return nil
 	}
 
-	podLabelSet := labels.Set(pod.Labels)
 	for _, c := range s.Constraints {
 		tpKey := c.TopologyKey
+
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
 			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
-		selfMatchNum := int32(0)
-		if c.Selector.Matches(podLabelSet) {
-			selfMatchNum = 1
-		}
-
-		pair := topologyPair{key: tpKey, value: tpVal}
 		paths, ok := s.TpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
 			klog.ErrorS(nil, "Internal error occurred while retrieving paths from topology key", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
 			continue
 		}
+
+		selfMatchNum := int32(0)
+		podLabelSet := labels.Set(pod.Labels)
+		if c.Selector.Matches(podLabelSet) {
+			selfMatchNum = 1
+		}
+
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
+		pair := topologyPair{key: tpKey, value: tpVal}
 		minMatchNum := paths[0].MatchNum
 		matchNum := int32(0)
 		if tpCount := s.TpPairToMatchNum[pair]; tpCount != nil {

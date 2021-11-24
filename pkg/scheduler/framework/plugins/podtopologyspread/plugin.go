@@ -36,6 +36,8 @@ const (
 	ErrReasonConstraintsNotMatch = "node(s) didn't match pod topology spread constraints"
 	// ErrReasonNodeLabelNotMatch is used when the node doesn't hold the required label.
 	ErrReasonNodeLabelNotMatch = ErrReasonConstraintsNotMatch + " (missing required label)"
+	// ErrReasonNodeUnschedulable is used when the node is unschedulable with `node.kubernetes.io/unschedulable:NoSchedule` taint.
+	ErrReasonNodeUnschedulable = ErrReasonConstraintsNotMatch + " (unschedulable now)"
 )
 
 var systemDefaultConstraints = []v1.TopologySpreadConstraint{
