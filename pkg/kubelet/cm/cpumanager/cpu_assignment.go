@@ -367,19 +367,24 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 }
 
 func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int) (int, int) {
+	// Get the total number of NUMA nodes in the system.
+	numNUMANodes := a.topo.CPUDetails.NUMANodes().Size()
+
 	// Get the total number of NUMA nodes that have CPUs available on them.
 	numNUMANodesAvailable := a.details.NUMANodes().Size()
 
-	// Get the total number of CPUs available across all NUMA nodes.
-	numCPUsAvailable := a.details.CPUs().Size()
+	// Get the total number of CPUs in the system.
+	numCPUs := a.topo.CPUDetails.CPUs().Size()
+
+	// Get the total number of 'cpuGroups' in the system.
+	numCPUGroups := (numCPUs-1)/cpuGroupSize + 1
+
+	// Calculate the number of 'cpuGroups' per NUMA Node in the system (rounding up).
+	numCPUGroupsPerNUMANode := (numCPUGroups-1)/numNUMANodes + 1
 
 	// Calculate the number of available 'cpuGroups' across all NUMA nodes as
 	// well as the number of 'cpuGroups' that need to be allocated (rounding up).
-	numCPUGroupsAvailable := (numCPUsAvailable-1)/cpuGroupSize + 1
 	numCPUGroupsNeeded := (a.numCPUsNeeded-1)/cpuGroupSize + 1
-
-	// Calculate the number of available 'cpuGroups' per NUMA Node (rounding up).
-	numCPUGroupsPerNUMANode := (numCPUGroupsAvailable-1)/numNUMANodesAvailable + 1
 
 	// Calculate the minimum number of numa nodes required to satisfy the
 	// allocation (rounding up).
