@@ -25,23 +25,23 @@ kind: Deployment
 metadata:
   # Change of deployment name must be incorporated in resourceNames field of
   # ClusterRole system:metrics-server to avoid backward/forward compatibility issues
-  name: metrics-server-v0.4.4
+  name: metrics-server-v0.5.2
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.4.4
+    version: v0.5.2
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.4.4
+      version: v0.5.2
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.4.4
+        version: v0.5.2
     spec:
       securityContext:
         seccompProfile:
@@ -52,7 +52,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server/metrics-server:v0.4.4
+        image: gcr.io/gke-release/metrics-server-amd64:v0.5.2-gke.0
         command:
         - /metrics-server
         - --metric-resolution=30s
@@ -99,7 +99,7 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.4.4
+          - --deployment=metrics-server-v0.5.2
           - --container=metrics-server
           - --poll-period=30000
           - --estimator=exponential
