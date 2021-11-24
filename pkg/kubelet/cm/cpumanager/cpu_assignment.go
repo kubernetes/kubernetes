@@ -605,13 +605,16 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			}
 
 			// Calculate how many CPUs will be available on each NUMA node in
-			// 'combo' after allocating an even distribution of CPU groups of
-			// size 'cpuGroupSize' from them. This will be used in the "balance
-			// score" calculation to help decide if this combo should
-			// ultimately be chosen.
-			availableAfterAllocation := make(mapIntInt, len(combo))
+			// the system after allocating an even distribution of CPU groups
+			// of size 'cpuGroupSize' from each NUMA node in 'combo'. This will
+			// be used in the "balance score" calculation to help decide if
+			// this combo should ultimately be chosen.
+			availableAfterAllocation := make(mapIntInt, len(numas))
+			for _, numa := range numas {
+				availableAfterAllocation[numa] = acc.details.CPUsInNUMANodes(numa).Size()
+			}
 			for _, numa := range combo {
-				availableAfterAllocation[numa] = acc.details.CPUsInNUMANodes(numa).Size() - distribution
+				availableAfterAllocation[numa] -= distribution
 			}
 
 			// Check if there are any remaining CPUs to distribute across the
@@ -648,7 +651,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 				}
 
 				// Calculate the "balance score" as the standard deviation of
-				// the number of CPUs available on all NUMA nodes in 'combo'
+				// the number of CPUs available on all NUMA nodes in the system
 				// after the remainder CPUs have been allocated across 'subset'
 				// in groups of size 'cpuGroupSize'.
 				balance := standardDeviation(availableAfterAllocation.Values())
