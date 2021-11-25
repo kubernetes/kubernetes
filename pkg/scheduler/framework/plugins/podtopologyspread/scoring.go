@@ -154,7 +154,7 @@ func (pl *PodTopologySpread) PreScore(
 		match, _ := requiredNodeAffinity.Match(node)
 		if !match ||
 			(requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints)) ||
-			matchUnSchedulableNodeTaint(node.Spec.Taints) {
+			(matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations)) {
 			return
 		}
 

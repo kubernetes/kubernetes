@@ -230,8 +230,8 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			continue
 		}
 
-		// filter node who has `node.kubernetes.io/unschedulable:NoSchedule` taint
-		if matchUnSchedulableNodeTaint(node.Spec.Taints) {
+		// filter node who has `node.kubernetes.io/unschedulable:NoSchedule` taint and pod doesn't tolerate it
+		if matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations) {
 			continue
 		}
 
@@ -289,7 +289,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
 
-	if matchUnSchedulableNodeTaint(node.Spec.Taints) {
+	if matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations) {
 		klog.V(5).InfoS("Node is unSchedulable", "node", klog.KObj(node))
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeUnschedulable)
 	}

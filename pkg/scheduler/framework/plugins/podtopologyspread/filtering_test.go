@@ -544,6 +544,40 @@ func TestPreFilterState(t *testing.T) {
 			},
 		},
 		{
+			name: "default constraints with unSchedulable taint and tolerated pod",
+			pod: st.MakePod().Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone2").Obj(),
+				st.MakeNode().Name("node-c").Label("zone", "zone3").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c2").Node("node-c").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:     1,
+						TopologyKey: "zone",
+						Selector:    mustConvertLabelSelectorAsSelector(t, fooSelector),
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{TopologyValue: "zone1", MatchNum: 1}, {TopologyValue: "zone2", MatchNum: 1}},
+				},
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
+					{key: "zone", value: "zone3"}: pointer.Int32Ptr(2),
+				},
+			},
+		},
+		{
 			name: "default constraints with memory pressure taint",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector).
@@ -1504,6 +1538,24 @@ func TestSingleConstraint(t *testing.T) {
 			},
 			wantStatusCode: map[string]framework.Code{
 				"node-a": framework.UnschedulableAndUnresolvable,
+				"node-b": framework.Success,
+			},
+		},
+		{
+			name: "node with unSchedulable taint, pod tolerated",
+			pod: st.MakePod().Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("node", "node-a").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
 				"node-b": framework.Success,
 			},
 		},

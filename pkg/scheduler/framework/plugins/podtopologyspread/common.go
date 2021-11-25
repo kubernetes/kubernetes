@@ -30,6 +30,12 @@ var (
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
+
+	// unSchedulablePodToleration is a toleration of the unschedulable taint
+	unSchedulablePodToleration = &v1.Toleration{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 )
 
 type topologyPair struct {
@@ -106,9 +112,18 @@ func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selec
 	return count
 }
 
-func matchUnSchedulableNodeTaint(taints []v1.Taint) bool {
+func matchUnSchedulableTaint(taints []v1.Taint) bool {
 	for _, taint := range taints {
 		if taint.MatchTaint(unSchedulableNodeTaint) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchUnSchedulableTaintToleration(tolerations []v1.Toleration) bool {
+	for _, t := range tolerations {
+		if t.Key == unSchedulablePodToleration.Key {
 			return true
 		}
 	}
