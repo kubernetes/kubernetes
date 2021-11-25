@@ -17,10 +17,10 @@ limitations under the License.
 package lifecycle
 
 import (
-	"reflect"
 	goruntime "runtime"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,8 +87,8 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 		nodeInfo := schedulerframework.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
 		pod := removeMissingExtendedResources(test.pod, nodeInfo)
-		if !reflect.DeepEqual(pod, test.expectedPod) {
-			t.Errorf("%s: Expected pod\n%v\ngot\n%v\n", test.desc, test.expectedPod, pod)
+		if diff := cmp.Diff(test.expectedPod, pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
 		}
 	}
 }
@@ -180,9 +180,7 @@ func TestGeneralPredicates(t *testing.T) {
 		pod      *v1.Pod
 		nodeInfo *schedulerframework.NodeInfo
 		node     *v1.Node
-		fits     bool
 		name     string
-		wErr     error
 		reasons  []PredicateFailureReason
 	}{
 		{
@@ -196,8 +194,6 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			fits: true,
-			wErr: nil,
 			name: "no resources/port/host requested always fits",
 		},
 		{
@@ -214,8 +210,6 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			fits: false,
-			wErr: nil,
 			reasons: []PredicateFailureReason{
 				&InsufficientResourceError{ResourceName: v1.ResourceCPU, Requested: 8, Used: 5, Capacity: 10},
 				&InsufficientResourceError{ResourceName: v1.ResourceMemory, Requested: 10, Used: 19, Capacity: 20},
@@ -233,8 +227,6 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			fits:    false,
-			wErr:    nil,
 			reasons: []PredicateFailureReason{&PredicateFailureError{nodename.Name, nodename.ErrReason}},
 			name:    "host not match",
 		},
@@ -245,8 +237,6 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			fits:    false,
-			wErr:    nil,
 			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
 			name:    "hostport conflict",
 		},
@@ -254,16 +244,9 @@ func TestGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			reasons, err := GeneralPredicates(test.pod, test.nodeInfo)
-			fits := len(reasons) == 0 && err == nil
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !fits && !reflect.DeepEqual(reasons, test.reasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.reasons)
-			}
-			if fits != test.fits {
-				t.Errorf("expected: %v got %v", test.fits, fits)
+			reasons := generalFilter(test.pod, test.nodeInfo)
+			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
+				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
 		})
 	}
