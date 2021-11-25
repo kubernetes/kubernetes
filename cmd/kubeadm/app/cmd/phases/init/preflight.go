@@ -20,17 +20,19 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
+	utilsexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
 	preflightExample = cmdutil.Examples(`
 		# Run pre-flight checks for kubeadm init using a config file.
-		kubeadm init phase preflight --config kubeadm-config.yml
+		kubeadm init phase preflight --config kubeadm-config.yaml
 		`)
 )
 

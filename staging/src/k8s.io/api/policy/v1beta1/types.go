@@ -33,8 +33,12 @@ type PodDisruptionBudgetSpec struct {
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
+	// A null selector selects no pods.
+	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+	// In policy/v1, an empty selector will select all pods in the namespace.
+	// +patchStrategy=replace
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" patchStrategy:"replace" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
@@ -77,16 +81,57 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
+
+	// Conditions contain conditions for PDB. The disruption controller sets the
+	// DisruptionAllowed condition. The following are known values for the reason field
+	// (additional reasons could be added in the future):
+	// - SyncFailed: The controller encountered an error and wasn't able to compute
+	//               the number of allowed disruptions. Therefore no disruptions are
+	//               allowed and the status of the condition will be False.
+	// - InsufficientPods: The number of pods are either at or below the number
+	//                     required by the PodDisruptionBudget. No disruptions are
+	//                     allowed and the status of the condition will be False.
+	// - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+	//                   The condition will be True, and the number of allowed
+	//                   disruptions are provided by the disruptionsAllowed property.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,7,rep,name=conditions"`
 }
+
+const (
+	// DisruptionAllowedCondition is a condition set by the disruption controller
+	// that signal whether any of the pods covered by the PDB can be disrupted.
+	DisruptionAllowedCondition = "DisruptionAllowed"
+
+	// SyncFailedReason is set on the DisruptionAllowed condition if reconcile
+	// of the PDB failed and therefore disruption of pods are not allowed.
+	SyncFailedReason = "SyncFailed"
+	// SufficientPodsReason is set on the DisruptionAllowed condition if there are
+	// more pods covered by the PDB than required and at least one can be disrupted.
+	SufficientPodsReason = "SufficientPods"
+	// InsufficientPodsReason is set on the DisruptionAllowed condition if the number
+	// of pods are equal to or fewer than required by the PDB.
+	InsufficientPodsReason = "InsufficientPods"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.5
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudget
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -100,14 +145,20 @@ type PodDisruptionBudget struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.5
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudgetList
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items           []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+	// items list individual PodDisruptionBudget objects
+	Items []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient

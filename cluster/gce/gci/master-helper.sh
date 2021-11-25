@@ -38,6 +38,7 @@ function create-master-instance {
 
   write-master-env
   ensure-gci-metadata-files
+  # shellcheck disable=SC2153 # 'MASTER_NAME' is assigned by upstream
   create-master-instance-internal "${MASTER_NAME}" "${address}" "${internal_address}"
 }
 
@@ -46,7 +47,8 @@ function replicate-master-instance() {
   local existing_master_name="${2}"
   local existing_master_replicas="${3}"
 
-  local kube_env="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-env)"
+  local kube_env
+  kube_env="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-env)"
   # Substitute INITIAL_ETCD_CLUSTER to enable etcd clustering.
   kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER")"
   kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER: '${existing_master_replicas},${REPLICA_NAME}'")"
@@ -64,7 +66,8 @@ function replicate-master-instance() {
   kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_CERT")"
   kube_env="$(echo -e "${kube_env}\nETCD_PEER_CERT: '${ETCD_PEER_CERT_BASE64}'")"
 
-  local master_certs="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs)"
+  local master_certs
+  master_certs="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs)"
 
   ETCD_APISERVER_CA_KEY="$(echo "${master_certs}" | grep "ETCD_APISERVER_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
   ETCD_APISERVER_CA_CERT="$(echo "${master_certs}" | grep "ETCD_APISERVER_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
@@ -79,8 +82,8 @@ function replicate-master-instance() {
   master_certs="$(echo "${master_certs}" | grep -v "ETCD_APISERVER_CLIENT_CERT")"
   master_certs="$(echo -e "${master_certs}\nETCD_APISERVER_CLIENT_CERT: '${ETCD_APISERVER_CLIENT_CERT_BASE64}'")"
 
-  echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
-  echo "${master_certs}" > ${KUBE_TEMP}/kube-master-certs.yaml
+  echo "${kube_env}" > "${KUBE_TEMP}/master-kube-env.yaml"
+  echo "${master_certs}" > "${KUBE_TEMP}/kube-master-certs.yaml"
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
@@ -102,7 +105,7 @@ function run-gcloud-command() {
 
   local result=""
 
-  for attempt in $(seq 1 ${retries}); do
+  for ((i=0; i<retries; i++)); do
     if result=$(gcloud compute ssh "${master_name}" --project "${PROJECT}" --zone "${zone}" --command "${command}" -- -oConnectTimeout=60 2>&1); then
       echo "Successfully executed '${command}' on ${master_name}"
       return 0
@@ -142,7 +145,9 @@ function create-master-instance-internal() {
     enable_ip_aliases=false
   fi
 
-  local network=$(make-gcloud-network-argument \
+  local network
+  # shellcheck disable=SC2153 # 'NETWORK' is assigned by upstream
+  network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" "${REGION}" "${NETWORK}" "${SUBNETWORK:-}" \
     "${address:-}" "${enable_ip_aliases:-}" "${IP_ALIAS_SIZE:-}")
 
@@ -166,7 +171,10 @@ function create-master-instance-internal() {
   disk="${disk},boot=no"
   disk="${disk},auto-delete=no"
 
-  for attempt in $(seq 1 ${retries}); do
+  for ((i=0; i<retries; i++)); do
+    # We expect ZONE to be set and deliberately do not quote preemptible_master
+    # and network
+    # shellcheck disable=SC2153 disable=SC2086
     if result=$(${gcloud} compute instances create "${master_name}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \

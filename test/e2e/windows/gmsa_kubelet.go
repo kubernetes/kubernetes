@@ -59,11 +59,21 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 						Containers: []v1.Container{
 							{
 								Name:  container1Name,
-								Image: imageutils.GetPauseImageName(),
+								Image: imageutils.GetE2EImage(imageutils.BusyBox),
+								Command: []string{
+									"powershell.exe",
+									"-Command",
+									"sleep -Seconds 600",
+								},
 							},
 							{
 								Name:  container2Name,
-								Image: imageutils.GetPauseImageName(),
+								Image: imageutils.GetE2EImage(imageutils.BusyBox),
+								Command: []string{
+									"powershell.exe",
+									"-Command",
+									"sleep -Seconds 600",
+								},
 								SecurityContext: &v1.SecurityContext{
 									WindowsOptions: &v1.WindowsSecurityContextOptions{
 										GMSACredentialSpec: generateDummyCredSpecs(container2Domain),

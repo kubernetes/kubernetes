@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -27,7 +28,7 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -54,7 +55,7 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
-			klog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
+			klog.V(5).InfoS("Failed to convert docker API image to runtime API image", "image", i, "err", err)
 			continue
 		}
 		result = append(result, apiImage)

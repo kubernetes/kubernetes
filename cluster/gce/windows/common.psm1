@@ -48,6 +48,25 @@ function Log-Output {
   }
 }
 
+# Dumps detailed information about the specified service to the console output.
+# $Delay can be set to a positive value to introduce some seconds of delay
+# before querying the service information, which may produce more consistent
+# results if this function is called immediately after changing a service's
+# configuration.
+function Write-VerboseServiceInfoToConsole {
+  param (
+    [parameter(Mandatory=$true)] [string]$Service,
+    [parameter(Mandatory=$false)] [int]$Delay = 0
+  )
+  if ($Delay -gt 0) {
+    Start-Sleep $Delay
+  }
+  Get-Service -ErrorAction Continue $Service | Select-Object * | Out-String
+  & sc.exe queryex $Service
+  & sc.exe qc $Service
+  & sc.exe qfailure $Service
+}
+
 # Checks if a file should be written or overwritten by testing if it already
 # exists and checking the value of the global $REDO_STEPS variable. Emits an
 # informative message if the file already exists.
@@ -229,7 +248,7 @@ function Get-RemoteFile {
     $httpResponseMessage.Wait()
     if (-not $httpResponseMessage.IsCanceled) {
       # Check if the request was successful.
-      # 
+      #
       # DO NOT replace with EnsureSuccessStatusCode(), it prints the
       # OAuth2 bearer token.
       if (-not $httpResponseMessage.Result.IsSuccessStatusCode) {
@@ -276,7 +295,7 @@ function Check-StorageScope {
   While($true) {
     $data = Get-InstanceMetadata -Key "service-accounts/default/scopes"
     if ($data) {
-      return ($data -match "auth/devstorage")
+      return ($data -match "auth/devstorage") -or ($data -match "auth/cloud-platform")
     }
     Start-Sleep -Seconds 1
   }

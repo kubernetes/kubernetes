@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	strategy "k8s.io/kubernetes/pkg/registry/apiserverinternal/storageversion"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for storage version against etcd
@@ -46,10 +47,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		},
 		DefaultQualifiedResource: apiserverinternal.Resource("storageversions"),
 
-		CreateStrategy: strategy.Strategy,
-		UpdateStrategy: strategy.Strategy,
-		DeleteStrategy: strategy.Strategy,
-		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		CreateStrategy:      strategy.Strategy,
+		UpdateStrategy:      strategy.Strategy,
+		DeleteStrategy:      strategy.Strategy,
+		ResetFieldsStrategy: strategy.Strategy,
+		TableConvertor:      printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -57,6 +59,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = strategy.StatusStrategy
+	statusStore.ResetFieldsStrategy = strategy.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
@@ -80,4 +83,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

@@ -84,6 +84,10 @@ var requiredLogs = []LogFileData{
 		Files:             []string{"/var/log/containerd.log"},
 		JournalctlCommand: []string{"-u", "containerd"},
 	},
+	{
+		Name:              "containerd-installation.log",
+		JournalctlCommand: []string{"-u", "containerd-installation"},
+	},
 }
 
 // getLogFiles get all logs to collect after the test.

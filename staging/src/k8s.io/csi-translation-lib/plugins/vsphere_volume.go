@@ -111,7 +111,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with VsphereVolume set from in-tree
 // and converts the VsphereVolume source to a CSIPersistentVolumeSource
-func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.VsphereVolume == nil {
 		return nil, fmt.Errorf("volume is nil or VsphereVolume not defined on volume")
 	}

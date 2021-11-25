@@ -134,6 +134,51 @@ func Fatal(args ...interface{}) {
 	std.Fatal(args...)
 }
 
+// TraceFn logs a message from a func at level Trace on the standard logger.
+func TraceFn(fn LogFunction) {
+	std.TraceFn(fn)
+}
+
+// DebugFn logs a message from a func at level Debug on the standard logger.
+func DebugFn(fn LogFunction) {
+	std.DebugFn(fn)
+}
+
+// PrintFn logs a message from a func at level Info on the standard logger.
+func PrintFn(fn LogFunction) {
+	std.PrintFn(fn)
+}
+
+// InfoFn logs a message from a func at level Info on the standard logger.
+func InfoFn(fn LogFunction) {
+	std.InfoFn(fn)
+}
+
+// WarnFn logs a message from a func at level Warn on the standard logger.
+func WarnFn(fn LogFunction) {
+	std.WarnFn(fn)
+}
+
+// WarningFn logs a message from a func at level Warn on the standard logger.
+func WarningFn(fn LogFunction) {
+	std.WarningFn(fn)
+}
+
+// ErrorFn logs a message from a func at level Error on the standard logger.
+func ErrorFn(fn LogFunction) {
+	std.ErrorFn(fn)
+}
+
+// PanicFn logs a message from a func at level Panic on the standard logger.
+func PanicFn(fn LogFunction) {
+	std.PanicFn(fn)
+}
+
+// FatalFn logs a message from a func at level Fatal on the standard logger then the process will exit with status set to 1.
+func FatalFn(fn LogFunction) {
+	std.FatalFn(fn)
+}
+
 // Tracef logs a message at level Trace on the standard logger.
 func Tracef(format string, args ...interface{}) {
 	std.Tracef(format, args...)

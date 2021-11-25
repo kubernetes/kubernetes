@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -85,13 +86,27 @@ func NewForConfigOrDie(c *rest.Config) Interface {
 // metadata details about any Kubernetes object (core, aggregated, or custom
 // resource based) in the form of PartialObjectMetadata objects, or returns
 // an error.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(inConfig *rest.Config) (Interface, error) {
+	config := ConfigFor(inConfig)
+
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(config, httpClient)
+}
+
+// NewForConfigAndClient creates a new metadata client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (Interface, error) {
 	config := ConfigFor(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
 	config.APIPath = "/this-value-should-never-be-sent"
 
-	restClient, err := rest.RESTClientFor(config)
+	restClient, err := rest.RESTClientForConfigAndClient(config, h)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +139,12 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	if len(name) == 0 {
 		return fmt.Errorf("name is required")
 	}
+	// if DeleteOptions are delivered to Negotiator for serialization,
+	// HTTP-Request header will bring "Content-Type: application/vnd.kubernetes.protobuf"
+	// apiextensions-apiserver uses unstructuredNegotiatedSerializer to decode the input,
+	// server-side will reply with 406 errors.
+	// The special treatment here is to be compatible with CRD Handler
+	// see: https://github.com/kubernetes/kubernetes/blob/1a845ccd076bbf1b03420fe694c85a5cd3bd6bed/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/customresource_handler.go#L843
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -132,6 +153,7 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	result := c.client.client.
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		Do(ctx)
 	return result.Error()
@@ -139,6 +161,7 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 
 // DeleteCollection triggers deletion of all resources in the specified scope (namespace or cluster).
 func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	// See comment on Delete
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -147,6 +170,7 @@ func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 	result := c.client.client.
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do(ctx)

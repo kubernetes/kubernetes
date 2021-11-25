@@ -5,19 +5,27 @@ package fscommon
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
-	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 var (
 	ErrNotValidFormat = errors.New("line is not a valid key value format")
+
+	// Deprecated: use cgroups.OpenFile instead.
+	OpenFile = cgroups.OpenFile
+	// Deprecated: use cgroups.ReadFile instead.
+	ReadFile = cgroups.ReadFile
+	// Deprecated: use cgroups.WriteFile instead.
+	WriteFile = cgroups.WriteFile
 )
 
-// Saturates negative values at zero and returns a uint64.
-// Due to kernel bugs, some of the memory cgroup stats can be negative.
+// ParseUint converts a string to an uint64 integer.
+// Negative values are returned at zero as, due to kernel bugs,
+// some of the memory cgroup stats can be negative.
 func ParseUint(s string, base, bitSize int) (uint64, error) {
 	value, err := strconv.ParseUint(s, base, bitSize)
 	if err != nil {
@@ -36,48 +44,88 @@ func ParseUint(s string, base, bitSize int) (uint64, error) {
 	return value, nil
 }
 
-// Parses a cgroup param and returns as name, value
-//  i.e. "io_service_bytes 1234" will return as io_service_bytes, 1234
-func GetCgroupParamKeyValue(t string) (string, uint64, error) {
-	parts := strings.Fields(t)
-	switch len(parts) {
-	case 2:
-		value, err := ParseUint(parts[1], 10, 64)
-		if err != nil {
-			return "", 0, fmt.Errorf("unable to convert param value (%q) to uint64: %v", parts[1], err)
-		}
-
-		return parts[0], value, nil
-	default:
-		return "", 0, ErrNotValidFormat
+// ParseKeyValue parses a space-separated "name value" kind of cgroup
+// parameter and returns its key as a string, and its value as uint64
+// (ParseUint is used to convert the value). For example,
+// "io_service_bytes 1234" will be returned as "io_service_bytes", 1234.
+func ParseKeyValue(t string) (string, uint64, error) {
+	parts := strings.SplitN(t, " ", 3)
+	if len(parts) != 2 {
+		return "", 0, fmt.Errorf("line %q is not in key value format", t)
 	}
+
+	value, err := ParseUint(parts[1], 10, 64)
+	if err != nil {
+		return "", 0, fmt.Errorf("unable to convert to uint64: %v", err)
+	}
+
+	return parts[0], value, nil
 }
 
-// Gets a single uint64 value from the specified cgroup file.
-func GetCgroupParamUint(cgroupPath, cgroupFile string) (uint64, error) {
-	fileName := filepath.Join(cgroupPath, cgroupFile)
-	contents, err := ioutil.ReadFile(fileName)
+// GetValueByKey reads a key-value pairs from the specified cgroup file,
+// and returns a value of the specified key. ParseUint is used for value
+// conversion.
+func GetValueByKey(path, file, key string) (uint64, error) {
+	content, err := cgroups.ReadFile(path, file)
 	if err != nil {
 		return 0, err
 	}
-	trimmed := strings.TrimSpace(string(contents))
-	if trimmed == "max" {
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		arr := strings.Split(line, " ")
+		if len(arr) == 2 && arr[0] == key {
+			return ParseUint(arr[1], 10, 64)
+		}
+	}
+
+	return 0, nil
+}
+
+// GetCgroupParamUint reads a single uint64 value from the specified cgroup file.
+// If the value read is "max", the math.MaxUint64 is returned.
+func GetCgroupParamUint(path, file string) (uint64, error) {
+	contents, err := GetCgroupParamString(path, file)
+	if err != nil {
+		return 0, err
+	}
+	contents = strings.TrimSpace(contents)
+	if contents == "max" {
 		return math.MaxUint64, nil
 	}
 
-	res, err := ParseUint(trimmed, 10, 64)
+	res, err := ParseUint(contents, 10, 64)
 	if err != nil {
-		return res, fmt.Errorf("unable to parse %q as a uint from Cgroup file %q", string(contents), fileName)
+		return res, fmt.Errorf("unable to parse file %q", path+"/"+file)
 	}
 	return res, nil
 }
 
-// Gets a string value from the specified cgroup file
-func GetCgroupParamString(cgroupPath, cgroupFile string) (string, error) {
-	contents, err := ioutil.ReadFile(filepath.Join(cgroupPath, cgroupFile))
+// GetCgroupParamInt reads a single int64 value from specified cgroup file.
+// If the value read is "max", the math.MaxInt64 is returned.
+func GetCgroupParamInt(path, file string) (int64, error) {
+	contents, err := cgroups.ReadFile(path, file)
+	if err != nil {
+		return 0, err
+	}
+	contents = strings.TrimSpace(contents)
+	if contents == "max" {
+		return math.MaxInt64, nil
+	}
+
+	res, err := strconv.ParseInt(contents, 10, 64)
+	if err != nil {
+		return res, fmt.Errorf("unable to parse %q as a int from Cgroup file %q", contents, path+"/"+file)
+	}
+	return res, nil
+}
+
+// GetCgroupParamString reads a string from the specified cgroup file.
+func GetCgroupParamString(path, file string) (string, error) {
+	contents, err := cgroups.ReadFile(path, file)
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(string(contents)), nil
+	return strings.TrimSpace(contents), nil
 }

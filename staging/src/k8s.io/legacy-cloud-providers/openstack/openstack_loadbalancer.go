@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -21,7 +22,6 @@ package openstack
 import (
 	"context"
 	"fmt"
-	"net"
 	"reflect"
 	"strings"
 	"time"
@@ -40,6 +40,7 @@ import (
 	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1059,7 +1060,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 		for _, port := range ports {
 			for _, sourceRange := range sourceRanges.StringSlice() {
 				ethertype := rules.EtherType4
-				network, _, err := net.ParseCIDR(sourceRange)
+				network, _, err := netutils.ParseCIDRSloppy(sourceRange)
 
 				if err != nil {
 					return fmt.Errorf("error parsing source range %s as a CIDR: %v", sourceRange, err)

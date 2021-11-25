@@ -21,11 +21,14 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // podDisruptionBudgetStrategy implements verification logic for PodDisruptionBudgets.
@@ -40,6 +43,21 @@ var Strategy = podDisruptionBudgetStrategy{legacyscheme.Scheme, names.SimpleName
 // NamespaceScoped returns true because all PodDisruptionBudget' need to be within a namespace.
 func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (podDisruptionBudgetStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"policy/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"policy/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of an PodDisruptionBudget before creation.
@@ -72,6 +90,11 @@ func (podDisruptionBudgetStrategy) Validate(ctx context.Context, obj runtime.Obj
 	return validation.ValidatePodDisruptionBudget(podDisruptionBudget)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (podDisruptionBudgetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (podDisruptionBudgetStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -84,6 +107,11 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (podDisruptionBudgetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDisruptionBudgetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
@@ -99,6 +127,21 @@ type podDisruptionBudgetStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (podDisruptionBudgetStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"policy/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"policy/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
@@ -109,7 +152,18 @@ func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx context.Context, o
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	// TODO: Validate status updates.
-	return field.ErrorList{}
-	// return validation.ValidatePodDisruptionBudgetStatusUpdate(obj.(*policy.PodDisruptionBudget), old.(*policy.PodDisruptionBudget))
+	var apiVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		apiVersion = schema.GroupVersion{
+			Group:   requestInfo.APIGroup,
+			Version: requestInfo.APIVersion,
+		}
+	}
+	return validation.ValidatePodDisruptionBudgetStatusUpdate(obj.(*policy.PodDisruptionBudget).Status,
+		old.(*policy.PodDisruptionBudget).Status, field.NewPath("status"), apiVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDisruptionBudgetStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

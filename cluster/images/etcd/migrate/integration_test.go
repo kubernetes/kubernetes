@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 /*
@@ -39,10 +40,11 @@ import (
 
 	"github.com/blang/semver"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 var (
-	testSupportedVersions = MustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
+	testSupportedVersions = mustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
 	testVersionPrevious   = &EtcdVersion{semver.MustParse("3.0.17")}
 	testVersionLatest     = &EtcdVersion{semver.MustParse("3.1.12")}
 )
@@ -79,8 +81,8 @@ func TestMigrate(t *testing.T) {
 
 	for _, m := range migrations {
 		t.Run(m.title, func(t *testing.T) {
-			start := MustParseEtcdVersionPair(m.startVersion)
-			end := MustParseEtcdVersionPair(m.endVersion)
+			start := mustParseEtcdVersionPair(m.startVersion)
+			end := mustParseEtcdVersionPair(m.endVersion)
 
 			testCfgs := clusterConfig(t, m.title, m.memberCount, m.protocol, m.clientListenUrls)
 
@@ -307,7 +309,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 func parseIPList(ips []string) []net.IP {
 	var netIPs []net.IP
 	for _, ip := range ips {
-		netIPs = append(netIPs, net.ParseIP(ip))
+		netIPs = append(netIPs, netutils.ParseIPSloppy(ip))
 	}
 	return netIPs
 }
@@ -335,7 +337,7 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		IsCA:                  true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)
@@ -362,4 +364,23 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+// mustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
+// or panics if the parse fails.
+func mustParseEtcdVersionPair(s string) *EtcdVersionPair {
+	pair, err := ParseEtcdVersionPair(s)
+	if err != nil {
+		panic(err)
+	}
+	return pair
+}
+
+// mustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
+func mustParseSupportedVersions(list []string) SupportedVersions {
+	versions, err := ParseSupportedVersions(list)
+	if err != nil {
+		panic(err)
+	}
+	return versions
 }

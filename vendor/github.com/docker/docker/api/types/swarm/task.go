@@ -56,6 +56,12 @@ type Task struct {
 	DesiredState        TaskState           `json:",omitempty"`
 	NetworksAttachments []NetworkAttachment `json:",omitempty"`
 	GenericResources    []GenericResource   `json:",omitempty"`
+
+	// JobIteration is the JobIteration of the Service that this Task was
+	// spawned from, if the Service is a ReplicatedJob or GlobalJob. This is
+	// used to determine which Tasks belong to which run of the job. This field
+	// is absent if the Service mode is Replicated or Global.
+	JobIteration *Version `json:",omitempty"`
 }
 
 // TaskSpec represents the spec of a task.
@@ -85,11 +91,19 @@ type TaskSpec struct {
 	Runtime RuntimeType `json:",omitempty"`
 }
 
-// Resources represents resources (CPU/Memory).
+// Resources represents resources (CPU/Memory) which can be advertised by a
+// node and requested to be reserved for a task.
 type Resources struct {
 	NanoCPUs         int64             `json:",omitempty"`
 	MemoryBytes      int64             `json:",omitempty"`
 	GenericResources []GenericResource `json:",omitempty"`
+}
+
+// Limit describes limits on resources which can be requested by a task.
+type Limit struct {
+	NanoCPUs    int64 `json:",omitempty"`
+	MemoryBytes int64 `json:",omitempty"`
+	Pids        int64 `json:",omitempty"`
 }
 
 // GenericResource represents a "user defined" resource which can
@@ -119,7 +133,7 @@ type DiscreteGenericResource struct {
 
 // ResourceRequirements represents resources requirements.
 type ResourceRequirements struct {
-	Limits       *Resources `json:",omitempty"`
+	Limits       *Limit     `json:",omitempty"`
 	Reservations *Resources `json:",omitempty"`
 }
 

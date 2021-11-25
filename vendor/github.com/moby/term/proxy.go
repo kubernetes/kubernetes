@@ -1,4 +1,4 @@
-package term // import "github.com/moby/term"
+package term
 
 import (
 	"io"
@@ -19,6 +19,7 @@ type escapeProxy struct {
 	escapeKeys   []byte
 	escapeKeyPos int
 	r            io.Reader
+	buf          []byte
 }
 
 // NewEscapeProxy returns a new TTY proxy reader which wraps the given reader
@@ -31,48 +32,57 @@ func NewEscapeProxy(r io.Reader, escapeKeys []byte) io.Reader {
 	}
 }
 
-func (r *escapeProxy) Read(buf []byte) (int, error) {
-	nr, err := r.r.Read(buf)
-
-	if len(r.escapeKeys) == 0 {
-		return nr, err
-	}
-
-	preserve := func() {
-		// this preserves the original key presses in the passed in buffer
-		nr += r.escapeKeyPos
-		preserve := make([]byte, 0, r.escapeKeyPos+len(buf))
-		preserve = append(preserve, r.escapeKeys[:r.escapeKeyPos]...)
-		preserve = append(preserve, buf...)
-		r.escapeKeyPos = 0
-		copy(buf[0:nr], preserve)
-	}
-
-	if nr != 1 || err != nil {
-		if r.escapeKeyPos > 0 {
-			preserve()
-		}
-		return nr, err
-	}
-
-	if buf[0] != r.escapeKeys[r.escapeKeyPos] {
-		if r.escapeKeyPos > 0 {
-			preserve()
-		}
-		return nr, nil
-	}
-
-	if r.escapeKeyPos == len(r.escapeKeys)-1 {
+func (r *escapeProxy) Read(buf []byte) (n int, err error) {
+	if len(r.escapeKeys) > 0 && r.escapeKeyPos == len(r.escapeKeys) {
 		return 0, EscapeError{}
 	}
 
-	// Looks like we've got an escape key, but we need to match again on the next
-	// read.
-	// Store the current escape key we found so we can look for the next one on
-	// the next read.
-	// Since this is an escape key, make sure we don't let the caller read it
-	// If later on we find that this is not the escape sequence, we'll add the
-	// keys back
-	r.escapeKeyPos++
-	return nr - r.escapeKeyPos, nil
+	if len(r.buf) > 0 {
+		n = copy(buf, r.buf)
+		r.buf = r.buf[n:]
+	}
+
+	nr, err := r.r.Read(buf[n:])
+	n += nr
+	if len(r.escapeKeys) == 0 {
+		return n, err
+	}
+
+	for i := 0; i < n; i++ {
+		if buf[i] == r.escapeKeys[r.escapeKeyPos] {
+			r.escapeKeyPos++
+
+			// Check if the full escape sequence is matched.
+			if r.escapeKeyPos == len(r.escapeKeys) {
+				n = i + 1 - r.escapeKeyPos
+				if n < 0 {
+					n = 0
+				}
+				return n, EscapeError{}
+			}
+			continue
+		}
+
+		// If we need to prepend a partial escape sequence from the previous
+		// read, make sure the new buffer size doesn't exceed len(buf).
+		// Otherwise, preserve any extra data in a buffer for the next read.
+		if i < r.escapeKeyPos {
+			preserve := make([]byte, 0, r.escapeKeyPos+n)
+			preserve = append(preserve, r.escapeKeys[:r.escapeKeyPos]...)
+			preserve = append(preserve, buf[:n]...)
+			n = copy(buf, preserve)
+			i += r.escapeKeyPos
+			r.buf = append(r.buf, preserve[n:]...)
+		}
+		r.escapeKeyPos = 0
+	}
+
+	// If we're in the middle of reading an escape sequence, make sure we don't
+	// let the caller read it. If later on we find that this is not the escape
+	// sequence, we'll prepend it back to buf.
+	n -= r.escapeKeyPos
+	if n < 0 {
+		n = 0
+	}
+	return n, err
 }

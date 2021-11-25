@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -288,6 +288,20 @@ func getKey(event *eventsv1.Event) eventKey {
 		key.related = *event.Related
 	}
 	return key
+}
+
+// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured logging function.
+// The return value can be ignored or used to stop recording, if desired.
+func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func() {
+	return e.StartEventWatcher(
+		func(obj runtime.Object) {
+			event, ok := obj.(*eventsv1.Event)
+			if !ok {
+				klog.Errorf("unexpected type, expected eventsv1.Event")
+				return
+			}
+			klog.V(verbosity).InfoS("Event occurred", "object", klog.KRef(event.Regarding.Namespace, event.Regarding.Name), "kind", event.Regarding.Kind, "apiVersion", event.Regarding.APIVersion, "type", event.Type, "reason", event.Reason, "action", event.Action, "note", event.Note)
+		})
 }
 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.

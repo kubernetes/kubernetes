@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -99,7 +102,7 @@ func (c *FakeMutatingWebhookConfigurations) Update(ctx context.Context, mutating
 // Delete takes name of the mutatingWebhookConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakeMutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(mutatingwebhookconfigurationsResource, name), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootDeleteActionWithOptions(mutatingwebhookconfigurationsResource, name, opts), &admissionregistrationv1.MutatingWebhookConfiguration{})
 	return err
 }
 
@@ -115,6 +118,27 @@ func (c *FakeMutatingWebhookConfigurations) DeleteCollection(ctx context.Context
 func (c *FakeMutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, pt, data, subresources...), &admissionregistrationv1.MutatingWebhookConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*admissionregistrationv1.MutatingWebhookConfiguration), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied mutatingWebhookConfiguration.
+func (c *FakeMutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebhookConfiguration *applyconfigurationsadmissionregistrationv1.MutatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
+	if mutatingWebhookConfiguration == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(mutatingWebhookConfiguration)
+	if err != nil {
+		return nil, err
+	}
+	name := mutatingWebhookConfiguration.Name
+	if name == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data), &admissionregistrationv1.MutatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

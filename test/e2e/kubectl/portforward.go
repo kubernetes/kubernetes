@@ -74,7 +74,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"netexec"},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							Exec: &v1.ExecAction{
 								Command: []string{
 									"sh", "-c", "netstat -na | grep LISTEN | grep -v 8080 | grep 80",
@@ -122,7 +122,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 	}
 }
 
-// WaitForTerminatedContainer wait till a given container be terminated for a given pod.
+// WaitForTerminatedContainer waits till a given container be terminated for a given pod.
 func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string) error {
 	return e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {

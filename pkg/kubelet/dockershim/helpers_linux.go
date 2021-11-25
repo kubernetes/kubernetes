@@ -1,3 +1,4 @@
+//go:build linux && !dockerless
 // +build linux,!dockerless
 
 /*
@@ -31,7 +32,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // DefaultMemorySwap always returns 0 for no memory swap in a sandbox
@@ -118,6 +119,8 @@ func (ds *dockerService) updateCreateConfig(
 				CPUShares:  rOpts.CpuShares,
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
+				CpusetCpus: rOpts.CpusetCpus,
+				CpusetMems: rOpts.CpusetMems,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
 		}
@@ -152,8 +155,4 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 		return "", fmt.Errorf("cannot find network namespace for the terminated container %q", c.ID)
 	}
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
-}
-
-// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
-func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

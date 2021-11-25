@@ -35,13 +35,15 @@ import (
 // plugin in the kube-apiserver.
 type TokenReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is filled in by the server and indicates whether the request can be authenticated.
+	// Status is filled in by the server and indicates whether the token can be authenticated.
 	// +optional
 	Status TokenReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }

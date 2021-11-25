@@ -36,25 +36,25 @@ import (
 
 var (
 	clusterRoleLong = templates.LongDesc(i18n.T(`
-		Create a ClusterRole.`))
+		Create a cluster role.`))
 
 	clusterRoleExample = templates.Examples(i18n.T(`
-		# Create a ClusterRole named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+		# Create a cluster role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
-		# Create a ClusterRole named "pod-reader" with ResourceName specified
+		# Create a cluster role named "pod-reader" with ResourceName specified
 		kubectl create clusterrole pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
-		# Create a ClusterRole named "foo" with API Group specified
+		# Create a cluster role named "foo" with API Group specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
 
-		# Create a ClusterRole named "foo" with SubResource specified
+		# Create a cluster role named "foo" with SubResource specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status
 
-		# Create a ClusterRole name "foo" with NonResourceURL specified
+		# Create a cluster role name "foo" with NonResourceURL specified
 		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*
 
-		# Create a ClusterRole name "monitoring" with AggregationRule specified
+		# Create a cluster role name "monitoring" with AggregationRule specified
 		kubectl create clusterrole monitoring --aggregation-rule="rbac.example.com/aggregate-to-monitoring=true"`))
 
 	// Valid nonResource verb list for validation.
@@ -78,7 +78,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd := &cobra.Command{
 		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 clusterRoleLong,
+		Short:                 i18n.T("Create a cluster role"),
 		Long:                  clusterRoleLong,
 		Example:               clusterRoleExample,
 		Run: func(cmd *cobra.Command, args []string) {

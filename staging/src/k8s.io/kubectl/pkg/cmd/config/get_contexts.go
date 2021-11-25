@@ -47,13 +47,13 @@ type GetContextsOptions struct {
 }
 
 var (
-	getContextsLong = templates.LongDesc(i18n.T(`Displays one or many contexts from the kubeconfig file.`))
+	getContextsLong = templates.LongDesc(i18n.T(`Display one or many contexts from the kubeconfig file.`))
 
 	getContextsExample = templates.Examples(`
 		# List all the contexts in your kubeconfig file
 		kubectl config get-contexts
 
-		# Describe one context in your kubeconfig file.
+		# Describe one context in your kubeconfig file
 		kubectl config get-contexts my-context`)
 )
 

@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -30,7 +31,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -40,7 +41,7 @@ import (
 )
 
 const (
-	defaultSandboxImage = "k8s.gcr.io/pause:3.2"
+	defaultSandboxImage = "k8s.gcr.io/pause:3.6"
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
@@ -97,7 +98,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}
 
 	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
-	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
+	// see: https://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-registry
 	// Only pull sandbox image when it's not present - v1.PullIfNotPresent.
 	if err := ensureSandboxImageExists(ds.client, image); err != nil {
 		return nil, err
@@ -233,12 +234,11 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 			if checkpointErr != errors.ErrCheckpointNotFound {
 				err := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
 				if err != nil {
-					klog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, err)
+					klog.ErrorS(err, "Failed to delete corrupt checkpoint for sandbox", "podSandboxID", podSandboxID)
 				}
 			}
 			if libdocker.IsContainerNotFoundError(statusErr) {
-				klog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
-					"Proceed without further sandbox information.", podSandboxID)
+				klog.InfoS("Both sandbox container and checkpoint could not be found. Proceed without further sandbox information.", "podSandboxID", podSandboxID)
 			} else {
 				return nil, utilerrors.NewAggregate([]error{
 					fmt.Errorf("failed to get checkpoint for sandbox %q: %v", podSandboxID, checkpointErr),
@@ -272,7 +272,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
 		// Do not return error if the container does not exist
 		if !libdocker.IsContainerNotFoundError(err) {
-			klog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
+			klog.ErrorS(err, "Failed to stop sandbox", "podSandboxID", podSandboxID)
 			errList = append(errList, err)
 		} else {
 			// remove the checkpoint for any sandbox that is not found in the runtime
@@ -399,7 +399,7 @@ func (ds *dockerService) getIPs(podSandboxID string, sandbox *dockertypes.Contai
 	// If all else fails, warn but don't return an error, as pod status
 	// should generally not return anything except fatal errors
 	// FIXME: handle network errors by restarting the pod somehow?
-	klog.Warningf("failed to read pod IP from plugin/docker: %v", err)
+	klog.InfoS("Failed to read pod IP from plugin/docker", "err", err)
 	return ips
 }
 
@@ -532,7 +532,7 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 	if filter == nil {
 		checkpoints, err = ds.checkpointManager.ListCheckpoints()
 		if err != nil {
-			klog.Errorf("Failed to list checkpoints: %v", err)
+			klog.ErrorS(err, "Failed to list checkpoints")
 		}
 	}
 
@@ -549,7 +549,7 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 		c := containers[i]
 		converted, err := containerToRuntimeAPISandbox(&c)
 		if err != nil {
-			klog.V(4).Infof("Unable to convert docker to runtime API sandbox %+v: %v", c, err)
+			klog.V(4).InfoS("Unable to convert docker to runtime API sandbox", "containerName", c.Names, "err", err)
 			continue
 		}
 		if filterOutReadySandboxes && converted.State == runtimeapi.PodSandboxState_SANDBOX_READY {
@@ -569,11 +569,11 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 		checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
 		err := ds.checkpointManager.GetCheckpoint(id, checkpoint)
 		if err != nil {
-			klog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
+			klog.ErrorS(err, "Failed to retrieve checkpoint for sandbox", "sandboxID", id)
 			if err == errors.ErrCorruptCheckpoint {
 				err = ds.checkpointManager.RemoveCheckpoint(id)
 				if err != nil {
-					klog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", id, err)
+					klog.ErrorS(err, "Failed to delete corrupt checkpoint for sandbox", "sandboxID", id)
 				}
 			}
 			continue
@@ -662,7 +662,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	securityOpts := ds.getSandBoxSecurityOpts(securityOptSeparator)
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
-	applyExperimentalCreateConfig(createConfig, c.Annotations)
 	return createConfig, nil
 }
 
@@ -720,14 +719,14 @@ func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {
 	case runtimeapi.Protocol_SCTP:
 		return protocolSCTP
 	}
-	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
 	return protocolTCP
 }
 
 // rewriteResolvFile rewrites resolv.conf file generated by docker.
 func rewriteResolvFile(resolvFilePath string, dns []string, dnsSearch []string, dnsOptions []string) error {
 	if len(resolvFilePath) == 0 {
-		klog.Errorf("ResolvConfPath is empty.")
+		klog.ErrorS(nil, "ResolvConfPath is empty.")
 		return nil
 	}
 
@@ -752,9 +751,9 @@ func rewriteResolvFile(resolvFilePath string, dns []string, dnsSearch []string, 
 		resolvFileContentStr := strings.Join(resolvFileContent, "\n")
 		resolvFileContentStr += "\n"
 
-		klog.V(4).Infof("Will attempt to re-write config file %s with: \n%s", resolvFilePath, resolvFileContent)
+		klog.V(4).InfoS("Will attempt to re-write config file", "path", resolvFilePath, "fileContent", resolvFileContent)
 		if err := rewriteFile(resolvFilePath, resolvFileContentStr); err != nil {
-			klog.Errorf("resolv.conf could not be updated: %v", err)
+			klog.ErrorS(err, "Resolv.conf could not be updated")
 			return err
 		}
 	}

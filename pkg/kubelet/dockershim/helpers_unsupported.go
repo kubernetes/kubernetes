@@ -1,3 +1,4 @@
+//go:build !linux && !windows && !dockerless
 // +build !linux,!windows,!dockerless
 
 /*
@@ -23,7 +24,7 @@ import (
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -33,12 +34,12 @@ func DefaultMemorySwap() int64 {
 }
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
-	klog.Warningf("getSecurityOpts is unsupported in this build")
+	klog.InfoS("getSecurityOpts is unsupported in this build")
 	return nil, nil
 }
 
 func (ds *dockerService) getSandBoxSecurityOpts(separator rune) []string {
-	klog.Warningf("getSandBoxSecurityOpts is unsupported in this build")
+	klog.InfoS("getSandBoxSecurityOpts is unsupported in this build")
 	return nil
 }
 
@@ -47,19 +48,15 @@ func (ds *dockerService) updateCreateConfig(
 	config *runtimeapi.ContainerConfig,
 	sandboxConfig *runtimeapi.PodSandboxConfig,
 	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
-	klog.Warningf("updateCreateConfig is unsupported in this build")
+	klog.InfoS("updateCreateConfig is unsupported in this build")
 	return nil
 }
 
 func (ds *dockerService) determinePodIPBySandboxID(uid string) []string {
-	klog.Warningf("determinePodIPBySandboxID is unsupported in this build")
+	klog.InfoS("determinePodIPBySandboxID is unsupported in this build")
 	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	return "", fmt.Errorf("unsupported platform")
-}
-
-// applyExperimentalCreateConfig applies experimental configures from sandbox annotations.
-func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

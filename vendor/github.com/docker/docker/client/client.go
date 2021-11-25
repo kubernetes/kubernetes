@@ -2,13 +2,13 @@
 Package client is a Go client for the Docker Engine API.
 
 For more information about the Engine API, see the documentation:
-https://docs.docker.com/engine/reference/api/
+https://docs.docker.com/engine/api/
 
 Usage
 
 You use the library by creating a client object and calling methods on it. The
-client can be created either from environment variables with NewEnvClient, or
-configured manually with NewClient.
+client can be created either from environment variables with NewClientWithOpts(client.FromEnv),
+or configured manually with NewClient().
 
 For example, to list running containers (the equivalent of "docker ps"):
 
@@ -252,7 +252,8 @@ func (cli *Client) DaemonHost() string {
 
 // HTTPClient returns a copy of the HTTP client bound to the server
 func (cli *Client) HTTPClient() *http.Client {
-	return &*cli.client
+	c := *cli.client
+	return &c
 }
 
 // ParseHostURL parses a url string, validates the string is a host url, and

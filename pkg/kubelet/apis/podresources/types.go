@@ -14,17 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=types.go -destination=testing/provider_mock.go -package=testing DevicesProvider,PodsProvider,CPUsProvider,MemoryProvider
 package podresources
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // DevicesProvider knows how to provide the devices used by the given container
 type DevicesProvider interface {
-	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+	// GetDevices returns information about the devices assigned to pods and containers
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+	// GetAllocatableDevices returns information about all the devices known to the manager
+	GetAllocatableDevices() []*podresourcesapi.ContainerDevices
 }
 
 // PodsProvider knows how to provide the pods admitted by the node
@@ -34,5 +39,15 @@ type PodsProvider interface {
 
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
+	// GetCPUs returns information about the cpus assigned to pods and containers
 	GetCPUs(podUID, containerName string) []int64
+	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
+	GetAllocatableCPUs() []int64
+}
+
+type MemoryProvider interface {
+	// GetMemory returns information about the memory assigned to containers
+	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
+	// GetAllocatableMemory returns the allocatable memory from the node
+	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
 }

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -25,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -41,10 +43,11 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
+	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/legacy-cloud-providers/gce"
+	netutils "k8s.io/utils/net"
 )
 
 // nodeProcessingInfo tracks information related to current nodes in processing
@@ -109,21 +112,21 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		AddFunc: controllerutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
 			networkUnavailableTaint := &v1.Taint{Key: v1.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
-			_, cond := nodeutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
+			_, cond := controllerutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
 		}),
-		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
 	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
@@ -246,34 +249,40 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		if errors.IsNotFound(err) {
 			return nil // node no longer available, skip processing
 		}
-		klog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
+		klog.ErrorS(err, "Failed while getting the node for updating Node.Spec.PodCIDR", "nodeName", nodeName)
 		return err
 	}
 	if node.Spec.ProviderID == "" {
 		return fmt.Errorf("node %s doesn't have providerID", nodeName)
 	}
 
-	cidrs, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
+	cidrStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
-		return fmt.Errorf("failed to allocate cidr: %v", err)
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		return fmt.Errorf("failed to get cidr(s) from provider: %v", err)
 	}
-	if len(cidrs) == 0 {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+	if len(cidrStrings) == 0 {
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
-	_, cidr, err := net.ParseCIDR(cidrs[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse string '%s' as a CIDR: %v", cidrs[0], err)
+	//Can have at most 2 ips (one for v4 and one for v6)
+	if len(cidrStrings) > 2 {
+		klog.InfoS("Got more than 2 ips, truncating to 2", "cidrStrings", cidrStrings)
+		cidrStrings = cidrStrings[:2]
 	}
-	podCIDR := cidr.String()
 
-	if node.Spec.PodCIDR == podCIDR {
-		klog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
-		// We don't return here, in order to set the NetworkUnavailable condition later below.
-	} else {
+	cidrs, err := netutils.ParseCIDRs(cidrStrings)
+	if err != nil {
+		return fmt.Errorf("failed to parse strings %v as CIDRs: %v", cidrStrings, err)
+	}
+
+	needUpdate, err := needPodCIDRsUpdate(node, cidrs)
+	if err != nil {
+		return fmt.Errorf("err: %v, CIDRS: %v", err, cidrStrings)
+	}
+	if needUpdate {
 		if node.Spec.PodCIDR != "" {
-			klog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v", node.Name, node.Spec.PodCIDR, podCIDR)
+			klog.ErrorS(nil, "PodCIDR being reassigned!", "nodeName", node.Name, "node.Spec.PodCIDRs", node.Spec.PodCIDRs, "cidrStrings", cidrStrings)
 			// We fall through and set the CIDR despite this error. This
 			// implements the same logic as implemented in the
 			// rangeAllocator.
@@ -281,19 +290,19 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
-				klog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
+			if err = nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
+				klog.InfoS("Set the node PodCIDRs", "nodeName", node.Name, "cidrStrings", cidrStrings)
 				break
 			}
 		}
 	}
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
-		klog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
+		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		klog.ErrorS(err, "Failed to update the node PodCIDR after multiple attempts", "nodeName", node.Name, "cidrStrings", cidrStrings)
 		return err
 	}
 
-	err = utilnode.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
+	err = nodeutil.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,
 		Reason:             "RouteCreated",
@@ -301,9 +310,47 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		LastTransitionTime: metav1.Now(),
 	})
 	if err != nil {
-		klog.Errorf("Error setting route status for node %v: %v", node.Name, err)
+		klog.ErrorS(err, "Error setting route status for the node", "nodeName", node.Name)
 	}
 	return err
+}
+
+func needPodCIDRsUpdate(node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
+	if node.Spec.PodCIDR == "" {
+		return true, nil
+	}
+	_, nodePodCIDR, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
+	if err != nil {
+		klog.ErrorS(err, "Found invalid node.Spec.PodCIDR", "node.Spec.PodCIDR", node.Spec.PodCIDR)
+		// We will try to overwrite with new CIDR(s)
+		return true, nil
+	}
+	nodePodCIDRs, err := netutils.ParseCIDRs(node.Spec.PodCIDRs)
+	if err != nil {
+		klog.ErrorS(err, "Found invalid node.Spec.PodCIDRs", "node.Spec.PodCIDRs", node.Spec.PodCIDRs)
+		// We will try to overwrite with new CIDR(s)
+		return true, nil
+	}
+
+	if len(podCIDRs) == 1 {
+		if cmp.Equal(nodePodCIDR, podCIDRs[0]) {
+			klog.V(4).InfoS("Node already has allocated CIDR. It matches the proposed one.", "nodeName", node.Name, "podCIDRs[0]", podCIDRs[0])
+			return false, nil
+		}
+	} else if len(nodePodCIDRs) == len(podCIDRs) {
+		if dualStack, _ := netutils.IsDualStackCIDRs(podCIDRs); !dualStack {
+			return false, fmt.Errorf("IPs are not dual stack")
+		}
+		for idx, cidr := range podCIDRs {
+			if !cmp.Equal(nodePodCIDRs[idx], cidr) {
+				return true, nil
+			}
+		}
+		klog.V(4).InfoS("Node already has allocated CIDRs. It matches the proposed one.", "nodeName", node.Name, "podCIDRs", podCIDRs)
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (ca *cloudCIDRAllocator) ReleaseCIDR(node *v1.Node) error {

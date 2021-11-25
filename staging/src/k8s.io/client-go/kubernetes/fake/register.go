@@ -30,28 +30,30 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -84,28 +86,30 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	authorizationv1.AddToScheme,
 	authorizationv1beta1.AddToScheme,
 	autoscalingv1.AddToScheme,
+	autoscalingv2.AddToScheme,
 	autoscalingv2beta1.AddToScheme,
 	autoscalingv2beta2.AddToScheme,
 	batchv1.AddToScheme,
 	batchv1beta1.AddToScheme,
-	batchv2alpha1.AddToScheme,
 	certificatesv1.AddToScheme,
 	certificatesv1beta1.AddToScheme,
 	coordinationv1beta1.AddToScheme,
 	coordinationv1.AddToScheme,
 	corev1.AddToScheme,
-	discoveryv1alpha1.AddToScheme,
+	discoveryv1.AddToScheme,
 	discoveryv1beta1.AddToScheme,
 	eventsv1.AddToScheme,
 	eventsv1beta1.AddToScheme,
 	extensionsv1beta1.AddToScheme,
 	flowcontrolv1alpha1.AddToScheme,
 	flowcontrolv1beta1.AddToScheme,
+	flowcontrolv1beta2.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1beta1.AddToScheme,
 	nodev1.AddToScheme,
 	nodev1alpha1.AddToScheme,
 	nodev1beta1.AddToScheme,
+	policyv1.AddToScheme,
 	policyv1beta1.AddToScheme,
 	rbacv1.AddToScheme,
 	rbacv1beta1.AddToScheme,

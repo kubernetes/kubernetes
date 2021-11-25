@@ -29,6 +29,11 @@ CMD_TARGETS="${KUBE_SERVER_IMAGE_TARGETS[*]}"
 if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
     CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"
 fi
+# include extra WHAT if specified so you can build docker images + binaries
+# in one call with a single pass of syncing to the container + generating code
+if [[ -n "${KUBE_EXTRA_WHAT:-}" ]]; then
+    CMD_TARGETS="${CMD_TARGETS} ${KUBE_EXTRA_WHAT}"
+fi
 
 kube::build::verify_prereqs
 kube::build::build_image

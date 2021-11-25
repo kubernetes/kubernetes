@@ -1429,7 +1429,7 @@ filename | sha512 hash
 - Client-go: resolves an issue with informers falling back to full list requests when timeouts are encountered, rather than re-establishing a watch. ([#89976](https://github.com/kubernetes/kubernetes/pull/89976), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Testing]
 - EndpointSlice controller now handles terminating pods correctly and is better at preventing race conditions. ([#89118](https://github.com/kubernetes/kubernetes/pull/89118), [@robscott](https://github.com/robscott)) [SIG Apps and Network]
 - Ensure Azure availability zone is always in lower cases. ([#89722](https://github.com/kubernetes/kubernetes/pull/89722), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
-- Fix failing conformance when using docker container runtime w/ the docker/journald logging driver. &#35;87933 ([#88586](https://github.com/kubernetes/kubernetes/pull/88586), [@jdef](https://github.com/jdef)) [SIG Node]
+- Fix failing conformance when using docker container runtime w/ the docker/journald logging driver. [#87933](https://github.com/kubernetes/kubernetes/pull/87933) ([#88586](https://github.com/kubernetes/kubernetes/pull/88586), [@jdef](https://github.com/jdef)) [SIG Node]
 - Fix invalid VMSS updates due to incorrect cache ([#89002](https://github.com/kubernetes/kubernetes/pull/89002), [@ArchangelSDY](https://github.com/ArchangelSDY)) [SIG Cloud Provider]
 - Fix the VMSS name and resource group name when updating Azure VMSS for LoadBalancer backendPools ([#89337](https://github.com/kubernetes/kubernetes/pull/89337), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
 - Fix: check disk status before delete azure disk ([#88360](https://github.com/kubernetes/kubernetes/pull/88360), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
@@ -1873,7 +1873,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
  `http_requests_total, http_response_size_bytes`
  `http_response_size_bytes_sum`
  `http_response_size_bytes_count`
- due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp&#35;InstrumentMetricHandler) instead.
+ due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp#InstrumentMetricHandler) instead.
 - Following metrics from kube-controller-manager are now marked as with the ALPHA stability level:
   `storage_count_attachable_volumes_in_use`
   `attachdetach_controller_total_volumes`
@@ -2186,7 +2186,7 @@ Renamed FeatureGate RequestManagement to APIPriorityAndFairness.  This feature g
 - New APIs to allow adding/removing pods from pre-calculated prefilter state in the scheduling framework ([#82912](https://github.com/kubernetes/kubernetes/pull/82912), [@ahg-g](https://github.com/ahg-g))
 - Added Clone method to the scheduling framework's PluginContext and ContextData. ([#82951](https://github.com/kubernetes/kubernetes/pull/82951), [@ahg-g](https://github.com/ahg-g))
 - Modified the scheduling framework's Filter API. ([#82842](https://github.com/kubernetes/kubernetes/pull/82842), [@ahg-g](https://github.com/ahg-g))
-- Critical pods can now be created in namespaces other than kube-system. To limit critical pods to the kube-system namespace, cluster admins should create an admission configuration file limiting critical pods by default, and a matching quota object in the `kube-system` namespace permitting critical pods in that namespace. See https://kubernetes.io/docs/concepts/policy/resource-quotas/&#35;limit-priority-class-consumption-by-default for details. ([#76310](https://github.com/kubernetes/kubernetes/pull/76310), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
+- Critical pods can now be created in namespaces other than kube-system. To limit critical pods to the kube-system namespace, cluster admins should create an admission configuration file limiting critical pods by default, and a matching quota object in the `kube-system` namespace permitting critical pods in that namespace. See https://kubernetes.io/docs/concepts/policy/resource-quotas/#limit-priority-class-consumption-by-default for details. ([#76310](https://github.com/kubernetes/kubernetes/pull/76310), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
 - Scheduler ComponentConfig fields are now pointers ([#83619](https://github.com/kubernetes/kubernetes/pull/83619), [@damemi](https://github.com/damemi))
 - Scheduler Policy API has a new recommended apiVersion `apiVersion: kubescheduler.config.k8s.io/v1` which is consistent with the scheduler API group `kubescheduler.config.k8s.io`. It holds the same API as the old apiVersion `apiVersion: v1`. ([#83578](https://github.com/kubernetes/kubernetes/pull/83578), [@Huang-Wei](https://github.com/Huang-Wei))
 - Rename PluginContext to CycleState in the scheduling framework ([#83430](https://github.com/kubernetes/kubernetes/pull/83430), [@draveness](https://github.com/draveness))

@@ -22,13 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/client-go/dynamic"
-
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 )
 
 func TestLimits(t *testing.T) {
@@ -47,14 +46,14 @@ func TestLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 
 	rest := apiExtensionClient.Discovery().RESTClient()
 
@@ -70,7 +69,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsRequestEntityTooLargeError(err) {
@@ -93,7 +92,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsBadRequest(err) {
@@ -116,7 +115,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsBadRequest(err) {
@@ -137,7 +136,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/json").
 			SetHeader("Content-Type", "application/json").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(jsonBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsRequestEntityTooLargeError(err) {
@@ -161,7 +160,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/json").
 			SetHeader("Content-Type", "application/json").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(jsonBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsBadRequest(err) {
@@ -185,7 +184,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		_, err := rest.Post().
 			SetHeader("Accept", "application/json").
 			SetHeader("Content-Type", "application/json").
-			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Body(jsonBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsBadRequest(err) {
@@ -196,7 +195,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 	// Create instance to allow patching
 	{
 		jsonBody := []byte(fmt.Sprintf(`{"apiVersion": %q, "kind": %q, "metadata": {"name": "test"}}`, apiVersion, kind))
-		_, err := rest.Post().AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).Body(jsonBody).DoRaw(context.TODO())
+		_, err := rest.Post().AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).Body(jsonBody).DoRaw(context.TODO())
 		if err != nil {
 			t.Fatalf("error creating object: %v", err)
 		}
@@ -207,7 +206,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 			t.Skip("skipping expensive test")
 		}
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}]`)
-		err = rest.Patch(types.JSONPatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
+		err = rest.Patch(types.JSONPatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %v", err)
@@ -218,7 +217,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 			t.Skip("skipping expensive test")
 		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.MergePatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
+		err = rest.Patch(types.MergePatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %v", err)
@@ -229,7 +228,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 			t.Skip("skipping expensive test")
 		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
+		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if !apierrors.IsBadRequest(err) {
 			t.Errorf("expected bad request err, got %#v", err)

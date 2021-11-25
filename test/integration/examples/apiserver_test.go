@@ -43,13 +43,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 	sampleserver "k8s.io/sample-apiserver/pkg/cmd/server"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAggregatedAPIServer(t *testing.T) {
@@ -80,7 +81,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	go func() {
 		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
 		o.RecommendedOptions.SecureServing.Listener = listener
-		o.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
 		wardleCmd.SetArgs([]string{
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
@@ -90,7 +91,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--kubeconfig", wardleToKASKubeConfigFile,
 		})
 		if err := wardleCmd.Execute(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}()
 	directWardleClientConfig, err := waitForWardleRunning(t, kubeClientConfig, wardleCertDir, wardlePort)
@@ -111,10 +112,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(context.TODO(), &apiregistrationv1beta1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(context.TODO(), &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
-		Spec: apiregistrationv1beta1.APIServiceSpec{
-			Service: &apiregistrationv1beta1.ServiceReference{
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},
@@ -131,7 +132,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// wait for the unavailable API service to be processed with updated status
 	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		_, err = kubeClient.Discovery().ServerResources()
+		_, _, err = kubeClient.Discovery().ServerGroupsAndResources()
 		hasExpectedError := checkWardleUnavailableDiscoveryError(t, err)
 		return hasExpectedError, nil
 	})

@@ -49,6 +49,7 @@ var _ = SIGDescribe("SSH", func() {
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
+		ginkgo.By(fmt.Sprintf("Found %d SSH'able hosts", len(hosts)))
 
 		testCases := []struct {
 			cmd            string
@@ -79,6 +80,8 @@ var _ = SIGDescribe("SSH", func() {
 			ginkgo.By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
 
 			for _, host := range testhosts {
+				ginkgo.By(fmt.Sprintf("SSH'ing host %s", host))
+
 				result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {

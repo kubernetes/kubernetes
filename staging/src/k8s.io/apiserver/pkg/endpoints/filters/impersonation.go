@@ -67,6 +67,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		username := ""
 		groups := []string{}
 		userExtra := map[string][]string{}
+		uid := ""
 		for _, impersonationRequest := range impersonationRequests {
 			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
 			actingAsAttributes := &authorizer.AttributesRecord{
@@ -103,15 +104,19 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				actingAsAttributes.Subresource = extraKey
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
 
+			case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
+				uid = string(impersonationRequest.Name)
+				actingAsAttributes.Resource = "uids"
+
 			default:
-				klog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				klog.V(4).InfoS("unknown impersonation request type", "Request", impersonationRequest)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
-				klog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
+				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "Reason", reason, "Error", err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}
@@ -154,18 +159,20 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 			Name:   username,
 			Groups: groups,
 			Extra:  userExtra,
+			UID:    uid,
 		}
 		req = req.WithContext(request.WithUser(ctx, newUser))
 
 		oldUser, _ := request.UserFrom(ctx)
 		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
 
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		audit.LogImpersonatedUser(ae, newUser)
 
 		// clear all the impersonation headers from the request
 		req.Header.Del(authenticationv1.ImpersonateUserHeader)
 		req.Header.Del(authenticationv1.ImpersonateGroupHeader)
+		req.Header.Del(authenticationv1.ImpersonateUIDHeader)
 		for headerName := range req.Header {
 			if strings.HasPrefix(headerName, authenticationv1.ImpersonateUserExtraHeaderPrefix) {
 				req.Header.Del(headerName)
@@ -231,7 +238,17 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 		}
 	}
 
-	if (hasGroups || hasUserExtra) && !hasUser {
+	requestedUID := headers.Get(authenticationv1.ImpersonateUIDHeader)
+	hasUID := len(requestedUID) > 0
+	if hasUID {
+		impersonationRequests = append(impersonationRequests, v1.ObjectReference{
+			Kind:       "UID",
+			Name:       requestedUID,
+			APIVersion: authenticationv1.SchemeGroupVersion.String(),
+		})
+	}
+
+	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
 		return nil, fmt.Errorf("requested %v without impersonating a user", impersonationRequests)
 	}
 

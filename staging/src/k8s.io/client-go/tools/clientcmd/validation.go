@@ -229,7 +229,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	}
 	if proxyURL := clusterInfo.ProxyURL; proxyURL != "" {
 		if _, err := parseProxyURL(proxyURL); err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %v", proxyURL, clusterName, err))
+			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %w", proxyURL, clusterName, err))
 		}
 	}
 	// Make sure CA data and CA file aren't both specified
@@ -239,7 +239,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %v", clusterInfo.CertificateAuthority, clusterName, err))
+			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
 		} else {
 			defer clientCertCA.Close()
 		}
@@ -278,7 +278,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		if len(authInfo.ClientCertificate) != 0 {
 			clientCertFile, err := os.Open(authInfo.ClientCertificate)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
 			} else {
 				defer clientCertFile.Close()
 			}
@@ -286,7 +286,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		if len(authInfo.ClientKey) != 0 {
 			clientKeyFile, err := os.Open(authInfo.ClientKey)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
 			} else {
 				defer clientKeyFile.Close()
 			}
@@ -308,6 +308,14 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 				validationErrors = append(validationErrors, fmt.Errorf("env variable name must be specified for %v to use exec authentication plugin", authInfoName))
 			}
 		}
+		switch authInfo.Exec.InteractiveMode {
+		case "":
+			validationErrors = append(validationErrors, fmt.Errorf("interactiveMode must be specified for %v to use exec authentication plugin", authInfoName))
+		case clientcmdapi.NeverExecInteractiveMode, clientcmdapi.IfAvailableExecInteractiveMode, clientcmdapi.AlwaysExecInteractiveMode:
+			// These are valid
+		default:
+			validationErrors = append(validationErrors, fmt.Errorf("invalid interactiveMode for %v: %q", authInfoName, authInfo.Exec.InteractiveMode))
+		}
 	}
 
 	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case
@@ -315,9 +323,9 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
 	}
 
-	// ImpersonateGroups or ImpersonateUserExtra should be requested with a user
-	if (len(authInfo.ImpersonateGroups) > 0 || len(authInfo.ImpersonateUserExtra) > 0) && (len(authInfo.Impersonate) == 0) {
-		validationErrors = append(validationErrors, fmt.Errorf("requesting groups or user-extra for %v without impersonating a user", authInfoName))
+	// ImpersonateUID, ImpersonateGroups or ImpersonateUserExtra should be requested with a user
+	if (len(authInfo.ImpersonateUID) > 0 || len(authInfo.ImpersonateGroups) > 0 || len(authInfo.ImpersonateUserExtra) > 0) && (len(authInfo.Impersonate) == 0) {
+		validationErrors = append(validationErrors, fmt.Errorf("requesting uid, groups or user-extra for %v without impersonating a user", authInfoName))
 	}
 	return validationErrors
 }

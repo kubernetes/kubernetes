@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -766,7 +767,6 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 	// Create the deployment of the webhook
 	podLabels := map[string]string{"app": "sample-webhook", "webhook": "true"}
 	replicas := int32(1)
-	zero := int64(0)
 	mounts := []v1.VolumeMount{
 		{
 			Name:      "webhook-certs",
@@ -796,7 +796,7 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 				fmt.Sprintf("--port=%d", containerPort),
 			},
 			ReadinessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Port:   intstr.FromInt(int(containerPort)),
@@ -811,31 +811,10 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 			Ports: []v1.ContainerPort{{ContainerPort: containerPort}},
 		},
 	}
-	d := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   deploymentName,
-			Labels: podLabels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: podLabels,
-			},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &zero,
-					Containers:                    containers,
-					Volumes:                       volumes,
-				},
-			},
-		},
-	}
+	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Template.Spec.Containers = containers
+	d.Spec.Template.Spec.Volumes = volumes
+
 	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
 	ginkgo.By("Wait for the deployment to be ready")
@@ -2127,13 +2106,13 @@ func labelNamespace(f *framework.Framework, namespace string) {
 	client := f.ClientSet
 
 	// Add a unique label to the namespace
-	ns, err := client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting namespace %s", namespace)
-	if ns.Labels == nil {
-		ns.Labels = map[string]string{}
-	}
-	ns.Labels[f.UniqueName] = "true"
-	_, err = client.CoreV1().Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	nsPatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{f.UniqueName: "true"},
+		},
+	})
+	framework.ExpectNoError(err, "error marshaling namespace %s", namespace)
+	_, err = client.CoreV1().Namespaces().Patch(context.TODO(), namespace, types.StrategicMergePatchType, nsPatch, metav1.PatchOptions{})
 	framework.ExpectNoError(err, "error labeling namespace %s", namespace)
 }
 

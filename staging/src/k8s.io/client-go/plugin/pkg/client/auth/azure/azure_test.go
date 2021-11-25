@@ -331,6 +331,16 @@ func TestAzureTokenSourceScenarios(t *testing.T) {
 			persistCalls: 1,
 		},
 		{
+			name:         "extend failure with fmt.Errorf nested tokenRefreshError",
+			configToken:  expiredToken,
+			refreshErr:   fmt.Errorf("refreshing token: %w", fakeTokenRefreshError{message: "nested FakeError happened when refreshing"}),
+			sourceToken:  fakeToken,
+			expectToken:  fakeToken,
+			refreshCalls: 1,
+			tokenCalls:   1,
+			persistCalls: 1,
+		},
+		{
 			name:         "unexpected error when extend",
 			configToken:  expiredToken,
 			refreshErr:   errors.New("unexpected refresh error"),

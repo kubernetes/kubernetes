@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -31,7 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
@@ -182,9 +183,6 @@ func TestContainerStatus(t *testing.T) {
 	imageName := "iamimage"
 	config := makeContainerConfig(sConfig, "pause", imageName, 0, labels, annotations)
 
-	var defaultTime time.Time
-	dt := defaultTime.UnixNano()
-	ct, st, ft := dt, dt, dt
 	state := runtimeapi.ContainerState_CONTAINER_CREATED
 	imageRef := DockerImageIDPrefix + imageName
 	// The following variables are not set in FakeDockerClient.
@@ -193,9 +191,6 @@ func TestContainerStatus(t *testing.T) {
 
 	expected := &runtimeapi.ContainerStatus{
 		State:       state,
-		CreatedAt:   ct,
-		StartedAt:   st,
-		FinishedAt:  ft,
 		Metadata:    config.Metadata,
 		Image:       config.Image,
 		ImageRef:    imageRef,

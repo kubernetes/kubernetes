@@ -338,7 +338,7 @@ func TestReadDockerConfigFileFromBytes(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		cfg, err := readDockerConfigFileFromBytes(tc.input)
+		cfg, err := ReadDockerConfigFileFromBytes(tc.input)
 		if err != nil && !tc.errorExpected {
 			t.Fatalf("Error was not expected: %v", err)
 		}

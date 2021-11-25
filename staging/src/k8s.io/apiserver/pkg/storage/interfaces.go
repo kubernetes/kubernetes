@@ -75,11 +75,11 @@ type ResponseMeta struct {
 }
 
 // IndexerFunc is a function that for a given object computes
-// <value of an index> for a particular <index>.
+// `<value of an index>` for a particular `<index>`.
 type IndexerFunc func(obj runtime.Object) string
 
-// IndexerFuncs is a mapping from <index name> to function that
-// for a given object computes <value for that index>.
+// IndexerFuncs is a mapping from `<index name>` to function that
+// for a given object computes `<value for that index>`.
 type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
@@ -88,7 +88,7 @@ var Everything = SelectionPredicate{
 	Field: fields.Everything(),
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
+// MatchValue defines a pair (`<index name>`, `<value for that index>`).
 type MatchValue struct {
 	IndexName string
 	Value     string
@@ -244,7 +244,7 @@ type Interface interface {
 	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
+		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)

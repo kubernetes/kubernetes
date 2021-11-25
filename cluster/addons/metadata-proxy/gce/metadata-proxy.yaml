@@ -57,7 +57,7 @@ spec:
             cpu: "30m"
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
+        image: gke.gcr.io/prometheus-to-sd:v0.11.1-gke.1
         # Request and limit resources to get guaranteed QoS.
         resources:
           requests:

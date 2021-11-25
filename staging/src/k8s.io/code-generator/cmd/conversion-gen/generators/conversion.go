@@ -133,7 +133,7 @@ type conversionFuncMap map[conversionPair]*types.Type
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
 	if pkg == nil {
-		klog.Warningf("Skipping nil package passed to getManualConversionFunctions")
+		klog.Warning("Skipping nil package passed to getManualConversionFunctions")
 		return
 	}
 	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
@@ -641,7 +641,7 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	if klog.V(5).Enabled() {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
-			klog.Infof("All objects without identical memory layout:")
+			klog.Info("All objects without identical memory layout:")
 			for k, v := range m {
 				if v {
 					continue

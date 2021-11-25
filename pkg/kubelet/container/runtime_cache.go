@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=runtime_cache.go  -destination=testing/mock_runtime_cache.go -package=testing RuntimeCache
 package container
 
 import (

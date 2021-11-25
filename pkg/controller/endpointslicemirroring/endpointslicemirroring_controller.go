@@ -23,18 +23,18 @@ import (
 	"golang.org/x/time/rate"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	discoveryinformers "k8s.io/client-go/informers/discovery/v1beta1"
+	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	discoverylisters "k8s.io/client-go/listers/discovery/v1beta1"
+	discoverylisters "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -42,6 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 const (
@@ -79,7 +80,7 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-mirroring-controller"})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_mirroring_controller", client.DiscoveryV1beta1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_mirroring_controller", client.DiscoveryV1().RESTClient().GetRateLimiter())
 	}
 
 	metrics.RegisterMetrics()
@@ -116,7 +117,7 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
-	c.endpointSliceTracker = newEndpointSliceTracker()
+	c.endpointSliceTracker = endpointsliceutil.NewEndpointSliceTracker()
 
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
@@ -169,7 +170,7 @@ type Controller struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 
 	// serviceLister is able to list/get services and is populated by the shared
 	// informer passed to NewController.
@@ -303,17 +304,20 @@ func (c *Controller) syncEndpoints(key string) error {
 		return err
 	}
 
-	// This means that if a Service transitions away from a nil selector, any
-	// mirrored EndpointSlices will not be cleaned up. #91072 tracks this issue
-	// for this controller along with the Endpoints and EndpointSlice
-	// controllers.
+	// If a selector is specified, clean up any mirrored slices.
 	if svc.Spec.Selector != nil {
-		return nil
+		klog.V(4).Infof("%s/%s Service now has selector, cleaning up any mirrored EndpointSlices", namespace, name)
+		c.endpointSliceTracker.DeleteService(namespace, name)
+		return c.deleteMirroredSlices(namespace, name)
 	}
 
 	endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, namespace, name)
 	if err != nil {
 		return err
+	}
+
+	if c.endpointSliceTracker.StaleSlices(svc, endpointSlices) {
+		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
 
 	err = c.reconciler.reconcile(endpoints, endpointSlices)
@@ -367,7 +371,7 @@ func (c *Controller) onServiceUpdate(prevObj, obj interface{}) {
 	service := obj.(*v1.Service)
 	prevService := prevObj.(*v1.Service)
 	if service == nil || prevService == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Service, got %T, %T", prevObj, obj))
 		return
 	}
 	if (service.Spec.Selector == nil) != (prevService.Spec.Selector == nil) {
@@ -439,7 +443,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceAdd() expected type discovery.EndpointSlice, got %T", obj))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice) {
+	if managedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -455,7 +459,18 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
 		return
 	}
-	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice)) {
+	// EndpointSlice generation does not change when labels change. Although the
+	// controller will never change LabelServiceName, users might. This check
+	// ensures that we handle changes to this label.
+	svcName := endpointSlice.Labels[discovery.LabelServiceName]
+	prevSvcName := prevEndpointSlice.Labels[discovery.LabelServiceName]
+	if svcName != prevSvcName {
+		klog.Warningf("%s label changed from %s  to %s for %s", discovery.LabelServiceName, prevSvcName, svcName, endpointSlice.Name)
+		c.queueEndpointsForEndpointSlice(endpointSlice)
+		c.queueEndpointsForEndpointSlice(prevEndpointSlice)
+		return
+	}
+	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice)) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -470,7 +485,11 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 		return
 	}
 	if managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
-		c.queueEndpointsForEndpointSlice(endpointSlice)
+		// This returns false if we didn't expect the EndpointSlice to be
+		// deleted. If that is the case, we queue the Service for another sync.
+		if !c.endpointSliceTracker.HandleDeletion(endpointSlice) {
+			c.queueEndpointsForEndpointSlice(endpointSlice)
+		}
 	}
 }
 

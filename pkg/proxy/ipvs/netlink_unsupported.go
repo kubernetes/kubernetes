@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -20,44 +21,57 @@ package ipvs
 
 import (
 	"fmt"
+	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type emptyHandle struct {
+// The type must match the one in proxier_test.go
+type netlinkHandle struct {
+	isIPv6 bool
 }
 
 // NewNetLinkHandle will create an EmptyHandle
 func NewNetLinkHandle(ipv6 bool) NetLinkHandle {
-	return &emptyHandle{}
+	return &netlinkHandle{}
 }
 
 // EnsureAddressBind checks if address is bound to the interface and, if not, binds it. If the address is already bound, return true.
-func (h *emptyHandle) EnsureAddressBind(address, devName string) (exist bool, err error) {
+func (h *netlinkHandle) EnsureAddressBind(address, devName string) (exist bool, err error) {
 	return false, fmt.Errorf("netlink not supported for this platform")
 }
 
 // UnbindAddress unbind address from the interface
-func (h *emptyHandle) UnbindAddress(address, devName string) error {
+func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	return fmt.Errorf("netlink not supported for this platform")
 }
 
 // EnsureDummyDevice is part of interface
-func (h *emptyHandle) EnsureDummyDevice(devName string) (bool, error) {
+func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 	return false, fmt.Errorf("netlink is not supported in this platform")
 }
 
 // DeleteDummyDevice is part of interface.
-func (h *emptyHandle) DeleteDummyDevice(devName string) error {
+func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 	return fmt.Errorf("netlink is not supported in this platform")
 }
 
 // ListBindAddress is part of interface.
-func (h *emptyHandle) ListBindAddress(devName string) ([]string, error) {
+func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
+	return nil, fmt.Errorf("netlink is not supported in this platform")
+}
+
+// GetAllLocalAddresses is part of interface.
+func (h *netlinkHandle) GetAllLocalAddresses() (sets.String, error) {
 	return nil, fmt.Errorf("netlink is not supported in this platform")
 }
 
 // GetLocalAddresses is part of interface.
-func (h *emptyHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
+func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
 	return nil, fmt.Errorf("netlink is not supported in this platform")
+}
+
+// Must match the one in proxier_test.go
+func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
+	return false
 }

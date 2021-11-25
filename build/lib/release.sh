@@ -28,7 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
-KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
 # Validate a ci version
@@ -216,6 +216,8 @@ function kube::release::package_node_tarballs() {
 
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
+  kube::util::ensure-docker-buildx
+
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
@@ -310,7 +312,7 @@ function kube::release::build_conformance_image() {
   local -r save_dir="${4-}"
   kube::log::status "Building conformance image for arch: ${arch}"
   ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
-    make -C cluster/images/conformance/ build >/dev/null
+    make -C test/conformance/image/ build >/dev/null
 
   local conformance_tag
   conformance_tag="${registry}/conformance-${arch}:${version}"
@@ -364,26 +366,35 @@ function kube::release::create_docker_images_for_server() {
       local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
-      local docker_file_path="${docker_build_path}/Dockerfile"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
+
+      local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
+      # If this binary has its own Dockerfile use that else use the generic Dockerfile.
+      if [[ -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile" ]]; then
+          docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile"
+      fi
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
-        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
-        chmod 0644 "${docker_build_path}/nsswitch.conf"
-        cat <<EOF > "${docker_file_path}"
-FROM --platform=linux/${arch} ${base_image}
-COPY ${binary_name} /usr/local/bin/${binary_name}
-EOF
-        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
-        if [[ "${base_image}" =~ busybox ]]; then
-          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
-        fi
 
-        "${DOCKER[@]}" build ${docker_build_opts:+"${docker_build_opts}"} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        local build_log="${docker_build_path}/build.log"
+        if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
+          -f "${docker_file_path}" \
+          --platform linux/"${arch}" \
+          --load ${docker_build_opts:+"${docker_build_opts}"} \
+          -t "${docker_image_tag}" \
+          --build-arg BASEIMAGE="${base_image}" \
+          --build-arg SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE}" \
+          --build-arg BINARY="${binary_name}" \
+          "${docker_build_path}" >"${build_log}" 2>&1; then
+            cat "${build_log}"
+            exit 1
+        fi
+        rm "${build_log}"
+
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"

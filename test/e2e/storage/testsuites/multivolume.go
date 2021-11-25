@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -66,6 +65,9 @@ func InitMultiVolumeTestSuite() storageframework.TestSuite {
 		storageframework.FsVolModeDynamicPV,
 		storageframework.BlockVolModePreprovisionedPV,
 		storageframework.BlockVolModeDynamicPV,
+		storageframework.Ext4DynamicPV,
+		storageframework.XfsDynamicPV,
+		storageframework.NtfsDynamicPV,
 	}
 	return InitCustomMultiVolumeTestSuite(patterns)
 }
@@ -111,7 +113,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 	}
 
 	cleanup := func() {
@@ -131,7 +133,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//      [   node1   ]                           ==>        [   node1   ]
 	//          /    \      <- same volume mode                   /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
-	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on the same node [LinuxOnly]", func() {
+	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on the same node", func() {
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
@@ -161,7 +163,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//      [   node1   ]                           ==>        [   node2   ]
 	//          /    \      <- same volume mode                   /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
-	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on different node [LinuxOnly]", func() {
+	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on different node", func() {
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
@@ -176,20 +178,11 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if l.driver.GetDriverInfo().Capabilities[storageframework.CapSingleNodeVolume] {
 			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < 2 {
-			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
-		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -211,7 +204,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//      [   node1   ]                          ==>        [   node1   ]
 	//          /    \      <- different volume mode             /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
-	ginkgo.It("should access to two volumes with different volume mode and retain data across pod recreation on the same node [LinuxOnly]", func() {
+	ginkgo.It("should access to two volumes with different volume mode and retain data across pod recreation on the same node", func() {
 		if pattern.VolMode == v1.PersistentVolumeFilesystem {
 			e2eskipper.Skipf("Filesystem volume case should be covered by block volume case -- skipping")
 		}
@@ -250,7 +243,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//      [   node1   ]                          ==>        [   node2   ]
 	//          /    \      <- different volume mode             /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
-	ginkgo.It("should access to two volumes with different volume mode and retain data across pod recreation on different node [LinuxOnly]", func() {
+	ginkgo.It("should access to two volumes with different volume mode and retain data across pod recreation on different node", func() {
 		if pattern.VolMode == v1.PersistentVolumeFilesystem {
 			e2eskipper.Skipf("Filesystem volume case should be covered by block volume case -- skipping")
 		}
@@ -269,20 +262,11 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if l.driver.GetDriverInfo().Capabilities[storageframework.CapSingleNodeVolume] {
 			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < 2 {
-			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
-		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -309,7 +293,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	// [   node1   ]
 	//   \      /     <- same volume mode
 	//   [volume1]
-	ginkgo.It("should concurrently access the single volume from pods on the same node [LinuxOnly]", func() {
+	ginkgo.It("should concurrently access the single volume from pods on the same node", func() {
 		init()
 		defer cleanup()
 
@@ -327,6 +311,106 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
 			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */, false /* readOnly */)
+	})
+
+	// This tests below configuration:
+	// [pod1]           [pod2]
+	// [        node1        ]
+	//   |                 |     <- same volume mode
+	// [volume1]   ->  [restored volume1 snapshot]
+	ginkgo.It("should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]", func() {
+		init()
+		defer cleanup()
+
+		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapSnapshotDataSource] {
+			e2eskipper.Skipf("Driver %q does not support volume snapshots - skipping", dInfo.Name)
+		}
+		if pattern.SnapshotType == "" {
+			e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+		}
+
+		// Create a volume
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		resource := storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resources = append(l.resources, resource)
+		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
+
+		// Create snapshot of it
+		expectedContent := fmt.Sprintf("volume content %d", time.Now().UTC().UnixNano())
+		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
+		if !ok {
+			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+		}
+		testConfig := storageframework.ConvertTestConfig(l.config)
+		dc := l.config.Framework.DynamicClient
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
+		defer cleanupFunc()
+
+		// Create 2nd PVC for testing
+		pvc2 := &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resource.Pvc.Name + "-restored",
+				Namespace: resource.Pvc.Namespace,
+			},
+		}
+		resource.Pvc.Spec.DeepCopyInto(&pvc2.Spec)
+		pvc2.Spec.VolumeName = ""
+		pvc2.Spec.DataSource = dataSource
+
+		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		pvcs = append(pvcs, pvc2)
+		defer func() {
+			l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete(context.TODO(), pvc2.Name, metav1.DeleteOptions{})
+		}()
+
+		// Test access to both volumes on the same node.
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs, expectedContent)
+	})
+
+	// This tests below configuration:
+	// [pod1]           [pod2]
+	// [        node1        ]
+	//   |                 |     <- same volume mode
+	// [volume1]   ->  [cloned volume1]
+	ginkgo.It("should concurrently access the volume and its clone from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]", func() {
+		init()
+		defer cleanup()
+
+		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapPVCDataSource] {
+			e2eskipper.Skipf("Driver %q does not support volume clone - skipping", dInfo.Name)
+		}
+
+		// Create a volume
+		expectedContent := fmt.Sprintf("volume content %d", time.Now().UTC().UnixNano())
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		resource := storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resources = append(l.resources, resource)
+		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
+		testConfig := storageframework.ConvertTestConfig(l.config)
+		dataSource, cleanupFunc := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
+		defer cleanupFunc()
+
+		// Create 2nd PVC for testing
+		pvc2 := &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resource.Pvc.Name + "-cloned",
+				Namespace: resource.Pvc.Namespace,
+			},
+		}
+		resource.Pvc.Spec.DeepCopyInto(&pvc2.Spec)
+		pvc2.Spec.VolumeName = ""
+		pvc2.Spec.DataSource = dataSource
+
+		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		pvcs = append(pvcs, pvc2)
+		defer func() {
+			l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete(context.TODO(), pvc2.Name, metav1.DeleteOptions{})
+		}()
+
+		// Test access to both volumes on the same node.
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs, expectedContent)
 	})
 
 	// This tests below configuration:
@@ -373,20 +457,12 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 
 		// Check different-node test requirement
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < numPods {
-			e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", numPods))
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		// Create volume
@@ -408,9 +484,9 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          pvcs,
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
 		NodeSelection: node,
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 	defer func() {
@@ -487,10 +563,10 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		podConfig := e2epod.Config{
 			NS:            ns,
 			PVCs:          []*v1.PersistentVolumeClaim{pvc},
-			SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
-			ImageID:       e2evolume.GetTestImageID(imageutils.DebianIptables),
+			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
@@ -510,17 +586,21 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		}
 	}
 
+	path := "/mnt/volume1"
+
 	var seed int64
 	byteLen := 64
 	directIO := false
 	// direct IO is needed for Block-mode PVs
 	if *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
+		if len(pods) < 1 {
+			framework.Failf("Number of pods shouldn't be less than 1, but got %d", len(pods))
+		}
 		// byteLen should be the size of a sector to enable direct I/O
-		byteLen = 512
+		byteLen = utils.GetSectorSize(f, pods[0], path)
 		directIO = true
 	}
 
-	path := "/mnt/volume1"
 	// Check if volume can be accessed from each pod
 	for i, pod := range pods {
 		index := i + 1
@@ -548,10 +628,10 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, directIO, path, byteLen, seed)
 	}
 
-	// Delete the last pod and remove from slice of pods
 	if len(pods) < 2 {
 		framework.Failf("Number of pods shouldn't be less than 2, but got %d", len(pods))
 	}
+	// Delete the last pod and remove from slice of pods
 	lastPod := pods[len(pods)-1]
 	framework.ExpectNoError(e2epod.DeletePodWithWait(cs, lastPod))
 	pods = pods[:len(pods)-1]
@@ -587,6 +667,61 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	}
 }
 
+// TestConcurrentAccessToRelatedVolumes tests access to multiple volumes from multiple pods.
+// Each provided PVC is used by a single pod. The test ensures that volumes created from
+// another volume (=clone) or volume snapshot can be used together with the original volume.
+func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.Interface, ns string,
+	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, expectedContent string) {
+
+	var pods []*v1.Pod
+
+	// Create each pod with pvc
+	for i := range pvcs {
+		index := i + 1
+		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
+		podConfig := e2epod.Config{
+			NS:            ns,
+			PVCs:          []*v1.PersistentVolumeClaim{pvcs[i]},
+			SeLinuxLabel:  e2epod.GetLinuxLabel(),
+			NodeSelection: node,
+			PVCsReadOnly:  false,
+			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
+		}
+		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+		}()
+		framework.ExpectNoError(err)
+		pods = append(pods, pod)
+		actualNodeName := pod.Spec.NodeName
+
+		// Always run the subsequent pods on the same node.
+		e2epod.SetAffinity(&node, actualNodeName)
+	}
+
+	for i, pvc := range pvcs {
+		var commands []string
+
+		if *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
+			fileName := "/mnt/volume1"
+			commands = e2evolume.GenerateReadBlockCmd(fileName, len(expectedContent))
+			// Check that all pods have the same content
+			index := i + 1
+			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
+			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the block volume %s.", fileName)
+		} else {
+			fileName := "/mnt/volume1/index.html"
+			commands = e2evolume.GenerateReadFileCmd(fileName)
+			// Check that all pods have the same content
+			index := i + 1
+			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
+			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
+		}
+	}
+}
+
 // getCurrentTopologies() goes through all Nodes and returns unique driver topologies and count of Nodes per topology
 func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys []string) ([]topology, []int, error) {
 	topos := []topology{}
@@ -619,8 +754,21 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 	return topos, topoCount, nil
 }
 
-// ensureTopologyRequirements sets nodeSelection affinity according to given topology keys for drivers that provide them
-func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.NodeList, cs clientset.Interface, topologyKeys []string, minCount int) error {
+// ensureTopologyRequirements check that there are enough nodes in the cluster for a test and
+// sets nodeSelection affinity according to given topology keys for drivers that provide them.
+func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, cs clientset.Interface, driverInfo *storageframework.DriverInfo, minCount int) error {
+	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	framework.ExpectNoError(err)
+	if len(nodes.Items) < minCount {
+		e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", minCount))
+	}
+
+	topologyKeys := driverInfo.TopologyKeys
+	if len(topologyKeys) == 0 {
+		// The driver does not have any topology restrictions
+		return nil
+	}
+
 	topologyList, topologyCount, err := getCurrentTopologiesNumber(cs, nodes, topologyKeys)
 	if err != nil {
 		return err
@@ -636,7 +784,6 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.N
 	}
 	// Take the first suitable topology
 	e2epod.SetNodeAffinityTopologyRequirement(nodeSelection, suitableTopologies[0])
-
 	return nil
 }
 
@@ -653,9 +800,9 @@ func initializeVolume(cs clientset.Interface, t *framework.TimeoutContext, ns st
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          []*v1.PersistentVolumeClaim{pvc},
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
 		NodeSelection: node,
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	pod, err := e2epod.CreateSecPod(cs, &podConfig, t.PodStart)
 	defer func() {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -28,7 +29,6 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
-	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -86,7 +85,6 @@ func volumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
@@ -145,7 +143,7 @@ type HollowKubletOptions struct {
 	MaxPods             int
 	PodsPerCore         int
 	NodeLabels          map[string]string
-	RegisterWithTaints  []core.Taint
+	RegisterWithTaints  []v1.Taint
 }
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
@@ -164,9 +162,8 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
 	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
-	f.RegisterNode = true
 	f.RegisterSchedulable = true
-	f.RegisterWithTaints = opt.RegisterWithTaints
+	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -210,6 +207,8 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
+	c.RegisterWithTaints = opt.RegisterWithTaints
+	c.RegisterNode = true
 
 	return f, c
 }

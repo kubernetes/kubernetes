@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,7 +80,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1beta1()
+				epAdapter.endpointSliceClient = client.DiscoveryV1()
 			}
 
 			for _, endpoints := range testCase.endpoints {
@@ -178,7 +178,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1beta1()
+				epAdapter.endpointSliceClient = client.DiscoveryV1()
 			}
 
 			for _, endpoints := range testCase.endpoints {
@@ -198,7 +198,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
+			epSliceList, err := client.DiscoveryV1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("Error listing Endpoint Slices: %v", err)
 			}
@@ -290,7 +290,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1beta1()
+				epAdapter.endpointSliceClient = client.DiscoveryV1()
 			}
 
 			for _, endpoints := range testCase.endpoints {
@@ -310,7 +310,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
+			epSliceList, err := client.DiscoveryV1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("Error listing Endpoint Slices: %v", err)
 			}
@@ -432,11 +432,11 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1beta1()
+				epAdapter.endpointSliceClient = client.DiscoveryV1()
 			}
 
 			for _, endpointSlice := range testCase.endpointSlices {
-				_, err := client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating EndpointSlice: %v", err)
 				}
@@ -447,7 +447,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			endpointSlice, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).Get(context.TODO(), testCase.endpointsParam.Name, metav1.GetOptions{})
+			endpointSlice, err := client.DiscoveryV1().EndpointSlices(testCase.namespaceParam).Get(context.TODO(), testCase.endpointsParam.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				t.Fatalf("Error getting Endpoint Slice: %v", err)
 			}

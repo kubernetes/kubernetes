@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,28 +49,28 @@ const (
 	timeout                           = time.Second * 10
 )
 
-func setup(t testing.TB) (*httptest.Server, *rest.Config, framework.CloseFunc) {
-	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
+func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (*httptest.Server, *rest.Config, framework.CloseFunc) {
+	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	resourceConfig.EnableVersions(schema.GroupVersion{
 		Group:   "flowcontrol.apiserver.k8s.io",
 		Version: "v1alpha1",
 	})
-	masterConfig.GenericConfig.MaxRequestsInFlight = 1
-	masterConfig.GenericConfig.MaxMutatingRequestsInFlight = 1
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig.GenericConfig.MaxRequestsInFlight = maxReadonlyRequestsInFlight
+	controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
-	return s, masterConfig.GenericConfig.LoopbackClientConfig, closeFn
+	return s, controlPlaneConfig.GenericConfig.LoopbackClientConfig, closeFn
 }
 
 func TestPriorityLevelIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	_, loopbackConfig, closeFn := setup(t)
+	_, loopbackConfig, closeFn := setup(t, 1, 1)
 	defer closeFn()
 
 	loopbackClient := clientset.NewForConfigOrDie(loopbackConfig)
@@ -235,7 +235,7 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[
 }
 
 func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrol.PriorityLevelConfiguration, *flowcontrol.FlowSchema, error) {
-	pl, err := c.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(context.Background(), &flowcontrol.PriorityLevelConfiguration{
+	pl, err := c.FlowcontrolV1beta2().PriorityLevelConfigurations().Create(context.Background(), &flowcontrol.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
@@ -257,7 +257,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	if err != nil {
 		return nil, nil, err
 	}
-	fs, err := c.FlowcontrolV1beta1().FlowSchemas().Create(context.TODO(), &flowcontrol.FlowSchema{
+	fs, err := c.FlowcontrolV1beta2().FlowSchemas().Create(context.TODO(), &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
@@ -297,7 +297,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	}
 
 	return pl, fs, wait.Poll(time.Second, timeout, func() (bool, error) {
-		fs, err := c.FlowcontrolV1beta1().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
+		fs, err := c.FlowcontrolV1beta2().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -19,21 +19,24 @@ ARG REGISTRY
 FROM --platform=linux/amd64 alpine:3.6 as prep
 
 ADD https://openresty.org/download/openresty-1.13.6.2-win64.zip /openresty-win64.zip
+ADD http://wiki.overbyte.eu/arch/openssl-1.1.1i-win64.zip /openssl.zip
 RUN mkdir /openresty &&\
-    unzip /openresty-win64.zip -d /openresty
+    unzip /openresty-win64.zip -d /openresty &&\
+    mkdir /openssl &&\
+    unzip /openssl.zip -d /openssl
 
-FROM $REGISTRY/windows-image-builder-helper:1.1-windows-amd64-1809 as helper
 FROM $BASEIMAGE
 
 COPY --from=prep /openresty/openresty-1.13.6.2-win64 /openresty
-COPY --from=helper /Windows/System32/vcruntime140.dll /Windows/System32/
-COPY --from=helper ["/Program Files/OpenSSL", "/Program Files/OpenSSL"]
+COPY --from=prep /openssl /openssl
 
-ENV PATH="C:\openresty\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
+ADD ["https://raw.githubusercontent.com/openssl/openssl/OpenSSL_1_1_1i/apps/openssl.cnf", "/Program Files/Common Files/SSL/openssl.cnf"]
+
+ENV PATH="C:\openssl\;C:\openresty\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
 
 ADD run.sh /openresty/run.sh
 ADD nginx.conf /openresty/conf/nginx.conf
 ADD template.lua /openresty/lua/template.lua
 
 EXPOSE 80 443 8080 8443
-ENTRYPOINT ["/bin/sh", "/openresty/run.sh"]
+ENTRYPOINT ["/bin/sh", "-c", " cd /openresty && ./run.sh"]

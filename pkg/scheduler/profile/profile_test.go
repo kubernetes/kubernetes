@@ -31,10 +31,10 @@ import (
 )
 
 var fakeRegistry = frameworkruntime.Registry{
-	"QueueSort": newFakePlugin,
-	"Bind1":     newFakePlugin,
-	"Bind2":     newFakePlugin,
-	"Another":   newFakePlugin,
+	"QueueSort": newFakePlugin("QueueSort"),
+	"Bind1":     newFakePlugin("Bind1"),
+	"Bind2":     newFakePlugin("Bind2"),
+	"Another":   newFakePlugin("Another"),
 }
 
 func TestNewMap(t *testing.T) {
@@ -49,12 +49,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-1",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind1"},
 							},
@@ -64,12 +64,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-2",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind2"},
 							},
@@ -90,12 +90,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-1",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind1"},
 							},
@@ -105,12 +105,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-2",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Another"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind2"},
 							},
@@ -126,12 +126,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-1",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind1"},
 							},
@@ -147,12 +147,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-2",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind2"},
 							},
@@ -168,12 +168,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-1",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind1"},
 							},
@@ -183,12 +183,12 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "profile-1",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind2"},
 							},
@@ -203,12 +203,12 @@ func TestNewMap(t *testing.T) {
 			cfgs: []config.KubeSchedulerProfile{
 				{
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
 						},
-						Bind: &config.PluginSet{
+						Bind: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "Bind1"},
 							},
@@ -233,7 +233,7 @@ func TestNewMap(t *testing.T) {
 				{
 					SchedulerName: "invalid-profile",
 					Plugins: &config.Plugins{
-						QueueSort: &config.PluginSet{
+						QueueSort: config.PluginSet{
 							Enabled: []config.Plugin{
 								{Name: "QueueSort"},
 							},
@@ -260,10 +260,12 @@ func TestNewMap(t *testing.T) {
 	}
 }
 
-type fakePlugin struct{}
+type fakePlugin struct {
+	name string
+}
 
 func (p *fakePlugin) Name() string {
-	return ""
+	return p.name
 }
 
 func (p *fakePlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bool {
@@ -274,8 +276,10 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 	return nil
 }
 
-func newFakePlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &fakePlugin{}, nil
+func newFakePlugin(name string) func(object runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &fakePlugin{name: name}, nil
+	}
 }
 
 func nilRecorderFactory(_ string) events.EventRecorder {

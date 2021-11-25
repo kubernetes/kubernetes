@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -30,10 +31,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -43,19 +41,17 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(
 		spec,
-		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
 		volume.VolumeOptions{},
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to make a new Mapper: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to make a new Mapper: %w", err)
 	}
 	csiMapper := mapper.(*csiBlockMapper)
 	return csiMapper, spec, pv, nil
 }
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -95,8 +91,6 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 }
 
 func TestBlockMapperGetStagingPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -132,8 +126,6 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 }
 
 func TestBlockMapperGetPublishPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -169,8 +161,6 @@ func TestBlockMapperGetPublishPath(t *testing.T) {
 }
 
 func TestBlockMapperGetDeviceMapPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -210,8 +200,6 @@ func TestBlockMapperGetDeviceMapPath(t *testing.T) {
 }
 
 func TestBlockMapperSetupDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -251,8 +239,6 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 }
 
 func TestBlockMapperSetupDeviceError(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -299,8 +285,6 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -346,8 +330,6 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
@@ -386,9 +368,53 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	}
 }
 
-func TestBlockMapperTearDownDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
+	fakeClient := fakeclient.NewSimpleClientset()
+	attachRequired := false
+	podInfo := true
+	fakeDriver := &storagev1.CSIDriver{
+		ObjectMeta: meta.ObjectMeta{
+			Name: testDriver,
+		},
+		Spec: storagev1.CSIDriverSpec{
+			PodInfoOnMount: &podInfo,
+			AttachRequired: &attachRequired,
+		},
+	}
+	_, err := fakeClient.StorageV1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create a fakeDriver: %v", err)
+	}
 
+	// after the driver is created, create the plugin. newTestPlugin waits for the informer to sync,
+	// such that csiMapper.SetUpDevice below sees the VolumeAttachment object in the lister.
+
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, _, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+	csiMapper.csiClient = setupClient(t, true)
+
+	// Map device to global and pod device map path
+	_, err = csiMapper.MapPodDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
+	}
+	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	pvol, ok := pvols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodePublishVolume call")
+	}
+
+	if !reflect.DeepEqual(pvol.VolumeContext, map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"}) {
+		t.Error("csi mapper check pod info failed")
+	}
+}
+
+func TestBlockMapperTearDownDevice(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -447,8 +473,6 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 }
 
 func TestVolumeSetupTeardown(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	// Follow volume setup + teardown sequences at top of cs_block.go and set up / clean up one CSI block device.
 	// Focus on testing that there were no leftover files present after the cleanup.
 

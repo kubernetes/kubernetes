@@ -1,3 +1,4 @@
+//go:build windows && !dockerless
 // +build windows,!dockerless
 
 /*
@@ -22,7 +23,7 @@ import (
 	"context"
 	"fmt"
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -54,9 +55,9 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
 	defer cancelFunc()
 	result, err := plugin.addToNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil, nil)
-	klog.V(5).Infof("GetPodNetworkStatus result %+v", result)
+	klog.V(5).InfoS("GetPodNetworkStatus", "result", result)
 	if err != nil {
-		klog.Errorf("error while adding to cni network: %s", err)
+		klog.ErrorS(err, "Got error while adding to cni network")
 		return nil, err
 	}
 
@@ -64,7 +65,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	var result020 *cniTypes020.Result
 	result020, err = cniTypes020.GetResult(result)
 	if err != nil {
-		klog.Errorf("error while cni parsing result: %s", err)
+		klog.ErrorS(err, "Got error while cni parsing result")
 		return nil, err
 	}
 

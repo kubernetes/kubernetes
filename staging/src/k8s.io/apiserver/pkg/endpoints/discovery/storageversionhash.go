@@ -35,6 +35,5 @@ func StorageVersionHash(group, version, kind string) string {
 	// the chance of colliding hash P(N,X) approximates to 1-e^(-(N^2)/2^(8X+1)).
 	// P(10,000, 8) ~= 2.7*10^(-12), which is low enough.
 	// See https://en.wikipedia.org/wiki/Birthday_problem#Approximations.
-	return base64.StdEncoding.EncodeToString(
-		bytes[:8])
+	return base64.StdEncoding.EncodeToString(bytes[:8])
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,10 +27,12 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 var (
@@ -39,7 +40,7 @@ var (
 	extendedResourceB     = v1.ResourceName("example.com/bbb")
 	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
-	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
@@ -69,8 +70,21 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 func newResourcePod(usage ...framework.Resource) *v1.Pod {
 	var containers []v1.Container
 	for _, req := range usage {
+		rl := v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(req.MilliCPU, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(req.Memory, resource.BinarySI),
+			v1.ResourcePods:             *resource.NewQuantity(int64(req.AllowedPodNumber), resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(req.EphemeralStorage, resource.BinarySI),
+		}
+		for rName, rQuant := range req.ScalarResources {
+			if rName == hugePageResourceA {
+				rl[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+			} else {
+				rl[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+			}
+		}
 		containers = append(containers, v1.Container{
-			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
+			Resources: v1.ResourceRequirements{Requests: rl},
 		})
 	}
 	return &v1.Pod{
@@ -92,6 +106,14 @@ func newResourceOverheadPod(pod *v1.Pod, overhead v1.ResourceList) *v1.Pod {
 
 func getErrReason(rn v1.ResourceName) string {
 	return fmt.Sprintf("Insufficient %v", rn)
+}
+
+var defaultScoringStrategy = &config.ScoringStrategy{
+	Type: config.LeastAllocated,
+	Resources: []config.ResourceSpec{
+		{Name: "cpu", Weight: 1},
+		{Name: "memory", Weight: 1},
+	},
 }
 
 func TestEnoughRequests(t *testing.T) {
@@ -403,7 +425,11 @@ func TestEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&test.args, nil)
+			if test.args.ScoringStrategy == nil {
+				test.args.ScoringStrategy = defaultScoringStrategy
+			}
+
+			p, err := NewFit(&test.args, nil, plfeature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -418,7 +444,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, true), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
@@ -431,13 +457,13 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+	p, err := NewFit(&config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnablePodOverhead: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterNodeResourcesFit" from cycleState: not found`)
+	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
@@ -481,7 +507,7 @@ func TestNotEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			p, err := NewFit(&config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -534,7 +560,7 @@ func TestStorageRequests(t *testing.T) {
 				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2})),
 			name: "ephemeral local storage request is ignored due to disabled feature gate",
 			features: map[featuregate.Feature]bool{
-				features.LocalStorageCapacityIsolation: false,
+				"LocalStorageCapacityIsolation": false,
 			},
 		},
 		{
@@ -553,7 +579,7 @@ func TestStorageRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			p, err := NewFit(&config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -572,71 +598,141 @@ func TestStorageRequests(t *testing.T) {
 
 }
 
-func TestValidateFitArgs(t *testing.T) {
-	argsTest := []struct {
-		name   string
-		args   config.NodeResourcesFitArgs
-		expect string
+func TestFitScore(t *testing.T) {
+	defaultResources := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+	}
+
+	tests := []struct {
+		name                 string
+		requestedPod         *v1.Pod
+		nodes                []*v1.Node
+		existingPods         []*v1.Pod
+		expectedPriorities   framework.NodeScoreList
+		nodeResourcesFitArgs config.NodeResourcesFitArgs
 	}{
 		{
-			name: "IgnoredResources: too long value",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
+			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
-			expect: "name part must be no more than 63 characters",
-		},
-		{
-			name: "IgnoredResources: name is empty",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResources: []string{"example.com/"},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
 			},
-			expect: "name part must be non-empty",
-		},
-		{
-			name: "IgnoredResources: name has too many slash",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResources: []string{"example.com/aaa/bbb"},
-			},
-			expect: "a qualified name must consist of alphanumeric characters",
-		},
-		{
-			name: "IgnoredResources: valid args",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResources: []string{"example.com"},
-			},
-		},
-		{
-			name: "IgnoredResourceGroups: valid args ",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResourceGroups: []string{"example.com"},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 10}, {Name: "node2", Score: 32}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: defaultResources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 10},
+							{Utilization: 100, Score: 0},
+						},
+					},
+				},
 			},
 		},
 		{
-			name: "IgnoredResourceGroups: illegal args",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResourceGroups: []string{"example.com/"},
+			name: "test case for ScoringStrategy RequestedToCapacityRatio case2",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
-			expect: "name part must be non-empty",
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 95}, {Name: "node2", Score: 68}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: defaultResources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 0},
+							{Utilization: 100, Score: 10},
+						},
+					},
+				},
+			},
 		},
 		{
-			name: "IgnoredResourceGroups: name is too long",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
+			name: "test case for ScoringStrategy MostAllocated",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
-			expect: "name part must be no more than 63 characters",
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 67}, {Name: "node2", Score: 36}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: defaultResources,
+				},
+			},
 		},
 		{
-			name: "IgnoredResourceGroups: name cannot be contain slash",
-			args: config.NodeResourcesFitArgs{
-				IgnoredResourceGroups: []string{"example.com/aa"},
+			name: "test case for ScoringStrategy LeastAllocated",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
-			expect: "resource group name can't contain '/'",
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 63}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
 		},
 	}
 
-	for _, test := range argsTest {
-		if err := validateFitArgs(test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
-			t.Errorf("case[%v]: error details do not include %v", test.name, err)
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			state := framework.NewCycleState()
+			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			args := test.nodeResourcesFitArgs
+			p, err := NewFit(&args, fh, plfeature.Features{EnablePodOverhead: true})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var gotPriorities framework.NodeScoreList
+			for _, n := range test.nodes {
+				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.requestedPod, n.Name)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
+				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
+			}
+
+			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
+				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
+			}
+		})
 	}
 }

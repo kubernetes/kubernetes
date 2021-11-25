@@ -73,8 +73,8 @@ func (ec *EstablishingController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ec.queue.ShutDown()
 
-	klog.Infof("Starting EstablishingController")
-	defer klog.Infof("Shutting down EstablishingController")
+	klog.Info("Starting EstablishingController")
+	defer klog.Info("Shutting down EstablishingController")
 
 	if !cache.WaitForCacheSync(stopCh, ec.crdSynced) {
 		return

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,17 +20,16 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"runtime"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
-
-	"k8s.io/klog/v2"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -52,7 +52,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	}
 
 	cpuLimit := container.Resources.Limits.Cpu()
-	isolatedByHyperv := kubeletapis.ShouldIsolatedByHyperV(pod.Annotations)
 	if !cpuLimit.IsZero() {
 		// Note that sysinfo.NumCPU() is limited to 64 CPUs on Windows due to Processor Groups,
 		// as only 64 processors are available for execution by a given process. This causes
@@ -79,22 +78,12 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		// Part three - CRI & ContainerD's implementation
 		//   The kubelet sets these directly on CGroups in Linux, but needs to pass them across CRI on Windows.
 		//   There is an existing cpu_maximum field, with a range of percent * 100, so 1-10000. This is different from Docker, but consistent with OCI
-		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.proto#L681-L682
+		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto#L681-L682
 		//   https://github.com/opencontainers/runtime-spec/blob/ad53dcdc39f1f7f7472b10aa0a45648fe4865496/config-windows.md#cpu
 		//   If both CpuWeight and CpuMaximum are set - ContainerD catches this invalid case and returns an error instead.
 
 		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(runtime.NumCPU()) / 1000
 
-		// TODO: This should be reviewed or removed once Hyper-V support is implemented with CRI-ContainerD
-		//       in a future release. cpuCount may or may not be required if cpuMaximum is set.
-		if isolatedByHyperv {
-			cpuCount := int64(cpuLimit.MilliValue()+999) / 1000
-			wc.Resources.CpuCount = cpuCount
-
-			if cpuCount != 0 {
-				cpuMaximum = cpuLimit.MilliValue() / cpuCount * 10000 / 1000
-			}
-		}
 		// ensure cpuMaximum is in range [1, 10000].
 		if cpuMaximum < 1 {
 			cpuMaximum = 1
@@ -105,15 +94,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.CpuMaximum = cpuMaximum
 	}
 
-	if !isolatedByHyperv {
-		// The processor resource controls are mutually exclusive on
-		// Windows Server Containers, the order of precedence is
-		// CPUCount first, then CPUMaximum.
-		if wc.Resources.CpuCount > 0 {
-			if wc.Resources.CpuMaximum > 0 {
-				wc.Resources.CpuMaximum = 0
-				klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
-			}
+	// The processor resource controls are mutually exclusive on
+	// Windows Server Containers, the order of precedence is
+	// CPUCount first, then CPUMaximum.
+	if wc.Resources.CpuCount > 0 {
+		if wc.Resources.CpuMaximum > 0 {
+			wc.Resources.CpuMaximum = 0
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
@@ -128,8 +115,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&
-		effectiveSc.WindowsOptions != nil &&
+	if effectiveSc.WindowsOptions != nil &&
 		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {
 		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec
 	}
@@ -137,6 +123,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	// override with Windows options if present
 	if effectiveSc.WindowsOptions != nil && effectiveSc.WindowsOptions.RunAsUserName != nil {
 		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
+	}
+
+	if securitycontext.HasWindowsHostProcessRequest(pod, container) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
+		}
+		wc.SecurityContext.HostProcess = true
 	}
 
 	return wc, nil

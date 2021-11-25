@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -200,18 +201,18 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	for i, expected := range expectedEvents {
 		if len(gotEvents) <= i {
 			t.Errorf("Event %q not emitted", expected)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 			continue
 		}
 		received := gotEvents[i]
 		if !strings.HasPrefix(received, expected) {
 			t.Errorf("Unexpected event received, expected %q, got %q", expected, received)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 		}
 	}
 	for i := len(expectedEvents); i < len(gotEvents); i++ {
 		t.Errorf("Unexpected event received: %q", gotEvents[i])
-		err = fmt.Errorf("Events do not match")
+		err = fmt.Errorf("events do not match")
 	}
 	return err
 }
@@ -369,6 +370,15 @@ func withVolumeDeletionTimestamp(pvs []*v1.PersistentVolume) []*v1.PersistentVol
 	return result
 }
 
+func volumesWithFinalizers(pvs []*v1.PersistentVolume, finalizers []string) []*v1.PersistentVolume {
+	result := []*v1.PersistentVolume{}
+	for _, pv := range pvs {
+		pv.SetFinalizers(finalizers)
+		result = append(result, pv)
+	}
+	return result
+}
+
 // newClaim returns a new claim with given attributes
 func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, class *string, annotations ...string) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
@@ -401,7 +411,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case pvutil.AnnStorageProvisioner:
+			case pvutil.AnnBetaStorageProvisioner, pvutil.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -439,6 +449,15 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 		claims[0].Annotations = map[string]string{name: value}
 	} else {
 		claims[0].Annotations[name] = value
+	}
+	return claims
+}
+
+func claimWithDataSource(name, kind, apiGroup string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.DataSource = &v1.TypedLocalObjectReference{
+		Name:     name,
+		Kind:     kind,
+		APIGroup: &apiGroup,
 	}
 	return claims
 }
@@ -481,11 +500,11 @@ func claimWithAccessMode(modes []v1.PersistentVolumeAccessMode, claims []*v1.Per
 }
 
 func testSyncClaim(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	return ctrl.syncClaim(test.initialClaims[0])
+	return ctrl.syncClaim(context.TODO(), test.initialClaims[0])
 }
 
 func testSyncClaimError(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	err := ctrl.syncClaim(test.initialClaims[0])
+	err := ctrl.syncClaim(context.TODO(), test.initialClaims[0])
 
 	if err != nil {
 		return nil
@@ -494,7 +513,7 @@ func testSyncClaimError(ctrl *PersistentVolumeController, reactor *pvtesting.Vol
 }
 
 func testSyncVolume(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	return ctrl.syncVolume(test.initialVolumes[0])
+	return ctrl.syncVolume(context.TODO(), test.initialVolumes[0])
 }
 
 type operationType string
@@ -514,6 +533,7 @@ var (
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
 	classWait                    string = "wait"
+	classCSI                     string = "csi"
 
 	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
@@ -713,7 +733,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 //    of volumes/claims with expected claims/volumes and report differences.
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
-	for _, test := range tests {
+	run := func(t *testing.T, test controllerTest) {
 		klog.V(4).Infof("starting multisync test %q", test.name)
 
 		// Initialize the controller
@@ -787,7 +807,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				claim := obj.(*v1.PersistentVolumeClaim)
 				// Simulate "claim updated" event
 				ctrl.claims.Update(claim)
-				err = ctrl.syncClaim(claim)
+				err = ctrl.syncClaim(context.TODO(), claim)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
@@ -804,7 +824,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				volume := obj.(*v1.PersistentVolume)
 				// Simulate "volume updated" event
 				ctrl.volumes.store.Update(volume)
-				err = ctrl.syncVolume(volume)
+				err = ctrl.syncVolume(context.TODO(), volume)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
@@ -821,6 +841,13 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		}
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 		klog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			run(t, test)
+		})
 	}
 }
 

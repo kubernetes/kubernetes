@@ -29,13 +29,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
+var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
@@ -123,6 +124,10 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func() {
+		// Requires special setup of test-handler which is only done in GCE kube-up environment
+		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
+		e2eskipper.SkipUnlessProviderIs("gce")
+
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 

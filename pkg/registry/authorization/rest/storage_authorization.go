@@ -18,7 +18,6 @@ package rest
 
 import (
 	authorizationv1 "k8s.io/api/authorization/v1"
-	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -46,29 +45,11 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(authorizationv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[authorizationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-	}
-
 	if apiResourceConfigSource.VersionEnabled(authorizationv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[authorizationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 
 	return apiGroupInfo, true, nil
-}
-
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
-	// subjectaccessreviews
-	storage["subjectaccessreviews"] = subjectaccessreview.NewREST(p.Authorizer)
-	// selfsubjectaccessreviews
-	storage["selfsubjectaccessreviews"] = selfsubjectaccessreview.NewREST(p.Authorizer)
-	// localsubjectaccessreviews
-	storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
-	// selfsubjectrulesreviews
-	storage["selfsubjectrulesreviews"] = selfsubjectrulesreview.NewREST(p.RuleResolver)
-
-	return storage
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {

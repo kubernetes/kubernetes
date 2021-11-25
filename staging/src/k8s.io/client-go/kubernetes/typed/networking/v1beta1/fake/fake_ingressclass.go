@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	networkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -99,7 +102,7 @@ func (c *FakeIngressClasses) Update(ctx context.Context, ingressClass *v1beta1.I
 // Delete takes name of the ingressClass and deletes it. Returns an error if one occurs.
 func (c *FakeIngressClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(ingressclassesResource, name), &v1beta1.IngressClass{})
+		Invokes(testing.NewRootDeleteActionWithOptions(ingressclassesResource, name, opts), &v1beta1.IngressClass{})
 	return err
 }
 
@@ -115,6 +118,27 @@ func (c *FakeIngressClasses) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeIngressClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.IngressClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, name, pt, data, subresources...), &v1beta1.IngressClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.IngressClass), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied ingressClass.
+func (c *FakeIngressClasses) Apply(ctx context.Context, ingressClass *networkingv1beta1.IngressClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.IngressClass, err error) {
+	if ingressClass == nil {
+		return nil, fmt.Errorf("ingressClass provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(ingressClass)
+	if err != nil {
+		return nil, err
+	}
+	name := ingressClass.Name
+	if name == nil {
+		return nil, fmt.Errorf("ingressClass.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, *name, types.ApplyPatchType, data), &v1beta1.IngressClass{})
 	if obj == nil {
 		return nil, err
 	}

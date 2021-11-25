@@ -24,4 +24,5 @@ limitations under the License.
 // The purpose of the kubeadm structured output is to have a well
 // defined versioned output format that other software that uses
 // kubeadm for cluster deployments can use and rely on.
+// DEPRECATED: use v1alpha2 instead
 package v1alpha1 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"

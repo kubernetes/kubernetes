@@ -87,6 +87,7 @@ func TestTimeLeft(t *testing.T) {
 		expectErr        bool
 		expectErrStr     string
 		expectedTimeLeft *time.Duration
+		expectedExpireAt time.Time
 	}{
 		{
 			name:         "Error case: Job unfinished",
@@ -108,6 +109,7 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
+			expectedExpireAt: now.Time,
 		},
 		{
 			name:             "Job completed now, 10s TTL",
@@ -115,6 +117,7 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
+			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
 			name:             "Job completed 10s ago, 15s TTL",
@@ -122,6 +125,7 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
+			expectedExpireAt: now.Add(5 * time.Second),
 		},
 		{
 			name:         "Error case: Job failed now, no TTL",
@@ -136,6 +140,7 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
+			expectedExpireAt: now.Time,
 		},
 		{
 			name:             "Job failed now, 10s TTL",
@@ -143,6 +148,7 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
+			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
 			name:             "Job failed 10s ago, 15s TTL",
@@ -150,12 +156,13 @@ func TestTimeLeft(t *testing.T) {
 			ttl:              utilpointer.Int32Ptr(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
+			expectedExpireAt: now.Add(5 * time.Second),
 		},
 	}
 
 	for _, tc := range testCases {
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		gotTimeLeft, gotErr := timeLeft(job, tc.since)
+		gotTimeLeft, gotExpireAt, gotErr := timeLeft(job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}
@@ -168,6 +175,9 @@ func TestTimeLeft(t *testing.T) {
 		if !tc.expectErr {
 			if *gotTimeLeft != *tc.expectedTimeLeft {
 				t.Errorf("%s: expected time left %v, got %v", tc.name, tc.expectedTimeLeft, gotTimeLeft)
+			}
+			if *gotExpireAt != tc.expectedExpireAt {
+				t.Errorf("%s: expected expire at %v, got %v", tc.name, tc.expectedExpireAt, *gotExpireAt)
 			}
 		}
 	}

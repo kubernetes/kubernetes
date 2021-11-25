@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
@@ -28,8 +29,12 @@ func (o MarshalOptions) marshalMessageSet(b []byte, m protoreflect.Message) ([]b
 	if !flags.ProtoLegacy {
 		return b, errors.New("no support for message_set_wire_format")
 	}
+	fieldOrder := order.AnyFieldOrder
+	if o.Deterministic {
+		fieldOrder = order.NumberFieldOrder
+	}
 	var err error
-	o.rangeFields(m, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+	order.RangeFields(m, fieldOrder, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		b, err = o.marshalMessageSetField(b, fd, v)
 		return err == nil
 	})

@@ -1,16 +1,28 @@
 package asm
 
 import (
+	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"strings"
+
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // InstructionSize is the size of a BPF instruction in bytes
 const InstructionSize = 8
+
+// RawInstructionOffset is an offset in units of raw BPF instructions.
+type RawInstructionOffset uint64
+
+// Bytes returns the offset of an instruction in bytes.
+func (rio RawInstructionOffset) Bytes() uint64 {
+	return uint64(rio) * InstructionSize
+}
 
 // Instruction is a single eBPF instruction.
 type Instruction struct {
@@ -45,7 +57,7 @@ func (ins *Instruction) Unmarshal(r io.Reader, bo binary.ByteOrder) (uint64, err
 		return 0, fmt.Errorf("can't unmarshal registers: %s", err)
 	}
 
-	if !bi.OpCode.isDWordLoad() {
+	if !bi.OpCode.IsDWordLoad() {
 		return InstructionSize, nil
 	}
 
@@ -68,7 +80,7 @@ func (ins Instruction) Marshal(w io.Writer, bo binary.ByteOrder) (uint64, error)
 		return 0, errors.New("invalid opcode")
 	}
 
-	isDWordLoad := ins.OpCode.isDWordLoad()
+	isDWordLoad := ins.OpCode.IsDWordLoad()
 
 	cons := int32(ins.Constant)
 	if isDWordLoad {
@@ -111,7 +123,7 @@ func (ins Instruction) Marshal(w io.Writer, bo binary.ByteOrder) (uint64, error)
 //
 // Returns an error if the instruction doesn't load a map.
 func (ins *Instruction) RewriteMapPtr(fd int) error {
-	if !ins.OpCode.isDWordLoad() {
+	if !ins.OpCode.IsDWordLoad() {
 		return fmt.Errorf("%s is not a 64 bit load", ins.OpCode)
 	}
 
@@ -126,15 +138,19 @@ func (ins *Instruction) RewriteMapPtr(fd int) error {
 	return nil
 }
 
-func (ins *Instruction) mapPtr() uint32 {
-	return uint32(uint64(ins.Constant) & math.MaxUint32)
+// MapPtr returns the map fd for this instruction.
+//
+// The result is undefined if the instruction is not a load from a map,
+// see IsLoadFromMap.
+func (ins *Instruction) MapPtr() int {
+	return int(int32(uint64(ins.Constant) & math.MaxUint32))
 }
 
 // RewriteMapOffset changes the offset of a direct load from a map.
 //
 // Returns an error if the instruction is not a direct load.
 func (ins *Instruction) RewriteMapOffset(offset uint32) error {
-	if !ins.OpCode.isDWordLoad() {
+	if !ins.OpCode.IsDWordLoad() {
 		return fmt.Errorf("%s is not a 64 bit load", ins.OpCode)
 	}
 
@@ -151,8 +167,24 @@ func (ins *Instruction) mapOffset() uint32 {
 	return uint32(uint64(ins.Constant) >> 32)
 }
 
-func (ins *Instruction) isLoadFromMap() bool {
+// IsLoadFromMap returns true if the instruction loads from a map.
+//
+// This covers both loading the map pointer and direct map value loads.
+func (ins *Instruction) IsLoadFromMap() bool {
 	return ins.OpCode == LoadImmOp(DWord) && (ins.Src == PseudoMapFD || ins.Src == PseudoMapValue)
+}
+
+// IsFunctionCall returns true if the instruction calls another BPF function.
+//
+// This is not the same thing as a BPF helper call.
+func (ins *Instruction) IsFunctionCall() bool {
+	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoCall
+}
+
+// IsConstantLoad returns true if the instruction loads a constant of the
+// given size.
+func (ins *Instruction) IsConstantLoad(size Size) bool {
+	return ins.OpCode == LoadImmOp(size) && ins.Src == R0 && ins.Offset == 0
 }
 
 // Format implements fmt.Formatter.
@@ -175,8 +207,8 @@ func (ins Instruction) Format(f fmt.State, c rune) {
 		return
 	}
 
-	if ins.isLoadFromMap() {
-		fd := int32(ins.mapPtr())
+	if ins.IsLoadFromMap() {
+		fd := ins.MapPtr()
 		switch ins.Src {
 		case PseudoMapFD:
 			fmt.Fprintf(f, "LoadMapPtr dst: %s fd: %d", ins.Dst, fd)
@@ -310,34 +342,12 @@ func (insns Instructions) ReferenceOffsets() map[string][]int {
 	return offsets
 }
 
-func (insns Instructions) marshalledOffsets() (map[string]int, error) {
-	symbols := make(map[string]int)
-
-	marshalledPos := 0
-	for _, ins := range insns {
-		currentPos := marshalledPos
-		marshalledPos += ins.OpCode.marshalledInstructions()
-
-		if ins.Symbol == "" {
-			continue
-		}
-
-		if _, ok := symbols[ins.Symbol]; ok {
-			return nil, fmt.Errorf("duplicate symbol %s", ins.Symbol)
-		}
-
-		symbols[ins.Symbol] = currentPos
-	}
-
-	return symbols, nil
-}
-
 // Format implements fmt.Formatter.
 //
 // You can control indentation of symbols by
 // specifying a width. Setting a precision controls the indentation of
 // instructions.
-// The default character is a tab, which can be overriden by specifying
+// The default character is a tab, which can be overridden by specifying
 // the ' ' space flag.
 func (insns Instructions) Format(f fmt.State, c rune) {
 	if c != 's' && c != 'v' {
@@ -370,63 +380,83 @@ func (insns Instructions) Format(f fmt.State, c rune) {
 		symIndent = strings.Repeat(" ", symPadding)
 	}
 
-	// Figure out how many digits we need to represent the highest
-	// offset.
-	highestOffset := 0
-	for _, ins := range insns {
-		highestOffset += ins.OpCode.marshalledInstructions()
-	}
+	// Guess how many digits we need at most, by assuming that all instructions
+	// are double wide.
+	highestOffset := len(insns) * 2
 	offsetWidth := int(math.Ceil(math.Log10(float64(highestOffset))))
 
-	offset := 0
-	for _, ins := range insns {
-		if ins.Symbol != "" {
-			fmt.Fprintf(f, "%s%s:\n", symIndent, ins.Symbol)
+	iter := insns.Iterate()
+	for iter.Next() {
+		if iter.Ins.Symbol != "" {
+			fmt.Fprintf(f, "%s%s:\n", symIndent, iter.Ins.Symbol)
 		}
-		fmt.Fprintf(f, "%s%*d: %v\n", indent, offsetWidth, offset, ins)
-		offset += ins.OpCode.marshalledInstructions()
+		fmt.Fprintf(f, "%s%*d: %v\n", indent, offsetWidth, iter.Offset, iter.Ins)
 	}
-
-	return
 }
 
 // Marshal encodes a BPF program into the kernel format.
 func (insns Instructions) Marshal(w io.Writer, bo binary.ByteOrder) error {
-	absoluteOffsets, err := insns.marshalledOffsets()
-	if err != nil {
-		return err
-	}
-
-	num := 0
 	for i, ins := range insns {
-		switch {
-		case ins.OpCode.JumpOp() == Call && ins.Src == PseudoCall && ins.Constant == -1:
-			// Rewrite bpf to bpf call
-			offset, ok := absoluteOffsets[ins.Reference]
-			if !ok {
-				return fmt.Errorf("instruction %d: reference to missing symbol %s", i, ins.Reference)
-			}
-
-			ins.Constant = int64(offset - num - 1)
-
-		case ins.OpCode.Class() == JumpClass && ins.Offset == -1:
-			// Rewrite jump to label
-			offset, ok := absoluteOffsets[ins.Reference]
-			if !ok {
-				return fmt.Errorf("instruction %d: reference to missing symbol %s", i, ins.Reference)
-			}
-
-			ins.Offset = int16(offset - num - 1)
-		}
-
-		n, err := ins.Marshal(w, bo)
+		_, err := ins.Marshal(w, bo)
 		if err != nil {
 			return fmt.Errorf("instruction %d: %w", i, err)
 		}
-
-		num += int(n / InstructionSize)
 	}
 	return nil
+}
+
+// Tag calculates the kernel tag for a series of instructions.
+//
+// It mirrors bpf_prog_calc_tag in the kernel and so can be compared
+// to ProgramInfo.Tag to figure out whether a loaded program matches
+// certain instructions.
+func (insns Instructions) Tag(bo binary.ByteOrder) (string, error) {
+	h := sha1.New()
+	for i, ins := range insns {
+		if ins.IsLoadFromMap() {
+			ins.Constant = 0
+		}
+		_, err := ins.Marshal(h, bo)
+		if err != nil {
+			return "", fmt.Errorf("instruction %d: %w", i, err)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:unix.BPF_TAG_SIZE]), nil
+}
+
+// Iterate allows iterating a BPF program while keeping track of
+// various offsets.
+//
+// Modifying the instruction slice will lead to undefined behaviour.
+func (insns Instructions) Iterate() *InstructionIterator {
+	return &InstructionIterator{insns: insns}
+}
+
+// InstructionIterator iterates over a BPF program.
+type InstructionIterator struct {
+	insns Instructions
+	// The instruction in question.
+	Ins *Instruction
+	// The index of the instruction in the original instruction slice.
+	Index int
+	// The offset of the instruction in raw BPF instructions. This accounts
+	// for double-wide instructions.
+	Offset RawInstructionOffset
+}
+
+// Next returns true as long as there are any instructions remaining.
+func (iter *InstructionIterator) Next() bool {
+	if len(iter.insns) == 0 {
+		return false
+	}
+
+	if iter.Ins != nil {
+		iter.Index++
+		iter.Offset += RawInstructionOffset(iter.Ins.OpCode.rawInstructions())
+	}
+	iter.Ins = &iter.insns[0]
+	iter.insns = iter.insns[1:]
+	return true
 }
 
 type bpfInstruction struct {

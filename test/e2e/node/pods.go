@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,12 +44,14 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
 	f := framework.NewDefaultFramework("pods")
 
-	framework.KubeDescribe("Delete Grace Period", func() {
+	ginkgo.Describe("Delete Grace Period", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -75,10 +78,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pods, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 0)
-			options = metav1.ListOptions{
-				LabelSelector:   selector.String(),
-				ResourceVersion: pods.ListMeta.ResourceVersion,
-			}
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(pod)
@@ -145,7 +144,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pods Set QOS Class", func() {
+	ginkgo.Describe("Pods Set QOS Class", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -197,7 +196,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pod Container Status", func() {
+	ginkgo.Describe("Pod Container Status", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -206,7 +205,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.It("should never report success for a pending container", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 
-			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~secret.*no such file or directory`)
+			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~(secret|projected).*no such file or directory`)
 
 			var (
 				lock sync.Mutex
@@ -214,6 +213,18 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 				wg sync.WaitGroup
 			)
+
+			r := prometheus.NewRegistry()
+			h := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+				Name: "start_latency",
+				Objectives: map[float64]float64{
+					0.5:  0.05,
+					0.75: 0.025,
+					0.9:  0.01,
+					0.99: 0.001,
+				},
+			}, []string{"node"})
+			r.MustRegister(h)
 
 			const delay = 2000
 			const workers = 3
@@ -352,10 +363,15 @@ var _ = SIGDescribe("Pods Extended", func() {
 									return fmt.Errorf("pod %s on node %s was terminated and then had termination cleared: %#v", pod.Name, pod.Spec.NodeName, status)
 								}
 							}
+							var hasNoStartTime bool
 							hasRunningContainers = status.State.Waiting == nil && status.State.Terminated == nil
 							if t != nil {
 								if !t.FinishedAt.Time.IsZero() {
-									duration = t.FinishedAt.Sub(t.StartedAt.Time)
+									if t.StartedAt.IsZero() {
+										hasNoStartTime = true
+									} else {
+										duration = t.FinishedAt.Sub(t.StartedAt.Time)
+									}
 									completeDuration = t.FinishedAt.Sub(pod.CreationTimestamp.Time)
 								}
 
@@ -363,11 +379,23 @@ var _ = SIGDescribe("Pods Extended", func() {
 								switch {
 								case t.ExitCode == 1:
 									// expected
+								case t.ExitCode == 137 && (t.Reason == "ContainerStatusUnknown" || t.Reason == "Error"):
+									// expected, pod was force-killed after grace period
 								case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 									// pod volume teardown races with container start in CRI, which reports a failure
 									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
 								default:
+									data, _ := json.MarshalIndent(pod.Status, "", "  ")
+									framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
 									return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
+								}
+								switch {
+								case duration > time.Hour:
+									// problem with status reporting
+									return fmt.Errorf("pod %s container %s on node %s had very long duration %s: start=%s end=%s", pod.Name, status.Name, pod.Spec.NodeName, duration, t.StartedAt, t.FinishedAt)
+								case hasNoStartTime:
+									// should never happen
+									return fmt.Errorf("pod %s container %s on node %s had finish time but not start time: end=%s", pod.Name, status.Name, pod.Spec.NodeName, t.FinishedAt)
 								}
 							}
 							if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
@@ -399,7 +427,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							if !hasTerminalPhase {
 								var names []string
 								for _, status := range pod.Status.ContainerStatuses {
-									if status.State.Terminated != nil || status.State.Running != nil {
+									if status.State.Running != nil {
 										names = append(names, status.Name)
 									}
 								}
@@ -422,6 +450,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						if duration > max || max == 0 {
 							max = duration
 						}
+						h.WithLabelValues(pod.Spec.NodeName).Observe(end.Sub(start).Seconds())
 						framework.Logf("Pod %s on node %s timings total=%s t=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, end.Sub(start), t, completeDuration, duration)
 					}
 
@@ -437,11 +466,16 @@ var _ = SIGDescribe("Pods Extended", func() {
 				}
 				framework.Failf("%d errors:\n%v", len(errs), strings.Join(messages, "\n"))
 			}
+			values, _ := r.Gather()
+			var buf bytes.Buffer
+			for _, m := range values {
+				expfmt.MetricFamilyToText(&buf, m)
+			}
+			framework.Logf("Summary of latencies:\n%s", buf.String())
 		})
-
 	})
 
-	framework.KubeDescribe("Pod Container lifecycle", func() {
+	ginkgo.Describe("Pod Container lifecycle", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()

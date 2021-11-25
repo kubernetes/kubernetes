@@ -12,3 +12,5 @@ approvers:
   - saad-ali
   - jsafrane
 
+labels:
+  - sig/storage

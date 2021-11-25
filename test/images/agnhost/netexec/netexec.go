@@ -37,18 +37,23 @@ import (
 	"github.com/spf13/cobra"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 )
 
 var (
-	httpPort     = 8080
-	udpPort      = 8081
-	sctpPort     = -1
-	shellPath    = "/bin/sh"
-	serverReady  = &atomicBool{0}
-	certFile     = ""
-	privKeyFile  = ""
-	httpOverride = ""
+	httpPort           = 8080
+	udpPort            = 8081
+	sctpPort           = -1
+	shellPath          = "/bin/sh"
+	serverReady        = &atomicBool{0}
+	certFile           = ""
+	privKeyFile        = ""
+	httpOverride       = ""
+	udpListenAddresses = ""
 )
+
+const bindToAny = ""
 
 // CmdNetexec is used by agnhost Cobra.
 var CmdNetexec = &cobra.Command{
@@ -101,11 +106,13 @@ will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey
 If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
 ignoring the request URL.
 
-It will also start a UDP server on the indicated UDP port that responds to the following commands:
+It will also start a UDP server on the indicated UDP port and addresses that responds to the following commands:
 
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
 - "clientip": Returns the request's IP address
+
+The UDP server can be disabled by setting --udp-port to -1.
 
 Additionally, if (and only if) --sctp-port is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
@@ -123,6 +130,7 @@ func init() {
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
 	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
+	CmdNetexec.Flags().StringVar(&udpListenAddresses, "udp-listen-addresses", "", "A comma separated list of ip addresses the udp servers listen from")
 }
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
@@ -162,7 +170,19 @@ func main(cmd *cobra.Command, args []string) {
 		addRoutes(http.DefaultServeMux, exitCh)
 	}
 
-	go startUDPServer(udpPort)
+	// UDP server
+	if udpPort != -1 {
+		udpBindTo, err := parseAddresses(udpListenAddresses)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, address := range udpBindTo {
+			go startUDPServer(address, udpPort)
+		}
+	}
+
+	// SCTP server
 	if sctpPort != -1 {
 		go startSCTPServer(sctpPort)
 	}
@@ -321,15 +341,12 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	var dialer func(string, net.Addr) (string, error)
 	switch strings.ToLower(protocol) {
 	case "", "http":
-		protocol = "http"
 		dialer = dialHTTP
 		addr, err = net.ResolveTCPAddr("tcp", hostPort)
 	case "udp":
-		protocol = "udp"
 		dialer = dialUDP
 		addr, err = net.ResolveUDPAddr("udp", hostPort)
 	case "sctp":
-		protocol = "sctp"
 		dialer = dialSCTP
 		addr, err = sctp.ResolveSCTPAddr("sctp", hostPort)
 	default:
@@ -542,15 +559,15 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // udp server supports the hostName, echo and clientIP commands.
-func startUDPServer(udpPort int) {
-	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
+func startUDPServer(address string, udpPort int) {
+	serverAddress, err := net.ResolveUDPAddr("udp", net.JoinHostPort(address, strconv.Itoa(udpPort)))
 	assertNoError(err, fmt.Sprintf("failed to resolve UDP address for port %d", sctpPort))
 	serverConn, err := net.ListenUDP("udp", serverAddress)
 	assertNoError(err, fmt.Sprintf("failed to create listener for UDP address %v", serverAddress))
 	defer serverConn.Close()
 	buf := make([]byte, 2048)
 
-	log.Printf("Started UDP server on port %d", udpPort)
+	log.Printf("Started UDP server on port %s %d", address, udpPort)
 	// Start responding to readiness probes.
 	serverReady.set(true)
 	defer func() {
@@ -641,4 +658,22 @@ func assertNoError(err error, detail string) {
 	if err != nil {
 		log.Fatalf("Error occurred: %s:%v", detail, err)
 	}
+}
+
+func parseAddresses(addresses string) ([]string, error) {
+	if addresses == "" {
+		return []string{bindToAny}, nil
+	}
+	// Using a set to remove duplicates
+	res := make([]string, 0)
+	split := strings.Split(addresses, ",")
+	for _, address := range split {
+		netAddr := netutils.ParseIPSloppy(address)
+		if netAddr == nil {
+			return nil, fmt.Errorf("parseAddress: invalid address %s", address)
+		}
+		res = append(res, address)
+	}
+	set := sets.NewString(res...)
+	return set.List(), nil
 }

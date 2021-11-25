@@ -66,6 +66,10 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 			}
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
+
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
 			initialConfig.FeatureGates[string(LSCIQuotaFeature)] = quotasRequested
 		})
 		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
@@ -90,7 +94,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
 // file; if du is used to monitor, it will not detect this.
-var _ = framework.KubeDescribe("LocalStorageCapacityIsolationQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
 	runOneQuotaTest(f, true)
 	runOneQuotaTest(f, false)

@@ -32,13 +32,13 @@ import (
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -70,12 +70,12 @@ func init() {
 	utilruntime.Must(Scheme.SetVersionPriority(authenticationv1.SchemeGroupVersion, authenticationv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(authorizationv1.SchemeGroupVersion, authorizationv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(autoscalingv1.SchemeGroupVersion, autoscalingv2beta1.SchemeGroupVersion))
-	utilruntime.Must(Scheme.SetVersionPriority(batchv1.SchemeGroupVersion, batchv1beta1.SchemeGroupVersion, batchv2alpha1.SchemeGroupVersion))
+	utilruntime.Must(Scheme.SetVersionPriority(batchv1.SchemeGroupVersion, batchv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(certificatesv1.SchemeGroupVersion, certificatesv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(extensionsv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(imagepolicyv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(networkingv1.SchemeGroupVersion))
-	utilruntime.Must(Scheme.SetVersionPriority(policyv1beta1.SchemeGroupVersion))
+	utilruntime.Must(Scheme.SetVersionPriority(policyv1beta1.SchemeGroupVersion, policyv1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(rbacv1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion, rbacv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(schedulingv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(storagev1.SchemeGroupVersion, storagev1beta1.SchemeGroupVersion))

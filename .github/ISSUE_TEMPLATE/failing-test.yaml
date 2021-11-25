@@ -1,0 +1,48 @@
+name: Failing Test
+description: Report continuously failing tests or jobs in Kubernetes CI
+labels: kind/failing-test
+body:
+  - type: textarea
+    id: jobs
+    attributes:
+      label: Which jobs are failing?
+      placeholder: |
+        Please only use this template for submitting reports about continuously failing tests or jobs in Kubernetes CI.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Which tests are failing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: since
+    attributes:
+      label: Since when has it been failing?
+    validations:
+      required: true
+
+  - type: input
+    id: testgrid
+    attributes:
+      label: Testgrid link
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason for failure (if possible)
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else we need to know?
+
+  - type: textarea
+    id: sigs
+    attributes:
+      label: Relevant SIG(s)
+      description: You can identify the SIG from the "prowjob_config_url" on the testgrid dashboard for a test.
+      value: /sig 

@@ -35,6 +35,14 @@ func NewNotSupportedError() *MetricsError {
 	}
 }
 
+// NewNotImplementedError creates a new MetricsError with code NotSupported.
+func NewNotImplementedError(reason string) *MetricsError {
+	return &MetricsError{
+		Code: ErrCodeNotSupported,
+		Msg:  fmt.Sprintf("metrics support is not implemented: %s", reason),
+	}
+}
+
 // NewNotSupportedErrorWithDriverName creates a new MetricsError with code NotSupported.
 // driver name is added to the error message.
 func NewNotSupportedErrorWithDriverName(name string) *MetricsError {

@@ -2,7 +2,7 @@
 
 module k8s.io/kube-proxy
 
-go 1.15
+go 1.16
 
 require (
 	k8s.io/apimachinery v0.0.0

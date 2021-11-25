@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -30,6 +31,7 @@ import (
 
 func TestNetworkPluginManagerMetrics(t *testing.T) {
 	metrics.Register()
+	defer legacyregistry.Reset()
 
 	operation := "test_operation"
 	recordOperation(operation, time.Now())

@@ -272,6 +272,7 @@ message HorizontalPodAutoscalerStatus {
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
   // and indicates whether or not those conditions are met.
+  // +optional
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 

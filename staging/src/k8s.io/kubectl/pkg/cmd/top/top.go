@@ -37,7 +37,7 @@ var (
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage.
+		Display Resource (CPU/Memory) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
@@ -47,7 +47,7 @@ var (
 func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
-		Short: i18n.T("Display Resource (CPU/Memory/Storage) usage."),
+		Short: i18n.T("Display resource (CPU/memory) usage"),
 		Long:  topLong,
 		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}

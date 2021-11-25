@@ -55,7 +55,6 @@ var ParameterCodec = runtime.NewParameterCodec(scheme)
 
 var optionsTypes = []runtime.Object{
 	&ListOptions{},
-	&ExportOptions{},
 	&GetOptions{},
 	&DeleteOptions{},
 	&CreateOptions{},

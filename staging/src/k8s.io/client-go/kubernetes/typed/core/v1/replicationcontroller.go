@@ -20,6 +20,8 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -27,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -48,6 +51,8 @@ type ReplicationControllerInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicationController, err error)
+	Apply(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error)
+	ApplyStatus(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error)
 	GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -192,6 +197,62 @@ func (c *replicationControllers) Patch(ctx context.Context, name string, pt type
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied replicationController.
+func (c *replicationControllers) Apply(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+	result = &v1.ReplicationController{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *replicationControllers) ApplyStatus(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+
+	result = &v1.ReplicationController{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

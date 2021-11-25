@@ -64,6 +64,7 @@ type Rule struct {
 }
 
 // ScopeType specifies a scope for a Rule.
+// +enum
 type ScopeType string
 
 const (
@@ -77,6 +78,7 @@ const (
 )
 
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
+// +enum
 type FailurePolicyType string
 
 const (
@@ -87,6 +89,7 @@ const (
 )
 
 // MatchPolicyType specifies the type of match policy.
+// +enum
 type MatchPolicyType string
 
 const (
@@ -97,6 +100,7 @@ const (
 )
 
 // SideEffectClass specifies the types of side effects a webhook may have.
+// +enum
 type SideEffectClass string
 
 const (
@@ -279,7 +283,7 @@ type ValidatingWebhook struct {
 	// SideEffects states whether this webhook has side effects.
 	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
-	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
 	// sideEffects == Unknown or Some.
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
@@ -408,7 +412,7 @@ type MutatingWebhook struct {
 	// SideEffects states whether this webhook has side effects.
 	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
-	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
 	// sideEffects == Unknown or Some.
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
@@ -450,6 +454,7 @@ type MutatingWebhook struct {
 }
 
 // ReinvocationPolicyType specifies what type of policy the admission hook uses.
+// +enum
 type ReinvocationPolicyType string
 
 const (
@@ -476,6 +481,7 @@ type RuleWithOperations struct {
 }
 
 // OperationType specifies an operation for a request.
+// +enum
 type OperationType string
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.

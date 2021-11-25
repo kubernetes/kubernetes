@@ -4,6 +4,8 @@ approvers:
 - derekwaynecarr
 - vishh
 - ConnorDoyle
-- balajismaniam
 reviewers:
 - klueska
+
+emeritus_approvers:
+- balajismaniam

@@ -5,7 +5,6 @@ package fs
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,8 +32,7 @@ const (
 	clockTicks uint64 = 100
 )
 
-type CpuacctGroup struct {
-}
+type CpuacctGroup struct{}
 
 func (s *CpuacctGroup) Name() string {
 	return "cpuacct"
@@ -44,7 +42,7 @@ func (s *CpuacctGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *CpuacctGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *CpuacctGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 
@@ -83,8 +81,7 @@ func (s *CpuacctGroup) GetStats(path string, stats *cgroups.Stats) error {
 
 // Returns user and kernel usage breakdown in nanoseconds.
 func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
-	userModeUsage := uint64(0)
-	kernelModeUsage := uint64(0)
+	var userModeUsage, kernelModeUsage uint64
 	const (
 		userField   = "user"
 		systemField = "system"
@@ -93,11 +90,11 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	// Expected format:
 	// user <usage in ticks>
 	// system <usage in ticks>
-	data, err := ioutil.ReadFile(filepath.Join(path, cgroupCpuacctStat))
+	data, err := cgroups.ReadFile(path, cgroupCpuacctStat)
 	if err != nil {
 		return 0, 0, err
 	}
-	fields := strings.Fields(string(data))
+	fields := strings.Fields(data)
 	if len(fields) < 4 {
 		return 0, 0, fmt.Errorf("failure - %s is expected to have at least 4 fields", filepath.Join(path, cgroupCpuacctStat))
 	}
@@ -119,11 +116,11 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 
 func getPercpuUsage(path string) ([]uint64, error) {
 	percpuUsage := []uint64{}
-	data, err := ioutil.ReadFile(filepath.Join(path, "cpuacct.usage_percpu"))
+	data, err := cgroups.ReadFile(path, "cpuacct.usage_percpu")
 	if err != nil {
 		return percpuUsage, err
 	}
-	for _, value := range strings.Fields(string(data)) {
+	for _, value := range strings.Fields(data) {
 		value, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
 			return percpuUsage, fmt.Errorf("Unable to convert param value to uint64: %s", err)
@@ -137,7 +134,7 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	usageKernelMode := []uint64{}
 	usageUserMode := []uint64{}
 
-	file, err := os.Open(filepath.Join(path, cgroupCpuacctUsageAll))
+	file, err := cgroups.OpenFile(path, cgroupCpuacctUsageAll, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return usageKernelMode, usageUserMode, nil
 	} else if err != nil {
@@ -146,7 +143,7 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	scanner.Scan() //skipping header line
+	scanner.Scan() // skipping header line
 
 	for scanner.Scan() {
 		lineFields := strings.SplitN(scanner.Text(), " ", cuacctUsageAllColumnsNumber+1)

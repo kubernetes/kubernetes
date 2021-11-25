@@ -142,3 +142,9 @@ func (v Variant) String() string {
 func (v Variant) Value() interface{} {
 	return v.value
 }
+
+// Store converts the variant into a native go type using the same
+// mechanism as the "Store" function.
+func (v Variant) Store(value interface{}) error {
+	return storeInterfaces(v.value, value)
+}

@@ -18,11 +18,10 @@ package iptables
 
 import (
 	"fmt"
-	"net"
 
 	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // LocalTrafficDetector in a interface to take action (jump) based on whether traffic originated locally
@@ -66,10 +65,10 @@ type detectLocalByCIDR struct {
 // NewDetectLocalByCIDR implements the LocalTrafficDetector interface using a CIDR. This can be used when a single CIDR
 // range can be used to capture the notion of local traffic.
 func NewDetectLocalByCIDR(cidr string, ipt utiliptables.Interface) (LocalTrafficDetector, error) {
-	if utilnet.IsIPv6CIDRString(cidr) != ipt.IsIPv6() {
+	if netutils.IsIPv6CIDRString(cidr) != ipt.IsIPv6() {
 		return nil, fmt.Errorf("CIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIPv6())
 	}
-	_, _, err := net.ParseCIDR(cidr)
+	_, _, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		return nil, err
 	}
@@ -82,12 +81,12 @@ func (d *detectLocalByCIDR) IsImplemented() bool {
 
 func (d *detectLocalByCIDR) JumpIfLocal(args []string, toChain string) []string {
 	line := append(args, "-s", d.cidr, "-j", toChain)
-	klog.V(4).Info("[DetectLocalByCIDR (", d.cidr, ")", " Jump Local: ", line)
+	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpLocal", line)
 	return line
 }
 
 func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []string {
 	line := append(args, "!", "-s", d.cidr, "-j", toChain)
-	klog.V(4).Info("[DetectLocalByCIDR (", d.cidr, ")]", " Jump Not Local: ", line)
+	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpNotLocal", line)
 	return line
 }

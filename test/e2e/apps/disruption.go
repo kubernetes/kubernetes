@@ -19,15 +19,16 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -74,7 +75,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 	ginkgo.Context("Listing PodDisruptionBudgets for all namespaces", func() {
 		anotherFramework := framework.NewDefaultFramework("disruption-2")
 
-		ginkgo.It("should list and delete a collection of PodDisruptionBudgets", func() {
+		/*
+		   Release : v1.21
+		   Testname: PodDisruptionBudget: list and delete collection
+		   Description: PodDisruptionBudget API must support list and deletecollection operations.
+		*/
+		framework.ConformanceIt("should list and delete a collection of PodDisruptionBudgets", func() {
 			specialLabels := map[string]string{"foo_pdb": "bar_pdb"}
 			labelSelector := labels.SelectorFromSet(specialLabels).String()
 			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(2), specialLabels)
@@ -90,11 +96,45 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	})
 
-	ginkgo.It("should create a PodDisruptionBudget", func() {
+	/*
+		Release : v1.21
+		Testname: PodDisruptionBudget: create, update, patch, and delete object
+		Description: PodDisruptionBudget API must support create, update, patch, and delete operations.
+	*/
+	framework.ConformanceIt("should create a PodDisruptionBudget", func() {
+		ginkgo.By("creating the pdb")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1%"), defaultLabels)
+
+		ginkgo.By("updating the pdb")
+		updatedPDB := updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
+			newMinAvailable := intstr.FromString("2%")
+			pdb.Spec.MinAvailable = &newMinAvailable
+			return pdb
+		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
+		framework.ExpectEqual(updatedPDB.Spec.MinAvailable.String(), "2%")
+
+		ginkgo.By("patching the pdb")
+		patchedPDB := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
+			newBytes, err := json.Marshal(map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minAvailable": "3%",
+				},
+			})
+			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			return newBytes, nil
+		})
+		framework.ExpectEqual(patchedPDB.Spec.MinAvailable.String(), "3%")
+
+		deletePDBOrDie(cs, ns, defaultName)
 	})
 
-	ginkgo.It("should observe PodDisruptionBudget status updated", func() {
+	/*
+	   Release : v1.21
+	   Testname: PodDisruptionBudget: Status updates
+	   Description: Disruption controller MUST update the PDB status with
+	   how many disruptions are allowed.
+	*/
+	framework.ConformanceIt("should observe PodDisruptionBudget status updated", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		createPodsOrDie(cs, ns, 3)
@@ -103,7 +143,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+			pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -112,7 +152,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should update/patch PodDisruptionBudget status", func() {
+	/*
+		Release : v1.21
+		Testname: PodDisruptionBudget: update and patch status
+		Description: PodDisruptionBudget API must support update and patch operations on status subresource.
+	*/
+	framework.ConformanceIt("should update/patch PodDisruptionBudget status", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		ginkgo.By("Updating PodDisruptionBudget status")
@@ -121,17 +166,17 @@ var _ = SIGDescribe("DisruptionController", func() {
 		createPodsOrDie(cs, ns, 1)
 		waitForPodsOrDie(cs, ns, 1)
 		pod, _ := locateRunningPod(cs, ns)
-		updatePDBOrDie(cs, ns, defaultName, func(old *policyv1beta1.PodDisruptionBudget) *policyv1beta1.PodDisruptionBudget {
+		updatePDBOrDie(cs, ns, defaultName, func(old *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
 			old.Status.DisruptedPods[pod.Name] = metav1.NewTime(time.Now())
 			return old
-		}, cs.PolicyV1beta1().PodDisruptionBudgets(ns).UpdateStatus)
+		}, cs.PolicyV1().PodDisruptionBudgets(ns).UpdateStatus)
 		// fetch again to make sure the update from API was effective
 		updated := getPDBStatusOrDie(dc, ns, defaultName)
 		framework.ExpectHaveKey(updated.Status.DisruptedPods, pod.Name, "Expecting the DisruptedPods have %s", pod.Name)
 
 		ginkgo.By("Patching PodDisruptionBudget status")
-		patched := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1beta1.PodDisruptionBudget) (bytes []byte, err error) {
+		patched := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldBytes, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for old data")
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
@@ -141,6 +186,25 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}, "status")
 		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
 	})
+
+	// PDB shouldn't error out when there are unmanaged pods
+	ginkgo.It("should observe that the PodDisruptionBudget status is not updated for unmanaged pods",
+		func() {
+			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+
+			createPodsOrDie(cs, ns, 3)
+			waitForPodsOrDie(cs, ns, 3)
+
+			// Since we allow unmanaged pods to be associated with a PDB, we should not see any error
+			gomega.Consistently(func() (bool, error) {
+				pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return isPDBErroring(pdb), nil
+			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod shouldn't error for "+
+				"unmanaged pod")
+		})
 
 	evictionCases := []struct {
 		description        string
@@ -240,7 +304,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			pod, err := locateRunningPod(cs, ns)
 			framework.ExpectNoError(err)
 
-			e := &policyv1beta1.Eviction{
+			e := &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
@@ -248,8 +312,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			if c.shouldDeny {
-				err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+				err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+				framework.ExpectError(err, "pod eviction should fail")
+				framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -259,7 +324,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-					err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+					err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 					if err != nil {
 						return false, nil
 					}
@@ -270,7 +335,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	}
 
-	ginkgo.It("should block an eviction until the PDB is updated to allow it", func() {
+	/*
+		Release : v1.22
+		Testname: PodDisruptionBudget: block an eviction until the PDB is updated to allow it
+		Description: Eviction API must block an eviction until the PDB is updated to allow it
+	*/
+	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func() {
 		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(3), defaultLabels)
 		createReplicaSetOrDie(cs, ns, 3, false)
@@ -280,30 +350,31 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		pod, err := locateRunningPod(cs, ns)
 		framework.ExpectNoError(err)
-		e := &policyv1beta1.Eviction{
+		e := &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
-		updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1beta1.PodDisruptionBudget) *policyv1beta1.PodDisruptionBudget {
+		updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
 			newMinAvailable := intstr.FromInt(2)
 			pdb.Spec.MinAvailable = &newMinAvailable
 			return pdb
-		}, cs.PolicyV1beta1().PodDisruptionBudgets(ns).Update)
+		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
 
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
 		waitForPdbToObserveHealthyPods(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
-		patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1beta1.PodDisruptionBudget) (bytes []byte, err error) {
+		patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldData, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for old data")
 			old.Spec.MinAvailable = nil
@@ -317,66 +388,67 @@ var _ = SIGDescribe("DisruptionController", func() {
 		waitForPodsOrDie(cs, ns, 3)
 		pod, err = locateRunningPod(cs, ns) // locate a new running pod
 		framework.ExpectNoError(err)
-		e = &policyv1beta1.Eviction{
+		e = &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
 		deletePDBOrDie(cs, ns, defaultName)
 
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, name string, minAvailable intstr.IntOrString, labels map[string]string) {
-	pdb := policyv1beta1.PodDisruptionBudget{
+	pdb := policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 			Labels:    labels,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
+	_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with minAvailable %d in namespace %s", minAvailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns, name)
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, name string, maxUnavailable intstr.IntOrString) {
-	pdb := policyv1beta1.PodDisruptionBudget{
+	pdb := policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MaxUnavailable: &maxUnavailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
+	_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with maxUnavailable %d in namespace %s", maxUnavailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns, name)
 }
 
-type updateFunc func(pdb *policyv1beta1.PodDisruptionBudget) *policyv1beta1.PodDisruptionBudget
-type updateRestAPI func(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1beta1.PodDisruptionBudget, error)
-type patchFunc func(pdb *policyv1beta1.PodDisruptionBudget) ([]byte, error)
+type updateFunc func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget
+type updateRestAPI func(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1.PodDisruptionBudget, error)
+type patchFunc func(pdb *policyv1.PodDisruptionBudget) ([]byte, error)
 
-func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFunc, api updateRestAPI) (updated *policyv1beta1.PodDisruptionBudget) {
+func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFunc, api updateRestAPI) (updated *policyv1.PodDisruptionBudget) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		old, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		old, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -392,12 +464,12 @@ func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFun
 	return updated
 }
 
-func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f patchFunc, subresources ...string) (updated *policyv1beta1.PodDisruptionBudget) {
+func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f patchFunc, subresources ...string) (updated *policyv1.PodDisruptionBudget) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old := getPDBStatusOrDie(dc, ns, name)
 		patchBytes, err := f(old)
 		framework.ExpectNoError(err)
-		if updated, err = cs.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
+		if updated, err = cs.PolicyV1().PodDisruptionBudgets(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
 			return err
 		}
 		framework.ExpectNoError(err)
@@ -410,13 +482,13 @@ func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, nam
 }
 
 func deletePDBOrDie(cs kubernetes.Interface, ns string, name string) {
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := cs.PolicyV1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "Deleting pdb in namespace %s", ns)
 	waitForPdbToBeDeleted(cs, ns, name)
 }
 
 func listPDBs(cs kubernetes.Interface, ns string, labelSelector string, count int, expectedPDBNames []string) {
-	pdbList, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	framework.ExpectNoError(err, "Listing PDB set in namespace %s", ns)
 	framework.ExpectEqual(len(pdbList.Items), count, "Expecting %d PDBs returned in namespace %s", count, ns)
 
@@ -429,7 +501,7 @@ func listPDBs(cs kubernetes.Interface, ns string, labelSelector string, count in
 
 func deletePDBCollection(cs kubernetes.Interface, ns string) {
 	ginkgo.By("deleting a collection of PDBs")
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	err := cs.PolicyV1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	framework.ExpectNoError(err, "Deleting PDB set in namespace %s", ns)
 
 	waitForPDBCollectionToBeDeleted(cs, ns)
@@ -438,7 +510,7 @@ func deletePDBCollection(cs kubernetes.Interface, ns string) {
 func waitForPDBCollectionToBeDeleted(cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pdbList, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{})
+		pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -564,7 +636,7 @@ func locateRunningPod(cs kubernetes.Interface, ns string) (pod *v1.Pod, err erro
 func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be processed")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -579,7 +651,7 @@ func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string, name string) {
 func waitForPdbToBeDeleted(cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be deleted")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil // done
 		}
@@ -594,7 +666,7 @@ func waitForPdbToBeDeleted(cs kubernetes.Interface, ns string, name string) {
 func waitForPdbToObserveHealthyPods(cs kubernetes.Interface, ns string, healthyCount int32) {
 	ginkgo.By("Waiting for the pdb to observed all healthy pods")
 	err := wait.PollImmediate(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
-		pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
+		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -606,8 +678,8 @@ func waitForPdbToObserveHealthyPods(cs kubernetes.Interface, ns string, healthyC
 	framework.ExpectNoError(err, "Waiting for the pdb in namespace %s to observed %d healthy pods", ns, healthyCount)
 }
 
-func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1beta1.PodDisruptionBudget {
-	pdbStatusResource := policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
+func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1.PodDisruptionBudget {
+	pdbStatusResource := policyv1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
 	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
 	framework.ExpectNoError(err)
 	pdb, err := unstructuredToPDB(unstruct)
@@ -615,14 +687,26 @@ func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1be
 	return pdb
 }
 
-func unstructuredToPDB(obj *unstructured.Unstructured) (*policyv1beta1.PodDisruptionBudget, error) {
+func unstructuredToPDB(obj *unstructured.Unstructured) (*policyv1.PodDisruptionBudget, error) {
 	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	pdb := &policyv1beta1.PodDisruptionBudget{}
+	pdb := &policyv1.PodDisruptionBudget{}
 	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pdb)
 	pdb.Kind = ""
 	pdb.APIVersion = ""
 	return pdb, err
+}
+
+// isPDBErroring checks if the PDB is erroring on when there are unmanaged pods
+func isPDBErroring(pdb *policyv1.PodDisruptionBudget) bool {
+	hasFailed := false
+	for _, condition := range pdb.Status.Conditions {
+		if strings.Contains(condition.Reason, "SyncFailed") &&
+			strings.Contains(condition.Message, "found no controller ref for pod") {
+			hasFailed = true
+		}
+	}
+	return hasFailed
 }

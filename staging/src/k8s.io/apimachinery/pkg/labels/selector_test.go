@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -147,7 +148,7 @@ func expectMatchDirect(t *testing.T, selector, ls Set) {
 	}
 }
 
-//lint:ignore U1000 currently commented out in TODO of TestSetMatches
+//nolint:staticcheck,unused //iccheck // U1000 currently commented out in TODO of TestSetMatches
 func expectNoMatchDirect(t *testing.T, selector, ls Set) {
 	if SelectorFromSet(selector).Matches(ls) {
 		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
@@ -300,6 +301,33 @@ func TestParserLookahead(t *testing.T) {
 			if token != token2 || lit != lit2 {
 				t.Errorf("Bad values")
 			}
+		}
+	}
+}
+
+func TestParseOperator(t *testing.T) {
+	testcases := []struct {
+		token         string
+		expectedError error
+	}{
+		{"in", nil},
+		{"=", nil},
+		{"==", nil},
+		{">", nil},
+		{"<", nil},
+		{"notin", nil},
+		{"!=", nil},
+		{"!", fmt.Errorf("found '%s', expected: %v", selection.DoesNotExist, strings.Join(binaryOperators, ", "))},
+		{"exists", fmt.Errorf("found '%s', expected: %v", selection.Exists, strings.Join(binaryOperators, ", "))},
+		{"(", fmt.Errorf("found '%s', expected: %v", "(", strings.Join(binaryOperators, ", "))},
+	}
+	for _, testcase := range testcases {
+		p := &Parser{l: &Lexer{s: testcase.token, pos: 0}, position: 0}
+		p.scan()
+
+		_, err := p.parseOperator()
+		if ok := reflect.DeepEqual(testcase.expectedError, err); !ok {
+			t.Errorf("\nexpect err [%v], \nactual err [%v]", testcase.expectedError, err)
 		}
 	}
 }
@@ -904,9 +932,99 @@ func TestValidatedSelectorFromSet(t *testing.T) {
 			t.Errorf("ValidatedSelectorFromSet %#v returned unexpected error (-want,+got):\n%s", tc.name, diff)
 		}
 		if err == nil {
-			if diff := cmp.Diff(tc.expectedSelector, selector, cmp.AllowUnexported(Requirement{})); diff != "" {
+			if diff := cmp.Diff(tc.expectedSelector, selector); diff != "" {
 				t.Errorf("ValidatedSelectorFromSet %#v returned unexpected selector (-want,+got):\n%s", tc.name, diff)
 			}
 		}
+	}
+}
+
+func BenchmarkRequirementString(b *testing.B) {
+	r := Requirement{
+		key:      "environment",
+		operator: selection.NotIn,
+		strValues: []string{
+			"dev",
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if r.String() != "environment notin (dev)" {
+			b.Errorf("Unexpected Requirement string")
+		}
+	}
+}
+
+func TestRequirementEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		x, y *Requirement
+		want bool
+	}{
+		{
+			name: "same requirements should be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			want: true,
+		},
+		{
+			name: "requirements with different keys should not be equal",
+			x: &Requirement{
+				key:       "key1",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key2",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			want: false,
+		},
+		{
+			name: "requirements with different operators should not be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.In,
+				strValues: []string{"foo", "bar"},
+			},
+			want: false,
+		},
+		{
+			name: "requirements with different values should not be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foobar"},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cmp.Equal(tt.x, tt.y); got != tt.want {
+				t.Errorf("cmp.Equal() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

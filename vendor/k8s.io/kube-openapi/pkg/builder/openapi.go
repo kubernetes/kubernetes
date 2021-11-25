@@ -23,10 +23,10 @@ import (
 	"strings"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (

@@ -109,6 +109,8 @@ type MutableFeatureGate interface {
 	SetFromMap(m map[string]bool) error
 	// Add adds features to the featureGate.
 	Add(features map[Feature]FeatureSpec) error
+	// GetAll returns a copy of the map of known feature names to feature specs.
+	GetAll() map[Feature]FeatureSpec
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -288,6 +290,15 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	f.known.Store(known)
 
 	return nil
+}
+
+// GetAll returns a copy of the map of known feature names to feature specs.
+func (f *featureGate) GetAll() map[Feature]FeatureSpec {
+	retval := map[Feature]FeatureSpec{}
+	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {
+		retval[k] = v
+	}
+	return retval
 }
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.

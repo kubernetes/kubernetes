@@ -1,3 +1,4 @@
+//go:build windows && !dockerless
 // +build windows,!dockerless
 
 /*
@@ -29,7 +30,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type containerCleanupInfo struct {

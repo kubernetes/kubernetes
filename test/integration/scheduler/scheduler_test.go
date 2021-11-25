@@ -28,20 +28,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/scheduler"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/pointer"
 )
 
 type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
@@ -49,314 +47,6 @@ type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.Node
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
 	makeUnSchedulable nodeMutationFunc
-}
-
-// TestSchedulerCreationFromConfigMap verifies that scheduler can be created
-// from configurations provided by a ConfigMap object and then verifies that the
-// configuration is applied correctly.
-func TestSchedulerCreationFromConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	defer clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
-
-	for i, test := range []struct {
-		policy          string
-		expectedPlugins map[string][]kubeschedulerconfig.Plugin
-	}{
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1",
-				"predicates" : [
-					{"name" : "PodFitsResources"}
-				],
-				"priorities" : [
-					{"name" : "ImageLocalityPriority", "weight" : 1}
-				]
-			}`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "TaintToleration"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"ScorePlugin": {
-					{Name: "ImageLocality", Weight: 1},
-				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1"
-			}`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "VolumeBinding"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "NodeName"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeRestrictions"},
-					{Name: "TaintToleration"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"PreScorePlugin": {
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-					{Name: "NodeAffinity"},
-					{Name: "TaintToleration"},
-				},
-				"ScorePlugin": {
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 2},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesLeastAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "TaintToleration", Weight: 1},
-				},
-				"ReservePlugin": {{Name: "VolumeBinding"}},
-				"PreBindPlugin": {{Name: "VolumeBinding"}},
-				"BindPlugin":    {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1",
-				"predicates" : [],
-				"priorities" : []
-			}`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"BindPlugin":       {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-predicates:
-- name: PodFitsResources
-priorities:
-- name: ImageLocalityPriority
-  weight: 1
-`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "TaintToleration"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"ScorePlugin": {
-					{Name: "ImageLocality", Weight: 1},
-				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "VolumeBinding"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "NodeName"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeRestrictions"},
-					{Name: "TaintToleration"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"PreScorePlugin": {
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-					{Name: "NodeAffinity"},
-					{Name: "TaintToleration"},
-				},
-				"ScorePlugin": {
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 2},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesLeastAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "TaintToleration", Weight: 1},
-				},
-				"ReservePlugin": {{Name: "VolumeBinding"}},
-				"PreBindPlugin": {{Name: "VolumeBinding"}},
-				"BindPlugin":    {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-predicates: []
-priorities: []
-`,
-			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-				},
-				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
-				"BindPlugin":       {{Name: "DefaultBinder"}},
-			},
-		},
-	} {
-		// Add a ConfigMap object.
-		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
-		policyConfigMap := v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-			Data:       map[string]string{kubeschedulerconfig.SchedulerPolicyConfigMapKey: test.policy},
-		}
-
-		policyConfigMap.APIVersion = "v1"
-		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
-
-		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1()})
-		stopCh := make(chan struct{})
-		eventBroadcaster.StartRecordingToSink(stopCh)
-
-		sched, err := scheduler.New(clientSet,
-			informerFactory,
-			profile.NewRecorderFactory(eventBroadcaster),
-			nil,
-			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
-				Policy: &kubeschedulerconfig.SchedulerPolicySource{
-					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-						Namespace: policyConfigMap.Namespace,
-						Name:      policyConfigMap.Name,
-					},
-				},
-			}),
-			scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{
-				SchedulerName: v1.DefaultSchedulerName,
-				PluginConfig: []kubeschedulerconfig.PluginConfig{
-					{
-						Name: "VolumeBinding",
-						Args: &kubeschedulerconfig.VolumeBindingArgs{
-							BindTimeoutSeconds: 30,
-						},
-					},
-				},
-			}),
-		)
-		if err != nil {
-			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
-		}
-
-		schedPlugins := sched.Profiles[v1.DefaultSchedulerName].ListPlugins()
-		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {
-			t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
-		}
-	}
-}
-
-// TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
-// scheduler from a non-existent ConfigMap fails.
-func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	defer clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
-
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1()})
-	stopCh := make(chan struct{})
-	eventBroadcaster.StartRecordingToSink(stopCh)
-
-	_, err := scheduler.New(clientSet,
-		informerFactory,
-		profile.NewRecorderFactory(eventBroadcaster),
-		nil,
-		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-					Namespace: "non-existent-config",
-					Name:      "non-existent-config",
-				},
-			},
-		}),
-		scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{
-			SchedulerName: v1.DefaultSchedulerName,
-			PluginConfig: []kubeschedulerconfig.PluginConfig{
-				{
-					Name: "VolumeBinding",
-					Args: &kubeschedulerconfig.VolumeBindingArgs{
-						BindTimeoutSeconds: 30,
-					},
-				},
-			},
-		}),
-	)
-
-	if err == nil {
-		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
-	}
 }
 
 func TestUnschedulableNodes(t *testing.T) {
@@ -562,8 +252,22 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	fooProf := kubeschedulerconfig.KubeSchedulerProfile{SchedulerName: fooScheduler}
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, nil, scheduler.WithProfiles(fooProf))
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(fooScheduler),
+			PluginConfig: []v1beta3.PluginConfig{
+				{
+					Name: "VolumeBinding",
+					Args: runtime.RawExtension{
+						Object: &v1beta3.VolumeBindingArgs{
+							BindTimeoutSeconds: pointer.Int64Ptr(30),
+						},
+					},
+				},
+			}},
+		},
+	})
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
@@ -624,14 +328,14 @@ func TestMultipleSchedulers(t *testing.T) {
 }
 
 func TestMultipleSchedulingProfiles(t *testing.T) {
-	testCtx := initTest(t, "multi-scheduler", scheduler.WithProfiles(
-		kubeschedulerconfig.KubeSchedulerProfile{
-			SchedulerName: "default-scheduler",
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
+			{SchedulerName: pointer.StringPtr("default-scheduler")},
+			{SchedulerName: pointer.StringPtr("custom-scheduler")},
 		},
-		kubeschedulerconfig.KubeSchedulerProfile{
-			SchedulerName: "custom-scheduler",
-		},
-	))
+	})
+
+	testCtx := initTest(t, "multi-scheduler", scheduler.WithProfiles(cfg.Profiles...))
 	defer testutils.CleanupTest(t, testCtx)
 
 	node := &v1.Node{

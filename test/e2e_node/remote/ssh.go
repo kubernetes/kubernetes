@@ -44,8 +44,12 @@ func init() {
 	sshOptionsMap = map[string]string{
 		"gce": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
 	}
+	defaultGceKey := os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
+	if defaultGceKey == "" {
+		defaultGceKey = fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir)
+	}
 	sshDefaultKeyMap = map[string]string{
-		"gce": fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir),
+		"gce": defaultGceKey,
 	}
 }
 
@@ -110,8 +114,10 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	if *sshOptions != "" {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
+	klog.Infof("Running the command %s, with args: %v", cmd, args)
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
+		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil

@@ -25,6 +25,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
+// FileNameFlags are flags for processing files.
 // Usage of this struct by itself is discouraged.
 // These flags are composed by ResourceBuilderFlags
 // which should be used instead.
@@ -36,6 +37,7 @@ type FileNameFlags struct {
 	Recursive *bool
 }
 
+// ToOptions creates a new FileNameOptions struct and sets FilenameOptions based on FileNameflags
 func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	options := resource.FilenameOptions{}
 
@@ -56,6 +58,7 @@ func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	return options
 }
 
+// AddFlags binds file name flags to a given flagset
 func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	if o == nil {
 		return

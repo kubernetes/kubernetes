@@ -72,7 +72,7 @@ func NewInitializedVolumePluginMgr(
 		csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
 	} else {
-		klog.Warning("kubeClient is nil. Skip initialization of CSIDriverLister")
+		klog.InfoS("KubeClient is nil. Skip initialization of CSIDriverLister")
 	}
 
 	kvh := &kubeletVolumeHost{
@@ -176,13 +176,13 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
 	if kvh.csiDriversSynced == nil {
-		klog.Error("csiDriversSynced not found on KubeletVolumeHost")
+		klog.ErrorS(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
 	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.Warning("failed to wait for cache sync for CSIDriverLister")
+		klog.InfoS("Failed to wait for cache sync for CSIDriverLister")
 		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
 	}
 

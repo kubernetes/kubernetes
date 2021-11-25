@@ -545,7 +545,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
 			func() []*v1.PersistentVolume {
 				volumes := newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volumes[0].Status.Message = `Error getting deleter volume plugin for volume "volume4-10": no volume plugin matched`
+				volumes[0].Status.Message = `error getting deleter volume plugin for volume "volume4-10": no volume plugin matched`
 				return volumes
 			}(),
 			noclaims,
@@ -560,6 +560,21 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-11", "10Gi", "uid4-11", "claim4-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
 			newClaimArray("claim4-11", "uid4-11", "10Gi", "volume4-11", v1.ClaimBound, nil, annSkipLocalStore),
 			newClaimArray("claim4-11", "uid4-11", "10Gi", "volume4-11", v1.ClaimBound, nil, annSkipLocalStore),
+			noevents, noerrors, testSyncVolume,
+		},
+
+		{
+			// syncVolume with volume bound to claim which exists in etcd but not updated to local cache.
+			"4-12 - volume bound to newest claim but not updated to local cache",
+			newVolumeArray("volume4-12", "10Gi", "uid4-12-new", "claim4-12", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newVolumeArray("volume4-12", "10Gi", "uid4-12-new", "claim4-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			func() []*v1.PersistentVolumeClaim {
+				newClaim := newClaimArray("claim4-12", "uid4-12", "10Gi", "volume4-12", v1.ClaimBound, nil, "")
+				// update uid to new-uid and not sync to cache.
+				newClaim = append(newClaim, newClaimArray("claim4-12", "uid4-12-new", "10Gi", "volume4-12", v1.ClaimBound, nil, annSkipLocalStore)...)
+				return newClaim
+			}(),
+			newClaimArray("claim4-12", "uid4-12-new", "10Gi", "volume4-12", v1.ClaimBound, nil, annSkipLocalStore),
 			noevents, noerrors, testSyncVolume,
 		},
 

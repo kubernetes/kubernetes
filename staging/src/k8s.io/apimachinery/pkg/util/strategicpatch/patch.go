@@ -987,10 +987,10 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 		return nil
 	}
 
-	var nonDeleteList, toDeleteList []interface{}
+	var nonDeleteList []interface{}
 	var err error
 	if len(mergeKey) > 0 {
-		nonDeleteList, toDeleteList, err = extractToDeleteItems(typedPatchList)
+		nonDeleteList, _, err = extractToDeleteItems(typedPatchList)
 		if err != nil {
 			return err
 		}
@@ -1018,7 +1018,6 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 	if patchIndex < len(nonDeleteList) && setOrderIndex >= len(typedSetOrderList) {
 		return fmt.Errorf("The order in patch list:\n%v\n doesn't match %s list:\n%v\n", typedPatchList, setElementOrderDirectivePrefix, setOrderList)
 	}
-	typedPatchList = append(nonDeleteList, toDeleteList...)
 	return nil
 }
 
@@ -1329,15 +1328,19 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 
 		_, ok := original[k]
 		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
+			if !isDeleteList {
+				// If it's not in the original document, just take the patch value.
+				original[k] = patchV
+			}
 			continue
 		}
 
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
 		if originalType != patchType {
-			original[k] = patchV
+			if !isDeleteList {
+				original[k] = patchV
+			}
 			continue
 		}
 		// If they're both maps or lists, recurse into the value.

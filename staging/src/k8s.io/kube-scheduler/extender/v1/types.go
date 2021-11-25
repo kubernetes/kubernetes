@@ -92,6 +92,10 @@ type ExtenderFilterResult struct {
 	NodeNames *[]string
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap
+	// Filtered out nodes where the pod can't be scheduled and preemption would
+	// not change anything. The value is the failure message same as FailedNodes.
+	// Nodes specified here takes precedence over FailedNodes.
+	FailedAndUnresolvableNodes FailedNodesMap
 	// Error message indicating failure
 	Error string
 }

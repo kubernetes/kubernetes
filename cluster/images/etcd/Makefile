@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.1] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,15 +26,15 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.1
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.4.13
+LATEST_ETCD_VERSION?=3.5.1
 
-# REVISION provides a version number fo this image and all it's bundled
+# REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=1
+REVISION?=0
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -62,27 +62,29 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.12.17
+GOLANG_VERSION?=1.16.10
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:buster-v1.2.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:buster-v1.2.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:buster-v1.2.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:buster-v1.2.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:buster-v1.2.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.0.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
+
+QEMUVERSION?=5.2.0-2
 
 build:
 	# Explicitly copy files to the temp directory
@@ -91,11 +93,11 @@ build:
 
 	# Compile migrate
 	migrate_tmp_dir=$(shell mktemp -d); \
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
+	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
@@ -125,7 +127,7 @@ else
 		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
-		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
+		docker run --rm --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
 			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
@@ -143,12 +145,20 @@ else
 	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
-	# Replace BASEIMAGE with the real base image
-	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
-	cd $(TEMP_DIR) && sed -i.bak 's|RUNNERIMAGE|$(RUNNERIMAGE)|g' Dockerfile
+	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes
+	docker buildx version
+	BUILDER=$(shell docker buildx create --use)
 
 	# And build the image
-	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)
+	docker buildx build \
+		--pull \
+		--load \
+		--platform linux/$(ARCH) \
+		-t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) \
+		--build-arg BASEIMAGE=$(BASEIMAGE) \
+		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
+		$(TEMP_DIR)
+	docker buildx rm $$BUILDER
 
 push: build
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
@@ -172,7 +182,7 @@ push-manifest:
 	docker manifest push --purge ${MANIFEST_IMAGE}:${IMAGE_TAG}
 
 unit-test:
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go test -v k8s.io/kubernetes/cluster/images/etcd/migrate"
 
 # Integration tests require both a golang build environment and all the etcd binaries from a `k8s.gcr.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
@@ -181,11 +191,15 @@ unit-test:
 build-integration-test-image: build
 	cp -r $(TEMP_DIR) $(TEMP_DIR)_integration_test
 	cp Dockerfile $(TEMP_DIR)_integration_test/Dockerfile
-	cd $(TEMP_DIR)_integration_test && sed -i.bak 's|BASEIMAGE|golang:$(GOLANG_VERSION)|g' Dockerfile
-	docker build --pull -t etcd-integration-test $(TEMP_DIR)_integration_test
+	docker build \
+		--pull \
+		-t etcd-integration-test \
+		--build-arg BASEIMAGE=golang:$(GOLANG_VERSION) \
+		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
+		$(TEMP_DIR)_integration_test
 
 integration-test:
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) etcd-integration-test \
+	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) etcd-integration-test \
 		/bin/bash -c "CGO_ENABLED=0 go test -tags=integration k8s.io/kubernetes/cluster/images/etcd/migrate -args -v 10 -logtostderr true"
 
 integration-build-test: build-integration-test-image integration-test

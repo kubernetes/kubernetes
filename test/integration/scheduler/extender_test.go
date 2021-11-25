@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -280,7 +281,7 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	testCtx := testutils.InitTestMaster(t, "scheduler-extender", nil)
+	testCtx := testutils.InitTestAPIServer(t, "scheduler-extender", nil)
 	clientSet := testCtx.ClientSet
 
 	extender1 := &Extender{
@@ -315,42 +316,39 @@ func TestSchedulerExtender(t *testing.T) {
 	}))
 	defer es3.Close()
 
-	policy := schedulerapi.Policy{
-		Extenders: []schedulerapi.Extender{
-			{
-				URLPrefix:      es1.URL,
-				FilterVerb:     filter,
-				PrioritizeVerb: prioritize,
-				Weight:         3,
-				EnableHTTPS:    false,
-			},
-			{
-				URLPrefix:      es2.URL,
-				FilterVerb:     filter,
-				PrioritizeVerb: prioritize,
-				BindVerb:       bind,
-				Weight:         4,
-				EnableHTTPS:    false,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{
-					{
-						Name:               extendedResourceName,
-						IgnoredByScheduler: true,
-					},
+	extenders := []schedulerapi.Extender{
+		{
+			URLPrefix:      es1.URL,
+			FilterVerb:     filter,
+			PrioritizeVerb: prioritize,
+			Weight:         3,
+			EnableHTTPS:    false,
+		},
+		{
+			URLPrefix:      es2.URL,
+			FilterVerb:     filter,
+			PrioritizeVerb: prioritize,
+			BindVerb:       bind,
+			Weight:         4,
+			EnableHTTPS:    false,
+			ManagedResources: []schedulerapi.ExtenderManagedResource{
+				{
+					Name:               extendedResourceName,
+					IgnoredByScheduler: true,
 				},
 			},
-			{
-				URLPrefix:        es3.URL,
-				FilterVerb:       filter,
-				PrioritizeVerb:   prioritize,
-				Weight:           10,
-				EnableHTTPS:      false,
-				NodeCacheCapable: true,
-			},
+		},
+		{
+			URLPrefix:        es3.URL,
+			FilterVerb:       filter,
+			PrioritizeVerb:   prioritize,
+			Weight:           10,
+			EnableHTTPS:      false,
+			NodeCacheCapable: true,
 		},
 	}
-	policy.APIVersion = "v1"
 
-	testCtx = testutils.InitTestScheduler(t, testCtx, &policy)
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithExtenders(extenders...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	defer testutils.CleanupTest(t, testCtx)

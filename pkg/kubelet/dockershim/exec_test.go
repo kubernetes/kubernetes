@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -29,7 +30,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	mockclient "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker/testing"
 )
 
@@ -43,6 +48,8 @@ func TestExecInContainer(t *testing.T) {
 		returnStartExec    error
 		returnInspectExec1 *dockertypes.ContainerExecInspect
 		returnInspectExec2 error
+		execProbeTimeout   bool
+		startExecDelay     time.Duration
 		expectError        error
 	}{{
 		description:       "ExecInContainer succeeds",
@@ -57,6 +64,7 @@ func TestExecInContainer(t *testing.T) {
 			ExitCode:    0,
 			Pid:         100},
 		returnInspectExec2: nil,
+		execProbeTimeout:   true,
 		expectError:        nil,
 	}, {
 		description:        "CreateExec returns an error",
@@ -66,6 +74,7 @@ func TestExecInContainer(t *testing.T) {
 		returnStartExec:    nil,
 		returnInspectExec1: nil,
 		returnInspectExec2: nil,
+		execProbeTimeout:   true,
 		expectError:        fmt.Errorf("failed to exec in container - Exec setup failed - error in CreateExec()"),
 	}, {
 		description:        "StartExec returns an error",
@@ -75,6 +84,7 @@ func TestExecInContainer(t *testing.T) {
 		returnStartExec:    fmt.Errorf("error in StartExec()"),
 		returnInspectExec1: nil,
 		returnInspectExec2: nil,
+		execProbeTimeout:   true,
 		expectError:        fmt.Errorf("error in StartExec()"),
 	}, {
 		description:        "InspectExec returns an error",
@@ -84,6 +94,7 @@ func TestExecInContainer(t *testing.T) {
 		returnStartExec:    nil,
 		returnInspectExec1: nil,
 		returnInspectExec2: fmt.Errorf("error in InspectExec()"),
+		execProbeTimeout:   true,
 		expectError:        fmt.Errorf("error in InspectExec()"),
 	}, {
 		description:       "ExecInContainer returns context DeadlineExceeded",
@@ -98,11 +109,35 @@ func TestExecInContainer(t *testing.T) {
 			ExitCode:    0,
 			Pid:         100},
 		returnInspectExec2: nil,
+		execProbeTimeout:   true,
 		expectError:        context.DeadlineExceeded,
+	}, {
+		description:        "[ExecProbeTimeout=true] StartExec that takes longer than the probe timeout returns context.DeadlineExceeded",
+		timeout:            1 * time.Second,
+		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
+		returnCreateExec2:  nil,
+		startExecDelay:     5 * time.Second,
+		returnStartExec:    fmt.Errorf("error in StartExec()"),
+		returnInspectExec1: nil,
+		returnInspectExec2: nil,
+		execProbeTimeout:   true,
+		expectError:        context.DeadlineExceeded,
+	}, {
+		description:        "[ExecProbeTimeout=false] StartExec that takes longer than the probe timeout returns a error",
+		timeout:            1 * time.Second,
+		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
+		returnCreateExec2:  nil,
+		startExecDelay:     5 * time.Second,
+		returnStartExec:    fmt.Errorf("error in StartExec()"),
+		returnInspectExec1: nil,
+		returnInspectExec2: nil,
+		execProbeTimeout:   false,
+		expectError:        fmt.Errorf("error in StartExec()"),
 	}}
 
 	eh := &NativeExecHandler{}
-	ctrl := gomock.NewController(t)
+	// to avoid the default calling Finish(). More details in https://github.com/golang/mock/pull/422/
+	ctrl := gomock.NewController(struct{ gomock.TestReporter }{t})
 	container := getFakeContainerJSON()
 	cmd := []string{"/bin/bash"}
 	var stdin io.Reader
@@ -110,23 +145,27 @@ func TestExecInContainer(t *testing.T) {
 	var resize <-chan remotecommand.TerminalSize
 
 	for _, tc := range testcases {
-		t.Logf("TestCase: %q", tc.description)
+		// these tests cannot be run in parallel due to the fact that they are feature gate dependent
+		tc := tc
+		t.Run(tc.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, tc.execProbeTimeout)()
 
-		mockClient := mockclient.NewMockInterface(ctrl)
-		mockClient.EXPECT().CreateExec(gomock.Any(), gomock.Any()).Return(
-			tc.returnCreateExec1,
-			tc.returnCreateExec2)
-		mockClient.EXPECT().StartExec(gomock.Any(), gomock.Any(), gomock.Any()).Return(tc.returnStartExec)
-		mockClient.EXPECT().InspectExec(gomock.Any()).Return(
-			tc.returnInspectExec1,
-			tc.returnInspectExec2)
+			mockClient := mockclient.NewMockInterface(ctrl)
+			mockClient.EXPECT().CreateExec(gomock.Any(), gomock.Any()).Return(
+				tc.returnCreateExec1,
+				tc.returnCreateExec2)
+			mockClient.EXPECT().StartExec(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(_ string, _ dockertypes.ExecStartCheck, _ libdocker.StreamOptions) { time.Sleep(tc.startExecDelay) }).Return(tc.returnStartExec)
+			mockClient.EXPECT().InspectExec(gomock.Any()).Return(
+				tc.returnInspectExec1,
+				tc.returnInspectExec2)
 
-		// use parent context of 2 minutes since that's the default remote
-		// runtime connection timeout used by dockershim
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		err := eh.ExecInContainer(ctx, mockClient, container, cmd, stdin, stdout, stderr, false, resize, tc.timeout)
-		assert.Equal(t, tc.expectError, err)
+			// use parent context of 2 minutes since that's the default remote
+			// runtime connection timeout used by dockershim
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			err := eh.ExecInContainer(ctx, mockClient, container, cmd, stdin, stdout, stderr, false, resize, tc.timeout)
+			assert.Equal(t, tc.expectError, err)
+		})
 	}
 }
 

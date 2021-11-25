@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -109,5 +110,19 @@ func NewRecommendedDebuggingConfiguration() *DebuggingConfiguration {
 func RecommendedLoggingConfiguration(obj *LoggingConfiguration) {
 	if obj.Format == "" {
 		obj.Format = "text"
+	}
+	var empty resource.QuantityValue
+	if obj.Options.JSON.InfoBufferSize == empty {
+		obj.Options.JSON.InfoBufferSize = resource.QuantityValue{
+			// This is similar, but not quite the same as a default
+			// constructed instance.
+			Quantity: *resource.NewQuantity(0, resource.DecimalSI),
+		}
+		// This sets the unexported Quantity.s which will be compared
+		// by reflect.DeepEqual in some tests.
+		_ = obj.Options.JSON.InfoBufferSize.String()
+	}
+	if obj.FlushFrequency == 0 {
+		obj.FlushFrequency = 5 * time.Second
 	}
 }

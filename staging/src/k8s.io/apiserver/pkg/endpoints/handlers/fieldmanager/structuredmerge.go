@@ -41,7 +41,7 @@ var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -49,7 +49,8 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
+			Converter:     newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
+			IgnoredFields: resetFields,
 		},
 	}, nil
 }
@@ -57,7 +58,7 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -65,35 +66,47 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: newCRDVersionConverter(typeConverter, objectConverter, hub),
+			Converter:     newCRDVersionConverter(typeConverter, objectConverter, hub),
+			IgnoredFields: resetFields,
 		},
 	}, nil
+}
+
+func objectGVKNN(obj runtime.Object) string {
+	name := "<unknown>"
+	namespace := "<unknown>"
+	if accessor, err := meta.Accessor(obj); err == nil {
+		name = accessor.GetName()
+		namespace = accessor.GetNamespace()
+	}
+
+	return fmt.Sprintf("%v/%v; %v", namespace, name, obj.GetObjectKind().GroupVersionKind())
 }
 
 // Update implements Manager.
 func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to proper version (%v): %v", objectGVKNN(newObj), f.groupVersion, err)
 	}
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to proper version: %v", objectGVKNN(liveObj), err)
 	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", objectGVKNN(newObjVersioned), err)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert live object (%v) to smd typed: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to smd typed: %v", objectGVKNN(liveObjVersioned), err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
 	// TODO(apelisse) use the first return value when unions are implemented
 	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), manager)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
+		return nil, nil, fmt.Errorf("failed to update ManagedFields (%v): %v", objectGVKNN(newObjVersioned), err)
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
 
@@ -121,16 +134,16 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to proper version: %v", objectGVKNN(liveObj), err)
 	}
 
 	patchObjTyped, err := f.typeConverter.ObjectToTyped(patchObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create typed patch object: %v", err)
+		return nil, nil, fmt.Errorf("failed to create typed patch object (%v): %v", objectGVKNN(patchObj), err)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create typed live object: %v", err)
+		return nil, nil, fmt.Errorf("failed to create typed live object (%v): %v", objectGVKNN(liveObjVersioned), err)
 	}
 
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
@@ -146,18 +159,18 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert new typed object to object: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert new typed object (%v) to object: %v", objectGVKNN(patchObj), err)
 	}
 
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to proper version: %v", objectGVKNN(patchObj), err)
 	}
 	f.objectDefaulter.Default(newObjVersioned)
 
 	newObjUnversioned, err := f.toUnversioned(newObjVersioned)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert to unversioned: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert to unversioned (%v): %v", objectGVKNN(patchObj), err)
 	}
 	return newObjUnversioned, managed, nil
 }

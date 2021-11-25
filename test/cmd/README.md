@@ -15,7 +15,7 @@ tests will not try and validate any required resources are available on the serv
 
 ## Adding Tests
 
-Test functions need to have the format `run_*_test` so they can executed individually.  Once a test has been added, insert a section in `legacy-script.sh` like
+Test functions need to have the format `run_*_test` so they can be executed individually.  Once a test has been added, insert a section in `legacy-script.sh` like
 
 ```bash
 ######################

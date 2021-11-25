@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -19,14 +20,20 @@ limitations under the License.
 package aws
 
 import (
-	"k8s.io/apimachinery/pkg/types"
+	"fmt"
+	"reflect"
 	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/api/core/v1"
 )
 
 func TestElbProtocolsAreEqual(t *testing.T) {
@@ -537,6 +544,538 @@ func TestFilterTargetNodes(t *testing.T) {
 			} else {
 				assert.Empty(t, targetNodes)
 			}
+		})
+	}
+}
+
+func makeNodeInstancePair(offset int) (*v1.Node, *ec2.Instance) {
+	instanceID := fmt.Sprintf("i-%x", int64(0x03bcc3496da09f78e)+int64(offset))
+	instance := &ec2.Instance{
+		InstanceId: aws.String(instanceID),
+		Placement: &ec2.Placement{
+			AvailabilityZone: aws.String("us-east-1b"),
+		},
+		PrivateDnsName:   aws.String(fmt.Sprintf("ip-192-168-32-%d.ec2.internal", 101+offset)),
+		PrivateIpAddress: aws.String(fmt.Sprintf("192.168.32.%d", 101+offset)),
+		PublicIpAddress:  aws.String(fmt.Sprintf("1.2.3.%d", 1+offset)),
+	}
+
+	var tag ec2.Tag
+	tag.Key = aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID))
+	tag.Value = aws.String("owned")
+	instance.Tags = []*ec2.Tag{&tag}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("ip-192-168-0-%d.ec2.internal", 101+offset),
+		},
+		Spec: v1.NodeSpec{
+			ProviderID: fmt.Sprintf("aws:///us-east-1b/%s", instanceID),
+		},
+	}
+	return node, instance
+}
+
+func TestCloud_findInstancesForELB(t *testing.T) {
+	defaultNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ip-172-20-0-100.ec2.internal",
+		},
+		Spec: v1.NodeSpec{
+			ProviderID: "aws:///us-east-1a/i-self",
+		},
+	}
+	newNode, newInstance := makeNodeInstancePair(1)
+	awsServices := NewFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+
+	want := map[InstanceID]*ec2.Instance{
+		"i-self": awsServices.selfInstance,
+	}
+	got, err := c.findInstancesForELB([]*v1.Node{defaultNode}, nil)
+	assert.NoError(t, err)
+	assert.True(t, reflect.DeepEqual(want, got))
+
+	// Add a new EC2 instance
+	awsServices.instances = append(awsServices.instances, newInstance)
+	want = map[InstanceID]*ec2.Instance{
+		"i-self": awsServices.selfInstance,
+		InstanceID(aws.StringValue(newInstance.InstanceId)): newInstance,
+	}
+	got, err = c.findInstancesForELB([]*v1.Node{defaultNode, newNode}, nil)
+	assert.NoError(t, err)
+	assert.True(t, reflect.DeepEqual(want, got))
+
+	// Verify existing instance cache gets used
+	cacheExpiryOld := c.instanceCache.snapshot.timestamp
+	got, err = c.findInstancesForELB([]*v1.Node{defaultNode, newNode}, nil)
+	assert.NoError(t, err)
+	assert.True(t, reflect.DeepEqual(want, got))
+	cacheExpiryNew := c.instanceCache.snapshot.timestamp
+	assert.Equal(t, cacheExpiryOld, cacheExpiryNew)
+
+	// Force cache expiry and verify cache gets updated with new timestamp
+	cacheExpiryOld = c.instanceCache.snapshot.timestamp
+	c.instanceCache.snapshot.timestamp = c.instanceCache.snapshot.timestamp.Add(-(defaultEC2InstanceCacheMaxAge + 1*time.Second))
+	got, err = c.findInstancesForELB([]*v1.Node{defaultNode, newNode}, nil)
+	assert.NoError(t, err)
+	assert.True(t, reflect.DeepEqual(want, got))
+	cacheExpiryNew = c.instanceCache.snapshot.timestamp
+	assert.True(t, cacheExpiryNew.After(cacheExpiryOld))
+}
+
+func TestCloud_chunkTargetDescriptions(t *testing.T) {
+	type args struct {
+		targets   []*elbv2.TargetDescription
+		chunkSize int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]*elbv2.TargetDescription
+	}{
+		{
+			name: "can be evenly chunked",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 2,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+				},
+				{
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "cannot be evenly chunked",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 3,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+				},
+				{
+
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunkSize equal to total count",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 4,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunkSize greater than total count",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 10,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunk nil slice",
+			args: args{
+				targets:   nil,
+				chunkSize: 2,
+			},
+			want: nil,
+		},
+		{
+			name: "chunk empty slice",
+			args: args{
+				targets:   []*elbv2.TargetDescription{},
+				chunkSize: 2,
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			got := c.chunkTargetDescriptions(tt.args.targets, tt.args.chunkSize)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCloud_diffTargetGroupTargets(t *testing.T) {
+	type args struct {
+		expectedTargets []*elbv2.TargetDescription
+		actualTargets   []*elbv2.TargetDescription
+	}
+	tests := []struct {
+		name                    string
+		args                    args
+		wantTargetsToRegister   []*elbv2.TargetDescription
+		wantTargetsToDeregister []*elbv2.TargetDescription
+	}{
+		{
+			name: "all targets to register",
+			args: args{
+				expectedTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+				},
+				actualTargets: nil,
+			},
+			wantTargetsToRegister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+			},
+			wantTargetsToDeregister: nil,
+		},
+		{
+			name: "all targets to deregister",
+			args: args{
+				expectedTargets: nil,
+				actualTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+			wantTargetsToRegister: nil,
+			wantTargetsToDeregister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+		{
+			name: "some targets to register and deregister",
+			args: args{
+				expectedTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef4"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef5"),
+						Port: aws.Int64(8080),
+					},
+				},
+				actualTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef3"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+			wantTargetsToRegister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef4"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef5"),
+					Port: aws.Int64(8080),
+				},
+			},
+			wantTargetsToDeregister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef3"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+		{
+			name: "both expected and actual targets are empty",
+			args: args{
+				expectedTargets: nil,
+				actualTargets:   nil,
+			},
+			wantTargetsToRegister:   nil,
+			wantTargetsToDeregister: nil,
+		},
+		{
+			name: "expected and actual targets equals",
+			args: args{
+				expectedTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef3"),
+						Port: aws.Int64(8080),
+					},
+				},
+				actualTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef3"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+			wantTargetsToRegister:   nil,
+			wantTargetsToDeregister: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			gotTargetsToRegister, gotTargetsToDeregister := c.diffTargetGroupTargets(tt.args.expectedTargets, tt.args.actualTargets)
+			assert.Equal(t, tt.wantTargetsToRegister, gotTargetsToRegister)
+			assert.Equal(t, tt.wantTargetsToDeregister, gotTargetsToDeregister)
+		})
+	}
+}
+
+func TestCloud_computeTargetGroupExpectedTargets(t *testing.T) {
+	type args struct {
+		instanceIDs []string
+		port        int64
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*elbv2.TargetDescription
+	}{
+		{
+			name: "no instance",
+			args: args{
+				instanceIDs: nil,
+				port:        8080,
+			},
+			want: []*elbv2.TargetDescription{},
+		},
+		{
+			name: "one instance",
+			args: args{
+				instanceIDs: []string{"i-abcdef1"},
+				port:        8080,
+			},
+			want: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+		{
+			name: "multiple instances",
+			args: args{
+				instanceIDs: []string{"i-abcdef1", "i-abcdef2", "i-abcdef3"},
+				port:        8080,
+			},
+			want: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef3"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			got := c.computeTargetGroupExpectedTargets(tt.args.instanceIDs, tt.args.port)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -19,11 +19,13 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog/v2"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 // Builder is a mutable builder for CPUSet. Functions that mutate instances
@@ -34,8 +36,8 @@ type Builder struct {
 }
 
 // NewBuilder returns a mutable CPUSet builder.
-func NewBuilder() Builder {
-	return Builder{
+func NewBuilder() *Builder {
+	return &Builder{
 		result: CPUSet{
 			elems: map[int]struct{}{},
 		},
@@ -44,7 +46,7 @@ func NewBuilder() Builder {
 
 // Add adds the supplied elements to the result. Calling Add after calling
 // Result has no effect.
-func (b Builder) Add(elems ...int) {
+func (b *Builder) Add(elems ...int) {
 	if b.done {
 		return
 	}
@@ -55,7 +57,7 @@ func (b Builder) Add(elems ...int) {
 
 // Result returns the result CPUSet containing all elements that were
 // previously added to this builder. Subsequent calls to Add have no effect.
-func (b Builder) Result() CPUSet {
+func (b *Builder) Result() CPUSet {
 	b.done = true
 	return b.result
 }
@@ -70,6 +72,15 @@ func NewCPUSet(cpus ...int) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {
 		b.Add(c)
+	}
+	return b.Result()
+}
+
+// NewCPUSet returns a new CPUSet containing the supplied elements, as slice of int64.
+func NewCPUSetInt64(cpus ...int64) CPUSet {
+	b := NewBuilder()
+	for _, c := range cpus {
+		b.Add(int(c))
 	}
 	return b.Result()
 }
@@ -198,6 +209,27 @@ func (s CPUSet) ToSliceNoSort() []int {
 	return result
 }
 
+// ToSliceInt64 returns an ordered slice of int64 that contains all elements from
+// this set
+func (s CPUSet) ToSliceInt64() []int64 {
+	var result []int64
+	for cpu := range s.elems {
+		result = append(result, int64(cpu))
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
+}
+
+// ToSliceNoSortInt64 returns a slice of int64 that contains all elements from
+// this set.
+func (s CPUSet) ToSliceNoSortInt64() []int64 {
+	var result []int64
+	for cpu := range s.elems {
+		result = append(result, int64(cpu))
+	}
+	return result
+}
+
 // String returns a new string representation of the elements in this CPU set
 // in canonical linux CPU list format.
 //
@@ -247,7 +279,8 @@ func (s CPUSet) String() string {
 func MustParse(s string) CPUSet {
 	res, err := Parse(s)
 	if err != nil {
-		klog.Fatalf("unable to parse [%s] as CPUSet: %v", s, err)
+		klog.ErrorS(err, "Failed to parse input as CPUSet", "input", s)
+		os.Exit(1)
 	}
 	return res
 }
@@ -264,11 +297,11 @@ func Parse(s string) (CPUSet, error) {
 	}
 
 	// Split CPU list string:
-	// "0-5,34,46-48 => ["0-5", "34", "46-48"]
+	// "0-5,34,46-48" => ["0-5", "34", "46-48"]
 	ranges := strings.Split(s, ",")
 
 	for _, r := range ranges {
-		boundaries := strings.Split(r, "-")
+		boundaries := strings.SplitN(r, "-", 2)
 		if len(boundaries) == 1 {
 			// Handle ranges that consist of only one element like "34".
 			elem, err := strconv.Atoi(boundaries[0])
@@ -286,6 +319,11 @@ func Parse(s string) (CPUSet, error) {
 			if err != nil {
 				return NewCPUSet(), err
 			}
+			if start > end {
+				return NewCPUSet(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
+			}
+			// start == end is acceptable (1-1 -> 1)
+
 			// Add all elements to the result.
 			// e.g. "0-5", "46-48" => [0, 1, 2, 3, 4, 5, 46, 47, 48].
 			for e := start; e <= end; e++ {

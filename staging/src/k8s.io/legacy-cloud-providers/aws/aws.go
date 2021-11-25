@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -23,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"path"
 	"regexp"
 	"sort"
@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -50,6 +49,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -232,6 +232,16 @@ const ServiceAnnotationLoadBalancerEIPAllocations = "service.beta.kubernetes.io/
 // the target nodes for the load balancer
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerTargetNodeLabels = "service.beta.kubernetes.io/aws-load-balancer-target-node-labels"
+
+// ServiceAnnotationLoadBalancerSubnets is the annotation used on the service to specify the
+// Availability Zone configuration for the load balancer. The values are comma separated list of
+// subnetID or subnetName from different AZs
+// By default, the controller will auto-discover the subnets. If there are multiple subnets per AZ, auto-discovery
+// will break the tie in the following order -
+//   1. prefer the subnet with the correct role tag. kubernetes.io/role/elb for public and kubernetes.io/role/internal-elb for private access
+//   2. prefer the subnet with the cluster tag kubernetes.io/cluster/<Cluster Name>
+//   3. prefer the subnet that is first in lexicographic order
+const ServiceAnnotationLoadBalancerSubnets = "service.beta.kubernetes.io/aws-load-balancer-subnets"
 
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
@@ -811,8 +821,11 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 
-	sess, err := session.NewSession(awsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -833,8 +846,10 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -851,8 +866,10 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -870,8 +887,10 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -901,8 +920,10 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -1160,30 +1181,28 @@ func init() {
 			return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
 		}
 
-		sess, err := session.NewSession(&aws.Config{})
+		sess, err := session.NewSessionWithOptions(session.Options{
+			Config:            aws.Config{},
+			SharedConfigState: session.SharedConfigEnable,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 		}
 
-		var provider credentials.Provider
-		if cfg.Global.RoleARN == "" {
-			provider = &ec2rolecreds.EC2RoleProvider{
-				Client: ec2metadata.New(sess),
-			}
-		} else {
+		var creds *credentials.Credentials
+		if cfg.Global.RoleARN != "" {
 			klog.Infof("Using AWS assumed role %v", cfg.Global.RoleARN)
-			provider = &stscreds.AssumeRoleProvider{
+			provider := &stscreds.AssumeRoleProvider{
 				Client:  sts.New(sess),
 				RoleARN: cfg.Global.RoleARN,
 			}
-		}
 
-		creds := credentials.NewChainCredentials(
-			[]credentials.Provider{
-				&credentials.EnvProvider{},
-				provider,
-				&credentials.SharedCredentialsProvider{},
-			})
+			creds = credentials.NewChainCredentials(
+				[]credentials.Provider{
+					&credentials.EnvProvider{},
+					provider,
+				})
+		}
 
 		aws := newAWSSDKProvider(creds, cfg)
 		return newAWSCloud(*cfg, aws)
@@ -1573,7 +1592,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 
 		for _, internalIP := range networkInterface.PrivateIpAddresses {
 			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
-				ip := net.ParseIP(ipAddress)
+				ip := netutils.ParseIPSloppy(ipAddress)
 				if ip == nil {
 					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
 				}
@@ -1585,7 +1604,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 	// TODO: Other IP addresses (multiple ips)?
 	publicIPAddress := aws.StringValue(instance.PublicIpAddress)
 	if publicIPAddress != "" {
-		ip := net.ParseIP(publicIPAddress)
+		ip := netutils.ParseIPSloppy(publicIPAddress)
 		if ip == nil {
 			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", aws.StringValue(instance.InstanceId), publicIPAddress)
 		}
@@ -2545,7 +2564,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		createType = DefaultVolumeType
 
 	default:
-		return "", fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
+		return KubernetesVolumeID(""), fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
 	}
 
 	request := &ec2.CreateVolumeInput{}
@@ -2577,12 +2596,12 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
-		return "", err
+		return KubernetesVolumeID(""), err
 	}
 
 	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
-		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
+		return KubernetesVolumeID(""), fmt.Errorf("VolumeID was not returned by CreateVolume")
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
@@ -2595,8 +2614,22 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		// because Kubernetes may have limited permissions to the key.
 		if isAWSErrorVolumeNotFound(err) {
 			err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
+		} else {
+			// When DescribeVolumes api failed, plugin will lose track on the volumes' state
+			// driver should be able to clean up these kind of volumes to make sure they are not leaked on customers' account
+			klog.V(5).Infof("Failed to create the volume %v due to %v. Will try to delete it.", volumeName, err)
+			awsDisk, newDiskError := newAWSDisk(c, volumeName)
+			if newDiskError != nil {
+				klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, newDiskError)
+			} else {
+				if _, deleteVolumeError := awsDisk.deleteVolume(); deleteVolumeError != nil {
+					klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, deleteVolumeError)
+				} else {
+					klog.V(5).Infof("%v is deleted because it is not in desired state after waiting", volumeName)
+				}
+			}
 		}
-		return "", err
+		return KubernetesVolumeID(""), err
 	}
 
 	return volumeName, nil
@@ -2739,12 +2772,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
-	labels[v1.LabelFailureDomainBetaZone] = az
+	labels[v1.LabelTopologyZone] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[v1.LabelFailureDomainBetaRegion] = region
+	labels[v1.LabelTopologyRegion] = region
 
 	return labels, nil
 }
@@ -3368,7 +3401,7 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 	return "", false
 }
 
-// Finds the subnets associated with the cluster, by matching tags.
+// Finds the subnets associated with the cluster, by matching cluster tags if present.
 // For maximal backwards compatibility, if no subnets are tagged, it will fall-back to the current subnet.
 // However, in future this will likely be treated as an error.
 func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
@@ -3383,6 +3416,8 @@ func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
 	var matches []*ec2.Subnet
 	for _, subnet := range subnets {
 		if c.tagging.hasClusterTag(subnet.Tags) {
+			matches = append(matches, subnet)
+		} else if c.tagging.hasNoClusterPrefixTag(subnet.Tags) {
 			matches = append(matches, subnet)
 		}
 	}
@@ -3447,7 +3482,7 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
-		// Try to break the tie using a tag
+		// Try to break the tie using the role tag
 		var tagName string
 		if internalELB {
 			tagName = TagNameSubnetInternalELB
@@ -3465,8 +3500,17 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
+		// Prefer the one with the cluster Tag
+		existingHasClusterTag := c.tagging.hasClusterTag(existing.Tags)
+		subnetHasClusterTag := c.tagging.hasClusterTag(subnet.Tags)
+		if existingHasClusterTag != subnetHasClusterTag {
+			if subnetHasClusterTag {
+				subnetsByAZ[az] = subnet
+			}
+			continue
+		}
+
 		// If we have two subnets for the same AZ we arbitrarily choose the one that is first lexicographically.
-		// TODO: Should this be an error.
 		if strings.Compare(*existing.SubnetId, *subnet.SubnetId) > 0 {
 			klog.Warningf("Found multiple subnets in AZ %q; choosing %q between subnets %q and %q", az, *subnet.SubnetId, *existing.SubnetId, *subnet.SubnetId)
 			subnetsByAZ[az] = subnet
@@ -3490,6 +3534,90 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 	}
 
 	return subnetIDs, nil
+}
+
+func splitCommaSeparatedString(commaSeparatedString string) []string {
+	var result []string
+	parts := strings.Split(commaSeparatedString, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if len(part) == 0 {
+			continue
+		}
+		result = append(result, part)
+	}
+	return result
+}
+
+// parses comma separated values from annotation into string slice, returns true if annotation exists
+func parseStringSliceAnnotation(annotations map[string]string, annotation string, value *[]string) bool {
+	rawValue := ""
+	if exists := parseStringAnnotation(annotations, annotation, &rawValue); !exists {
+		return false
+	}
+	*value = splitCommaSeparatedString(rawValue)
+	return true
+}
+
+func (c *Cloud) getLoadBalancerSubnets(service *v1.Service, internalELB bool) ([]string, error) {
+	var rawSubnetNameOrIDs []string
+	if exists := parseStringSliceAnnotation(service.Annotations, ServiceAnnotationLoadBalancerSubnets, &rawSubnetNameOrIDs); exists {
+		return c.resolveSubnetNameOrIDs(rawSubnetNameOrIDs)
+	}
+	return c.findELBSubnets(internalELB)
+}
+
+func (c *Cloud) resolveSubnetNameOrIDs(subnetNameOrIDs []string) ([]string, error) {
+	var subnetIDs []string
+	var subnetNames []string
+	if len(subnetNameOrIDs) == 0 {
+		return []string{}, fmt.Errorf("unable to resolve empty subnet slice")
+	}
+	for _, nameOrID := range subnetNameOrIDs {
+		if strings.HasPrefix(nameOrID, "subnet-") {
+			subnetIDs = append(subnetIDs, nameOrID)
+		} else {
+			subnetNames = append(subnetNames, nameOrID)
+		}
+	}
+	var resolvedSubnets []*ec2.Subnet
+	if len(subnetIDs) > 0 {
+		req := &ec2.DescribeSubnetsInput{
+			SubnetIds: aws.StringSlice(subnetIDs),
+		}
+		subnets, err := c.ec2.DescribeSubnets(req)
+		if err != nil {
+			return []string{}, err
+		}
+		resolvedSubnets = append(resolvedSubnets, subnets...)
+	}
+	if len(subnetNames) > 0 {
+		req := &ec2.DescribeSubnetsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("tag:Name"),
+					Values: aws.StringSlice(subnetNames),
+				},
+				{
+					Name:   aws.String("vpc-id"),
+					Values: aws.StringSlice([]string{c.vpcID}),
+				},
+			},
+		}
+		subnets, err := c.ec2.DescribeSubnets(req)
+		if err != nil {
+			return []string{}, err
+		}
+		resolvedSubnets = append(resolvedSubnets, subnets...)
+	}
+	if len(resolvedSubnets) != len(subnetNameOrIDs) {
+		return []string{}, fmt.Errorf("expected to find %v, but found %v subnets", len(subnetNameOrIDs), len(resolvedSubnets))
+	}
+	var subnets []string
+	for _, subnet := range resolvedSubnets {
+		subnets = append(subnets, aws.StringValue(subnet.SubnetId))
+	}
+	return subnets, nil
 }
 
 func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
@@ -3796,6 +3924,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if len(apiService.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
+	if err := checkMixedProtocol(apiService.Spec.Ports); err != nil {
+		return nil, err
+	}
 	// Figure out what mappings we want on the load balancer
 	listeners := []*elb.Listener{}
 	v2Mappings := []nlbPortMapping{}
@@ -3869,7 +4000,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	if isNLB(annotations) {
 		// Find the subnets that the ELB will live in
-		subnetIDs, err := c.findELBSubnets(internalELB)
+		subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 		if err != nil {
 			klog.Errorf("Error listing subnets in VPC: %q", err)
 			return nil, err
@@ -4036,7 +4167,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	// Find the subnets that the ELB will live in
-	subnetIDs, err := c.findELBSubnets(internalELB)
+	subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 	if err != nil {
 		klog.Errorf("Error listing subnets in VPC: %q", err)
 		return nil, err
@@ -4880,6 +5011,19 @@ func (c *Cloud) nodeNameToProviderID(nodeName types.NodeName) (InstanceID, error
 	}
 
 	return KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+}
+
+func checkMixedProtocol(ports []v1.ServicePort) error {
+	if len(ports) == 0 {
+		return nil
+	}
+	firstProtocol := ports[0].Protocol
+	for _, port := range ports[1:] {
+		if port.Protocol != firstProtocol {
+			return fmt.Errorf("mixed protocol is not supported for LoadBalancer")
+		}
+	}
+	return nil
 }
 
 func checkProtocol(port v1.ServicePort, annotations map[string]string) error {

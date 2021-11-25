@@ -6,5 +6,6 @@ approvers:
 - RainbowMango
 reviewers:
 - sig-instrumentation-reviewers
+- YoyinZyc
 labels:
 - sig/instrumentation

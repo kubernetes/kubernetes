@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 const (
@@ -65,7 +64,7 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 	var syncerr error
 	defer func() {
 		if syncerr != nil {
-			utillog.Errorf(syncerr.Error())
+			klog.ErrorS(syncerr, "Kubelet config controller")
 			cc.pokeConfigSourceWorker()
 		}
 	}()
@@ -80,7 +79,7 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 
 	// a nil source simply means we reset to local defaults
 	if source == nil {
-		utillog.Infof("Node.Spec.ConfigSource is empty, will reset assigned and last-known-good to defaults")
+		klog.InfoS("Kubelet config controller Node.Spec.ConfigSource is empty, will reset assigned and last-known-good to defaults")
 		if updated, reason, err := cc.resetConfig(); err != nil {
 			reason = fmt.Sprintf(status.SyncErrorFmt, reason)
 			cc.configStatus.SetErrorOverride(reason)
@@ -93,7 +92,7 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 	}
 
 	// a non-nil source means we should attempt to download the config, and checkpoint it if necessary
-	utillog.Infof("Node.Spec.ConfigSource is non-empty, will checkpoint source and update config if necessary")
+	klog.InfoS("Kubelet config controller Node.Spec.ConfigSource is non-empty, will checkpoint source and update config if necessary")
 
 	// TODO(mtaufen): It would be nice if we could check the payload's metadata before (re)downloading the whole payload
 	//                we at least try pulling the latest configmap out of the local informer store.
@@ -156,7 +155,7 @@ func (cc *Controller) saveConfigCheckpoint(source checkpoint.RemoteConfigSource,
 		return status.InternalError, fmt.Errorf("%s, error: %v", status.InternalError, err)
 	}
 	if ok {
-		utillog.Infof("checkpoint already exists for %s, UID: %s, ResourceVersion: %s", source.APIPath(), payload.UID(), payload.ResourceVersion())
+		klog.InfoS("Kubelet config controller checkpoint already exists for source", "apiPath", source.APIPath(), "checkpointUID", payload.UID(), "resourceVersion", payload.ResourceVersion())
 		return "", nil
 	}
 	if err := cc.checkpointStore.Save(payload); err != nil {
@@ -198,11 +197,11 @@ func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, sourc
 	// we directly log and send the event, instead of using the event recorder,
 	// because the event recorder won't flush its queue before we exit (we'd lose the event)
 	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
-	klog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+	klog.V(3).InfoS("Event created", "event", klog.KObj(event), "involvedObject", event.InvolvedObject, "eventType", event.Type, "reason", event.Reason, "message", event.Message)
 	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(context.TODO(), event, metav1.CreateOptions{}); err != nil {
-		utillog.Errorf("failed to send event, error: %v", err)
+		klog.ErrorS(err, "Kubelet config controller failed to send event")
 	}
-	utillog.Infof(message)
+	klog.InfoS("Kubelet config controller event", "message", message)
 	os.Exit(0)
 }
 
@@ -211,17 +210,17 @@ func latestNodeConfigSource(store cache.Store, nodeName string) (*apiv1.NodeConf
 	obj, ok, err := store.GetByKey(nodeName)
 	if err != nil {
 		err := fmt.Errorf("failed to retrieve Node %q from informer's store, error: %v", nodeName, err)
-		utillog.Errorf(err.Error())
+		klog.ErrorS(err, "Kubelet config controller")
 		return nil, err
 	} else if !ok {
 		err := fmt.Errorf("node %q does not exist in the informer's store, can't sync config source", nodeName)
-		utillog.Errorf(err.Error())
+		klog.ErrorS(err, "Kubelet config controller")
 		return nil, err
 	}
 	node, ok := obj.(*apiv1.Node)
 	if !ok {
 		err := fmt.Errorf("failed to cast object from informer's store to Node, can't sync config source for Node %q", nodeName)
-		utillog.Errorf(err.Error())
+		klog.ErrorS(err, "Kubelet config controller")
 		return nil, err
 	}
 	// Copy the source, so anyone who modifies it after here doesn't mess up the informer's store!

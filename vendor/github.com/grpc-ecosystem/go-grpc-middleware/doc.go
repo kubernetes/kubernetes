@@ -23,7 +23,7 @@ server chaining:
 
 	myServer := grpc.NewServer(
 	    grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(loggingStream, monitoringStream, authStream)),
-	    grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(loggingUnary, monitoringUnary, authUnary),
+	    grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(loggingUnary, monitoringUnary, authUnary)),
 	)
 
 These interceptors will be executed from left to right: logging, monitoring and auth.
@@ -63,7 +63,7 @@ needed. For example:
 	func FakeAuthStreamingInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	   newStream := grpc_middleware.WrapServerStream(stream)
 	   newStream.WrappedContext = context.WithValue(ctx, "user_id", "john@example.com")
-	   return handler(srv, stream)
+	   return handler(srv, newStream)
 	}
 */
 package grpc_middleware

@@ -71,8 +71,9 @@ var (
 
 		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
 		TYPE is a Kubernetes resource. Shortcuts and groups will be resolved.
-		NONRESOURCEURL is a partial URL starts with "/".
-		NAME is the name of a particular Kubernetes resource.`)
+		NONRESOURCEURL is a partial URL that starts with "/".
+		NAME is the name of a particular Kubernetes resource.
+		This command pairs nicely with impersonation. See --as global flag.`)
 
 	canIExample = templates.Examples(`
 		# Check to see if I can create pods in any namespace
@@ -98,6 +99,8 @@ var (
 
 	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
 	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
+	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
+	nonStandardResourceNames = sets.NewString("users", "groups")
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
@@ -304,10 +307,12 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		var err error
 		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
-			if len(groupResource.Group) == 0 {
-				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
-			} else {
-				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+			if !nonStandardResourceNames.Has(groupResource.String()) {
+				if len(groupResource.Group) == 0 {
+					fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+				} else {
+					fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+				}
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}

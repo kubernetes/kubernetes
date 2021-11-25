@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -38,7 +39,8 @@ import (
 // ERROR_BAD_NET_NAME                = 67
 // ERROR_SESSION_CREDENTIAL_CONFLICT = 1219
 // ERROR_LOGON_FAILURE               = 1326
-var errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326}
+// WSAEHOSTDOWN                      = 10064
+var errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326, 10064}
 
 // IsCorruptedMnt return true if err is about corrupted mount point
 func IsCorruptedMnt(err error) bool {
@@ -83,15 +85,9 @@ func NormalizeWindowsPath(path string) string {
 
 // ValidateDiskNumber : disk number should be a number in [0, 99]
 func ValidateDiskNumber(disk string) error {
-	diskNum, err := strconv.Atoi(disk)
-	if err != nil {
-		return fmt.Errorf("wrong disk number format: %q, err:%v", disk, err)
+	if _, err := strconv.Atoi(disk); err != nil {
+		return fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
 	}
-
-	if diskNum < 0 || diskNum > 99 {
-		return fmt.Errorf("disk number out of range: %q", disk)
-	}
-
 	return nil
 }
 

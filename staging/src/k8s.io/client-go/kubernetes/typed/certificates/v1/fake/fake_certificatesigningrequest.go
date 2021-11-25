@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -110,7 +113,7 @@ func (c *FakeCertificateSigningRequests) UpdateStatus(ctx context.Context, certi
 // Delete takes name of the certificateSigningRequest and deletes it. Returns an error if one occurs.
 func (c *FakeCertificateSigningRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(certificatesigningrequestsResource, name), &certificatesv1.CertificateSigningRequest{})
+		Invokes(testing.NewRootDeleteActionWithOptions(certificatesigningrequestsResource, name, opts), &certificatesv1.CertificateSigningRequest{})
 	return err
 }
 
@@ -126,6 +129,49 @@ func (c *FakeCertificateSigningRequests) DeleteCollection(ctx context.Context, o
 func (c *FakeCertificateSigningRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *certificatesv1.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, pt, data, subresources...), &certificatesv1.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificatesv1.CertificateSigningRequest), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied certificateSigningRequest.
+func (c *FakeCertificateSigningRequests) Apply(ctx context.Context, certificateSigningRequest *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *certificatesv1.CertificateSigningRequest, err error) {
+	if certificateSigningRequest == nil {
+		return nil, fmt.Errorf("certificateSigningRequest provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := certificateSigningRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, *name, types.ApplyPatchType, data), &certificatesv1.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificatesv1.CertificateSigningRequest), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeCertificateSigningRequests) ApplyStatus(ctx context.Context, certificateSigningRequest *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *certificatesv1.CertificateSigningRequest, err error) {
+	if certificateSigningRequest == nil {
+		return nil, fmt.Errorf("certificateSigningRequest provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := certificateSigningRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, *name, types.ApplyPatchType, data, "status"), &certificatesv1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

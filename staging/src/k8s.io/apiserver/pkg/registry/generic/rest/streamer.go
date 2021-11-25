@@ -30,6 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
+type CounterMetric interface {
+	Inc()
+}
+
 // LocationStreamer is a resource that streams the contents of a particular
 // location URL.
 type LocationStreamer struct {
@@ -39,6 +43,9 @@ type LocationStreamer struct {
 	Flush           bool
 	ResponseChecker HttpResponseChecker
 	RedirectChecker func(req *http.Request, via []*http.Request) error
+	// TLSVerificationErrorCounter is an optional value that will Inc every time a TLS error is encountered.  This can
+	// be wired a single prometheus counter instance to get counts overall.
+	TLSVerificationErrorCounter CounterMetric
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
@@ -77,6 +84,10 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 
 	resp, err := client.Do(req)
 	if err != nil {
+		// TODO prefer segregate TLS errors more reliably, but we do want to increment a count
+		if strings.Contains(err.Error(), "x509:") && s.TLSVerificationErrorCounter != nil {
+			s.TLSVerificationErrorCounter.Inc()
+		}
 		return nil, false, "", err
 	}
 

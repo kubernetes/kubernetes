@@ -21,10 +21,9 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/storage/ephemeral"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )
@@ -385,8 +384,8 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		claimName := ""
 		if v.PersistentVolumeClaim != nil {
 			claimName = v.PersistentVolumeClaim.ClaimName
-		} else if v.Ephemeral != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-			claimName = pod.Name + "-" + v.Name
+		} else if v.Ephemeral != nil {
+			claimName = ephemeral.VolumeClaimName(pod, &v)
 		}
 		if claimName != "" {
 			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, claimName)

@@ -100,14 +100,14 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
+	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-
 	framework.ExpectEqual(stderr, "Access is denied.")
 }
 
 func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {
 	var (
-		filePath        = volumePath + "\\test-file"
+		filePath        = volumePath + "\\test-file" + string(uuid.NewUUID())
 		podName         = "pod-" + string(uuid.NewUUID())
 		pod             = testPodWithROVolume(podName, source, volumePath)
 		rwcontainerName = containerName + "-rw"
@@ -133,15 +133,17 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	ginkgo.By("verifying that pod has the correct nodeSelector")
 	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
-	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
-
-	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, cmd...)
-	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, stdoutRW, stderrRW)
+	ginkgo.By("verifying that pod can write to a volume with read/write access")
+	writecmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
+	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, writecmd...)
+	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", writecmd, stdoutRW, stderrRW)
 	framework.ExpectNoError(errRW, msg)
 
-	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
+	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
+	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, writecmd...)
 	framework.ExpectEqual(stderr, "Access is denied.")
 
+	ginkgo.By("verifying that pod can read from the the volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)

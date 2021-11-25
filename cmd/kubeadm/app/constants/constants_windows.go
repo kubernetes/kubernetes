@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -21,7 +22,4 @@ package constants
 const (
 	// DefaultDockerCRISocket defines the default Docker CRI socket
 	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
-
-	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "1.4.0"
 )

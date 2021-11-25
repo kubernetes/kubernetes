@@ -76,6 +76,12 @@ message Endpoint {
   // with the EndpointSliceNodeName feature gate.
   // +optional
   optional string nodeName = 6;
+
+  // hints contains information associated with how an endpoint should be
+  // consumed.
+  // +featureGate=TopologyAwareHints
+  // +optional
+  optional EndpointHints hints = 7;
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -102,6 +108,14 @@ message EndpointConditions {
   // with the EndpointSliceTerminatingCondition feature gate.
   // +optional
   optional bool terminating = 3;
+}
+
+// EndpointHints provides hints describing how an endpoint should be consumed.
+message EndpointHints {
+  // forZones indicates the zone(s) this endpoint should be consumed by to
+  // enable topology aware routing. May contain a maximum of 8 entries.
+  // +listType=atomic
+  repeated ForZone forZones = 1;
 }
 
 // EndpointPort represents a Port used by an EndpointSlice
@@ -176,5 +190,11 @@ message EndpointSliceList {
 
   // List of endpoint slices
   repeated EndpointSlice items = 2;
+}
+
+// ForZone provides information about which zones should consume this endpoint.
+message ForZone {
+  // name represents the name of the zone.
+  optional string name = 1;
 }
 

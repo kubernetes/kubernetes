@@ -56,7 +56,7 @@ func IsNamespaceSupported(ns NamespaceType) bool {
 	if nsFile == "" {
 		return false
 	}
-	_, err := os.Stat(fmt.Sprintf("/proc/self/ns/%s", nsFile))
+	_, err := os.Stat("/proc/self/ns/" + nsFile)
 	// a namespace is supported if it exists and we have permissions to read it
 	supported = err == nil
 	supportedNamespaces[ns] = supported

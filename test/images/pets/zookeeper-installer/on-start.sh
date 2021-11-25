@@ -60,7 +60,7 @@ for peer in "${PEERS[@]}"; do
     if [[ "${peer}" == *"${HOSTNAME}"* ]]; then
       MY_ID=$i
       MY_NAME=${peer}
-      echo $i > "${MY_ID_FILE}"
+      echo "$i" > "${MY_ID_FILE}"
       echo "server.${i}=${peer}:2888:3888:observer;2181" >> "${CFG_BAK}"
     else
       if [[ $(echo srvr | /opt/nc "${peer}" 2181 | grep Mode) = "Mode: leader" ]]; then
@@ -95,10 +95,10 @@ ADD_SERVER="server.$MY_ID=$MY_NAME:2888:3888:participant;0.0.0.0:2181"
 # Prove that we've actually joined the running cluster
 ITERATION=0
 until echo config | /opt/nc localhost 2181 | grep "${ADD_SERVER}" > /dev/null; do
-  echo $ITERATION] waiting for updated config to sync back to localhost
+  echo "$ITERATION"] waiting for updated config to sync back to localhost
   sleep 1
   (( ITERATION=ITERATION+1 ))
-  if [ $ITERATION -eq 20 ]; then
+  if [ "$ITERATION" -eq 20 ]; then
     exit 1
   fi
 done

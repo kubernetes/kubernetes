@@ -13,12 +13,12 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/pkg/errors"
 )
 
-// NewUserSystemdDbus creates a connection for systemd user-instance.
-func NewUserSystemdDbus() (*systemdDbus.Conn, error) {
+// newUserSystemdDbus creates a connection for systemd user-instance.
+func newUserSystemdDbus() (*systemdDbus.Conn, error) {
 	addr, err := DetectUserDbusSessionBusAddress()
 	if err != nil {
 		return nil, err
@@ -52,12 +52,12 @@ func NewUserSystemdDbus() (*systemdDbus.Conn, error) {
 //
 // Otherwise returns os.Getuid() .
 func DetectUID() (int, error) {
-	if !system.RunningInUserNS() {
+	if !userns.RunningInUserNS() {
 		return os.Getuid(), nil
 	}
 	b, err := exec.Command("busctl", "--user", "--no-pager", "status").CombinedOutput()
 	if err != nil {
-		return -1, errors.Wrap(err, "could not execute `busctl --user --no-pager status`")
+		return -1, errors.Wrapf(err, "could not execute `busctl --user --no-pager status`: %q", string(b))
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	for scanner.Scan() {
@@ -102,5 +102,5 @@ func DetectUserDbusSessionBusAddress() (string, error) {
 			return strings.TrimPrefix(s, "DBUS_SESSION_BUS_ADDRESS="), nil
 		}
 	}
-	return "", errors.New("could not detect DBUS_SESSION_BUS_ADDRESS from `systemctl --user --no-pager show-environment`")
+	return "", errors.New("could not detect DBUS_SESSION_BUS_ADDRESS from `systemctl --user --no-pager show-environment`. Make sure you have installed the dbus-user-session or dbus-daemon package and then run: `systemctl --user start dbus`")
 }

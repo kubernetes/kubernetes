@@ -181,6 +181,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	if len(configAuthInfo.Impersonate) > 0 {
 		clientConfig.Impersonate = restclient.ImpersonationConfig{
 			UserName: configAuthInfo.Impersonate,
+			UID:      configAuthInfo.ImpersonateUID,
 			Groups:   configAuthInfo.ImpersonateGroups,
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
@@ -255,6 +256,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{
 			UserName: configAuthInfo.Impersonate,
+			UID:      configAuthInfo.ImpersonateUID,
 			Groups:   configAuthInfo.ImpersonateGroups,
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
@@ -612,7 +614,7 @@ func (config *inClusterClientConfig) Possible() bool {
 // to the default config.
 func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
-		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
+		klog.Warning("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
 		kubeconfig, err := restclient.InClusterConfig()
 		if err == nil {
 			return kubeconfig, nil

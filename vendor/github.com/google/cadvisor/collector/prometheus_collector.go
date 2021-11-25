@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/common/model"
 
 	"github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 type PrometheusCollector struct {

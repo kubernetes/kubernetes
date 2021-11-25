@@ -78,6 +78,8 @@ type Connection interface {
 	// SetIdleTimeout sets the amount of time the connection may remain idle before
 	// it is automatically closed.
 	SetIdleTimeout(timeout time.Duration)
+	// RemoveStreams can be used to remove a set of streams from the Connection.
+	RemoveStreams(streams ...Stream)
 }
 
 // Stream represents a bidirectional communications channel that is part of an

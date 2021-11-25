@@ -17,17 +17,18 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
-func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
+func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
 	if err != nil {
 		return err
 	}
@@ -35,23 +36,23 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
 	// scale down old replica sets.
-	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(activeOldRSs, d)
+	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(ctx, activeOldRSs, d)
 	if err != nil {
 		return err
 	}
 	if scaledDown {
 		// Update DeploymentStatus.
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// Do not process a deployment when it has old pods running.
 	if oldPodsRunning(newRS, oldRSs, podMap) {
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// If we need to create a new RS, create it now.
 	if newRS == nil {
-		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
+		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, true)
 		if err != nil {
 			return err
 		}
@@ -59,22 +60,22 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 	}
 
 	// scale up new replica set.
-	if _, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d); err != nil {
+	if _, err := dc.scaleUpNewReplicaSetForRecreate(ctx, newRS, d); err != nil {
 		return err
 	}
 
 	if util.DeploymentComplete(d, &d.Status) {
-		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+		if err := dc.cleanupDeployment(ctx, oldRSs, d); err != nil {
 			return err
 		}
 	}
 
 	// Sync deployment status.
-	return dc.syncRolloutStatus(allRSs, newRS, d)
+	return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 }
 
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate".
-func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
+func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(ctx context.Context, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
 	scaled := false
 	for i := range oldRSs {
 		rs := oldRSs[i]
@@ -82,7 +83,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*app
 		if *(rs.Spec.Replicas) == 0 {
 			continue
 		}
-		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
+		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(ctx, rs, 0, deployment)
 		if err != nil {
 			return false, err
 		}
@@ -110,7 +111,9 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 				// Don't count pods in terminal state.
 				continue
 			case v1.PodUnknown:
-				// This happens in situation like when the node is temporarily disconnected from the cluster.
+				// v1.PodUnknown is a deprecated status.
+				// This logic is kept for backward compatibility.
+				// This used to happen in situation like when the node is temporarily disconnected from the cluster.
 				// If we can't be sure that the pod is not running, we have to count it.
 				return true
 			default:
@@ -123,7 +126,7 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate".
-func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
-	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, *(deployment.Spec.Replicas), deployment)
+func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(ctx context.Context, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
+	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, newRS, *(deployment.Spec.Replicas), deployment)
 	return scaled, err
 }

@@ -45,7 +45,7 @@ type SnapshotResource struct {
 // CreateSnapshot creates a VolumeSnapshotClass with given SnapshotDeletionPolicy and a VolumeSnapshot
 // from the VolumeSnapshotClass using a dynamic client.
 // Returns the unstructured VolumeSnapshotClass and VolumeSnapshot objects.
-func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext) (*unstructured.Unstructured, *unstructured.Unstructured) {
+func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured) {
 	defer ginkgo.GinkgoRecover()
 	var err error
 	if pattern.SnapshotType != DynamicCreatedSnapshot && pattern.SnapshotType != PreprovisionedCreatedSnapshot {
@@ -55,7 +55,7 @@ func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, patt
 	dc := config.Framework.DynamicClient
 
 	ginkgo.By("creating a SnapshotClass")
-	sclass := sDriver.GetSnapshotClass(config)
+	sclass := sDriver.GetSnapshotClass(config, parameters)
 	if sclass == nil {
 		framework.Failf("Failed to get snapshot class based on test config")
 	}
@@ -79,13 +79,13 @@ func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, patt
 
 // CreateSnapshotResource creates a snapshot resource for the current test. It knows how to deal with
 // different test pattern snapshot provisioning and deletion policy
-func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext) *SnapshotResource {
+func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *SnapshotResource {
 	var err error
 	r := SnapshotResource{
 		Config:  config,
 		Pattern: pattern,
 	}
-	r.Vsclass, r.Vs = CreateSnapshot(sDriver, config, pattern, pvcName, pvcNamespace, timeouts)
+	r.Vsclass, r.Vs = CreateSnapshot(sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
 
 	dc := r.Config.Framework.DynamicClient
 
@@ -104,10 +104,13 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Update(context.TODO(), r.Vscontent, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("recording the volume handle and snapshotHandle")
+		ginkgo.By("recording properties of the preprovisioned snapshot")
 		snapshotHandle := r.Vscontent.Object["status"].(map[string]interface{})["snapshotHandle"].(string)
-		framework.Logf("Recording snapshot handle: %s", snapshotHandle)
+		framework.Logf("Recording snapshot content handle: %s", snapshotHandle)
+		snapshotContentAnnotations := r.Vscontent.GetAnnotations()
+		framework.Logf("Recording snapshot content annotations: %v", snapshotContentAnnotations)
 		csiDriverName := r.Vsclass.Object["driver"].(string)
+		framework.Logf("Recording snapshot driver: %s", csiDriverName)
 
 		// If the deletion policy is retain on vscontent:
 		// when vs is deleted vscontent will not be deleted
@@ -140,7 +143,7 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		snapName := getPreProvisionedSnapshotName(uuid)
 		snapcontentName := getPreProvisionedSnapshotContentName(uuid)
 
-		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
+		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapshotContentAnnotations, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Create(context.TODO(), r.Vscontent, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -299,13 +302,14 @@ func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstru
 
 	return snapshot
 }
-func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+func getPreProvisionedSnapshotContent(snapcontentName string, snapshotContentAnnotations map[string]string, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
 	snapshotContent := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshotContent",
 			"apiVersion": utils.SnapshotAPIVersion,
 			"metadata": map[string]interface{}{
-				"name": snapcontentName,
+				"name":        snapcontentName,
+				"annotations": snapshotContentAnnotations,
 			},
 			"spec": map[string]interface{}{
 				"source": map[string]interface{}{

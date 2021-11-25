@@ -71,17 +71,16 @@ if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
     )
 fi
 
-# Only run whitelisted fast checks in quick mode.
-# These run in <10s each on enisoc's workstation, assuming that
-# `make` had already been run.
+# Only run known fast checks in quick mode.
+# These ideally run in less than 10s.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
-  "verify-bazel.sh"
   "verify-boilerplate.sh"
   "verify-external-dependencies-version.sh"
   "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
+  "verify-non-mutating-validation.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-spelling.sh"

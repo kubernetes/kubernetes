@@ -28,11 +28,11 @@ import (
 
 func TestValidateResourceRequirements(t *testing.T) {
 	successCase := []struct {
-		Name         string
+		name         string
 		requirements v1.ResourceRequirements
 	}{
 		{
-			Name: "Resources with Requests equal to Limits",
+			name: "Resources with Requests equal to Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -45,7 +45,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			Name: "Resources with only Limits",
+			name: "Resources with only Limits",
 			requirements: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -55,7 +55,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			Name: "Resources with only Requests",
+			name: "Resources with only Requests",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -65,7 +65,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			Name: "Resources with Requests Less Than Limits",
+			name: "Resources with Requests Less Than Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("9"),
@@ -81,17 +81,19 @@ func TestValidateResourceRequirements(t *testing.T) {
 		},
 	}
 	for _, tc := range successCase {
-		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) != 0 {
-			t.Errorf("%q unexpected error: %v", tc.Name, errs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 
 	errorCase := []struct {
-		Name         string
+		name         string
 		requirements v1.ResourceRequirements
 	}{
 		{
-			Name: "Resources with Requests Larger Than Limits",
+			name: "Resources with Requests Larger Than Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -106,7 +108,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid Resources with Requests",
+			name: "Invalid Resources with Requests",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName("my.org"): resource.MustParse("10m"),
@@ -114,7 +116,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid Resources with Limits",
+			name: "Invalid Resources with Limits",
 			requirements: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceName("my.org"): resource.MustParse("9m"),
@@ -123,65 +125,71 @@ func TestValidateResourceRequirements(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCase {
-		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
-			t.Errorf("%q expected error", tc.Name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
 func TestValidateContainerResourceName(t *testing.T) {
 	successCase := []struct {
-		Name         string
+		name         string
 		ResourceName string
 	}{
 		{
-			Name:         "CPU resource",
+			name:         "CPU resource",
 			ResourceName: "cpu",
 		},
 		{
-			Name:         "Memory resource",
+			name:         "Memory resource",
 			ResourceName: "memory",
 		},
 		{
-			Name:         "Hugepages resource",
+			name:         "Hugepages resource",
 			ResourceName: "hugepages-2Mi",
 		},
 		{
-			Name:         "Namespaced resource",
+			name:         "Namespaced resource",
 			ResourceName: "kubernetes.io/resource-foo",
 		},
 		{
-			Name:         "Extended Resource",
+			name:         "Extended Resource",
 			ResourceName: "my.org/resource-bar",
 		},
 	}
 	for _, tc := range successCase {
-		if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) != 0 {
-			t.Errorf("%q unexpected error: %v", tc.Name, errs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 
 	errorCase := []struct {
-		Name         string
+		name         string
 		ResourceName string
 	}{
 		{
-			Name:         "Invalid standard resource",
+			name:         "Invalid standard resource",
 			ResourceName: "cpu-core",
 		},
 		{
-			Name:         "Invalid namespaced resource",
+			name:         "Invalid namespaced resource",
 			ResourceName: "kubernetes.io/",
 		},
 		{
-			Name:         "Invalid extended resource",
+			name:         "Invalid extended resource",
 			ResourceName: "my.org-foo-resource",
 		},
 	}
 	for _, tc := range errorCase {
-		if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) == 0 {
-			t.Errorf("%q expected error", tc.Name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
@@ -198,40 +206,40 @@ func TestValidatePodLogOptions(t *testing.T) {
 	)
 
 	successCase := []struct {
-		Name          string
+		name          string
 		podLogOptions v1.PodLogOptions
 	}{
 		{
-			Name:          "Empty PodLogOptions",
+			name:          "Empty PodLogOptions",
 			podLogOptions: v1.PodLogOptions{},
 		},
 		{
-			Name: "PodLogOptions with TailLines",
+			name: "PodLogOptions with TailLines",
 			podLogOptions: v1.PodLogOptions{
 				TailLines: &positiveLine,
 			},
 		},
 		{
-			Name: "PodLogOptions with LimitBytes",
+			name: "PodLogOptions with LimitBytes",
 			podLogOptions: v1.PodLogOptions{
 				LimitBytes: &limitBytesGreaterThan1,
 			},
 		},
 		{
-			Name: "PodLogOptions with only sinceSeconds",
+			name: "PodLogOptions with only sinceSeconds",
 			podLogOptions: v1.PodLogOptions{
 				SinceSeconds: &sinceSecondsGreaterThan1,
 			},
 		},
 		{
-			Name: "PodLogOptions with LimitBytes with TailLines",
+			name: "PodLogOptions with LimitBytes with TailLines",
 			podLogOptions: v1.PodLogOptions{
 				LimitBytes: &limitBytesGreaterThan1,
 				TailLines:  &positiveLine,
 			},
 		},
 		{
-			Name: "PodLogOptions with LimitBytes with TailLines with SinceSeconds",
+			name: "PodLogOptions with LimitBytes with TailLines with SinceSeconds",
 			podLogOptions: v1.PodLogOptions{
 				LimitBytes:   &limitBytesGreaterThan1,
 				TailLines:    &positiveLine,
@@ -240,17 +248,19 @@ func TestValidatePodLogOptions(t *testing.T) {
 		},
 	}
 	for _, tc := range successCase {
-		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
-			t.Errorf("%q unexpected error: %v", tc.Name, errs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 
 	errorCase := []struct {
-		Name          string
+		name          string
 		podLogOptions v1.PodLogOptions
 	}{
 		{
-			Name: "Invalid podLogOptions with Negative TailLines",
+			name: "Invalid podLogOptions with Negative TailLines",
 			podLogOptions: v1.PodLogOptions{
 				TailLines:    &negativeLine,
 				LimitBytes:   &limitBytesGreaterThan1,
@@ -258,7 +268,7 @@ func TestValidatePodLogOptions(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid podLogOptions with zero or negative LimitBytes",
+			name: "Invalid podLogOptions with zero or negative LimitBytes",
 			podLogOptions: v1.PodLogOptions{
 				TailLines:    &positiveLine,
 				LimitBytes:   &limitBytesLessThan1,
@@ -266,14 +276,14 @@ func TestValidatePodLogOptions(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid podLogOptions with zero or negative SinceSeconds",
+			name: "Invalid podLogOptions with zero or negative SinceSeconds",
 			podLogOptions: v1.PodLogOptions{
 				TailLines:    &negativeLine,
 				LimitBytes:   &limitBytesGreaterThan1,
 				SinceSeconds: &sinceSecondsLessThan1,
 			},
 		}, {
-			Name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
+			name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
 			podLogOptions: v1.PodLogOptions{
 				TailLines:    &negativeLine,
 				LimitBytes:   &limitBytesGreaterThan1,
@@ -283,20 +293,23 @@ func TestValidatePodLogOptions(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCase {
-		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
-			t.Errorf("%q expected error", tc.Name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
 func TestAccumulateUniqueHostPorts(t *testing.T) {
 	successCase := []struct {
+		name        string
 		containers  []v1.Container
 		accumulator *sets.String
 		fldPath     *field.Path
-		result      string
 	}{
 		{
+			name: "HostPort is not allocated while containers use the same port with different protocol",
 			containers: []v1.Container{
 				{
 					Ports: []v1.ContainerPort{
@@ -317,9 +330,9 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 			},
 			accumulator: &sets.String{},
 			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is not allocated",
 		},
 		{
+			name: "HostPort is not allocated while containers use different ports",
 			containers: []v1.Container{
 				{
 					Ports: []v1.ContainerPort{
@@ -340,21 +353,23 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 			},
 			accumulator: &sets.String{},
 			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is not allocated",
 		},
 	}
-	for index, tc := range successCase {
-		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) != 0 {
-			t.Errorf("unexpected error for test case %v: %v", index, errs)
-		}
+	for _, tc := range successCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
 	}
 	errorCase := []struct {
+		name        string
 		containers  []v1.Container
 		accumulator *sets.String
 		fldPath     *field.Path
-		result      string
 	}{
 		{
+			name: "HostPort is already allocated while containers use the same port with UDP",
 			containers: []v1.Container{
 				{
 					Ports: []v1.ContainerPort{
@@ -375,9 +390,9 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 			},
 			accumulator: &sets.String{},
 			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is already allocated",
 		},
 		{
+			name: "HostPort is already allocated",
 			containers: []v1.Container{
 				{
 					Ports: []v1.ContainerPort{
@@ -398,12 +413,13 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 			},
 			accumulator: &sets.String{"8080/UDP": sets.Empty{}},
 			fldPath:     field.NewPath("spec", "containers"),
-			result:      "HostPort is already allocated",
 		},
 	}
-	for index, tc := range errorCase {
-		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) == 0 {
-			t.Errorf("test case %v: expected error %v, but get nil", index, tc.result)
-		}
+	for _, tc := range errorCase {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) == 0 {
+				t.Errorf("expected error, but get nil")
+			}
+		})
 	}
 }

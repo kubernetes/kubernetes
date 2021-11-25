@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -30,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/waitgroup"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
@@ -79,7 +80,7 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
-	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
 	clientset := fake.NewSimpleClientset()
@@ -111,7 +112,7 @@ func TestNewWithDelegate(t *testing.T) {
 
 	wrappingConfig := NewConfig(codecs)
 	wrappingConfig.ExternalAddress = "192.168.10.4:443"
-	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 
@@ -179,6 +180,24 @@ func TestNewWithDelegate(t *testing.T) {
 		"/readyz/shutdown",
 	}
 	checkExpectedPathsAtRoot(server.URL, expectedPaths, t)
+
+	// wait for health (max-in-flight-filter is initialized asynchronously, can take a few milliseconds to initialize)
+	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// healthz checks are installed in PrepareRun
+		resp, err := http.Get(server.URL + "/healthz?exclude=wrapping-health&exclude=delegate-health")
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := ioutil.ReadAll(resp.Body)
+		if http.StatusOK != resp.StatusCode {
+			t.Logf("got %d", resp.StatusCode)
+			t.Log(string(data))
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok
 [+]log ok
 [-]wrapping-health failed: reason withheld
@@ -262,7 +281,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
 		// confirm that trying to use the audit event directly would never work
-		if ae := request.AuditEventFrom(req.Context()); ae != nil {
+		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
 			t.Errorf("expected nil audit event, got %v", ae)
 		}
 
@@ -270,15 +289,16 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	})
 	backend := &testBackend{}
 	c := &Config{
-		Authentication:     AuthenticationInfo{Authenticator: authn},
-		AuditBackend:       backend,
-		AuditPolicyChecker: policy.FakeChecker(auditinternal.LevelMetadata, nil),
+		Authentication:           AuthenticationInfo{Authenticator: authn},
+		AuditBackend:             backend,
+		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
 		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
 		RequestInfoResolver:   &request.RequestInfoFactory{},
 		RequestTimeout:        10 * time.Second,
 		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:      newLifecycleSignals(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +308,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := request.AuditEventFrom(r.Context())
+		ae := audit.AuditEventFrom(r.Context())
 		if ae == nil {
 			t.Error("unexpected nil audit event")
 		}

@@ -19,17 +19,6 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-retry() {
-  for i in {1..5}; do
-    if "$@"; then
-      return 0
-    else
-      sleep "${i}"
-    fi
-  done
-  "$@"
-}
-
 # Runs the unit and integration tests, producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
@@ -47,14 +36,10 @@ pushd "./hack/tools" >/dev/null
   GO111MODULE=on go install gotest.tools/gotestsum
 popd >/dev/null
 
-# Enable the Go race detector.
-export KUBE_RACE=-race
 # Disable coverage report
 export KUBE_COVER="n"
 # Set artifacts directory
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
-# Produce a JUnit-style XML test report
-export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4

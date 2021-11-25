@@ -922,7 +922,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 	go func() {
 		defer response.Body.Close()
 		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		wg.Done()
 	}()
@@ -962,7 +962,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	go func() {
 		defer ws.Close()
 		if _, err := io.Copy(ioutil.Discard, ws); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		wg.Done()
 	}()
@@ -1011,7 +1011,7 @@ func BenchmarkWatchProtobuf(b *testing.B) {
 	go func() {
 		defer response.Body.Close()
 		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		wg.Done()
 	}()

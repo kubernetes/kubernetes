@@ -152,7 +152,7 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
 		indexedModes := v1helper.GetAccessModesFromString(key)
-		if volumeutil.AccessModesContainedInAll(indexedModes, requestedModes) {
+		if volumeutil.ContainsAllAccessModes(indexedModes, requestedModes) {
 			matchedModes = append(matchedModes, indexedModes)
 		}
 	}

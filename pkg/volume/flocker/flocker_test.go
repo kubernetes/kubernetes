@@ -92,7 +92,7 @@ func (c *fakeFlockerClient) GetDatasetID(metaName string) (datasetID string, err
 	if val, ok := c.Metadata["Name"]; !ok {
 		return val, nil
 	}
-	return "", fmt.Errorf("No dataset with metadata X found")
+	return "", fmt.Errorf("no dataset with metadata X found")
 }
 
 func (c *fakeFlockerClient) GetPrimaryUUID() (primaryUUID string, err error) {

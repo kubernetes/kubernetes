@@ -238,6 +238,19 @@ func TestPVSecrets(t *testing.T) {
 		t.Logf("Extra namespaced names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra namespaced names extracted. Verify VisitPVSecretNames() is correctly extracting secret names")
 	}
+
+	emptyPV := &corev1.PersistentVolume{
+		Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CephFS: &corev1.CephFSPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
+						Name:      "",
+						Namespace: "cephfs"}}}}}
+	VisitPVSecretNames(emptyPV, func(namespace, name string, kubeletVisible bool) bool {
+		t.Fatalf("expected no empty names collected, got %q", name)
+		return false
+	})
 }
 
 // collectSecretPaths traverses the object, computing all the struct paths that lead to fields with "secret" in the name.

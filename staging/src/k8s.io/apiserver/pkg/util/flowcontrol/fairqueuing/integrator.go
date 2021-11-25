@@ -21,17 +21,16 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/utils/clock"
 )
 
 // Integrator computes the moments of some variable X over time as
 // read from a particular clock.  The integrals start when the
 // Integrator is created, and ends at the latest operation on the
-// Integrator.  As a `metrics.TimedObserver` this fixes X1=1 and
-// ignores attempts to change X1.
+// Integrator.
 type Integrator interface {
-	metrics.TimedObserver
+	metrics.ChangeObserver
 
 	GetResults() IntegratorResults
 
@@ -70,10 +69,7 @@ func NewIntegrator(clock clock.PassiveClock) Integrator {
 	}
 }
 
-func (igr *integrator) SetX1(x1 float64) {
-}
-
-func (igr *integrator) Set(x float64) {
+func (igr *integrator) Observe(x float64) {
 	igr.Lock()
 	igr.setLocked(x)
 	igr.Unlock()

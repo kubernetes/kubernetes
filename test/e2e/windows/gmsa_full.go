@@ -58,7 +58,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -77,6 +76,12 @@ const (
 	// gmsaWebhookDeployScriptURL is the URL of the deploy script for the GMSA webook
 	// TODO(wk8): we should pin versions.
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
+
+	// output from the nltest /query command should have this in it
+	expectedQueryOutput = "The command completed successfully"
+
+	// The name of the expected domain
+	gmsaDomain = "k8sgmsa.lan"
 )
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
@@ -140,16 +145,33 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			var output string
 			gomega.Eventually(func() bool {
 				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
-				return err == nil
-			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+				if err != nil {
+					framework.Logf("unable to run command in container via exec: %s", err)
+					return false
+				}
 
-			expectedSubstr := "The command completed successfully"
-			if !strings.Contains(output, expectedSubstr) {
-				framework.Failf("Expected %q to contain %q", output, expectedSubstr)
-			}
+				if !isValidOutput(output) {
+					// try repairing the secure channel by running reset command
+					// https://kubernetes.io/docs/tasks/configure-pod-container/configure-gmsa/#troubleshooting
+					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
+					if err != nil {
+						framework.Logf("unable to run command in container via exec: %s", err)
+						return false
+					}
+					framework.Logf("failed to connect to domain; tried resetting the domain, output:\n%s", string(output))
+					return false
+				}
+				return true
+			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 		})
 	})
 })
+
+func isValidOutput(output string) bool {
+	return strings.Contains(output, expectedQueryOutput) &&
+		!strings.Contains(output, "ERROR_NO_LOGON_SERVERS") &&
+		!strings.Contains(output, "RPC_S_SERVER_UNAVAILABLE")
+}
 
 // findPreconfiguredGmsaNode finds node with the gmsaFullNodeLabel label on it.
 func findPreconfiguredGmsaNodes(c clientset.Interface) []v1.Node {
@@ -225,7 +247,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	tempDir, err := ioutil.TempDir("", "")
 	if err != nil {
-		return cleanUpFunc, errors.Wrapf(err, "unable to create temp dir")
+		return cleanUpFunc, fmt.Errorf("unable to create temp dir: %w", err)
 	}
 
 	manifestsFile := path.Join(tempDir, "manifests.yml")
@@ -252,7 +274,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 	if err == nil {
 		framework.Logf("GMSA webhook successfully deployed, output:\n%s", string(output))
 	} else {
-		err = errors.Wrapf(err, "unable to deploy GMSA webhook, output:\n%s", string(output))
+		err = fmt.Errorf("unable to deploy GMSA webhook, output:\n%s: %w", string(output), err)
 	}
 
 	return cleanUpFunc, err
@@ -267,7 +289,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return cleanUpFunc, errors.Wrapf(err, "unable to create temp file")
+		return cleanUpFunc, fmt.Errorf("unable to create temp file: %w", err)
 	}
 	defer tempFile.Close()
 
@@ -278,13 +300,13 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 
 	_, err = tempFile.WriteString(crdManifestContents)
 	if err != nil {
-		err = errors.Wrapf(err, "unable to write GMSA contents to %q", tempFile.Name())
+		err = fmt.Errorf("unable to write GMSA contents to %q: %w", tempFile.Name(), err)
 		return cleanUpFunc, err
 	}
 
 	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
-		err = errors.Wrapf(err, "unable to create custom resource, output:\n%s", output)
+		err = fmt.Errorf("unable to create custom resource, output:\n%s: %w", output, err)
 	}
 
 	return cleanUpFunc, err
@@ -316,7 +338,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 
 	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 	if err != nil {
-		err = errors.Wrapf(err, "unable to create RBAC cluster role %q", roleName)
+		err = fmt.Errorf("unable to create RBAC cluster role %q: %w", roleName, err)
 	}
 
 	return roleName, cleanUpFunc, err
@@ -375,7 +397,12 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 			Containers: []v1.Container{
 				{
 					Name:  podName,
-					Image: imageutils.GetPauseImageName(),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{
+						"powershell.exe",
+						"-Command",
+						"sleep -Seconds 600",
+					},
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{

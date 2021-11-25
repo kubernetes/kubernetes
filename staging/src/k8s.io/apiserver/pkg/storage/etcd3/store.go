@@ -28,11 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -64,14 +65,16 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client        *clientv3.Client
-	codec         runtime.Codec
-	versioner     storage.Versioner
-	transformer   value.Transformer
-	pathPrefix    string
-	watcher       *watcher
-	pagingEnabled bool
-	leaseManager  *leaseManager
+	client              *clientv3.Client
+	codec               runtime.Codec
+	versioner           storage.Versioner
+	transformer         value.Transformer
+	pathPrefix          string
+	groupResource       schema.GroupResource
+	groupResourceString string
+	watcher             *watcher
+	pagingEnabled       bool
+	leaseManager        *leaseManager
 }
 
 type objState struct {
@@ -83,11 +86,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -98,9 +101,11 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix:   path.Join("/", prefix),
-		watcher:      newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
+		pathPrefix:          path.Join("/", prefix),
+		groupResource:       groupResource,
+		groupResourceString: groupResource.String(),
+		watcher:             newWatcher(c, codec, newFunc, versioner, transformer),
+		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -230,12 +235,22 @@ func (s *store) conditionalDelete(
 				}
 
 				// It's possible we're working with stale data.
+				// Remember the revision of the potentially stale data and the resulting update error
+				cachedRev := origState.rev
+				cachedUpdateErr := err
+
 				// Actually fetch
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
 				origStateIsCurrent = true
+
+				// it turns out our cached data was not stale, return the error
+				if cachedRev == origState.rev {
+					return cachedUpdateErr
+				}
+
 				// Retry
 				continue
 			}
@@ -246,12 +261,22 @@ func (s *store) conditionalDelete(
 			}
 
 			// It's possible we're working with stale data.
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}
@@ -345,12 +370,22 @@ func (s *store) GuaranteedUpdate(
 			}
 
 			// It's possible we were working with stale data
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}
@@ -694,6 +729,14 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	var numFetched int
+	var numEvald int
+	// Because these metrics are for understanding the costs of handling LIST requests,
+	// get them recorded even in error cases.
+	defer func() {
+		numReturn := v.Len()
+		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
+	}()
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
@@ -701,6 +744,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
+		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
@@ -719,7 +763,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
-		for _, kv := range getResp.Kvs {
+		for i, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= pred.Limit {
 				hasMore = true
 				break
@@ -734,6 +778,10 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
+			numEvald++
+
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
 		}
 
 		// indicate to the client which resource version was returned

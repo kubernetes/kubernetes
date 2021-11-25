@@ -18,9 +18,10 @@ package lifecycle
 
 import (
 	"reflect"
+	goruntime "runtime"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -144,11 +145,11 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 	}
 }
 
-func newResourcePod(usage ...schedulerframework.Resource) *v1.Pod {
+func newResourcePod(containerResources ...v1.ResourceList) *v1.Pod {
 	containers := []v1.Container{}
-	for _, req := range usage {
+	for _, rl := range containerResources {
 		containers = append(containers, v1.Container{
-			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
+			Resources: v1.ResourceRequirements{Requests: rl},
 		})
 	}
 	return &v1.Pod{
@@ -187,7 +188,10 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod: &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(
-				newResourcePod(schedulerframework.Resource{MilliCPU: 9, Memory: 19})),
+				newResourcePod(v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
+				})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
@@ -197,9 +201,15 @@ func TestGeneralPredicates(t *testing.T) {
 			name: "no resources/port/host requested always fits",
 		},
 		{
-			pod: newResourcePod(schedulerframework.Resource{MilliCPU: 8, Memory: 10}),
+			pod: newResourcePod(v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(8, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
+			}),
 			nodeInfo: schedulerframework.NewNodeInfo(
-				newResourcePod(schedulerframework.Resource{MilliCPU: 5, Memory: 19})),
+				newResourcePod(v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
+				})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
@@ -254,6 +264,92 @@ func TestGeneralPredicates(t *testing.T) {
 			}
 			if fits != test.fits {
 				t.Errorf("expected: %v got %v", test.fits, fits)
+			}
+		})
+	}
+}
+
+func TestRejectPodAdmissionBasedOnOSSelector(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		node            *v1.Node
+		expectRejection bool
+	}{
+		{
+			name:            "OS label match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			expectRejection: false,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS matches",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: false,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS doesn't match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS doesn't match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "OS field mismatch, OS label on node object would be reset to correct value",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "No label selector on the pod, should be admitted",
+			pod:             &v1.Pod{},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult := rejectPodAdmissionBasedOnOSSelector(test.pod, test.node)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		expectRejection bool
+	}{
+		{
+			name:            "OS field match",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: v1.OSName(goruntime.GOOS)}}},
+			expectRejection: false,
+		},
+		{
+			name:            "OS field mismatch",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "no OS field",
+			pod:             &v1.Pod{Spec: v1.PodSpec{}},
+			expectRejection: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult := rejectPodAdmissionBasedOnOSField(test.pod)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}
 		})
 	}

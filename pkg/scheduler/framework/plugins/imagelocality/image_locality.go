@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for
@@ -42,7 +43,7 @@ type ImageLocality struct {
 var _ framework.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "ImageLocality"
+const Name = names.ImageLocality
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {

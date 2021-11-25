@@ -43,6 +43,13 @@ func Parse(s string) (t Tag, err error) {
 // https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // The resulting tag is canonicalized using the canonicalization type c.
 func (c CanonType) Parse(s string) (t Tag, err error) {
+	defer func() {
+		if recover() != nil {
+			t = Tag{}
+			err = language.ErrSyntax
+		}
+	}()
+
 	tt, err := language.Parse(s)
 	if err != nil {
 		return makeTag(tt), err
@@ -79,6 +86,13 @@ func Compose(part ...interface{}) (t Tag, err error) {
 // tag is returned after canonicalizing using CanonType c. If one or more errors
 // are encountered, one of the errors is returned.
 func (c CanonType) Compose(part ...interface{}) (t Tag, err error) {
+	defer func() {
+		if recover() != nil {
+			t = Tag{}
+			err = language.ErrSyntax
+		}
+	}()
+
 	var b language.Builder
 	if err = update(&b, part...); err != nil {
 		return und, err
@@ -142,6 +156,14 @@ var errInvalidWeight = errors.New("ParseAcceptLanguage: invalid weight")
 // Tags with a weight of zero will be dropped. An error will be returned if the
 // input could not be parsed.
 func ParseAcceptLanguage(s string) (tag []Tag, q []float32, err error) {
+	defer func() {
+		if recover() != nil {
+			tag = nil
+			q = nil
+			err = language.ErrSyntax
+		}
+	}()
+
 	var entry string
 	for s != "" {
 		if entry, s = split(s, ','); entry == "" {

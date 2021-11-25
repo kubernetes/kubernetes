@@ -11,6 +11,9 @@ import (
 // rootlessEUID makes sure that the config can be applied when runc
 // is being executed as a non-root user (euid != 0) in the current user namespace.
 func (v *ConfigValidator) rootlessEUID(config *configs.Config) error {
+	if !config.RootlessEUID {
+		return nil
+	}
 	if err := rootlessEUIDMappings(config); err != nil {
 		return err
 	}

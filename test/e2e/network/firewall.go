@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
@@ -44,12 +45,12 @@ import (
 
 const (
 	firewallTestTCPTimeout = time.Duration(1 * time.Second)
-	// Set ports outside of 30000-32767, 80 and 8080 to avoid being whitelisted by the e2e cluster
+	// Set ports outside of 30000-32767, 80 and 8080 to avoid being allowlisted by the e2e cluster
 	firewallTestHTTPPort = int32(29999)
 	firewallTestUDPPort  = int32(29998)
 )
 
-var _ = SIGDescribe("Firewall rule", func() {
+var _ = common.SIGDescribe("Firewall rule", func() {
 	var firewallTestName = "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
 
@@ -152,7 +153,8 @@ var _ = SIGDescribe("Firewall rule", func() {
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
 				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))
 			pod.ObjectMeta.Labels = jig.Labels
-			pod.Spec.NodeName = nodeName
+			nodeSelection := e2epod.NodeSelection{Name: nodeName}
+			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 			pod.Spec.HostNetwork = true
 			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -166,7 +168,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			}()
 		}
 
-		// Send requests from outside of the cluster because internal traffic is whitelisted
+		// Send requests from outside of the cluster because internal traffic is allowlisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
 		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
 		framework.ExpectNoError(err)
@@ -216,8 +218,10 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddr := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
-		if nodeAddr == "" {
-			framework.Failf("did not find any node addresses")
+		if nodeAddr != "" {
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 		}
 
 		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
@@ -225,9 +229,6 @@ var _ = SIGDescribe("Firewall rule", func() {
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", ports.KubeControllerManagerPort, firewallTestTCPTimeout, true)
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", kubeschedulerconfig.DefaultKubeSchedulerPort, firewallTestTCPTimeout, true)
 		}
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 	})
 })
 

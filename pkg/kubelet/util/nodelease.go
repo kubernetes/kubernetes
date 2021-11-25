@@ -46,7 +46,7 @@ func SetNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordi
 					},
 				}
 			} else {
-				klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", nodeName, err)
+				klog.ErrorS(err, "Failed to get node when trying to set owner ref to the node lease", "node", klog.KRef("", nodeName))
 				return err
 			}
 		}

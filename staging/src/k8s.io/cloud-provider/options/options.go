@@ -42,6 +42,8 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	netutils "k8s.io/utils/net"
+
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
 )
@@ -87,7 +89,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP(componentConfig.Generic.Address),
+			BindAddress: netutils.ParseIPSloppy(componentConfig.Generic.Address),
 			BindPort:    int(componentConfig.Generic.Port),
 			BindNetwork: "tcp",
 		}).WithLoopback(),
@@ -98,7 +100,6 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
 	s.Authorization.RemoteKubeConfigFileOptional = true
-	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
 	// Set the PairName but leave certificate directory blank to generate in-memory by default
 	s.SecureServing.ServerCert.CertDirectory = ""
@@ -188,20 +189,16 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		return err
 	}
 
-	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
-
 	c.EventRecorder = createRecorder(c.Client, userAgent)
 
 	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		c.ClientBuilder = clientbuilder.SAControllerClientBuilder{
-			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
-			CoreClient:           c.Client.CoreV1(),
-			AuthenticationClient: c.Client.AuthenticationV1(),
-			Namespace:            metav1.NamespaceSystem,
-		}
+		c.ClientBuilder = clientbuilder.NewDynamicClientBuilder(
+			restclient.AnonymousClientConfig(c.Kubeconfig),
+			c.Client.CoreV1(),
+			metav1.NamespaceSystem)
 	} else {
 		c.ClientBuilder = rootClientBuilder
 	}
@@ -251,7 +248,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 		return nil, err
 	}
 
-	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"sync"
@@ -26,42 +27,105 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
+	"k8s.io/utils/clock"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
 // deterministic behaviour in testing.
 type fakePodWorkers struct {
+	lock      sync.Mutex
 	syncPodFn syncPodFnType
 	cache     kubecontainer.Cache
 	t         TestingInterface
+
+	triggeredDeletion []types.UID
+
+	statusLock            sync.Mutex
+	running               map[types.UID]bool
+	terminating           map[types.UID]bool
+	terminated            map[types.UID]bool
+	terminationRequested  map[types.UID]bool
+	removeRuntime         map[types.UID]bool
+	removeContent         map[types.UID]bool
+	terminatingStaticPods map[string]bool
 }
 
-func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
-	status, err := f.cache.Get(options.Pod.UID)
+func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	var uid types.UID
+	switch {
+	case options.Pod != nil:
+		uid = options.Pod.UID
+	case options.RunningPod != nil:
+		uid = options.RunningPod.ID
+	default:
+		return
+	}
+	status, err := f.cache.Get(uid)
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
-	if err := f.syncPodFn(syncPodOptions{
-		mirrorPod:      options.MirrorPod,
-		pod:            options.Pod,
-		podStatus:      status,
-		updateType:     options.UpdateType,
-		killPodOptions: options.KillPodOptions,
-	}); err != nil {
-		f.t.Errorf("Unexpected error: %v", err)
+	switch options.UpdateType {
+	case kubetypes.SyncPodKill:
+		f.triggeredDeletion = append(f.triggeredDeletion, uid)
+	default:
+		if err := f.syncPodFn(context.Background(), options.UpdateType, options.Pod, options.MirrorPod, status); err != nil {
+			f.t.Errorf("Unexpected error: %v", err)
+		}
 	}
 }
 
-func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]sets.Empty) {}
+func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkerState {
+	return nil
+}
 
-func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
+func (f *fakePodWorkers) IsPodKnownTerminated(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminated[uid]
+}
+func (f *fakePodWorkers) CouldHaveRunningContainers(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.running[uid]
+}
+func (f *fakePodWorkers) IsPodTerminationRequested(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminationRequested[uid]
+}
+func (f *fakePodWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminating[uid]
+}
+func (f *fakePodWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.removeRuntime[uid]
+}
+func (f *fakePodWorkers) setPodRuntimeBeRemoved(uid types.UID) {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	f.removeRuntime = map[types.UID]bool{uid: true}
+}
+func (f *fakePodWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.removeContent[uid]
+}
+func (f *fakePodWorkers) IsPodForMirrorPodTerminatingByFullName(podFullname string) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminatingStaticPods[podFullname]
+}
 
 type TestingInterface interface {
 	Errorf(format string, args ...interface{})
@@ -76,10 +140,36 @@ func newPod(uid, name string) *v1.Pod {
 	}
 }
 
+func newPodWithPhase(uid, name string, phase v1.PodPhase) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+		},
+		Status: v1.PodStatus{
+			Phase: phase,
+		},
+	}
+}
+
+func newStaticPod(uid, name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource,
+			},
+		},
+	}
+}
+
 // syncPodRecord is a record of a sync pod call
 type syncPodRecord struct {
 	name       string
 	updateType kubetypes.SyncPodType
+	runningPod *kubecontainer.Pod
+	terminated bool
 }
 
 func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
@@ -88,15 +178,38 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
-	podWorkers := newPodWorkers(
-		func(options syncPodOptions) error {
+	w := newPodWorkers(
+		func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
-				pod := options.pod
+				pod := pod
 				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
 					name:       pod.Name,
-					updateType: options.updateType,
+					updateType: updateType,
+				})
+			}()
+			return nil
+		},
+		func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+			func() {
+				lock.Lock()
+				defer lock.Unlock()
+				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
+					name:       pod.Name,
+					updateType: kubetypes.SyncPodKill,
+					runningPod: runningPod,
+				})
+			}()
+			return nil
+		},
+		func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+			func() {
+				lock.Lock()
+				defer lock.Unlock()
+				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
+					name:       pod.Name,
+					terminated: true,
 				})
 			}()
 			return nil
@@ -107,7 +220,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 		time.Second,
 		fakeCache,
 	)
-	return podWorkers, processed
+	return w.(*podWorkers), processed
 }
 
 func drainWorkers(podWorkers *podWorkers, numPods int) {
@@ -115,8 +228,27 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 		stillWorking := false
 		podWorkers.podLock.Lock()
 		for i := 0; i < numPods; i++ {
-			if podWorkers.isWorking[types.UID(strconv.Itoa(i))] {
+			if s, ok := podWorkers.podSyncStatuses[types.UID(strconv.Itoa(i))]; ok && s.working {
 				stillWorking = true
+				break
+			}
+		}
+		podWorkers.podLock.Unlock()
+		if !stillWorking {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func drainAllWorkers(podWorkers *podWorkers) {
+	for {
+		stillWorking := false
+		podWorkers.podLock.Lock()
+		for _, worker := range podWorkers.podSyncStatuses {
+			if worker.working {
+				stillWorking = true
+				break
 			}
 		}
 		podWorkers.podLock.Unlock()
@@ -133,7 +265,7 @@ func TestUpdatePod(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(&UpdatePodOptions{
+			podWorkers.UpdatePod(UpdatePodOptions{
 				Pod:        newPod(strconv.Itoa(j), strconv.Itoa(i)),
 				UpdateType: kubetypes.SyncPodCreate,
 			})
@@ -165,20 +297,110 @@ func TestUpdatePod(t *testing.T) {
 	}
 }
 
+func TestUpdatePodWithTerminatedPod(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
+	runningPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
+	pod := newPod("0000-0000-0002", "running-pod")
+
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        terminatedPod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: runningPod,
+	})
+
+	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
+		t.Errorf("podWorker state should not be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
+		t.Errorf("podWorker state should be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
+		t.Errorf("podWorker state should not be marked terminated for a running pod")
+	}
+}
+
+func TestUpdatePodForRuntimePod(t *testing.T) {
+	podWorkers, processed := createPodWorkers()
+
+	// ignores running pod of wrong sync type
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodCreate,
+		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
+	})
+	drainAllWorkers(podWorkers)
+	if len(processed) != 0 {
+		t.Fatalf("Not all pods processed: %v", len(processed))
+	}
+
+	// creates synthetic pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
+	})
+	drainAllWorkers(podWorkers)
+	if len(processed) != 1 {
+		t.Fatalf("Not all pods processed: %v", processed)
+	}
+	updates := processed["1"]
+	if len(updates) != 1 {
+		t.Fatalf("unexpected updates: %v", updates)
+	}
+	if updates[0].runningPod == nil || updates[0].updateType != kubetypes.SyncPodKill || updates[0].name != "1" {
+		t.Fatalf("unexpected update: %v", updates)
+	}
+}
+
+func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
+	podWorkers, processed := createPodWorkers()
+
+	now := time.Now()
+	podWorkers.podSyncStatuses[types.UID("1")] = &podSyncStatus{
+		startedTerminating: true,
+		terminatedAt:       now.Add(-time.Second),
+		terminatingAt:      now.Add(-2 * time.Second),
+		gracePeriod:        1,
+	}
+
+	// creates synthetic pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
+	})
+	drainAllWorkers(podWorkers)
+	if len(processed) != 0 {
+		t.Fatalf("Not all pods processed: %v", processed)
+	}
+	updates := processed["1"]
+	if len(updates) != 0 {
+		t.Fatalf("unexpected updates: %v", updates)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Fatalf("Unexpected undelivered work")
+	}
+}
+
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		pod := newPod(strconv.Itoa(i), strconv.Itoa(i))
-		podWorkers.UpdatePod(&UpdatePodOptions{
+		podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodCreate,
 		})
-		podWorkers.UpdatePod(&UpdatePodOptions{
+		podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodKill,
 		})
-		podWorkers.UpdatePod(&UpdatePodOptions{
+		podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
@@ -205,12 +427,12 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	}
 }
 
-func TestForgetNonExistingPodWorkers(t *testing.T) {
+func TestSyncKnownPods(t *testing.T) {
 	podWorkers, _ := createPodWorkers()
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(&UpdatePodOptions{
+		podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        newPod(strconv.Itoa(i), "name"),
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
@@ -224,7 +446,72 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 	desiredPods := map[types.UID]sets.Empty{}
 	desiredPods[types.UID("2")] = sets.Empty{}
 	desiredPods[types.UID("14")] = sets.Empty{}
-	podWorkers.ForgetNonExistingPodWorkers(desiredPods)
+	desiredPodList := []*v1.Pod{newPod("2", "name"), newPod("14", "name")}
+
+	// kill all but the requested pods
+	for i := 0; i < numPods; i++ {
+		pod := newPod(strconv.Itoa(i), "name")
+		if _, ok := desiredPods[pod.UID]; ok {
+			continue
+		}
+		if (i % 2) == 0 {
+			now := metav1.Now()
+			pod.DeletionTimestamp = &now
+		}
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodKill,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if !podWorkers.ShouldPodContainersBeTerminating(types.UID("0")) {
+		t.Errorf("Expected pod to be terminating")
+	}
+	if !podWorkers.ShouldPodContainersBeTerminating(types.UID("1")) {
+		t.Errorf("Expected pod to be terminating")
+	}
+	if podWorkers.ShouldPodContainersBeTerminating(types.UID("2")) {
+		t.Errorf("Expected pod to not be terminating")
+	}
+	if !podWorkers.IsPodTerminationRequested(types.UID("0")) {
+		t.Errorf("Expected pod to be terminating")
+	}
+	if podWorkers.IsPodTerminationRequested(types.UID("2")) {
+		t.Errorf("Expected pod to not be terminating")
+	}
+
+	if podWorkers.CouldHaveRunningContainers(types.UID("0")) {
+		t.Errorf("Expected pod to be terminated (deleted and terminated)")
+	}
+	if podWorkers.CouldHaveRunningContainers(types.UID("1")) {
+		t.Errorf("Expected pod to be terminated")
+	}
+	if !podWorkers.CouldHaveRunningContainers(types.UID("2")) {
+		t.Errorf("Expected pod to not be terminated")
+	}
+
+	if !podWorkers.ShouldPodContentBeRemoved(types.UID("0")) {
+		t.Errorf("Expected pod to be suitable for removal (deleted and terminated)")
+	}
+	if podWorkers.ShouldPodContentBeRemoved(types.UID("1")) {
+		t.Errorf("Expected pod to not be suitable for removal (terminated but not deleted)")
+	}
+	if podWorkers.ShouldPodContentBeRemoved(types.UID("2")) {
+		t.Errorf("Expected pod to not be suitable for removal (not terminated)")
+	}
+
+	if podWorkers.ShouldPodContainersBeTerminating(types.UID("abc")) {
+		t.Errorf("Expected pod to not be known to be terminating (does not exist but not yet synced)")
+	}
+	if !podWorkers.CouldHaveRunningContainers(types.UID("abc")) {
+		t.Errorf("Expected pod to potentially have running containers (does not exist but not yet synced)")
+	}
+	if podWorkers.ShouldPodContentBeRemoved(types.UID("abc")) {
+		t.Errorf("Expected pod to not be suitable for removal (does not exist but not yet synced)")
+	}
+
+	podWorkers.SyncKnownPods(desiredPodList)
 	if len(podWorkers.podUpdates) != 2 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
@@ -234,10 +521,52 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 	if _, exists := podWorkers.podUpdates[types.UID("14")]; !exists {
 		t.Errorf("No updates channel for pod 14")
 	}
+	if podWorkers.IsPodTerminationRequested(types.UID("2")) {
+		t.Errorf("Expected pod termination request to be cleared after sync")
+	}
 
-	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]sets.Empty{})
+	if !podWorkers.ShouldPodContainersBeTerminating(types.UID("abc")) {
+		t.Errorf("Expected pod to be expected to terminate containers (does not exist and synced at least once)")
+	}
+	if podWorkers.CouldHaveRunningContainers(types.UID("abc")) {
+		t.Errorf("Expected pod to be known not to have running containers (does not exist and synced at least once)")
+	}
+	if !podWorkers.ShouldPodContentBeRemoved(types.UID("abc")) {
+		t.Errorf("Expected pod to be suitable for removal (does not exist and synced at least once)")
+	}
+
+	// verify workers that are not terminated stay open even if config no longer
+	// sees them
+	podWorkers.SyncKnownPods(nil)
+	if len(podWorkers.podUpdates) != 2 {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	if len(podWorkers.podSyncStatuses) != 2 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.podSyncStatuses)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.lastUndeliveredWorkUpdate)
+	}
+
+	for uid := range desiredPods {
+		pod := newPod(string(uid), "name")
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodKill,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	// verify once those pods terminate (via some other flow) the workers are cleared
+	podWorkers.SyncKnownPods(nil)
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	if len(podWorkers.podSyncStatuses) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.podSyncStatuses)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.lastUndeliveredWorkUpdate)
 	}
 }
 
@@ -248,14 +577,22 @@ type simpleFakeKubelet struct {
 	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+func (kl *simpleFakeKubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	kl.wg.Done()
+	return nil
+}
+
+func (kl *simpleFakeKubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+	return nil
+}
+
+func (kl *simpleFakeKubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 	return nil
 }
 
@@ -269,8 +606,16 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
-	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
+	realPodWorkers := newPodWorkers(
+		kubeletForRealWorkers.syncPodWithWaitGroup,
+		kubeletForRealWorkers.syncTerminatingPod,
+		kubeletForRealWorkers.syncTerminatedPod,
+		fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
+	fakePodWorkers := &fakePodWorkers{
+		syncPodFn: kubeletForFakeWorkers.syncPod,
+		cache:     fakeCache,
+		t:         t,
+	}
 
 	tests := []struct {
 		pod       *v1.Pod
@@ -292,12 +637,12 @@ func TestFakePodWorkers(t *testing.T) {
 
 	for i, tt := range tests {
 		kubeletForRealWorkers.wg.Add(1)
-		realPodWorkers.UpdatePod(&UpdatePodOptions{
+		realPodWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        tt.pod,
 			MirrorPod:  tt.mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
-		fakePodWorkers.UpdatePod(&UpdatePodOptions{
+		fakePodWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        tt.pod,
 			MirrorPod:  tt.mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,
@@ -326,19 +671,212 @@ func TestKillPodNowFunc(t *testing.T) {
 	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
-	err := killPodFunc(pod, v1.PodStatus{Phase: v1.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
+	err := killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
+		status.Phase = v1.PodFailed
+		status.Reason = "reason"
+		status.Message = "message"
+	})
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
+	drainAllWorkers(podWorkers)
 	if len(processed) != 1 {
-		t.Errorf("len(processed) expected: %v, actual: %v", 1, len(processed))
-		return
+		t.Fatalf("len(processed) expected: %v, actual: %#v", 1, processed)
 	}
 	syncPodRecords := processed[pod.UID]
-	if len(syncPodRecords) != 1 {
-		t.Errorf("Pod processed %v times, but expected %v", len(syncPodRecords), 1)
+	if len(syncPodRecords) != 2 {
+		t.Fatalf("Pod processed expected %v times, got %#v", 1, syncPodRecords)
 	}
 	if syncPodRecords[0].updateType != kubetypes.SyncPodKill {
 		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodKill)
+	}
+	if !syncPodRecords[1].terminated {
+		t.Errorf("Pod terminated %v, but expected %v", syncPodRecords[1].terminated, true)
+	}
+}
+
+func Test_allowPodStart(t *testing.T) {
+	testCases := []struct {
+		desc                               string
+		pod                                *v1.Pod
+		podSyncStatuses                    map[types.UID]*podSyncStatus
+		startedStaticPodsByFullname        map[string]types.UID
+		waitingToStartStaticPodsByFullname map[string][]types.UID
+		allowed                            bool
+	}{
+		{
+			// TBD: Do we want to allow non-static pods with the same full name?
+			// Note that it may disable the force deletion of pods.
+			desc: "non-static pod",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			allowed: true,
+		},
+		{
+			// TBD: Do we want to allow a non-static pod with the same full name
+			// as the started static pod?
+			desc: "non-static pod when there is a started static pod with the same full name",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"test_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			// TBD: Do we want to allow a static pod with the same full name as the
+			// started non-static pod?
+			desc: "static pod when there is a started non-static pod with the same full name",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"test_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod when there are no started static pods with the same full name",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "bar_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"bar_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod when there is a started static pod with the same full name",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-1"),
+			},
+			allowed: false,
+		},
+		{
+			desc: "static pod if the static pod has already started",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod if the static pod is the first pod waiting to start",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-0"),
+				},
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod if the static pod is not the first pod waiting to start",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-1"),
+					types.UID("uid-0"),
+				},
+			},
+			allowed: false,
+		},
+		{
+			desc: "static pod if the static pod is the first valid pod waiting to start / clean up until picking the first valid pod",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-2"),
+					types.UID("uid-2"),
+					types.UID("uid-3"),
+					types.UID("uid-0"),
+					types.UID("uid-1"),
+				},
+			},
+			allowed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			podWorkers, _ := createPodWorkers()
+			if tc.podSyncStatuses != nil {
+				podWorkers.podSyncStatuses = tc.podSyncStatuses
+			}
+			if tc.startedStaticPodsByFullname != nil {
+				podWorkers.startedStaticPodsByFullname = tc.startedStaticPodsByFullname
+			}
+			if tc.waitingToStartStaticPodsByFullname != nil {
+				podWorkers.waitingToStartStaticPodsByFullname = tc.waitingToStartStaticPodsByFullname
+			}
+			if podWorkers.allowPodStart(tc.pod) != tc.allowed {
+				if tc.allowed {
+					t.Errorf("Pod should be allowed")
+				} else {
+					t.Errorf("Pod should not be allowed")
+				}
+			}
+		})
 	}
 }

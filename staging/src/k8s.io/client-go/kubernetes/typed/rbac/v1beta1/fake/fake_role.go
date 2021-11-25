@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -105,7 +108,7 @@ func (c *FakeRoles) Update(ctx context.Context, role *v1beta1.Role, opts v1.Upda
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
 func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1beta1.Role{})
+		Invokes(testing.NewDeleteActionWithOptions(rolesResource, c.ns, name, opts), &v1beta1.Role{})
 
 	return err
 }
@@ -122,6 +125,28 @@ func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &v1beta1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Role), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied role.
+func (c *FakeRoles) Apply(ctx context.Context, role *rbacv1beta1.RoleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Role, err error) {
+	if role == nil {
+		return nil, fmt.Errorf("role provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(role)
+	if err != nil {
+		return nil, err
+	}
+	name := role.Name
+	if name == nil {
+		return nil, fmt.Errorf("role.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Role{})
 
 	if obj == nil {
 		return nil, err

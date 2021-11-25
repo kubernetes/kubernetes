@@ -44,7 +44,7 @@ func (d *CacheDumper) DumpAll() {
 // dumpNodes writes NodeInfo to the scheduler logs.
 func (d *CacheDumper) dumpNodes() {
 	dump := d.cache.Dump()
-	klog.Info("Dump of cached NodeInfo")
+	klog.InfoS("Dump of cached NodeInfo")
 	for name, nodeInfo := range dump.Nodes {
 		klog.Info(d.printNodeInfo(name, nodeInfo))
 	}
@@ -70,11 +70,11 @@ func (d *CacheDumper) printNodeInfo(name string, n *framework.NodeInfo) string {
 		nodeData.WriteString(printPod(p.Pod))
 	}
 	// Dumping nominated pods info on the node
-	nominatedPods := d.podQueue.NominatedPodsForNode(name)
-	if len(nominatedPods) != 0 {
-		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPods)))
-		for _, p := range nominatedPods {
-			nodeData.WriteString(printPod(p))
+	nominatedPodInfos := d.podQueue.NominatedPodsForNode(name)
+	if len(nominatedPodInfos) != 0 {
+		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPodInfos)))
+		for _, pi := range nominatedPodInfos {
+			nodeData.WriteString(printPod(pi.Pod))
 		}
 	}
 	return nodeData.String()

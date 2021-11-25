@@ -20,13 +20,12 @@ import (
 	"encoding/json"
 	"strings"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -254,6 +253,9 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	}
 	if in.XMapType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
+	}
+	if len(in.XValidations) != 0 {
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", in.XValidations)
 	}
 	return nil
 }

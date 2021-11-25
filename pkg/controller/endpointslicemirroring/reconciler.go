@@ -21,7 +21,8 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -40,7 +42,7 @@ type reconciler struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 
 	// eventRecorder allows reconciler to record an event if it finds an invalid
 	// IP address in an Endpoints resource.
@@ -94,7 +96,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 			if totalAddressesAdded >= int(r.maxEndpointsPerSubset) {
 				break
 			}
-			if ok := d.addAddress(address, multiKey, true); ok {
+			if ok := d.addAddress(address, multiKey, false); ok {
 				totalAddressesAdded++
 			} else {
 				numInvalidAddresses++
@@ -172,7 +174,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 func (r *reconciler) reconcileByPortMapping(
 	endpoints *corev1.Endpoints,
 	existingSlices []*discovery.EndpointSlice,
-	desiredSet endpointSet,
+	desiredSet endpointsliceutil.EndpointSet,
 	endpointPorts []discovery.EndpointPort,
 	addressType discovery.AddressType,
 ) (slicesByAction, totalsByAction) {
@@ -196,9 +198,14 @@ func (r *reconciler) reconcileByPortMapping(
 		// if >0 existing slices, mark all but 1 for deletion.
 		slices.toDelete = existingSlices[1:]
 
-		// Return early if first slice matches desired endpoints.
+		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
+		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime, corev1.LastAppliedConfigAnnotation)
+		compareLabels := cloneAndRemoveKeys(existingSlices[0].Labels, discovery.LabelManagedBy, discovery.LabelServiceName)
+		// Return early if first slice matches desired endpoints, labels and annotations
 		totals = totalChanges(existingSlices[0], desiredSet)
-		if totals.added == 0 && totals.updated == 0 && totals.removed == 0 {
+		if totals.added == 0 && totals.updated == 0 && totals.removed == 0 &&
+			apiequality.Semantic.DeepEqual(endpoints.Labels, compareLabels) &&
+			apiequality.Semantic.DeepEqual(compareAnnotations, existingSlices[0].Annotations) {
 			return slices, totals
 		}
 	}
@@ -230,7 +237,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	// be deleted.
 	recycleSlices(&slices)
 
-	epsClient := r.client.DiscoveryV1beta1().EndpointSlices(endpoints.Namespace)
+	epsClient := r.client.DiscoveryV1().EndpointSlices(endpoints.Namespace)
 
 	// Don't create more EndpointSlices if corresponding Endpoints resource is
 	// being deleted.
@@ -263,7 +270,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 		if err != nil {
 			return fmt.Errorf("failed to delete %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
-		r.endpointSliceTracker.Delete(endpointSlice)
+		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
@@ -276,13 +283,13 @@ func (r *reconciler) deleteEndpoints(namespace, name string, endpointSlices []*d
 	r.metricsCache.DeleteEndpoints(types.NamespacedName{Namespace: namespace, Name: name})
 	var errs []error
 	for _, endpointSlice := range endpointSlices {
-		err := r.client.DiscoveryV1beta1().EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1().EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("Error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
+		return fmt.Errorf("error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
 	}
 	return nil
 }
@@ -300,7 +307,7 @@ func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[addrType
 
 // totalChanges returns the total changes that will be required for an
 // EndpointSlice to match a desired set of endpoints.
-func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointSet) totalsByAction {
+func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointsliceutil.EndpointSet) totalsByAction {
 	totals := totalsByAction{}
 	existingMatches := 0
 
@@ -314,7 +321,7 @@ func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointSet
 
 			// If existing version of endpoint doesn't match desired version
 			// increment number of endpoints to be updated.
-			if !endpointsEqualBeyondHash(got, &endpoint) {
+			if !endpointutil.EndpointsEqualBeyondHash(got, &endpoint) {
 				totals.updated++
 			}
 		}

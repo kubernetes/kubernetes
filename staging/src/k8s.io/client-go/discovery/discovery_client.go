@@ -20,12 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	//nolint:staticcheck // SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
@@ -41,7 +43,7 @@ import (
 )
 
 const (
-	// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
+	// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. CustomResourceDefinitions).
 	defaultRetries = 2
 	// protobuf mime type
 	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
@@ -95,7 +97,7 @@ type ServerResourcesInterface interface {
 	//
 	// Deprecated: use ServerGroupsAndResources instead.
 	ServerResources() ([]*metav1.APIResourceList, error)
-	// ServerResources returns the supported groups and resources for all groups and versions.
+	// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 	//
 	// The returned group and resource lists might be non-nil with partial results even in the
 	// case of non-nil error.
@@ -481,12 +483,29 @@ func setDiscoveryDefaults(config *restclient.Config) error {
 
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
 // can be used to discover supported resources in the API server.
+// NewDiscoveryClientForConfig is equivalent to NewDiscoveryClientForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error) {
 	config := *c
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.UnversionedRESTClientFor(&config)
+	httpClient, err := restclient.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewDiscoveryClientForConfigAndClient(&config, httpClient)
+}
+
+// NewDiscoveryClientForConfigAndClient creates a new DiscoveryClient for the given config. This client
+// can be used to discover supported resources in the API server.
+// Note the http client provided takes precedence over the configured transport values.
+func NewDiscoveryClientForConfigAndClient(c *restclient.Config, httpClient *http.Client) (*DiscoveryClient, error) {
+	config := *c
+	if err := setDiscoveryDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := restclient.UnversionedRESTClientForConfigAndClient(&config, httpClient)
 	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
 }
 

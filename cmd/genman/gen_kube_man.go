@@ -26,6 +26,7 @@ import (
 	mangen "github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	kubectlcmd "k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -96,15 +97,14 @@ func main() {
 		}
 	case "kubectl":
 		// generate manpage for kubectl
-		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+		kubectl := kubectlcmd.NewKubectlCommand(kubectlcmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: bytes.NewReader(nil), Out: ioutil.Discard, ErrOut: ioutil.Discard}})
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)
 		}
 	case "kubeadm":
-		// generate manpage for kubelet
-		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		// generate manpage for kubeadm
+		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), ioutil.Discard, ioutil.Discard)
 		genMarkdown(kubeadm, "", outDir)
 		for _, c := range kubeadm.Commands() {
 			genMarkdown(c, "kubeadm", outDir)

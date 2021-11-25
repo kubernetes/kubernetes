@@ -206,10 +206,16 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		test := t
 		testCaseName := fmt.Sprintf("(%s)[LinuxOnly], %s", test.podfsGroupChangePolicy, test.name)
 		ginkgo.It(testCaseName, func() {
+			dInfo := driver.GetDriverInfo()
+			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
+
+			if dInfo.Capabilities[storageframework.CapVolumeMountGroup] &&
+				policy == v1.FSGroupChangeOnRootMismatch {
+				e2eskipper.Skipf("Driver %q supports VolumeMountGroup, which doesn't supported the OnRootMismatch FSGroup policy - skipping", dInfo.Name)
+			}
+
 			init()
 			defer cleanup()
-
-			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 			podConfig := e2epod.Config{
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,

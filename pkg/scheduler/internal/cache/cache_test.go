@@ -28,9 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -95,8 +92,6 @@ func newNodeInfo(requestedResource *framework.Resource,
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
 func TestAssumePodScheduled(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
@@ -248,8 +243,6 @@ func assumeAndFinishBinding(cache *schedulerCache, pod *v1.Pod, assumedTime time
 // TestExpirePod tests that assumed pods will be removed if expired.
 // The removal will be reflected in node info.
 func TestExpirePod(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
@@ -321,8 +314,6 @@ func TestExpirePod(t *testing.T) {
 // TestAddPodWillConfirm tests that a pod being Add()ed will be confirmed if assumed.
 // The pod info should still exist after manually expiring unconfirmed pods.
 func TestAddPodWillConfirm(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	now := time.Now()
 	ttl := 10 * time.Second
@@ -394,32 +385,34 @@ func TestDump(t *testing.T) {
 		podsToAdd:    []*v1.Pod{testPods[0]},
 	}}
 
-	for _, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
-		for _, podToAssume := range tt.podsToAssume {
-			if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
-				t.Errorf("assumePod failed: %v", err)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			cache := newSchedulerCache(ttl, time.Second, nil)
+			for _, podToAssume := range tt.podsToAssume {
+				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
+					t.Errorf("assumePod failed: %v", err)
+				}
 			}
-		}
-		for _, podToAdd := range tt.podsToAdd {
-			if err := cache.AddPod(podToAdd); err != nil {
-				t.Errorf("AddPod failed: %v", err)
+			for _, podToAdd := range tt.podsToAdd {
+				if err := cache.AddPod(podToAdd); err != nil {
+					t.Errorf("AddPod failed: %v", err)
+				}
 			}
-		}
 
-		snapshot := cache.Dump()
-		if len(snapshot.Nodes) != len(cache.nodes) {
-			t.Errorf("Unequal number of nodes in the cache and its snapshot. expected: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
-		}
-		for name, ni := range snapshot.Nodes {
-			nItem := cache.nodes[name]
-			if !reflect.DeepEqual(ni, nItem.info) {
-				t.Errorf("expect \n%+v; got \n%+v", nItem.info, ni)
+			snapshot := cache.Dump()
+			if len(snapshot.Nodes) != len(cache.nodes) {
+				t.Errorf("Unequal number of nodes in the cache and its snapshot. expected: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
 			}
-		}
-		if !reflect.DeepEqual(snapshot.AssumedPods, cache.assumedPods) {
-			t.Errorf("expect \n%+v; got \n%+v", cache.assumedPods, snapshot.AssumedPods)
-		}
+			for name, ni := range snapshot.Nodes {
+				nItem := cache.nodes[name]
+				if !reflect.DeepEqual(ni, nItem.info) {
+					t.Errorf("expect \n%+v; got \n%+v", nItem.info, ni)
+				}
+			}
+			if !reflect.DeepEqual(snapshot.AssumedPods, cache.assumedPods) {
+				t.Errorf("expect \n%+v; got \n%+v", cache.assumedPods, snapshot.AssumedPods)
+			}
+		})
 	}
 }
 
@@ -490,8 +483,6 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 
 // TestAddPodAfterExpiration tests that a pod being Add()ed will be added back if expired.
 func TestAddPodAfterExpiration(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	ttl := 10 * time.Second
 	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
@@ -542,8 +533,6 @@ func TestAddPodAfterExpiration(t *testing.T) {
 
 // TestUpdatePod tests that a pod will be updated if added before.
 func TestUpdatePod(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	ttl := 10 * time.Second
 	testPods := []*v1.Pod{
@@ -647,33 +636,33 @@ func TestUpdatePodAndGet(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			cache := newSchedulerCache(ttl, time.Second, nil)
 
-		if err := tt.handler(cache, tt.pod); err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-
-		if !tt.assumePod {
-			if err := cache.UpdatePod(tt.pod, tt.podToUpdate); err != nil {
-				t.Fatalf("UpdatePod failed: %v", err)
+			if err := tt.handler(cache, tt.pod); err != nil {
+				t.Fatalf("unexpected err: %v", err)
 			}
-		}
 
-		cachedPod, err := cache.GetPod(tt.pod)
-		if err != nil {
-			t.Fatalf("GetPod failed: %v", err)
-		}
-		if !reflect.DeepEqual(tt.podToUpdate, cachedPod) {
-			t.Fatalf("pod get=%s, want=%s", cachedPod, tt.podToUpdate)
-		}
+			if !tt.assumePod {
+				if err := cache.UpdatePod(tt.pod, tt.podToUpdate); err != nil {
+					t.Fatalf("UpdatePod failed: %v", err)
+				}
+			}
+
+			cachedPod, err := cache.GetPod(tt.pod)
+			if err != nil {
+				t.Fatalf("GetPod failed: %v", err)
+			}
+			if !reflect.DeepEqual(tt.podToUpdate, cachedPod) {
+				t.Fatalf("pod get=%s, want=%s", cachedPod, tt.podToUpdate)
+			}
+		})
 	}
 }
 
 // TestExpireAddUpdatePod test the sequence that a pod is expired, added, then updated
 func TestExpireAddUpdatePod(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	ttl := 10 * time.Second
 	testPods := []*v1.Pod{
@@ -773,8 +762,6 @@ func makePodWithEphemeralStorage(nodeName, ephemeralStorage string) *v1.Pod {
 }
 
 func TestEphemeralStorageResource(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	podE := makePodWithEphemeralStorage(nodeName, "500")
 	tests := []struct {
@@ -820,61 +807,62 @@ func TestEphemeralStorageResource(t *testing.T) {
 
 // TestRemovePod tests after added pod is removed, its information should also be subtracted.
 func TestRemovePod(t *testing.T) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
-	basePod := makeBasePod(t, "node-1", "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
-	tests := []struct {
-		nodes     []*v1.Node
-		pod       *v1.Pod
-		wNodeInfo *framework.NodeInfo
-	}{{
-		nodes: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
-			},
+	pod := makeBasePod(t, "node-1", "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
 		},
-		pod: basePod,
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			[]*v1.Pod{basePod},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}}
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
+		},
+	}
+	wNodeInfo := newNodeInfo(
+		&framework.Resource{
+			MilliCPU: 100,
+			Memory:   500,
+		},
+		&framework.Resource{
+			MilliCPU: 100,
+			Memory:   500,
+		},
+		[]*v1.Pod{pod},
+		newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+		make(map[string]*framework.ImageStateSummary),
+	)
+	tests := map[string]struct {
+		assume bool
+	}{
+		"bound":   {},
+		"assumed": {assume: true},
+	}
 
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			nodeName := tt.pod.Spec.NodeName
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			nodeName := pod.Spec.NodeName
 			cache := newSchedulerCache(time.Second, time.Second, nil)
-			// Add pod succeeds even before adding the nodes.
-			if err := cache.AddPod(tt.pod); err != nil {
-				t.Fatalf("AddPod failed: %v", err)
-			}
-			n := cache.nodes[nodeName]
-			if err := deepEqualWithoutGeneration(n, tt.wNodeInfo); err != nil {
-				t.Error(err)
-			}
-			for _, n := range tt.nodes {
-				if err := cache.AddNode(n); err != nil {
-					t.Error(err)
+			// Add/Assume pod succeeds even before adding the nodes.
+			if tt.assume {
+				if err := cache.AddPod(pod); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			} else {
+				if err := cache.AssumePod(pod); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
 				}
 			}
+			n := cache.nodes[nodeName]
+			if err := deepEqualWithoutGeneration(n, wNodeInfo); err != nil {
+				t.Error(err)
+			}
+			for _, n := range nodes {
+				cache.AddNode(n)
+			}
 
-			if err := cache.RemovePod(tt.pod); err != nil {
+			if err := cache.RemovePod(pod); err != nil {
 				t.Fatalf("RemovePod failed: %v", err)
 			}
 
-			if _, err := cache.GetPod(tt.pod); err == nil {
+			if _, err := cache.GetPod(pod); err == nil {
 				t.Errorf("pod was not deleted")
 			}
 
@@ -1076,9 +1064,7 @@ func TestNodeOperators(t *testing.T) {
 			node := test.node
 
 			cache := newSchedulerCache(time.Second, time.Second, nil)
-			if err := cache.AddNode(node); err != nil {
-				t.Fatal(err)
-			}
+			cache.AddNode(node)
 			for _, pod := range test.pods {
 				if err := cache.AddPod(pod); err != nil {
 					t.Fatal(err)
@@ -1122,9 +1108,7 @@ func TestNodeOperators(t *testing.T) {
 			node.Status.Allocatable[v1.ResourceMemory] = mem50m
 			expected.Allocatable.Memory = mem50m.Value()
 
-			if err := cache.UpdateNode(nil, node); err != nil {
-				t.Error(err)
-			}
+			cache.UpdateNode(nil, node)
 			got, found = cache.nodes[node.Name]
 			if !found {
 				t.Errorf("Failed to find node %v in schedulertypes after UpdateNode.", node.Name)
@@ -1261,9 +1245,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	addNode := func(i int) operation {
 		return func(t *testing.T) {
-			if err := cache.AddNode(nodes[i]); err != nil {
-				t.Error(err)
-			}
+			cache.AddNode(nodes[i])
 		}
 	}
 	removeNode := func(i int) operation {
@@ -1275,9 +1257,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 	updateNode := func(i int) operation {
 		return func(t *testing.T) {
-			if err := cache.UpdateNode(nodes[i], updatedNodes[i]); err != nil {
-				t.Error(err)
-			}
+			cache.UpdateNode(nodes[i], updatedNodes[i])
 		}
 	}
 	addPod := func(i int) operation {
@@ -1585,9 +1565,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 	var snapshot *Snapshot
 
 	addNode := func(t *testing.T, i int) {
-		if err := cache.AddNode(nodes[i]); err != nil {
-			t.Error(err)
-		}
+		cache.AddNode(nodes[i])
 		_, ok := snapshot.nodeInfoMap[nodes[i].Name]
 		if !ok {
 			snapshot.nodeInfoMap[nodes[i].Name] = cache.nodes[nodes[i].Name].info
@@ -1707,8 +1685,6 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 }
 
 func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
-	// Enable volumesOnNodeForBalancing to do balanced resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(nil, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

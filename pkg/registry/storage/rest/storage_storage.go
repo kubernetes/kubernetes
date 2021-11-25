@@ -24,10 +24,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	csidriverstore "k8s.io/kubernetes/pkg/registry/storage/csidriver/storage"
 	csinodestore "k8s.io/kubernetes/pkg/registry/storage/csinode/storage"
 	csistoragecapacitystore "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity/storage"
@@ -70,54 +68,26 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// volumeattachments
-	volumeAttachmentStorage, err := volumeattachmentstore.NewStorage(restOptionsGetter)
+
+	// register csistoragecapacities
+	csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
 	if err != nil {
 		return storage, err
 	}
-	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
-
-	// register csistoragecapacity if CSIStorageCapacity feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
-		if err != nil {
-			return storage, err
-		}
-		storage["csistoragecapacities"] = csiStorageStorage.CSIStorageCapacity
-	}
+	storage["csistoragecapacities"] = csiStorageStorage.CSIStorageCapacity
 
 	return storage, nil
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// storageclasses
-	storageClassStorage, err := storageclassstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["storageclasses"] = storageClassStorage
 
-	// volumeattachments
-	volumeAttachmentStorage, err := volumeattachmentstore.NewStorage(restOptionsGetter)
+	// register csistoragecapacities
+	csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
 	if err != nil {
 		return storage, err
 	}
-	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
-
-	// register csinodes
-	csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["csinodes"] = csiNodeStorage.CSINode
-
-	// register csidrivers
-	csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["csidrivers"] = csiDriverStorage.CSIDriver
+	storage["csistoragecapacities"] = csiStorageStorage.CSIStorageCapacity
 
 	return storage, nil
 }

@@ -60,8 +60,18 @@ func Test_RoundUpToGiB(t *testing.T) {
 			roundedVal: int64(1000),
 		},
 		{
-			name:        "round overflowed quantity to int64",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to GiB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(2),
+		},
+		{
+			name:       "round big value to GiB",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(8588886016),
+		},
+		{
+			name:        "round quantity to GiB that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
 			roundedVal:  int64(0),
 			expectError: true,
 		},
@@ -125,8 +135,18 @@ func Test_RoundUpToMB(t *testing.T) {
 			roundedVal: int64(1073742),
 		},
 		{
-			name:        "round overflowed quantity to int64",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to MB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(1289),
+		},
+		{
+			name:       "round big value to MB",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(9222246136948),
+		},
+		{
+			name:        "round quantity to MB that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
 			roundedVal:  int64(0),
 			expectError: true,
 		},
@@ -190,8 +210,18 @@ func Test_RoundUpToMiB(t *testing.T) {
 			roundedVal: int64(1024000),
 		},
 		{
-			name:        "round overflowed quantity to int64",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to MiB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(1229),
+		},
+		{
+			name:       "round big value to MiB",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(8795019280384),
+		},
+		{
+			name:        "round quantity to MiB that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
 			roundedVal:  int64(0),
 			expectError: true,
 		},
@@ -255,8 +285,18 @@ func Test_RoundUpToKB(t *testing.T) {
 			roundedVal: int64(1073741824),
 		},
 		{
-			name:        "round overflowed quantity to int64",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to KB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(1288491),
+		},
+		{
+			name:       "round big value to KB",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(9222246136947934),
+		},
+		{
+			name:        "round quantity to KB that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
 			roundedVal:  int64(0),
 			expectError: true,
 		},
@@ -320,8 +360,18 @@ func Test_RoundUpToKiB(t *testing.T) {
 			roundedVal: int64(1048576000),
 		},
 		{
-			name:        "round overflowed quantity to int64",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to KiB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(1258292),
+		},
+		{
+			name:       "round big value to KiB",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(9006099743113216),
+		},
+		{
+			name:        "round quantity to KiB that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
 			roundedVal:  int64(0),
 			expectError: true,
 		},
@@ -385,8 +435,18 @@ func Test_RoundUpToGiBInt32(t *testing.T) {
 			roundedVal: int32(1000),
 		},
 		{
-			name:        "round overflowed quantity to int32",
-			resource:    resource.MustParse("73786976299133170k"),
+			name:       "round decimal to GiB",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int32(2),
+		},
+		{
+			name:       "round big value to GiB",
+			resource:   resource.MustParse("2047Pi"),
+			roundedVal: int32(2146435072),
+		},
+		{
+			name:        "round quantity to GiB that would lead to an int32 overflow",
+			resource:    resource.MustParse("2048Pi"),
 			roundedVal:  int32(0),
 			expectError: true,
 		},
@@ -395,6 +455,56 @@ func Test_RoundUpToGiBInt32(t *testing.T) {
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			val, err := RoundUpToGiBInt32(test.resource)
+			if !test.expectError && err != nil {
+				t.Errorf("expected no error got: %v", err)
+			}
+
+			if test.expectError && err == nil {
+				t.Errorf("expected error but got nothing")
+			}
+
+			if val != test.roundedVal {
+				t.Logf("actual rounded value: %d", val)
+				t.Logf("expected rounded value: %d", test.roundedVal)
+				t.Error("unexpected rounded value")
+			}
+		})
+	}
+}
+
+func Test_RoundUpToB(t *testing.T) {
+	testcases := []struct {
+		name        string
+		resource    resource.Quantity
+		roundedVal  int64
+		expectError bool
+	}{
+		{
+			name:       "round m to B",
+			resource:   resource.MustParse("987m"),
+			roundedVal: int64(1),
+		},
+		{
+			name:       "round decimal to B",
+			resource:   resource.MustParse("1.2Gi"),
+			roundedVal: int64(1288490189),
+		},
+		{
+			name:       "round big value to B",
+			resource:   resource.MustParse("8191Pi"),
+			roundedVal: int64(9222246136947933184),
+		},
+		{
+			name:        "round quantity to B that would lead to an int64 overflow",
+			resource:    resource.MustParse("8192Pi"),
+			roundedVal:  int64(0),
+			expectError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			val, err := RoundUpToB(test.resource)
 			if !test.expectError && err != nil {
 				t.Errorf("expected no error got: %v", err)
 			}

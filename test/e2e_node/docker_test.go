@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]", func() {
+var _ = SIGDescribe("Docker features [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("docker-feature-test")
 
 	ginkgo.BeforeEach(func() {

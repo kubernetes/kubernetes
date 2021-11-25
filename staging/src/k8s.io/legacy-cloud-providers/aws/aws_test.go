@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -20,6 +21,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -70,6 +72,11 @@ func (m *MockedFakeEC2) expectDescribeSecurityGroups(clusterID, groupName string
 func (m *MockedFakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
 	args := m.Called(request)
 	return args.Get(0).([]*ec2.Volume), nil
+}
+
+func (m *MockedFakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
+	args := m.Called(request)
+	return args.Get(0).(*ec2.DeleteVolumeOutput), nil
 }
 
 func (m *MockedFakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
@@ -808,6 +815,356 @@ func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
 	}
 }
 
+func Test_findELBSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	subnetA0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000003 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000003"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetC0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-c0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetOther := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-other"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameKubernetesClusterPrefix + "clusterid.other"),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetNoTag := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-notag"),
+	}
+
+	tests := []struct {
+		name        string
+		subnets     []*ec2.Subnet
+		routeTables map[string]bool
+		internal    bool
+		want        []string
+	}{
+		{
+			name: "no subnets",
+		},
+		{
+			name: "single tagged subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+			},
+			internal: false,
+			want:     []string{"subnet-a0000001"},
+		},
+		{
+			name: "no matching public subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000002": false,
+			},
+			want: nil,
+		},
+		{
+			name: "prefer role over cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000003,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000003": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "prefer cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetC0000001,
+				subnetNoTag,
+			},
+			want: []string{"subnet-c0000001"},
+		},
+		{
+			name: "include untagged",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetNoTag,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-notag":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-notag"},
+		},
+		{
+			name: "ignore some other cluster owned subnet",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-b0000001"},
+		},
+		{
+			name: "prefer matching role",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetB0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": false,
+				"subnet-b0000002": false,
+			},
+			want:     []string{"subnet-b0000002"},
+			internal: true,
+		},
+		{
+			name: "choose lexicographic order",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "everything",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+				subnetB0000001,
+				subnetB0000002,
+				subnetC0000001,
+				subnetNoTag,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+				"subnet-b0000001": true,
+				"subnet-b0000002": true,
+				"subnet-c0000001": true,
+				"subnet-notag":    true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-b0000001", "subnet-c0000001"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			awsServices.ec2.RemoveRouteTables()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			routeTables := constructRouteTables(tt.routeTables)
+			for _, rt := range routeTables {
+				awsServices.ec2.CreateRouteTable(rt)
+			}
+			got, _ := c.findELBSubnets(tt.internal)
+			sort.Strings(tt.want)
+			sort.Strings(got)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_getLoadBalancerSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	tests := []struct {
+		name        string
+		service     *v1.Service
+		subnets     []*ec2.Subnet
+		internalELB bool
+		want        []string
+		wantErr     error
+	}{
+		{
+			name:    "no annotation",
+			service: &v1.Service{},
+		},
+		{
+			name: "annotation with no subnets",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "\t",
+					},
+				},
+			},
+			wantErr: errors.New("unable to resolve empty subnet slice"),
+		},
+		{
+			name: "subnet ids",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "subnet-a000001, subnet-a000002",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "subnet names",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2 ",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "unable to find all subnets",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2, Test Subnet ",
+					},
+				},
+			},
+			wantErr: errors.New("expected to find 3, but found 1 subnets"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			got, err := c.getLoadBalancerSubnets(tt.service, tt.internalELB)
+			if tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			} else {
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 func TestSubnetIDsinVPC(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, err := newAWSCloud(CloudConfig{}, awsServices)
@@ -1225,8 +1582,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		v1.LabelFailureDomainBetaZone:   "us-east-1a",
-		v1.LabelFailureDomainBetaRegion: "us-east-1"}, labels)
+		v1.LabelTopologyZone:   "us-east-1a",
+		v1.LabelTopologyRegion: "us-east-1"}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1299,8 +1656,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 				AvailabilityZone: aws.String("us-east-1a"),
 			}},
 			map[string]string{
-				v1.LabelFailureDomainBetaZone:   "us-east-1a",
-				v1.LabelFailureDomainBetaRegion: "us-east-1",
+				v1.LabelTopologyZone:   "us-east-1a",
+				v1.LabelTopologyRegion: "us-east-1",
 			},
 			nil,
 		},
@@ -1352,6 +1709,65 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
 
 	c.EnsureLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
+}
+
+func TestCheckMixedProtocol(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		ports       []v1.ServicePort
+		wantErr     error
+	}{
+		{
+			name:        "TCP",
+			annotations: make(map[string]string),
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     int32(8080),
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "UDP",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+					Port:     int32(8080),
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "TCP and UDP",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+					Port:     int32(53),
+				},
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     int32(53),
+				},
+			},
+			wantErr: errors.New("mixed protocol is not supported for LoadBalancer"),
+		},
+	}
+	for _, test := range tests {
+		tt := test
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkMixedProtocol(tt.ports)
+			if tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			} else {
+				assert.Equal(t, err, nil)
+			}
+		})
+	}
 }
 
 func TestCheckProtocol(t *testing.T) {
@@ -2009,6 +2425,51 @@ func TestCreateDisk(t *testing.T) {
 	volumeID, err := c.CreateDisk(volumeOptions)
 	assert.Nil(t, err, "Error creating disk: %v", err)
 	assert.Equal(t, volumeID, KubernetesVolumeID("aws://us-east-1a/vol-volumeId0"))
+	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
+}
+
+func TestCreateDiskFailDescribeVolume(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, _ := newAWSCloud(CloudConfig{}, awsServices)
+
+	volumeOptions := &VolumeOptions{
+		AvailabilityZone: "us-east-1a",
+		CapacityGB:       10,
+	}
+	request := &ec2.CreateVolumeInput{
+		AvailabilityZone: aws.String("us-east-1a"),
+		Encrypted:        aws.Bool(false),
+		VolumeType:       aws.String(DefaultVolumeType),
+		Size:             aws.Int64(10),
+		TagSpecifications: []*ec2.TagSpecification{
+			{ResourceType: aws.String(ec2.ResourceTypeVolume), Tags: []*ec2.Tag{
+				// CreateVolume from MockedFakeEC2 expects sorted tags, so we need to
+				// always have these tags sorted:
+				{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterID)},
+				{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID)), Value: aws.String(ResourceLifecycleOwned)},
+			}},
+		},
+	}
+
+	volume := &ec2.Volume{
+		AvailabilityZone: aws.String("us-east-1a"),
+		VolumeId:         aws.String("vol-volumeId0"),
+		State:            aws.String("creating"),
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("CreateVolume", request).Return(volume, nil)
+
+	describeVolumesRequest := &ec2.DescribeVolumesInput{
+		VolumeIds: []*string{aws.String("vol-volumeId0")},
+	}
+	deleteVolumeRequest := &ec2.DeleteVolumeInput{
+		VolumeId: aws.String("vol-volumeId0"),
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("DescribeVolumes", describeVolumesRequest).Return([]*ec2.Volume{volume}, nil)
+	awsServices.ec2.(*MockedFakeEC2).On("DeleteVolume", deleteVolumeRequest).Return(&ec2.DeleteVolumeOutput{}, nil)
+
+	volumeID, err := c.CreateDisk(volumeOptions)
+	assert.Error(t, err)
+	assert.Equal(t, volumeID, KubernetesVolumeID(""))
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -3061,6 +3522,57 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 			} else {
 				assert.NotNil(t, err)
 			}
+		})
+	}
+}
+
+func Test_parseStringSliceAnnotation(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotation  string
+		annotations map[string]string
+		want        []string
+		wantExist   bool
+	}{
+		{
+			name:       "empty annotation",
+			annotation: "test.annotation",
+			wantExist:  false,
+		},
+		{
+			name:       "empty value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "\t, ,,",
+			},
+			want:      nil,
+			wantExist: true,
+		},
+		{
+			name:       "single value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "   value 1 ",
+			},
+			want:      []string{"value 1"},
+			wantExist: true,
+		},
+		{
+			name:       "multiple values",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "subnet-1, subnet-2, My Subnet ",
+			},
+			want:      []string{"subnet-1", "subnet-2", "My Subnet"},
+			wantExist: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotValue []string
+			gotExist := parseStringSliceAnnotation(tt.annotations, tt.annotation, &gotValue)
+			assert.Equal(t, tt.wantExist, gotExist)
+			assert.Equal(t, tt.want, gotValue)
 		})
 	}
 }

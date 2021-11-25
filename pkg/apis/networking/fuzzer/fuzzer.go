@@ -20,6 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the networking api group.
@@ -61,6 +62,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				p.Number = 0
 				if p.Name == "" {
 					p.Name = "portname"
+				}
+			}
+		},
+		func(p *networking.IngressClass, c fuzz.Continue) {
+			c.FuzzNoCustom(p) // fuzz self without calling this function again
+			// default Parameters to Cluster
+			if p.Spec.Parameters == nil || p.Spec.Parameters.Scope == nil {
+				p.Spec.Parameters = &networking.IngressClassParametersReference{
+					Scope: utilpointer.StringPtr(networking.IngressClassParametersReferenceScopeCluster),
 				}
 			}
 		},

@@ -18,7 +18,6 @@ package filters
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -31,40 +30,37 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, timeout time.Duration) http.Handler {
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck) http.Handler {
 	if longRunning == nil {
 		return handler
 	}
-	timeoutFunc := func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+	timeoutFunc := func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		ctx := req.Context()
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			return req, time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
+			return req, false, func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
 
 		if longRunning(req, requestInfo) {
-			return req, nil, nil, nil
+			return req, true, nil, nil
 		}
-
-		ctx, cancel := context.WithCancel(ctx)
-		req = req.WithContext(ctx)
 
 		postTimeoutFn := func() {
-			cancel()
 			metrics.RecordRequestTermination(req, requestInfo, metrics.APIServerComponent, http.StatusGatewayTimeout)
 		}
-		return req, time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
+		return req, false, postTimeoutFn, apierrors.NewTimeoutError("request did not complete within the allotted timeout", 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
 
-type timeoutFunc = func(*http.Request) (req *http.Request, timeout <-chan time.Time, postTimeoutFunc func(), err *apierrors.StatusError)
+type timeoutFunc = func(*http.Request) (req *http.Request, longRunning bool, postTimeoutFunc func(), err *apierrors.StatusError)
 
 // WithTimeout returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
@@ -85,15 +81,18 @@ type timeoutHandler struct {
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r, after, postTimeoutFn, err := t.timeout(r)
-	if after == nil {
+	r, longRunning, postTimeoutFn, err := t.timeout(r)
+	if longRunning {
 		t.handler.ServeHTTP(w, r)
 		return
 	}
 
+	timeoutCh := r.Context().Done()
+
 	// resultCh is used as both errCh and stopCh
 	resultCh := make(chan interface{})
-	tw := newTimeoutWriter(w)
+	var tw timeoutWriter
+	tw, w = newTimeoutWriter(w)
 	go func() {
 		defer func() {
 			err := recover()
@@ -108,7 +107,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			resultCh <- err
 		}()
-		t.handler.ServeHTTP(tw, r)
+		t.handler.ServeHTTP(w, r)
 	}()
 	select {
 	case err := <-resultCh:
@@ -117,21 +116,25 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		return
-	case <-after:
+	case <-timeoutCh:
 		defer func() {
 			// resultCh needs to have a reader, since the function doing
 			// the work needs to send to it. This is defer'd to ensure it runs
 			// ever if the post timeout work itself panics.
 			go func() {
+				timedOutAt := time.Now()
 				res := <-resultCh
+
+				status := metrics.PostTimeoutHandlerOK
 				if res != nil {
-					switch t := res.(type) {
-					case error:
-						utilruntime.HandleError(t)
-					default:
-						utilruntime.HandleError(fmt.Errorf("%v", res))
-					}
+					// a non nil res indicates that there was a panic.
+					status = metrics.PostTimeoutHandlerPanic
 				}
+
+				metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceTimeoutHandler, status)
+				err := fmt.Errorf("post-timeout activity - time-elapsed: %s, %v %q result: %v",
+					time.Since(timedOutAt), r.Method, r.URL.Path, res)
+				utilruntime.HandleError(err)
 			}()
 		}()
 
@@ -145,23 +148,15 @@ type timeoutWriter interface {
 	timeout(*apierrors.StatusError)
 }
 
-func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
+func newTimeoutWriter(w http.ResponseWriter) (timeoutWriter, http.ResponseWriter) {
 	base := &baseTimeoutWriter{w: w}
+	wrapped := responsewriter.WrapForHTTP1Or2(base)
 
-	_, notifiable := w.(http.CloseNotifier)
-	_, hijackable := w.(http.Hijacker)
-
-	switch {
-	case notifiable && hijackable:
-		return &closeHijackTimeoutWriter{base}
-	case notifiable:
-		return &closeTimeoutWriter{base}
-	case hijackable:
-		return &hijackTimeoutWriter{base}
-	default:
-		return base
-	}
+	return base, wrapped
 }
+
+var _ http.ResponseWriter = &baseTimeoutWriter{}
+var _ responsewriter.UserProvidedDecorator = &baseTimeoutWriter{}
 
 type baseTimeoutWriter struct {
 	w http.ResponseWriter
@@ -173,6 +168,10 @@ type baseTimeoutWriter struct {
 	wroteHeader bool
 	// if this timeout writer has been hijacked
 	hijacked bool
+}
+
+func (tw *baseTimeoutWriter) Unwrap() http.ResponseWriter {
+	return tw.w
 }
 
 func (tw *baseTimeoutWriter) Header() http.Header {
@@ -209,9 +208,9 @@ func (tw *baseTimeoutWriter) Flush() {
 		return
 	}
 
-	if flusher, ok := tw.w.(http.Flusher); ok {
-		flusher.Flush()
-	}
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Flusher if the inner object (tw.w) implements http.Flusher.
+	tw.w.(http.Flusher).Flush()
 }
 
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
@@ -258,7 +257,7 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	}
 }
 
-func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
+func (tw *baseTimeoutWriter) CloseNotify() <-chan bool {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 
@@ -268,47 +267,24 @@ func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
 		return done
 	}
 
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.CloseNotifier if the inner object (tw.w) implements http.CloseNotifier.
 	return tw.w.(http.CloseNotifier).CloseNotify()
 }
 
-func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (tw *baseTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
 		return nil, nil, http.ErrHandlerTimeout
 	}
+
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (tw.w) implements http.Hijacker.
 	conn, rw, err := tw.w.(http.Hijacker).Hijack()
 	if err == nil {
 		tw.hijacked = true
 	}
 	return conn, rw, err
-}
-
-type closeTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
-type hijackTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *hijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return tw.hijack()
-}
-
-type closeHijackTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeHijackTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
-func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return tw.hijack()
 }

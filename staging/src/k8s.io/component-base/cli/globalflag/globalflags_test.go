@@ -24,12 +24,15 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 )
 
 func TestAddGlobalFlags(t *testing.T) {
 	namedFlagSets := &cliflag.NamedFlagSets{}
 	nfs := namedFlagSets.FlagSet("global")
+	nfs.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	AddGlobalFlags(nfs, "test-cmd")
 
 	actualFlag := []string{}
@@ -40,9 +43,11 @@ func TestAddGlobalFlags(t *testing.T) {
 	// Get all flags from flags.CommandLine, except flag `test.*`.
 	wantedFlag := []string{"help"}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	logs.AddFlags(pflag.CommandLine)
+	normalizeFunc := nfs.GetNormalizeFunc()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		if !strings.Contains(flag.Name, "test.") {
-			wantedFlag = append(wantedFlag, normalize(flag.Name))
+			wantedFlag = append(wantedFlag, string(normalizeFunc(nfs, flag.Name)))
 		}
 	})
 	sort.Strings(wantedFlag)

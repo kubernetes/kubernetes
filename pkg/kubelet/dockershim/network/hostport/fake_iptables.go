@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -21,12 +22,12 @@ package hostport
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeChain struct {
@@ -123,6 +124,14 @@ func (f *fakeIPTables) DeleteChain(tableName utiliptables.Table, chainName utili
 	return nil
 }
 
+func (f *fakeIPTables) ChainExists(tableName utiliptables.Table, chainName utiliptables.Chain) (bool, error) {
+	_, _, err := f.getChain(tableName, chainName)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Returns index of rule in array; < 0 if rule is not found
 func findRule(chain *fakeChain, rule string) int {
 	for i, candidate := range chain.rules {
@@ -148,14 +157,14 @@ func (f *fakeIPTables) ensureRule(position utiliptables.RulePosition, tableName 
 		return true, nil
 	}
 
-	if position == utiliptables.Prepend {
+	switch position {
+	case utiliptables.Prepend:
 		chain.rules = append([]string{rule}, chain.rules...)
-	} else if position == utiliptables.Append {
+	case utiliptables.Append:
 		chain.rules = append(chain.rules, rule)
-	} else {
+	default:
 		return false, fmt.Errorf("unknown position argument %q", position)
 	}
-
 	return false, nil
 }
 
@@ -184,8 +193,8 @@ func normalizeRule(rule string) (string, error) {
 		arg := remaining[:end]
 
 		// Normalize un-prefixed IP addresses like iptables does
-		if net.ParseIP(arg) != nil {
-			arg = arg + "/32"
+		if netutils.ParseIPSloppy(arg) != nil {
+			arg += "/32"
 		}
 
 		if len(normalized) > 0 {
@@ -281,7 +290,10 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 			if strings.HasPrefix(line, ":") {
 				chainName := utiliptables.Chain(strings.Split(line[1:], " ")[0])
 				if flush == utiliptables.FlushTables {
-					table, chain, _ := f.getChain(tableName, chainName)
+					table, chain, err := f.getChain(tableName, chainName)
+					if err != nil {
+						return err
+					}
 					if chain != nil {
 						delete(table.chains, string(chainName))
 					}
@@ -356,4 +368,8 @@ func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName ut
 
 func (f *fakeIPTables) HasRandomFully() bool {
 	return false
+}
+
+func (f *fakeIPTables) Present() bool {
+	return true
 }

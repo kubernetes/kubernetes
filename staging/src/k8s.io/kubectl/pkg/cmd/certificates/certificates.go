@@ -26,7 +26,6 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -135,6 +134,10 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		as a requested identity. Before approving a CSR, ensure you understand what the
 		signed certificate can do.
 		`)),
+		Example: templates.Examples(i18n.T(`
+			# Approve CSR 'csr-sqgzp'
+			kubectl certificate approve csr-sqgzp
+		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -174,6 +177,10 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		kubectl certificate deny allows a cluster admin to deny a certificate
 		signing request (CSR). This action tells a certificate signing controller to
 		not to issue a certificate to the requestor.
+		`)),
+		Example: templates.Examples(i18n.T(`
+			# Deny CSR 'csr-sqgzp'
+			kubectl certificate deny csr-sqgzp
 		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -251,7 +258,7 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 				default:
 					return fmt.Errorf("can only handle certificates.k8s.io CertificateSigningRequest objects, got %T", modifiedCSR)
 				}
-				if errors.IsConflict(err) && i < 10 {
+				if apierrors.IsConflict(err) && i < 10 {
 					if err := info.Get(); err != nil {
 						return err
 					}

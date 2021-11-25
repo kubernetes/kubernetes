@@ -102,11 +102,16 @@ message CronJobSpec {
 message CronJobStatus {
   // A list of pointers to currently running jobs.
   // +optional
+  // +listType=atomic
   repeated k8s.io.api.core.v1.ObjectReference active = 1;
 
   // Information when was the last time the job was successfully scheduled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScheduleTime = 4;
+
+  // Information when was the last time the job successfully completed.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
 }
 
 // JobTemplate describes a template for creating copies of a predefined pod.

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -303,8 +304,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
-//lint:ignore SA4009 poduid is overwritten by design, see comment below
-func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error {
+func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error { //nolint:staticcheck // SA4009 poduid is overwritten by design, see comment below
 	if bytes == nil {
 		return fmt.Errorf("attempting to assign null quota to %s", path)
 	}
@@ -319,7 +319,7 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 	// volumes in a pod, we can simply remove this line of code.
 	// If and when we decide permanently that we're going to adopt
 	// one quota per volume, we can rip all of the pod code out.
-	poduid = types.UID(uuid.NewUUID())
+	poduid = types.UID(uuid.NewUUID()) //nolint:staticcheck // SA4009 poduid is overwritten by design, see comment above
 	if pod, ok := dirPodMap[path]; ok && pod != poduid {
 		return fmt.Errorf("requesting quota on existing directory %s but different pod %s %s", path, pod, poduid)
 	}

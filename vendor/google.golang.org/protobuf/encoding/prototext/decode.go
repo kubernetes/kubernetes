@@ -6,7 +6,6 @@ package prototext
 
 import (
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"google.golang.org/protobuf/internal/encoding/messageset"
@@ -23,6 +22,7 @@ import (
 )
 
 // Unmarshal reads the given []byte into the given proto.Message.
+// The provided message must be mutable (e.g., a non-nil pointer to a message).
 func Unmarshal(b []byte, m proto.Message) error {
 	return UnmarshalOptions{}.Unmarshal(b, m)
 }
@@ -51,8 +51,9 @@ type UnmarshalOptions struct {
 	}
 }
 
-// Unmarshal reads the given []byte and populates the given proto.Message using options in
-// UnmarshalOptions object.
+// Unmarshal reads the given []byte and populates the given proto.Message
+// using options in the UnmarshalOptions object.
+// The provided message must be mutable (e.g., a non-nil pointer to a message).
 func (o UnmarshalOptions) Unmarshal(b []byte, m proto.Message) error {
 	return o.unmarshal(b, m)
 }
@@ -158,21 +159,11 @@ func (d decoder) unmarshalMessage(m pref.Message, checkDelims bool) error {
 		switch tok.NameKind() {
 		case text.IdentName:
 			name = pref.Name(tok.IdentName())
-			fd = fieldDescs.ByName(name)
-			if fd == nil {
-				// The proto name of a group field is in all lowercase,
-				// while the textproto field name is the group message name.
-				gd := fieldDescs.ByName(pref.Name(strings.ToLower(string(name))))
-				if gd != nil && gd.Kind() == pref.GroupKind && gd.Message().Name() == name {
-					fd = gd
-				}
-			} else if fd.Kind() == pref.GroupKind && fd.Message().Name() != name {
-				fd = nil // reset since field name is actually the message name
-			}
+			fd = fieldDescs.ByTextName(string(name))
 
 		case text.TypeName:
 			// Handle extensions only. This code path is not for Any.
-			xt, xtErr = d.findExtension(pref.FullName(tok.TypeName()))
+			xt, xtErr = d.opts.Resolver.FindExtensionByName(pref.FullName(tok.TypeName()))
 
 		case text.FieldNumber:
 			isFieldNumberName = true
@@ -267,15 +258,6 @@ func (d decoder) unmarshalMessage(m pref.Message, checkDelims bool) error {
 	}
 
 	return nil
-}
-
-// findExtension returns protoreflect.ExtensionType from the Resolver if found.
-func (d decoder) findExtension(xtName pref.FullName) (pref.ExtensionType, error) {
-	xt, err := d.opts.Resolver.FindExtensionByName(xtName)
-	if err == nil {
-		return xt, nil
-	}
-	return messageset.FindMessageSetExtension(d.opts.Resolver, xtName)
 }
 
 // unmarshalSingular unmarshals a non-repeated field value specified by the
@@ -762,9 +744,6 @@ func (d decoder) skipValue() error {
 				// Skip items. This will not validate whether skipped values are
 				// of the same type or not, same behavior as C++
 				// TextFormat::Parser::AllowUnknownField(true) version 3.8.0.
-				if err := d.skipValue(); err != nil {
-					return err
-				}
 			}
 		}
 	}

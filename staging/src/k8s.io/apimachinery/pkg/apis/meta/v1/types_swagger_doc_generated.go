@@ -86,6 +86,17 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_ApplyOptions = map[string]string{
+	"":             "ApplyOptions may be provided when applying an API object. FieldManager is required for apply requests. ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation that speaks specifically to how the options fields relate to apply.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required.",
+}
+
+func (ApplyOptions) SwaggerDoc() map[string]string {
+	return map_ApplyOptions
+}
+
 var map_Condition = map[string]string{
 	"":                   "Condition contains details for one aspect of the current state of this API Resource.",
 	"type":               "type of condition in CamelCase or in foo.example.com/CamelCase.",
@@ -101,9 +112,10 @@ func (Condition) SwaggerDoc() map[string]string {
 }
 
 var map_CreateOptions = map[string]string{
-	"":             "CreateOptions may be provided when creating an API object.",
-	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
+	"":                "CreateOptions may be provided when creating an API object.",
+	"dryRun":          "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager":    "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
+	"fieldValidation": "fieldValidation determines how the server should respond to unknown/duplicate fields in the object in the request. Introduced as alpha in 1.23, older servers or servers with the `ServerSideFieldValidation` feature disabled will discard valid values specified in  this param and not perform any server side field validation. Valid values are: - Ignore: ignores unknown/duplicate fields. - Warn: responds with a warning for each unknown/duplicate field, but successfully serves the request. - Strict: fails the request on unknown/duplicate fields.",
 }
 
 func (CreateOptions) SwaggerDoc() map[string]string {
@@ -121,16 +133,6 @@ var map_DeleteOptions = map[string]string{
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
-}
-
-var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call. Deprecated. Planned for removal in 1.18.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify. Deprecated. Planned for removal in 1.18.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'. Deprecated. Planned for removal in 1.18.",
-}
-
-func (ExportOptions) SwaggerDoc() map[string]string {
-	return map_ExportOptions
 }
 
 var map_FieldsV1 = map[string]string{
@@ -208,7 +210,7 @@ var map_ListOptions = map[string]string{
 	"labelSelector":        "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
 	"fieldSelector":        "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"allowWatchBookmarks":  "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored. If the feature gate WatchBookmarks is not enabled in apiserver, this field is ignored.",
+	"allowWatchBookmarks":  "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
 	"resourceVersion":      "resourceVersion sets a constraint on what resource versions a request may be served from. See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
 	"resourceVersionMatch": "resourceVersionMatch determines how resourceVersion is applied to list calls. It is highly recommended that resourceVersionMatch be set for list calls where resourceVersion is set See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
 	"timeoutSeconds":       "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
@@ -221,13 +223,14 @@ func (ListOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedFieldsEntry = map[string]string{
-	"":           "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
-	"manager":    "Manager is an identifier of the workflow managing these fields.",
-	"operation":  "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
-	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
-	"time":       "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
-	"fieldsType": "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
-	"fieldsV1":   "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
+	"":            "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
+	"manager":     "Manager is an identifier of the workflow managing these fields.",
+	"operation":   "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
+	"apiVersion":  "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"time":        "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
+	"fieldsType":  "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
+	"fieldsV1":    "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
+	"subresource": "Subresource is the name of the subresource used to update that object, or empty string if the object was updated through the main resource. The value of this field is used to distinguish between managers, even if they share the same name. For example, a status update will be distinct from a regular update using the same manager name. Note that the APIVersion field is not related to the Subresource field and it always corresponds to the version of the main resource.",
 }
 
 func (ManagedFieldsEntry) SwaggerDoc() map[string]string {
@@ -300,10 +303,11 @@ func (Patch) SwaggerDoc() map[string]string {
 }
 
 var map_PatchOptions = map[string]string{
-	"":             "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
-	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
+	"":                "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun":          "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":           "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"fieldManager":    "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
+	"fieldValidation": "fieldValidation determines how the server should respond to unknown/duplicate fields in the object in the request. Introduced as alpha in 1.23, older servers or servers with the `ServerSideFieldValidation` feature disabled will discard valid values specified in  this param and not perform any server side field validation. Valid values are: - Ignore: ignores unknown/duplicate fields. - Warn: responds with a warning for each unknown/duplicate field, but successfully serves the request. - Strict: fails the request on unknown/duplicate fields.",
 }
 
 func (PatchOptions) SwaggerDoc() map[string]string {
@@ -445,9 +449,10 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":             "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
-	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
+	"":                "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
+	"dryRun":          "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager":    "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
+	"fieldValidation": "fieldValidation determines how the server should respond to unknown/duplicate fields in the object in the request. Introduced as alpha in 1.23, older servers or servers with the `ServerSideFieldValidation` feature disabled will discard valid values specified in  this param and not perform any server side field validation. Valid values are: - Ignore: ignores unknown/duplicate fields. - Warn: responds with a warning for each unknown/duplicate field, but successfully serves the request. - Strict: fails the request on unknown/duplicate fields.",
 }
 
 func (UpdateOptions) SwaggerDoc() map[string]string {

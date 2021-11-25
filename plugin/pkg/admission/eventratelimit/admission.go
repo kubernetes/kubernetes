@@ -27,6 +27,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation"
+	"k8s.io/utils/clock"
 )
 
 // PluginName indicates name of admission plugin.
@@ -47,7 +48,7 @@ func Register(plugins *admission.Plugins) {
 					return nil, errs.ToAggregate()
 				}
 			}
-			return newEventRateLimit(configuration, realClock{})
+			return newEventRateLimit(configuration, clock.RealClock{})
 		})
 }
 

@@ -1,5 +1,5 @@
-// +build !providerless
-// +build linux
+//go:build !providerless && linux
+// +build !providerless,linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -27,7 +27,7 @@ import (
 
 func verifyDevicePath(path string) (string, error) {
 	if pathExists, err := mount.PathExists(path); err != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", err)
+		return "", fmt.Errorf("error checking if path exists: %w", err)
 	} else if pathExists {
 		return path, nil
 	}

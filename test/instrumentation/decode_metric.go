@@ -182,6 +182,25 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				if err != nil {
 					return m, err
 				}
+			case *ast.SelectorExpr:
+				s, ok := v.X.(*ast.Ident)
+				if !ok {
+					return m, newDecodeErrorf(expr, errExprNotIdent, v.X)
+				}
+
+				variableExpr, found := c.variables[strings.Join([]string{s.Name, v.Sel.Name}, ".")]
+				if !found {
+					return m, newDecodeErrorf(expr, errBadImportedVariableAttribute)
+				}
+				bl, ok := variableExpr.(*ast.BasicLit)
+				if !ok {
+					return m, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				value, err = stringValue(bl)
+				if err != nil {
+					return m, err
+				}
+
 			default:
 				return m, newDecodeErrorf(expr, errNonStringAttribute)
 			}

@@ -23,11 +23,11 @@ spec:
         - all
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: k8s.gcr.io/kube-addon-manager:v9.1.1
+    image: k8s.gcr.io/addon-manager/kube-addon-manager:v9.1.5
     command:
     - /bin/bash
     - -c
-    - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    - exec /opt/kube-addons-main.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m

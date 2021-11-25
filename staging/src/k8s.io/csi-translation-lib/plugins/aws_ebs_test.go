@@ -17,9 +17,10 @@ limitations under the License.
 package plugins
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"reflect"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
 
 	storage "k8s.io/api/storage/v1"
 )
@@ -101,6 +102,11 @@ func TestTranslateEBSInTreeStorageClassToCSI(t *testing.T) {
 			sc:    NewStorageClass(map[string]string{"fstype": "ext3"}, nil),
 			expSc: NewStorageClass(map[string]string{"csi.storage.k8s.io/fstype": "ext3"}, nil),
 		},
+		{
+			name:  "translate with iops",
+			sc:    NewStorageClass(map[string]string{"iopsPerGB": "100"}, nil),
+			expSc: NewStorageClass(map[string]string{"iopsPerGB": "100", "allowautoiopspergbincrease": "true"}, nil),
+		},
 	}
 
 	for _, tc := range cases {
@@ -176,7 +182,7 @@ func TestTranslateInTreeInlineVolumeToCSI(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("Testing %v", tc.name)
-			got, err := translator.TranslateInTreeInlineVolumeToCSI(&v1.Volume{Name: "volume", VolumeSource: tc.volumeSource})
+			got, err := translator.TranslateInTreeInlineVolumeToCSI(&v1.Volume{Name: "volume", VolumeSource: tc.volumeSource}, "")
 			if err != nil && !tc.expErr {
 				t.Fatalf("Did not expect error but got: %v", err)
 			}
@@ -195,6 +201,80 @@ func TestTranslateInTreeInlineVolumeToCSI(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func TestGetAwsRegionFromZones(t *testing.T) {
+
+	cases := []struct {
+		name      string
+		zones     []string
+		expRegion string
+		expErr    bool
+	}{
+		{
+			name:      "Commercial zone",
+			zones:     []string{"us-west-2a", "us-west-2b"},
+			expRegion: "us-west-2",
+		},
+		{
+			name:      "Govcloud zone",
+			zones:     []string{"us-gov-east-1a"},
+			expRegion: "us-gov-east-1",
+		},
+		{
+			name:      "Wavelength zone",
+			zones:     []string{"us-east-1-wl1-bos-wlz-1"},
+			expRegion: "us-east-1",
+		},
+		{
+			name:      "Local zone",
+			zones:     []string{"us-west-2-lax-1a"},
+			expRegion: "us-west-2",
+		},
+		{
+			name:   "Invalid: empty zones",
+			zones:  []string{},
+			expErr: true,
+		},
+		{
+			name:   "Invalid: multiple regions",
+			zones:  []string{"us-west-2a", "us-east-1a"},
+			expErr: true,
+		},
+		{
+			name:   "Invalid: region name only",
+			zones:  []string{"us-west-2"},
+			expErr: true,
+		},
+		{
+			name:   "Invalid: invalid suffix",
+			zones:  []string{"us-west-2ab"},
+			expErr: true,
+		},
+		{
+			name:   "Invalid: not enough fields",
+			zones:  []string{"us-west"},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing %v", tc.name)
+			got, err := getAwsRegionFromZones(tc.zones)
+			if err != nil && !tc.expErr {
+				t.Fatalf("Did not expect error but got: %v", err)
+			}
+
+			if err == nil && tc.expErr {
+				t.Fatalf("Expected error, but did not get one.")
+			}
+
+			if err == nil && !reflect.DeepEqual(got, tc.expRegion) {
+				t.Errorf("Got PV name: %v, expected :%v", got, tc.expRegion)
+			}
 		})
 	}
 }

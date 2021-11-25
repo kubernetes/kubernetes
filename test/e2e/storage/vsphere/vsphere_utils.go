@@ -226,7 +226,7 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string, zon
 		term := v1.TopologySelectorTerm{
 			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 				{
-					Key:    v1.LabelFailureDomainBetaZone,
+					Key:    v1.LabelTopologyZone,
 					Values: zones,
 				},
 			},
@@ -762,7 +762,7 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 }
 
 // GetReadySchedulableRandomNodeInfo returns NodeInfo object for one of the Ready and Schedulable Node.
-// if multiple nodes are present with Ready and Scheduable state then one of the Node is selected randomly
+// if multiple nodes are present with Ready and Schedulable state then one of the Node is selected randomly
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()

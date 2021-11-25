@@ -33,7 +33,7 @@ import (
 // FieldImmutableErrorMsg is a error message for field is immutable.
 const FieldImmutableErrorMsg string = `field is immutable`
 
-const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
+const TotalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
@@ -46,17 +46,26 @@ var ValidateClusterName = NameIsDNS1035Label
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	var totalSize int64
-	for k, v := range annotations {
+	for k := range annotations {
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
 			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
 		}
-		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
-	if totalSize > (int64)(totalAnnotationSizeLimitB) {
-		allErrs = append(allErrs, field.TooLong(fldPath, "", totalAnnotationSizeLimitB))
+	if err := ValidateAnnotationsSize(annotations); err != nil {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", TotalAnnotationSizeLimitB))
 	}
 	return allErrs
+}
+
+func ValidateAnnotationsSize(annotations map[string]string) error {
+	var totalSize int64
+	for k, v := range annotations {
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+	if totalSize > (int64)(TotalAnnotationSizeLimitB) {
+		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, TotalAnnotationSizeLimitB)
+	}
+	return nil
 }
 
 func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
@@ -134,7 +143,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	metadata, err := meta.Accessor(objMeta)
 	if err != nil {
-		allErrs := field.ErrorList{}
+		var allErrs field.ErrorList
 		allErrs = append(allErrs, field.Invalid(fldPath, objMeta, err.Error()))
 		return allErrs
 	}
@@ -145,7 +154,7 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	var allErrs field.ErrorList
 
 	if len(meta.GetGenerateName()) != 0 {
 		for _, msg := range nameFn(meta.GetGenerateName(), true) {
@@ -180,9 +189,7 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetClusterName(), msg))
 		}
 	}
-	for _, entry := range meta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
+
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
@@ -248,9 +255,6 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}
 
-	for _, entry := range newMeta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)

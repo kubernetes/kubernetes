@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,25 +32,28 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	attachExample = templates.Examples(i18n.T(`
-		# Get output from running pod mypod, using the first container by default
+		# Get output from running pod mypod; use the 'kubectl.kubernetes.io/default-container' annotation
+		# for selecting the container to be attached or the first container in the pod will be chosen
 		kubectl attach mypod
 
 		# Get output from ruby-container from pod mypod
 		kubectl attach mypod -c ruby-container
 
-		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
+		# Switch to raw terminal mode; sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
 		kubectl attach mypod -c ruby-container -i -t
 
-		# Get output from the first pod of a ReplicaSet named nginx
+		# Get output from the first pod of a replica set named nginx
 		kubectl attach rs/nginx
 		`))
 )
@@ -68,9 +70,7 @@ type AttachOptions struct {
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
 
-	CommandName             string
-	ParentCommandName       string
-	EnableSuggestedCmdUsage bool
+	CommandName string
 
 	Pod *corev1.Pod
 
@@ -105,6 +105,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Attach to a running container"),
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
 		Example:               attachExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -112,9 +113,10 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
+	cmdutil.AddContainerVarFlags(cmd, &o.ContainerName, o.ContainerName)
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
 	return cmd
 }
 
@@ -184,14 +186,6 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.Resources = args
 	o.restClientGetter = f
 
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		o.ParentCommandName = cmdParent.CommandPath()
-	}
-	if len(o.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		o.EnableSuggestedCmdUsage = true
-	}
-
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
@@ -257,8 +251,8 @@ func (o *AttachOptions) Run() error {
 	}
 	if o.TTY && !containerToAttach.TTY {
 		o.TTY = false
-		if o.ErrOut != nil {
-			fmt.Fprintf(o.ErrOut, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
+		if !o.Quiet && o.ErrOut != nil {
+			fmt.Fprintf(o.ErrOut, "error: Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
 	} else if !o.TTY && containerToAttach.TTY {
 		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
@@ -292,7 +286,7 @@ func (o *AttachOptions) Run() error {
 		return err
 	}
 
-	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
+	if !o.Quiet && o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
 		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
 	}
 	return nil
@@ -308,35 +302,11 @@ func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*corev1.Pod, erro
 	return attachablePod, nil
 }
 
-// containerToAttach returns a reference to the container to attach to, given
-// by name or the first container if name is empty.
+// containerToAttach returns a reference to the container to attach to, given by name.
+// use the kubectl.kubernetes.io/default-container annotation for selecting the container to be attached
+// or the first container in the pod will be chosen If name is empty.
 func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container, error) {
-	if len(o.ContainerName) > 0 {
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == o.ContainerName {
-				return &pod.Spec.Containers[i], nil
-			}
-		}
-		for i := range pod.Spec.InitContainers {
-			if pod.Spec.InitContainers[i].Name == o.ContainerName {
-				return &pod.Spec.InitContainers[i], nil
-			}
-		}
-		for i := range pod.Spec.EphemeralContainers {
-			if pod.Spec.EphemeralContainers[i].Name == o.ContainerName {
-				return (*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), nil
-			}
-		}
-		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
-	}
-
-	if o.EnableSuggestedCmdUsage {
-		fmt.Fprintf(o.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(o.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", o.ParentCommandName, o.PodName, o.Namespace)
-	}
-
-	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-	return &pod.Spec.Containers[0], nil
+	return podcmd.FindOrDefaultContainerByName(pod, o.ContainerName, o.Quiet, o.ErrOut)
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.

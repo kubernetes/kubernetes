@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -20,13 +21,13 @@ package openstack
 
 import (
 	"context"
-	"net"
 	"testing"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	netutils "k8s.io/utils/net"
 )
 
 func TestRoutes(t *testing.T) {
@@ -73,7 +74,7 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("ListRoutes() error: %v", err)
 	}
 	for _, route := range routelist {
-		_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
+		_, cidr, err := netutils.ParseCIDRSloppy(route.DestinationCIDR)
 		if err != nil {
 			t.Logf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
 			continue

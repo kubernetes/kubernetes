@@ -19,10 +19,13 @@ package endpointslice
 import (
 	"context"
 
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -51,6 +54,7 @@ func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	endpointSlice.Generation = 1
 
 	dropDisabledFieldsOnCreate(endpointSlice)
+	dropTopologyOnV1(ctx, nil, endpointSlice)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -62,10 +66,10 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	// This needs to be changed if a status attribute is added to EndpointSlice
 	ogNewMeta := newEPS.ObjectMeta
 	ogOldMeta := oldEPS.ObjectMeta
-	newEPS.ObjectMeta = v1.ObjectMeta{}
-	oldEPS.ObjectMeta = v1.ObjectMeta{}
+	newEPS.ObjectMeta = metav1.ObjectMeta{}
+	oldEPS.ObjectMeta = metav1.ObjectMeta{}
 
-	if !apiequality.Semantic.DeepEqual(newEPS, oldEPS) {
+	if !apiequality.Semantic.DeepEqual(newEPS, oldEPS) || !apiequality.Semantic.DeepEqual(ogNewMeta.Labels, ogOldMeta.Labels) {
 		ogNewMeta.Generation = ogOldMeta.Generation + 1
 	}
 
@@ -73,6 +77,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	oldEPS.ObjectMeta = ogOldMeta
 
 	dropDisabledFieldsOnUpdate(oldEPS, newEPS)
+	dropTopologyOnV1(ctx, oldEPS, newEPS)
 }
 
 // Validate validates a new EndpointSlice.
@@ -80,6 +85,11 @@ func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	err := validation.ValidateEndpointSliceCreate(endpointSlice)
 	return err
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (endpointSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -98,6 +108,11 @@ func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtim
 	return validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (endpointSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.
 func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 	return true
@@ -105,17 +120,17 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
 	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
+	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
 
-	if dropNodeName || dropTerminating {
+	if dropHints || dropTerminating {
 		for i := range endpointSlice.Endpoints {
-			if dropNodeName {
-				endpointSlice.Endpoints[i].NodeName = nil
-			}
 			if dropTerminating {
 				endpointSlice.Endpoints[i].Conditions.Serving = nil
 				endpointSlice.Endpoints[i].Conditions.Terminating = nil
+			}
+			if dropHints {
+				endpointSlice.Endpoints[i].Hints = nil
 			}
 		}
 	}
@@ -124,16 +139,6 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
-	if dropNodeName {
-		for _, ep := range oldEPS.Endpoints {
-			if ep.NodeName != nil {
-				dropNodeName = false
-				break
-			}
-		}
-	}
-
 	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
 	if dropTerminating {
 		for _, ep := range oldEPS.Endpoints {
@@ -144,15 +149,48 @@ func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
 		}
 	}
 
-	if dropNodeName || dropTerminating {
-		for i := range newEPS.Endpoints {
-			if dropNodeName {
-				newEPS.Endpoints[i].NodeName = nil
+	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
+	if dropHints {
+		for _, ep := range oldEPS.Endpoints {
+			if ep.Hints != nil {
+				dropHints = false
+				break
 			}
+		}
+	}
+
+	if dropHints || dropTerminating {
+		for i := range newEPS.Endpoints {
 			if dropTerminating {
 				newEPS.Endpoints[i].Conditions.Serving = nil
 				newEPS.Endpoints[i].Conditions.Terminating = nil
 			}
+			if dropHints {
+				newEPS.Endpoints[i].Hints = nil
+			}
+		}
+	}
+}
+
+// dropTopologyOnV1 on V1 request wipes the DeprecatedTopology field  and copies
+// the NodeName value into DeprecatedTopology
+func dropTopologyOnV1(ctx context.Context, oldEPS, newEPS *discovery.EndpointSlice) {
+	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
+		requestGV := schema.GroupVersion{Group: info.APIGroup, Version: info.APIVersion}
+		if requestGV == discoveryv1beta1.SchemeGroupVersion {
+			return
+		}
+
+		// do not drop topology if endpoints have not been changed
+		if oldEPS != nil && apiequality.Semantic.DeepEqual(oldEPS.Endpoints, newEPS.Endpoints) {
+			return
+		}
+
+		for i := range newEPS.Endpoints {
+			ep := &newEPS.Endpoints[i]
+
+			//Silently clear out DeprecatedTopology
+			ep.DeprecatedTopology = nil
 		}
 	}
 }

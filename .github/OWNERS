@@ -1,10 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - castrojo
+  - alisondy
   - cblecker
   - guineveresaenger
-  - justaugustus
   - mrbobbytables
   - nikhita
   - parispittman
@@ -12,6 +11,7 @@ approvers:
   - sig-contribex-approvers
   - parispittman
 emeritus_approvers:
+  - castrojo
   - Phillels
 labels:
   - sig/contributor-experience

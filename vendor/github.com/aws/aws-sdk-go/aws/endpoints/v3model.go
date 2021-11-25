@@ -178,12 +178,12 @@ type service struct {
 }
 
 func (s *service) endpointForRegion(region string) (endpoint, bool) {
-	if s.IsRegionalized == boxedFalse {
-		return s.Endpoints[s.PartitionEndpoint], region == s.PartitionEndpoint
-	}
-
 	if e, ok := s.Endpoints[region]; ok {
 		return e, true
+	}
+
+	if s.IsRegionalized == boxedFalse {
+		return s.Endpoints[s.PartitionEndpoint], region == s.PartitionEndpoint
 	}
 
 	// Unable to find any matching endpoint, return

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
@@ -56,7 +56,8 @@ func genPL(rng *rand.Rand, name string) *flowcontrol.PriorityLevelConfiguration 
 			HandSize:         hs,
 			QueueLengthLimit: 5}
 	}
-	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, []string{"test"}))
+	labelVals := []string{"test"}
+	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, labelVals), metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, labelVals))
 	if err != nil {
 		panic(err)
 	}
@@ -251,7 +252,9 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 		ftr.addDigests(skippingRDigests, false)
 		ftr.addDigests(skippingNDigests, false)
 	}
-	t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, ftr.wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	if testDebugLogs {
+		t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, ftr.wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	}
 	return ftr
 }
 
@@ -342,7 +345,9 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatc
 		_, _, skippingNRIs = genNonResourceRule(rng, pfx+"-o", false, someMatchesAllNonResourceRequests)
 	}
 	rule := flowcontrol.PolicyRulesWithSubjects{subjects, resourceRules, nonResourceRules}
-	t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%s, mu=%s, su=%s, mrr=%s, mnr=%s, srr=%s, snr=%s", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
+	if testDebugLogs {
+		t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%s, mu=%s, su=%s, mrr=%s, mnr=%s, srr=%s, snr=%s", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
+	}
 	matchingRDigests := cross(matchingUIs, matchingRRIs)
 	skippingRDigests := append(append(cross(matchingUIs, skippingRRIs),
 		cross(skippingUIs, matchingRRIs)...),
@@ -379,12 +384,16 @@ func shuffleAndTakeDigests(t *testing.T, rng *rand.Rand, rule *flowcontrol.Polic
 		if rule != nil {
 			thisMatches := matchesPolicyRule(digest, rule)
 			if toMatch {
-				t.Logf("Added matching digest %#+v", digest)
+				if testDebugLogs {
+					t.Logf("Added matching digest %#+v", digest)
+				}
 				if !thisMatches {
 					t.Errorf("Fail in check: rule %s does not match digest %#+v", fcfmt.Fmt(rule), digest)
 				}
 			} else {
-				t.Logf("Added skipping digest %#+v", digest)
+				if testDebugLogs {
+					t.Logf("Added skipping digest %#+v", digest)
+				}
 				if thisMatches {
 					t.Errorf("Fail in check: rule %s matches digest %#+v", fcfmt.Fmt(rule), digest)
 				}

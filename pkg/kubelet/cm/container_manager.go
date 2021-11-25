@@ -17,6 +17,9 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -24,7 +27,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -32,10 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-
-	"fmt"
-	"strconv"
-	"strings"
 )
 
 type ActivePodsFunc func() []*v1.Pod
@@ -103,12 +105,6 @@ type ContainerManager interface {
 	// registration.
 	GetPluginRegistrationHandler() cache.PluginHandler
 
-	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
-
-	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) []int64
-
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
 	ShouldResetExtendedResourceCapacity() bool
@@ -116,8 +112,13 @@ type ContainerManager interface {
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
 	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
 
-	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
-	UpdateAllocatedDevices()
+	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+	GetNodeAllocatableAbsolute() v1.ResourceList
+
+	// Implements the podresources Provider API for CPUs, Memory and Devices
+	podresources.CPUsProvider
+	podresources.DevicesProvider
+	podresources.MemoryProvider
 }
 
 type NodeConfig struct {
@@ -131,14 +132,17 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                           map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy          string
-	ExperimentalTopologyManagerScope      string
-	ExperimentalCPUManagerReconcilePeriod time.Duration
-	ExperimentalPodPidsLimit              int64
-	EnforceCPULimits                      bool
-	CPUCFSQuotaPeriod                     time.Duration
-	ExperimentalTopologyManagerPolicy     string
+	QOSReserved                             map[v1.ResourceName]int64
+	ExperimentalCPUManagerPolicy            string
+	ExperimentalCPUManagerPolicyOptions     map[string]string
+	ExperimentalTopologyManagerScope        string
+	ExperimentalCPUManagerReconcilePeriod   time.Duration
+	ExperimentalMemoryManagerPolicy         string
+	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
+	ExperimentalPodPidsLimit                int64
+	EnforceCPULimits                        bool
+	CPUCFSQuotaPeriod                       time.Duration
+	ExperimentalTopologyManagerPolicy       string
 }
 
 type NodeAllocatableConfig struct {
@@ -188,4 +192,40 @@ func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 		}
 	}
 	return &reservations, nil
+}
+
+func containerDevicesFromResourceDeviceInstances(devs devicemanager.ResourceDeviceInstances) []*podresourcesapi.ContainerDevices {
+	var respDevs []*podresourcesapi.ContainerDevices
+
+	for resourceName, resourceDevs := range devs {
+		for devID, dev := range resourceDevs {
+			topo := dev.GetTopology()
+			if topo == nil {
+				// Some device plugin do not report the topology information.
+				// This is legal, so we report the devices anyway,
+				// let the client decide what to do.
+				respDevs = append(respDevs, &podresourcesapi.ContainerDevices{
+					ResourceName: resourceName,
+					DeviceIds:    []string{devID},
+				})
+				continue
+			}
+
+			for _, node := range topo.GetNodes() {
+				respDevs = append(respDevs, &podresourcesapi.ContainerDevices{
+					ResourceName: resourceName,
+					DeviceIds:    []string{devID},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: node.GetID(),
+							},
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return respDevs
 }

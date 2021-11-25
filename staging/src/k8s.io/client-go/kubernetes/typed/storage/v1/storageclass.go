@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type StorageClassInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.StorageClassList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.StorageClass, err error)
+	Apply(ctx context.Context, storageClass *storagev1.StorageClassApplyConfiguration, opts metav1.ApplyOptions) (result *v1.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -161,6 +165,31 @@ func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchT
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied storageClass.
+func (c *storageClasses) Apply(ctx context.Context, storageClass *storagev1.StorageClassApplyConfiguration, opts metav1.ApplyOptions) (result *v1.StorageClass, err error) {
+	if storageClass == nil {
+		return nil, fmt.Errorf("storageClass provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(storageClass)
+	if err != nil {
+		return nil, err
+	}
+	name := storageClass.Name
+	if name == nil {
+		return nil, fmt.Errorf("storageClass.Name must be provided to Apply")
+	}
+	result = &v1.StorageClass{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("storageclasses").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

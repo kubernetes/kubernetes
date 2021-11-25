@@ -130,6 +130,10 @@ EOF
 # Creates a node object with name 127.0.0.1. This is required because we do not
 # run kubelet.
 #
+# An arbitrary annotation is needed to ensure field managers are saved on the
+# object. Without it, we would be creating an empty object and because status
+# and name get wiped, there were be no field managers tracking any fields.
+#
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
@@ -138,7 +142,10 @@ function create_node() {
   "kind": "Node",
   "apiVersion": "v1",
   "metadata": {
-    "name": "127.0.0.1"
+    "name": "127.0.0.1",
+    "annotations": {
+      "save-managers": "true"
+    }
   },
   "status": {
     "capacity": {
@@ -163,7 +170,8 @@ if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
   # invoke the tests
   make -C "${KUBE_ROOT}" test \
     WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
-    KUBE_TIMEOUT=--timeout=240s
+    KUBE_TIMEOUT=--timeout=240s \
+    KUBE_RACE=""
 
   # if we ONLY want to run kubeadm, then exit here.
   if [[ ${WHAT} == "kubeadm" ]]; then

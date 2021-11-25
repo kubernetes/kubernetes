@@ -24,6 +24,6 @@ import (
 )
 
 // NewFromTokens returns an authenticator.Request or an error
-func NewFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
-	return bearertoken.New(tokenfile.New(tokens))
+func NewFromTokens(tokens map[string]*user.DefaultInfo, audiences authenticator.Audiences) authenticator.Request {
+	return bearertoken.New(authenticator.WrapAudienceAgnosticToken(audiences, tokenfile.New(tokens)))
 }

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -101,7 +102,7 @@ func (plugin *cinderPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podU
 		return nil, err
 	}
 
-	return &cinderVolumeMapper{
+	mapper := &cinderVolumeMapper{
 		cinderVolume: &cinderVolume{
 			podUID:  podUID,
 			volName: spec.Name(),
@@ -111,7 +112,16 @@ func (plugin *cinderPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podU
 			mounter: mounter,
 			plugin:  plugin,
 		},
-		readOnly: readOnly}, nil
+		readOnly: readOnly,
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *cinderPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
@@ -131,6 +141,7 @@ func (plugin *cinderPlugin) newUnmapperInternal(volName string, podUID types.UID
 
 type cinderPluginUnmapper struct {
 	*cinderVolume
+	volume.MetricsNil
 }
 
 var _ volume.BlockVolumeUnmapper = &cinderPluginUnmapper{}
@@ -158,4 +169,10 @@ func (cd *cinderVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 func (cd *cinderVolume) GetPodDeviceMapPath() (string, string) {
 	name := cinderVolumePluginName
 	return cd.plugin.host.GetPodVolumeDeviceDir(cd.podUID, utilstrings.EscapeQualifiedName(name)), cd.volName
+}
+
+// SupportsMetrics returns true for cinderVolumeMapper as it initializes the
+// MetricsProvider.
+func (cvm *cinderVolumeMapper) SupportsMetrics() bool {
+	return true
 }

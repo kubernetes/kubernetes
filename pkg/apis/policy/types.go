@@ -77,6 +77,10 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32
+
+	// Conditions contain conditions for PDB
+	// +optional
+	Conditions []metav1.Condition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -305,6 +309,7 @@ const (
 	PortworxVolume        FSType = "portworxVolume"
 	ScaleIO               FSType = "scaleIO"
 	CSI                   FSType = "csi"
+	Ephemeral             FSType = "ephemeral"
 	All                   FSType = "*"
 )
 

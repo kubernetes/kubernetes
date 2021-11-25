@@ -3,3 +3,6 @@
 reviewers:
 - wojtek-t
 - jimmidyson
+
+approvers:
+- logicalhan

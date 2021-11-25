@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,10 +44,10 @@ var (
 		# Create a job
 		kubectl create job my-job --image=busybox
 
-		# Create a job with command
+		# Create a job with a command
 		kubectl create job my-job --image=busybox -- date
 
-		# Create a job from a CronJob named "a-cronjob"
+		# Create a job from a cron job named "a-cronjob"
 		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
@@ -89,7 +88,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 jobLong,
+		Short:                 i18n.T("Create a job with the specified name"),
 		Long:                  jobLong,
 		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -146,11 +145,7 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -181,7 +176,7 @@ func (o *CreateJobOptions) Run() error {
 		job = o.createJob()
 	} else {
 		infos, err := o.Builder.
-			Unstructured().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			ResourceTypeOrNameArgs(false, o.From).
 			Flatten().
@@ -195,16 +190,12 @@ func (o *CreateJobOptions) Run() error {
 			return fmt.Errorf("from must be an existing cronjob")
 		}
 
-		uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, batchv1beta1.SchemeGroupVersion)
-		if err != nil {
-			return fmt.Errorf("from must be an existing cronjob: %v", err)
+		switch obj := infos[0].Object.(type) {
+		case *batchv1.CronJob:
+			job = o.createJobFromCronJob(obj)
+		default:
+			return fmt.Errorf("unknown object type %T", obj)
 		}
-		cronJob, ok := uncastVersionedObj.(*batchv1beta1.CronJob)
-		if !ok {
-			return fmt.Errorf("from must be an existing cronjob")
-		}
-
-		job = o.createJobFromCronJob(cronJob)
 	}
 
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, job, scheme.DefaultJSONEncoder()); err != nil {
@@ -260,7 +251,7 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 	return job
 }
 
-func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *batchv1.Job {
+func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batchv1.Job {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {
@@ -276,8 +267,8 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: batchv1beta1.SchemeGroupVersion.String(),
-					Kind:       cronJob.Kind,
+					APIVersion: batchv1.SchemeGroupVersion.String(),
+					Kind:       "CronJob",
 					Name:       cronJob.GetName(),
 					UID:        cronJob.GetUID(),
 				},

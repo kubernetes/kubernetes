@@ -150,7 +150,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					NodeName:        string(nodeName),
 					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways, TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 					SecurityContext: &v1.PodSecurityContext{},
-					SchedulerName:   api.DefaultSchedulerName,
+					SchedulerName:   v1.DefaultSchedulerName,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -172,7 +172,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
-						SchedulerName:                 api.DefaultSchedulerName,
+						SchedulerName:                 v1.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
@@ -205,7 +205,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways, TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 							SecurityContext: &v1.PodSecurityContext{},
-							SchedulerName:   api.DefaultSchedulerName,
+							SchedulerName:   v1.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
@@ -220,7 +220,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: "", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 							SecurityContext: &v1.PodSecurityContext{},
-							SchedulerName:   api.DefaultSchedulerName,
+							SchedulerName:   v1.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
@@ -244,7 +244,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
-						SchedulerName:                 api.DefaultSchedulerName,
+						SchedulerName:                 v1.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
@@ -273,7 +273,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
-						SchedulerName:                 api.DefaultSchedulerName,
+						SchedulerName:                 v1.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{

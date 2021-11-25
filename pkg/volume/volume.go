@@ -48,6 +48,14 @@ type BlockVolume interface {
 	// and name of a symbolic link associated to a block device.
 	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/, {volumeName}
 	GetPodDeviceMapPath() (string, string)
+
+	// SupportsMetrics should return true if the MetricsProvider is
+	// initialized
+	SupportsMetrics() bool
+
+	// MetricsProvider embeds methods for exposing metrics (e.g.
+	// used, available space).
+	MetricsProvider
 }
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
@@ -92,6 +100,17 @@ type Metrics struct {
 	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
 	// on the underlying storage, and is shared with host processes and other volumes
 	InodesFree *resource.Quantity
+
+	// Normal volumes are available for use and operating optimally.
+	// An abnormal volume does not meet these criteria.
+	// This field is OPTIONAL. Only some csi drivers which support NodeServiceCapability_RPC_VOLUME_CONDITION
+	// need to fill it.
+	Abnormal *bool
+
+	// The message describing the condition of the volume.
+	// This field is OPTIONAL. Only some csi drivers which support capability_RPC_VOLUME_CONDITION
+	// need to fill it.
+	Message *string
 }
 
 // Attributes represents the attributes of this mounter.
@@ -252,6 +271,11 @@ type Attacher interface {
 	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 }
 
+// DeviceMounterArgs provides auxiliary, optional arguments to DeviceMounter.
+type DeviceMounterArgs struct {
+	FsGroup *int64
+}
+
 // DeviceMounter can mount a block volume to a global path.
 type DeviceMounter interface {
 	// GetDeviceMountPath returns a path where the device should
@@ -266,7 +290,7 @@ type DeviceMounter interface {
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
 	//   - Error of any other type should be considered a final error
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string, deviceMounterArgs DeviceMounterArgs) error
 }
 
 type BulkVolumeVerifier interface {

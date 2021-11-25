@@ -28,8 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controlplane"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -69,7 +69,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			if opts.Authentication.ServiceAccounts == nil {
 				opts.Authentication.ServiceAccounts = &kubeoptions.ServiceAccountAuthenticationOptions{}
 			}
-			opts.Authentication.ServiceAccounts.Issuer = iss
+			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
 			opts.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
@@ -84,7 +84,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	exp := int64(600)
 	leeway := 99
 	ns := "default"
-	clientBuilder := controller.NewTestDynamicClientBuilder(
+	clientBuilder := clientbuilder.NewTestDynamicClientBuilder(
 		restclient.AnonymousClientConfig(baseConfig),
 		baseClient.CoreV1(),
 		ns, exp, leeway)

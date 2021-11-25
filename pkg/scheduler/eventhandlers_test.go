@@ -17,232 +17,29 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	dyfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-func TestSkipPodUpdate(t *testing.T) {
-	for _, test := range []struct {
-		pod              *v1.Pod
-		isAssumedPodFunc func(*v1.Pod) bool
-		getPodFunc       func(*v1.Pod) *v1.Pod
-		expected         bool
-		name             string
-	}{
-		{
-			name: "Non-assumed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool { return false },
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: false,
-		},
-		{
-			name: "with changes on ResourceVersion, Spec.NodeName and/or Annotations",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"c": "d"},
-						ResourceVersion: "1",
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with ServerSideApply changes on Annotations",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-					ManagedFields: []metav1.ManagedFieldsEntry{
-						{
-							Manager:    "some-actor",
-							Operation:  metav1.ManagedFieldsOperationApply,
-							APIVersion: "v1",
-							FieldsType: "FieldsV1",
-							FieldsV1: &metav1.FieldsV1{
-								Raw: []byte(`
-									"f:metadata": {
-									  "f:annotations": {
-										"f:a: {}
-									  }
-									}
-								`),
-							},
-						},
-					},
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"a": "c", "d": "e"},
-						ResourceVersion: "1",
-						ManagedFields: []metav1.ManagedFieldsEntry{
-							{
-								Manager:    "some-actor",
-								Operation:  metav1.ManagedFieldsOperationApply,
-								APIVersion: "v1",
-								FieldsType: "FieldsV1",
-								FieldsV1: &metav1.FieldsV1{
-									Raw: []byte(`
-										"f:metadata": {
-										  "f:annotations": {
-											"f:a: {}
-											"f:d: {}
-										  }
-										}
-									`),
-								},
-							},
-							{
-								Manager:    "some-actor",
-								Operation:  metav1.ManagedFieldsOperationApply,
-								APIVersion: "v1",
-								FieldsType: "FieldsV1",
-								FieldsV1: &metav1.FieldsV1{
-									Raw: []byte(`
-										"f:metadata": {
-										  "f:annotations": {
-											"f:a: {}
-										  }
-										}
-									`),
-								},
-							},
-						},
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with changes on Labels",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "pod-0",
-					Labels: map[string]string{"a": "b"},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "pod-0",
-						Labels: map[string]string{"c": "d"},
-					},
-				}
-			},
-			expected: false,
-		},
-		{
-			name: "with changes on Finalizers",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "pod-0",
-					Finalizers: []string{"a", "b"},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:       "pod-0",
-						Finalizers: []string{"c", "d"},
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with changes on Conditions",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
-				Status: v1.PodStatus{
-					Conditions: []v1.PodCondition{
-						{Type: "foo"},
-					},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: true,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			c := &Scheduler{
-				SchedulerCache: &fakecache.Cache{
-					IsAssumedPodFunc: test.isAssumedPodFunc,
-					GetPodFunc:       test.getPodFunc,
-				},
-			}
-			got := c.skipPodUpdate(test.pod)
-			if got != test.expected {
-				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-			}
-		})
-	}
-}
 
 func TestNodeAllocatableChanged(t *testing.T) {
 	newQuantity := func(value int64) resource.Quantity {
@@ -417,10 +214,10 @@ func TestUpdatePodInCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			schedulerCache := cache.New(ttl, stopCh)
-			schedulerQueue := queue.NewPriorityQueue(nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			schedulerCache := cache.New(ttl, ctx.Done())
+			schedulerQueue := queue.NewTestQueue(ctx, nil)
 			sched := &Scheduler{
 				SchedulerCache:  schedulerCache,
 				SchedulingQueue: schedulerQueue,
@@ -441,4 +238,208 @@ func TestUpdatePodInCache(t *testing.T) {
 func withPodName(pod *v1.Pod, name string) *v1.Pod {
 	pod.Name = name
 	return pod
+}
+
+func TestPreCheckForNode(t *testing.T) {
+	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
+	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
+	tests := []struct {
+		name               string
+		nodeFn             func() *v1.Node
+		existingPods, pods []*v1.Pod
+		want               []bool
+	}{
+		{
+			name: "regular node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).Obj(),
+				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p6").Obj(),
+				st.MakePod().Name("p7").Node("invalid-node").Obj(),
+				st.MakePod().Name("p8").HostPort(8080).Obj(),
+				st.MakePod().Name("p9").HostPort(80).Obj(),
+			},
+			want: []bool{true, false, false, true, false, true, false, true, false},
+		},
+		{
+			name: "tainted node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Toleration("bar").Obj(),
+				st.MakePod().Name("p4").Toleration("bar").Toleration("foo").Obj(),
+			},
+			want: []bool{false, true, false, true},
+		},
+		{
+			name: "regular node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
+				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
+			},
+			want: []bool{false, false, true, false, false},
+		},
+		{
+			name: "tainted node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Toleration("bar").Obj(),
+				st.MakePod().Name("p2").Req(cpu4).Toleration("bar").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("bar").Obj(),
+			},
+			want: []bool{false, true, false, false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
+			nodeInfo.SetNode(tt.nodeFn())
+			preCheckFn := preCheckForNode(nodeInfo)
+
+			var got []bool
+			for _, pod := range tt.pods {
+				got = append(got, preCheckFn(pod))
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// test for informers of resources we care about is registered
+func TestAddAllEventHandlers(t *testing.T) {
+	tests := []struct {
+		name                   string
+		gvkMap                 map[framework.GVK]framework.ActionType
+		expectStaticInformers  map[reflect.Type]bool
+		expectDynamicInformers map[schema.GroupVersionResource]bool
+	}{
+		{
+			name:   "default handlers in framework",
+			gvkMap: map[framework.GVK]framework.ActionType{},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):  true,
+				reflect.TypeOf(&v1.Node{}): true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "add GVKs handlers defined in framework dynamically",
+			gvkMap: map[framework.GVK]framework.ActionType{
+				"Pod":                               framework.Add | framework.Delete,
+				"PersistentVolume":                  framework.Delete,
+				"storage.k8s.io/CSIStorageCapacity": framework.Update,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                            true,
+				reflect.TypeOf(&v1.Node{}):                           true,
+				reflect.TypeOf(&v1.PersistentVolume{}):               true,
+				reflect.TypeOf(&storagev1beta1.CSIStorageCapacity{}): true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "add GVKs handlers defined in plugins dynamically",
+			gvkMap: map[framework.GVK]framework.ActionType{
+				"daemonsets.v1.apps": framework.Add | framework.Delete,
+				"cronjobs.v1.batch":  framework.Delete,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):  true,
+				reflect.TypeOf(&v1.Node{}): true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{
+				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
+				{Group: "batch", Version: "v1", Resource: "cronjobs"}:  true,
+			},
+		},
+		{
+			name: "add GVKs handlers defined in plugins dynamically, with one illegal GVK form",
+			gvkMap: map[framework.GVK]framework.ActionType{
+				"daemonsets.v1.apps":    framework.Add | framework.Delete,
+				"custommetrics.v1beta1": framework.Update,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):  true,
+				reflect.TypeOf(&v1.Node{}): true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{
+				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	var localSchemeBuilder = runtime.SchemeBuilder{
+		appsv1.AddToScheme,
+		batchv1.AddToScheme,
+	}
+	localSchemeBuilder.AddToScheme(scheme)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			testSched := Scheduler{
+				StopEverything:  stopCh,
+				SchedulingQueue: queue.NewTestQueue(context.Background(), nil),
+			}
+
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			dynclient := dyfake.NewSimpleDynamicClient(scheme)
+			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
+
+			addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap)
+
+			informerFactory.Start(testSched.StopEverything)
+			dynInformerFactory.Start(testSched.StopEverything)
+			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
+			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+
+			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
+				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.expectDynamicInformers, dynamicInformers); diff != "" {
+				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
+	}
 }

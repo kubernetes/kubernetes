@@ -19,6 +19,8 @@ package fieldpath
 import (
 	"sort"
 	"strings"
+
+	"sigs.k8s.io/structured-merge-diff/v4/schema"
 )
 
 // Set identifies a set of fields.
@@ -110,6 +112,30 @@ func (s *Set) RecursiveDifference(s2 *Set) *Set {
 	}
 }
 
+// EnsureNamedFieldsAreMembers returns a Set that contains all the
+// fields in s, as well as all the named fields that are typically not
+// included. For example, a set made of "a.b.c" will end-up also owning
+// "a" if it's a named fields but not "a.b" if it's a map.
+func (s *Set) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.TypeRef) *Set {
+	members := PathElementSet{
+		members: make(sortedPathElements, 0, s.Members.Size()+len(s.Children.members)),
+	}
+	atom, _ := sc.Resolve(tr)
+	members.members = append(members.members, s.Members.members...)
+	for _, node := range s.Children.members {
+		// Only insert named fields.
+		if node.pathElement.FieldName != nil && atom.Map != nil {
+			if _, has := atom.Map.FindField(*node.pathElement.FieldName); has {
+				members.Insert(node.pathElement)
+			}
+		}
+	}
+	return &Set{
+		Members:  members,
+		Children: *s.Children.EnsureNamedFieldsAreMembers(sc, tr),
+	}
+}
+
 // Size returns the number of members of the set.
 func (s *Set) Size() int {
 	return s.Members.Size() + s.Children.Size()
@@ -178,6 +204,40 @@ func (s *Set) WithPrefix(pe PathElement) *Set {
 		return NewSet()
 	}
 	return subset
+}
+
+// Leaves returns a set containing only the leaf paths
+// of a set.
+func (s *Set) Leaves() *Set {
+	leaves := PathElementSet{}
+	im := 0
+	ic := 0
+
+	// any members that are not also children are leaves
+outer:
+	for im < len(s.Members.members) {
+		member := s.Members.members[im]
+
+		for ic < len(s.Children.members) {
+			d := member.Compare(s.Children.members[ic].pathElement)
+			if d == 0 {
+				ic++
+				im++
+				continue outer
+			} else if d < 0 {
+				break
+			} else /* if d > 0 */ {
+				ic++
+			}
+		}
+		leaves.members = append(leaves.members, member)
+		im++
+	}
+
+	return &Set{
+		Members:  leaves,
+		Children: *s.Children.Leaves(),
+	}
 }
 
 // setNode is a pair of PathElement / Set, for the purpose of expressing
@@ -391,6 +451,31 @@ func (s *SetNodeMap) RecursiveDifference(s2 *Set) *SetNodeMap {
 	return out
 }
 
+// EnsureNamedFieldsAreMembers returns a set that contains all the named fields along with the leaves.
+func (s *SetNodeMap) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.TypeRef) *SetNodeMap {
+	out := make(sortedSetNode, 0, s.Size())
+	atom, _ := sc.Resolve(tr)
+	for _, member := range s.members {
+		tr := schema.TypeRef{}
+		if member.pathElement.FieldName != nil && atom.Map != nil {
+			tr = atom.Map.ElementType
+			if sf, ok := atom.Map.FindField(*member.pathElement.FieldName); ok {
+				tr = sf.Type
+			}
+		} else if member.pathElement.Key != nil && atom.List != nil {
+			tr = atom.List.ElementType
+		}
+		out = append(out, setNode{
+			pathElement: member.pathElement,
+			set:         member.set.EnsureNamedFieldsAreMembers(sc, tr),
+		})
+	}
+
+	return &SetNodeMap{
+		members: out,
+	}
+}
+
 // Iterate calls f for each PathElement in the set.
 func (s *SetNodeMap) Iterate(f func(PathElement)) {
 	for _, n := range s.members {
@@ -403,4 +488,18 @@ func (s *SetNodeMap) iteratePrefix(prefix Path, f func(Path)) {
 		pe := n.pathElement
 		n.set.iteratePrefix(append(prefix, pe), f)
 	}
+}
+
+// Leaves returns a SetNodeMap containing
+// only setNodes with leaf PathElements.
+func (s *SetNodeMap) Leaves() *SetNodeMap {
+	out := &SetNodeMap{}
+	out.members = make(sortedSetNode, len(s.members))
+	for i, n := range s.members {
+		out.members[i] = setNode{
+			pathElement: n.pathElement,
+			set:         n.set.Leaves(),
+		}
+	}
+	return out
 }

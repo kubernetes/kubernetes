@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,6 +75,7 @@ type StorageClass struct {
 	// An empty TopologySelectorTerm list means there is no topology restriction.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +listType=atomic
 	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
 }
 
@@ -182,7 +184,7 @@ type VolumeAttachmentSource struct {
 	// a persistent volume defined by a pod's inline VolumeSource. This field
 	// is populated only for the CSIMigration feature. It contains
 	// translated fields from a pod's inline VolumeSource to a
-	// PersistentVolumeSpec. This field is alpha-level and is only
+	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
 	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
@@ -291,6 +293,9 @@ type CSIDriverSpec struct {
 	// If the CSIDriverRegistry feature gate is enabled and the value is
 	// specified to false, the attach operation will be skipped.
 	// Otherwise the attach operation will be called.
+	//
+	// This field is immutable.
+	//
 	// +optional
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 
@@ -309,7 +314,7 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
-	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
+	// "csi.storage.k8s.io/ephemeral": "true" if the volume is an ephemeral inline volume
 	//                                 defined by a CSIVolumeSource, otherwise "false"
 	//
 	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
@@ -318,6 +323,9 @@ type CSIDriverSpec struct {
 	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
 	// deployed on such a cluster and the deployment determines which mode that is, for example
 	// via a command line parameter of the driver.
+	//
+	// This field is immutable.
+	//
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
 
@@ -333,6 +341,9 @@ type CSIDriverSpec struct {
 	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
 	// A driver can support one or more of these modes and
 	// more modes may be added in the future.
+	//
+	// This field is immutable.
+	//
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 
@@ -351,17 +362,25 @@ type CSIDriverSpec struct {
 	// unset or false and it can be flipped later when storage
 	// capacity information has been published.
 	//
-	// This is an alpha field and only available when the CSIStorageCapacity
+	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
+	//
+	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
 	// +optional
+	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
-	// This field is alpha-level, and is only honored by servers
-	// that enable the CSIVolumeFSGroupPolicy feature gate.
+	//
+	// This field is immutable.
+	//
+	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
+	// to determine if Kubernetes should modify ownership and permissions of the volume.
+	// With the default policy the defined fsGroup will only be applied
+	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
 	// +optional
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 
@@ -381,9 +400,6 @@ type CSIDriverSpec struct {
 	// most one token is empty string. To receive a new token after expiry,
 	// RequiresRepublish can be used to trigger NodePublishVolume periodically.
 	//
-	// This is an alpha feature and only available when the
-	// CSIServiceAccountToken feature is enabled.
-	//
 	// +optional
 	// +listType=atomic
 	TokenRequests []TokenRequest `json:"tokenRequests,omitempty" protobuf:"bytes,6,opt,name=tokenRequests"`
@@ -395,9 +411,6 @@ type CSIDriverSpec struct {
 	// Note: After a successful initial NodePublishVolume call, subsequent calls
 	// to NodePublishVolume should only update the contents of the volume. New
 	// mount points will not be seen by a running container.
-	//
-	// This is an alpha feature and only available when the
-	// CSIServiceAccountToken feature is enabled.
 	//
 	// +optional
 	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`
@@ -417,9 +430,11 @@ const (
 	ReadWriteOnceWithFSTypeFSGroupPolicy FSGroupPolicy = "ReadWriteOnceWithFSType"
 
 	// FileFSGroupPolicy indicates that CSI driver supports volume ownership
-	// and permission change via fsGroup, and Kubernetes may use fsGroup
-	// to change permissions and ownership of the volume to match user requested fsGroup in
+	// and permission change via fsGroup, and Kubernetes will change the permissions
+	// and ownership of every file in the volume to match the user requested fsGroup in
 	// the pod's SecurityPolicy regardless of fstype or access mode.
+	// Use this mode if Kubernetes should modify the permissions and ownership
+	// of the volume.
 	FileFSGroupPolicy FSGroupPolicy = "File"
 
 	// None indicates that volumes will be mounted without performing
@@ -568,4 +583,103 @@ type CSINodeList struct {
 
 	// items is the list of CSINode
 	Items []CSINode `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
+
+// CSIStorageCapacity stores the result of one CSI GetCapacity call.
+// For a given StorageClass, this describes the available capacity in a
+// particular topology segment.  This can be used when considering where to
+// instantiate new PersistentVolumes.
+//
+// For example this can express things like:
+// - StorageClass "standard" has "1234 GiB" available in "topology.kubernetes.io/zone=us-east1"
+// - StorageClass "localssd" has "10 GiB" available in "kubernetes.io/hostname=knode-abc123"
+//
+// The following three cases all imply that no capacity is available for
+// a certain combination:
+// - no object exists with suitable topology and storage class name
+// - such an object exists, but the capacity is unset
+// - such an object exists, but the capacity is zero
+//
+// The producer of these objects can decide which approach is more suitable.
+//
+// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
+// is enabled there and a CSI driver opts into capacity-aware scheduling with
+// CSIDriver.StorageCapacity.
+type CSIStorageCapacity struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata. The name has no particular meaning. It must be
+	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
+	// there are no conflicts with other CSI drivers on the cluster, the recommendation
+	// is to use csisc-<uuid>, a generated name, or a reverse-domain name which ends
+	// with the unique CSI driver name.
+	//
+	// Objects are namespaced.
+	//
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// NodeTopology defines which nodes have access to the storage
+	// for which capacity was reported. If not set, the storage is
+	// not accessible from any node in the cluster. If empty, the
+	// storage is accessible from all nodes. This field is
+	// immutable.
+	//
+	// +optional
+	NodeTopology *metav1.LabelSelector `json:"nodeTopology,omitempty" protobuf:"bytes,2,opt,name=nodeTopology"`
+
+	// The name of the StorageClass that the reported capacity applies to.
+	// It must meet the same requirements as the name of a StorageClass
+	// object (non-empty, DNS subdomain). If that object no longer exists,
+	// the CSIStorageCapacity object is obsolete and should be removed by its
+	// creator.
+	// This field is immutable.
+	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
+
+	// Capacity is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// The semantic is currently (CSI spec 1.2) defined as:
+	// The available capacity, in bytes, of the storage that can be used
+	// to provision volumes. If not set, that information is currently
+	// unavailable and treated like zero capacity.
+	//
+	// +optional
+	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,4,opt,name=capacity"`
+
+	// MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// This is defined since CSI spec 1.4.0 as the largest size
+	// that may be used in a
+	// CreateVolumeRequest.capacity_range.required_bytes field to
+	// create a volume with the same parameters as those in
+	// GetCapacityRequest. The corresponding value in the Kubernetes
+	// API is ResourceRequirements.Requests in a volume claim.
+	//
+	// +optional
+	MaximumVolumeSize *resource.Quantity `json:"maximumVolumeSize,omitempty" protobuf:"bytes,5,opt,name=maximumVolumeSize"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
+
+// CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
+type CSIStorageCapacityList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of CSIStorageCapacity objects.
+	// +listType=map
+	// +listMapKey=name
+	Items []CSIStorageCapacity `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

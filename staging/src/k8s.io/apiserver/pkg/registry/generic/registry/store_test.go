@@ -62,8 +62,6 @@ import (
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
-const validInitializerName = "test.k8s.io"
-
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	utilruntime.Must(example.AddToScheme(scheme))
@@ -86,6 +84,16 @@ type testOrphanDeleteStrategy struct {
 
 func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
+}
+
+type mutatingDeleteRESTStrategy struct {
+	runtime.ObjectTyper
+}
+
+func (t *mutatingDeleteRESTStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+	n := int64(10)
+	options.GracePeriodSeconds = &n
+	return true
 }
 
 type testRESTStrategy struct {
@@ -117,7 +125,13 @@ func (t *testRESTStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (t *testRESTStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
+func (t *testRESTStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
 func (t *testRESTStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return nil
+}
+func (t *testRESTStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
@@ -205,29 +219,30 @@ func TestStoreList(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ctx := testContext
-		if item.context != nil {
-			ctx = item.context
-		}
-		destroyFunc, registry := NewTestGenericStoreRegistry(t)
-
-		if item.in != nil {
-			if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
-				t.Errorf("Unexpected error %v", err)
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext
+			if item.context != nil {
+				ctx = item.context
 			}
-		}
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
 
-		list, err := registry.ListPredicate(ctx, item.m, nil)
-		if err != nil {
-			t.Errorf("Unexpected error %v", err)
-			continue
-		}
+			if item.in != nil {
+				if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
+					t.Fatalf("Unexpected error %v", err)
+				}
+			}
 
-		// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
-		if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
-			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
-		}
-		destroyFunc()
+			list, err := registry.ListPredicate(ctx, item.m, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error %v", err)
+			}
+
+			// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
+			if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
+				t.Fatalf("%v: Expected %#v, got %#v", name, e, a)
+			}
+		})
 	}
 }
 
@@ -265,7 +280,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 		l, err := registry.List(ctx, option)
 		if err != nil {
 			close(waitListCh)
-			t.Fatal(err)
+			t.Error(err)
 			return
 		}
 		waitListCh <- l
@@ -458,6 +473,7 @@ func TestNewDeleteOptionsFromUpdateOptions(t *testing.T) {
 
 		// DeleteOptions does not have these fields.
 		delete(inMap, "fieldManager")
+		delete(inMap, "fieldValidation")
 
 		// UpdateOptions does not have these fields.
 		delete(outMap, "gracePeriodSeconds")
@@ -1143,6 +1159,8 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 			registry.Decorator = tc.decorator
 			ttlFailDone = false
 			registry.TTLFunc = tc.ttl
+			// force storage to use a cached object with a non-matching resourceVersion to guarantee a live lookup + retry
+			created.(*example.Pod).ResourceVersion += "0"
 			registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: created}
 			_, _, err = registry.Update(testContext, pod.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 			if err != nil && !tc.expectError {
@@ -1159,104 +1177,6 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TODO: Add a test to check no-op update if we have object with ResourceVersion
-// already stored in etcd. Currently there is no easy way to store object with
-// ResourceVersion in etcd.
-
-type testPodExport struct{}
-
-func (t testPodExport) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	pod := obj.(*example.Pod)
-	if pod.Labels == nil {
-		pod.Labels = map[string]string{}
-	}
-	pod.Labels["exported"] = "true"
-	pod.Labels["exact"] = strconv.FormatBool(exact)
-
-	return nil
-}
-
-func TestStoreCustomExport(t *testing.T) {
-	podA := example.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "foo",
-			Labels:    map[string]string{},
-		},
-		Spec: example.PodSpec{NodeName: "machine"},
-	}
-
-	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer destroyFunc()
-
-	registry.ExportStrategy = testPodExport{}
-
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
-	if !updateAndVerify(t, testContext, registry, &podA) {
-		t.Errorf("Unexpected error updating podA")
-	}
-
-	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	exportedPod := obj.(*example.Pod)
-	if exportedPod.Labels["exported"] != "true" {
-		t.Errorf("expected: exported->true, found: %s", exportedPod.Labels["exported"])
-	}
-	if exportedPod.Labels["exact"] != "false" {
-		t.Errorf("expected: exact->false, found: %s", exportedPod.Labels["exact"])
-	}
-	if exportedPod.Labels["prepare_create"] != "true" {
-		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
-	}
-	delete(exportedPod.Labels, "exported")
-	delete(exportedPod.Labels, "exact")
-	delete(exportedPod.Labels, "prepare_create")
-	exportObjectMeta(&podA.ObjectMeta, false)
-	podA.Spec = exportedPod.Spec
-	if !reflect.DeepEqual(&podA, exportedPod) {
-		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, exportedPod)
-	}
-}
-
-func TestStoreBasicExport(t *testing.T) {
-	podA := example.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "foo",
-			Labels:    map[string]string{},
-		},
-		Spec:   example.PodSpec{NodeName: "machine"},
-		Status: example.PodStatus{HostIP: "1.2.3.4"},
-	}
-
-	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer destroyFunc()
-
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
-	if !updateAndVerify(t, testContext, registry, &podA) {
-		t.Errorf("Unexpected error updating podA")
-	}
-
-	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	exportedPod := obj.(*example.Pod)
-	if exportedPod.Labels["prepare_create"] != "true" {
-		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
-	}
-	delete(exportedPod.Labels, "prepare_create")
-	exportObjectMeta(&podA.ObjectMeta, false)
-	podA.Spec = exportedPod.Spec
-	if !reflect.DeepEqual(&podA, exportedPod) {
-		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, exportedPod)
 	}
 }
 
@@ -2134,6 +2054,36 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteCollectionNoMutateOptions(t *testing.T) {
+	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.DeleteStrategy = &mutatingDeleteRESTStrategy{scheme}
+	defer destroyFunc()
+
+	if _, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Create(testContext, podB, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	n := int64(50)
+	inputDeleteOptions := &metav1.DeleteOptions{GracePeriodSeconds: &n}
+	safeCopyOfDelete := inputDeleteOptions.DeepCopy()
+	// Delete all pods.
+	_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, inputDeleteOptions, &metainternalversion.ListOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(inputDeleteOptions, safeCopyOfDelete) {
+		t.Error(inputDeleteOptions)
+	}
+}
+
 func TestStoreDeleteCollectionNotFound(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
@@ -2160,7 +2110,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 				defer wg.Done()
 				_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
 				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
+					t.Errorf("Unexpected error: %v", err)
 				}
 			}()
 		}
@@ -2172,6 +2122,37 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 		if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 			t.Errorf("Unexpected error: %v", err)
 		}
+	}
+}
+
+func TestStoreDeleteCollectionWorkDistributorExited(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	for i := 0; i < 100; i++ {
+		if _, err := registry.Create(
+			testContext,
+			&example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("foo-%d", i),
+				},
+			},
+			rest.ValidateAllObjectFunc,
+			&metav1.CreateOptions{},
+		); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	expectErr := fmt.Errorf("validate object failed")
+
+	_, err := registry.DeleteCollection(testContext, func(ctx context.Context, obj runtime.Object) error {
+		return expectErr
+	}, nil, &metainternalversion.ListOptions{})
+	if err != expectErr {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -2236,37 +2217,39 @@ func TestStoreWatch(t *testing.T) {
 	}
 
 	for name, m := range table {
-		ctx := testContext
-		if m.context != nil {
-			ctx = m.context
-		}
-		podA := &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "test",
-			},
-			Spec: example.PodSpec{NodeName: "machine"},
-		}
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext
+			if m.context != nil {
+				ctx = m.context
+			}
+			podA := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "test",
+				},
+				Spec: example.PodSpec{NodeName: "machine"},
+			}
 
-		destroyFunc, registry := NewTestGenericStoreRegistry(t)
-		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		} else {
-			obj, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+			wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 			if err != nil {
-				got, open := <-wi.ResultChan()
-				if !open {
-					t.Errorf("%v: unexpected channel close", name)
-				} else {
-					if e, a := obj, got.Object; !reflect.DeepEqual(e, a) {
-						t.Errorf("Expected %#v, got %#v", e, a)
+				t.Errorf("%v: unexpected error: %v", name, err)
+			} else {
+				obj, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if err != nil {
+					got, open := <-wi.ResultChan()
+					if !open {
+						t.Errorf("%v: unexpected channel close", name)
+					} else {
+						if e, a := obj, got.Object; !reflect.DeepEqual(e, a) {
+							t.Errorf("Expected %#v, got %#v", e, a)
+						}
 					}
 				}
+				wi.Stop()
 			}
-			wi.Stop()
-		}
-		destroyFunc()
+		})
 	}
 }
 
@@ -2279,7 +2262,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc, newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2748,7 +2731,7 @@ func TestRetryDeleteValidation(t *testing.T) {
 			// This update will cause the Delete to retry due to conflict.
 			_, _, err := registry.Update(testContext, test.pod.Name, rest.DefaultUpdatedObjectInfo(test.pod, transformer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			updatedOnce.Do(func() {
 				close(updated)

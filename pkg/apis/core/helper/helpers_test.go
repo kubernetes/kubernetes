@@ -87,24 +87,41 @@ func TestIsStandardContainerResource(t *testing.T) {
 
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
 
 	modes = GetAccessModesFromString("ROX,RWX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, core.ReadWriteMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
 	}
 
 	modes = GetAccessModesFromString("RWO,ROX,RWX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOnce, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, core.ReadWriteMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX,RWOP")
+	if !ContainsAccessMode(modes, core.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOnce, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadWriteOncePod) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOncePod, modes)
 	}
 }
 
@@ -207,6 +224,60 @@ func TestIsHugePageResourceName(t *testing.T) {
 	for _, testCase := range testCases {
 		if testCase.result != IsHugePageResourceName(testCase.name) {
 			t.Errorf("resource: %v expected result: %v", testCase.name, testCase.result)
+		}
+	}
+}
+
+func TestIsHugePageResourceValueDivisible(t *testing.T) {
+	testCases := []struct {
+		name     core.ResourceName
+		quantity resource.Quantity
+		result   bool
+	}{
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("4Mi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("5Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2Gi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2.1Gi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Mi"),
+			quantity: resource.MustParse("2.1Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-64Ki"),
+			quantity: resource.MustParse("128Ki"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
+			t.Errorf("resource: %v storage:%v expected result: %v", testCase.name, testCase.quantity, testCase.result)
 		}
 	}
 }

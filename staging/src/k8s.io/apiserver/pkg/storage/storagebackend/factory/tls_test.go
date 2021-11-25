@@ -24,17 +24,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.etcd.io/etcd/integration"
-	"go.etcd.io/etcd/pkg/transport"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -53,29 +54,32 @@ func TestTLSConnection(t *testing.T) {
 	certFile, keyFile, caFile := configureTLSCerts(t)
 	defer os.RemoveAll(filepath.Dir(certFile))
 
-	tlsInfo := &transport.TLSInfo{
+	// override server config to be TLS-enabled
+	etcdConfig := testserver.NewTestConfig(t)
+	etcdConfig.ClientTLSInfo = transport.TLSInfo{
 		CertFile:      certFile,
 		KeyFile:       keyFile,
 		TrustedCAFile: caFile,
 	}
+	for i := range etcdConfig.LCUrls {
+		etcdConfig.LCUrls[i].Scheme = "https"
+	}
+	for i := range etcdConfig.ACUrls {
+		etcdConfig.ACUrls[i].Scheme = "https"
+	}
 
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{
-		Size:      1,
-		ClientTLS: tlsInfo,
-	})
-	defer cluster.Terminate(t)
-
+	client := testserver.RunEtcd(t, etcdConfig)
 	cfg := storagebackend.Config{
 		Type: storagebackend.StorageTypeETCD3,
 		Transport: storagebackend.TransportConfig{
-			ServerList:    []string{cluster.Members[0].GRPCAddr()},
+			ServerList:    client.Endpoints(),
 			CertFile:      certFile,
 			KeyFile:       keyFile,
 			TrustedCAFile: caFile,
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(cfg, nil)
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil)
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)

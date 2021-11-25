@@ -1,0 +1,8 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- sig-apps-api-approvers
+reviewers:
+- sig-apps-api-reviewers
+labels:
+- sig/apps

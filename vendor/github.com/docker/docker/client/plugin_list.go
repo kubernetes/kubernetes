@@ -15,6 +15,7 @@ func (cli *Client) PluginList(ctx context.Context, filter filters.Args) (types.P
 	query := url.Values{}
 
 	if filter.Len() > 0 {
+		//nolint:staticcheck // ignore SA1019 for old code
 		filterJSON, err := filters.ToParamWithVersion(cli.version, filter)
 		if err != nil {
 			return plugins, err

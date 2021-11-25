@@ -132,7 +132,7 @@ func (t *typeValidator) Applies(source interface{}, kind reflect.Kind) bool {
 func (t *typeValidator) Validate(data interface{}) *Result {
 	result := new(Result)
 	result.Inc()
-	if data == nil || reflect.DeepEqual(reflect.Zero(reflect.TypeOf(data)), reflect.ValueOf(data)) {
+	if data == nil {
 		// nil or zero value for the passed structure require Type: null
 		if len(t.Type) > 0 && !t.Type.Contains(nullType) && !t.Nullable { // TODO: if a property is not required it also passes this
 			return errorHelp.sErr(errors.InvalidType(t.Path, t.In, strings.Join(t.Type, ","), nullType))

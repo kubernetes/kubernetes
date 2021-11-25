@@ -18,15 +18,14 @@ package debug
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -1027,13 +1026,18 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name, nodeName string
-		opts           *DebugOptions
-		expected       *corev1.Pod
+		name     string
+		node     *corev1.Node
+		opts     *DebugOptions
+		expected *corev1.Pod
 	}{
 		{
-			name:     "minimum options",
-			nodeName: "node-XXX",
+			name: "minimum options",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -1070,12 +1074,21 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 							},
 						},
 					},
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
 				},
 			},
 		},
 		{
-			name:     "debug args as container command",
-			nodeName: "node-XXX",
+			name: "debug args as container command",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
 			opts: &DebugOptions{
 				Args:       []string{"/bin/echo", "one", "two", "three"},
 				Container:  "custom-debugger",
@@ -1115,12 +1128,21 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 							},
 						},
 					},
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
 				},
 			},
 		},
 		{
-			name:     "debug args as container args",
-			nodeName: "node-XXX",
+			name: "debug args as container args",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
 			opts: &DebugOptions{
 				ArgsOnly:   true,
 				Container:  "custom-debugger",
@@ -1161,6 +1183,11 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 							},
 						},
 					},
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
 				},
 			},
 		},
@@ -1169,7 +1196,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
-			pod := tc.opts.generateNodeDebugPod(tc.nodeName)
+			pod := tc.opts.generateNodeDebugPod(tc.node)
 			if diff := cmp.Diff(tc.expected, pod); diff != "" {
 				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
 			}
@@ -1272,7 +1299,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			args: "--image=busybox --env=FOO=BAR mypod",
 			wantOpts: &DebugOptions{
 				Args:           []string{},
-				Env:            []v1.EnvVar{{Name: "FOO", Value: "BAR"}},
+				Env:            []corev1.EnvVar{{Name: "FOO", Value: "BAR"}},
 				Image:          "busybox",
 				Namespace:      "test",
 				ShareProcesses: true,

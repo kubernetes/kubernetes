@@ -17,12 +17,12 @@ limitations under the License.
 package labels
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -31,12 +31,15 @@ import (
 )
 
 var (
-	validRequirementOperators = []string{
+	unaryOperators = []string{
+		string(selection.Exists), string(selection.DoesNotExist),
+	}
+	binaryOperators = []string{
 		string(selection.In), string(selection.NotIn),
 		string(selection.Equals), string(selection.DoubleEquals), string(selection.NotEquals),
-		string(selection.Exists), string(selection.DoesNotExist),
 		string(selection.GreaterThan), string(selection.LessThan),
 	}
+	validRequirementOperators = append(binaryOperators, unaryOperators...)
 )
 
 // Requirements is AND of all requirements.
@@ -140,7 +143,7 @@ type Requirement struct {
 
 // NewRequirement is the constructor for a Requirement.
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn, Equals, DoubleEquals, NotEquals, Exists, or DoesNotExist.
+// (1) The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
 // (2) If the operator is In or NotIn, the values set must be non-empty.
 // (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
 // (4) If the operator is Exists or DoesNotExist, the value set must be empty.
@@ -277,6 +280,17 @@ func (r *Requirement) Values() sets.String {
 	return ret
 }
 
+// Equal checks the equality of requirement.
+func (r Requirement) Equal(x Requirement) bool {
+	if r.key != x.key {
+		return false
+	}
+	if r.operator != x.operator {
+		return false
+	}
+	return cmp.Equal(r.strValues, x.strValues)
+}
+
 // Empty returns true if the internalSelector doesn't restrict selection space
 func (s internalSelector) Empty() bool {
 	if s == nil {
@@ -289,48 +303,55 @@ func (s internalSelector) Empty() bool {
 // Requirement. If called on an invalid Requirement, an error is
 // returned. See NewRequirement for creating a valid Requirement.
 func (r *Requirement) String() string {
-	var buffer bytes.Buffer
+	var sb strings.Builder
+	sb.Grow(
+		// length of r.key
+		len(r.key) +
+			// length of 'r.operator' + 2 spaces for the worst case ('in' and 'notin')
+			len(r.operator) + 2 +
+			// length of 'r.strValues' slice times. Heuristically 5 chars per word
+			+5*len(r.strValues))
 	if r.operator == selection.DoesNotExist {
-		buffer.WriteString("!")
+		sb.WriteString("!")
 	}
-	buffer.WriteString(r.key)
+	sb.WriteString(r.key)
 
 	switch r.operator {
 	case selection.Equals:
-		buffer.WriteString("=")
+		sb.WriteString("=")
 	case selection.DoubleEquals:
-		buffer.WriteString("==")
+		sb.WriteString("==")
 	case selection.NotEquals:
-		buffer.WriteString("!=")
+		sb.WriteString("!=")
 	case selection.In:
-		buffer.WriteString(" in ")
+		sb.WriteString(" in ")
 	case selection.NotIn:
-		buffer.WriteString(" notin ")
+		sb.WriteString(" notin ")
 	case selection.GreaterThan:
-		buffer.WriteString(">")
+		sb.WriteString(">")
 	case selection.LessThan:
-		buffer.WriteString("<")
+		sb.WriteString("<")
 	case selection.Exists, selection.DoesNotExist:
-		return buffer.String()
+		return sb.String()
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString("(")
+		sb.WriteString("(")
 	}
 	if len(r.strValues) == 1 {
-		buffer.WriteString(r.strValues[0])
+		sb.WriteString(r.strValues[0])
 	} else { // only > 1 since == 0 prohibited by NewRequirement
 		// normalizes value order on output, without mutating the in-memory selector representation
 		// also avoids normalization when it is not required, and ensures we do not mutate shared data
-		buffer.WriteString(strings.Join(safeSort(r.strValues), ","))
+		sb.WriteString(strings.Join(safeSort(r.strValues), ","))
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString(")")
+		sb.WriteString(")")
 	}
-	return buffer.String()
+	return sb.String()
 }
 
 // safeSort sorts input strings without modification
@@ -346,13 +367,9 @@ func safeSort(in []string) []string {
 
 // Add adds requirements to the selector. It copies the current selector returning a new one
 func (s internalSelector) Add(reqs ...Requirement) Selector {
-	var ret internalSelector
-	for ix := range s {
-		ret = append(ret, s[ix])
-	}
-	for _, r := range reqs {
-		ret = append(ret, r)
-	}
+	ret := make(internalSelector, 0, len(s)+len(reqs))
+	ret = append(ret, s...)
+	ret = append(ret, reqs...)
 	sort.Sort(ByKey(ret))
 	return ret
 }
@@ -735,7 +752,7 @@ func (p *Parser) parseOperator() (op selection.Operator, err error) {
 	case NotEqualsToken:
 		op = selection.NotEquals
 	default:
-		return "", fmt.Errorf("found '%s', expected: '=', '!=', '==', 'in', notin'", lit)
+		return "", fmt.Errorf("found '%s', expected: %v", lit, strings.Join(binaryOperators, ", "))
 	}
 	return op, nil
 }

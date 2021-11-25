@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -26,13 +27,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -156,19 +159,6 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", statusResp))
 }
 
-// TestSandboxHasLeastPrivilegesConfig tests that the sandbox is set with no-new-privileges
-// and it uses runtime/default seccomp profile.
-func TestSandboxHasLeastPrivilegesConfig(t *testing.T) {
-	ds, _, _ := newTestDockerService()
-	config := makeSandboxConfig("foo", "bar", "1", 0)
-
-	// test the default
-	createConfig, err := ds.makeSandboxDockerConfig(config, defaultSandboxImage)
-	assert.NoError(t, err)
-	assert.Equal(t, len(createConfig.HostConfig.SecurityOpt), 1, "sandbox should use runtime/default")
-	assert.Equal(t, "no-new-privileges", createConfig.HostConfig.SecurityOpt[0], "no-new-privileges not set")
-}
-
 // TestSandboxStatusAfterRestart tests that retrieving sandbox status returns
 // an IP address even if RunPodSandbox() was not yet called for this pod, as
 // would happen on kubelet restart
@@ -219,9 +209,10 @@ func TestSandboxStatusAfterRestart(t *testing.T) {
 // calls are made when we run/stop a sandbox.
 func TestNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
-	mockPlugin := newTestNetworkPlugin(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockPlugin := nettest.NewMockNetworkPlugin(ctrl)
 	ds.network = network.NewPluginManager(mockPlugin)
-	defer mockPlugin.Finish()
 
 	name := "foo0"
 	ns := "bar0"
@@ -233,7 +224,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
-	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
+	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID, map[string]string{"annotation": ns}, map[string]string{})
 	mockPlugin.EXPECT().TearDownPod(ns, name, cID).After(setup)
 
 	_, err := ds.RunPodSandbox(getTestCTX(), &runtimeapi.RunPodSandboxRequest{Config: c})
@@ -246,9 +237,10 @@ func TestNetworkPluginInvocation(t *testing.T) {
 // for host network sandboxes.
 func TestHostNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
-	mockPlugin := newTestNetworkPlugin(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockPlugin := nettest.NewMockNetworkPlugin(ctrl)
 	ds.network = network.NewPluginManager(mockPlugin)
-	defer mockPlugin.Finish()
 
 	name := "foo0"
 	ns := "bar0"
@@ -278,9 +270,10 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 // hits a SetUpPod failure.
 func TestSetUpPodFailure(t *testing.T) {
 	ds, _, _ := newTestDockerService()
-	mockPlugin := newTestNetworkPlugin(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockPlugin := nettest.NewMockNetworkPlugin(ctrl)
 	ds.network = network.NewPluginManager(mockPlugin)
-	defer mockPlugin.Finish()
 
 	name := "foo0"
 	ns := "bar0"
@@ -291,7 +284,7 @@ func TestSetUpPodFailure(t *testing.T) {
 	)
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
-	mockPlugin.EXPECT().SetUpPod(ns, name, cID).Return(errors.New("setup pod error")).AnyTimes()
+	mockPlugin.EXPECT().SetUpPod(ns, name, cID, map[string]string{"annotation": ns}, map[string]string{}).Return(errors.New("setup pod error")).AnyTimes()
 	// If SetUpPod() fails, we expect TearDownPod() to immediately follow
 	mockPlugin.EXPECT().TearDownPod(ns, name, cID)
 	// Assume network plugin doesn't return error, dockershim should still be able to return not ready correctly.

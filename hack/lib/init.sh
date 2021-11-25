@@ -41,7 +41,7 @@ KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
 
 # Set no_proxy for localhost if behind a proxy, otherwise,
 # the connections to localhost in scripts will time out
-export no_proxy=127.0.0.1,localhost
+export no_proxy="127.0.0.1,localhost${no_proxy:+,${no_proxy}}"
 
 # This is a symlink to binaries for "this platform", e.g. build tools.
 export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
@@ -50,6 +50,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 kube::log::install_errexit
+kube::util::ensure-bash-version
 
 source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
@@ -75,16 +76,16 @@ authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1 \
 authorization.k8s.io/v1beta1 \
 autoscaling/v1 \
+autoscaling/v2 \
 autoscaling/v2beta1 \
 autoscaling/v2beta2 \
 batch/v1 \
 batch/v1beta1 \
-batch/v2alpha1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
-discovery.k8s.io/v1alpha1 \
+discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
@@ -95,6 +96,7 @@ networking.k8s.io/v1beta1 \
 node.k8s.io/v1 \
 node.k8s.io/v1alpha1 \
 node.k8s.io/v1beta1 \
+policy/v1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
@@ -107,6 +109,7 @@ storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
+flowcontrol.apiserver.k8s.io/v1beta2 \
 internal.apiserver.k8s.io/v1alpha1 \
 }"
 

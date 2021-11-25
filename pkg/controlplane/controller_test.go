@@ -17,17 +17,17 @@ limitations under the License.
 package controlplane
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	netutils "k8s.io/utils/net"
 )
 
 func TestReconcileEndpoints(t *testing.T) {
@@ -36,7 +36,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		o := metav1.ObjectMeta{Namespace: ns, Name: name}
 		if skipMirrorLabel {
 			o.Labels = map[string]string{
-				discoveryv1beta1.LabelSkipMirror: "true",
+				discoveryv1.LabelSkipMirror: "true",
 			}
 		}
 		return o
@@ -401,7 +401,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
+		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -520,7 +520,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
+		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -585,7 +585,7 @@ func TestEmptySubsets(t *testing.T) {
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
 	}
-	err := reconciler.RemoveEndpoints("foo", net.ParseIP("1.2.3.4"), endpointPorts)
+	err := reconciler.RemoveEndpoints("foo", netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -631,7 +631,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
 		master.ServiceClient = fakeClient.CoreV1()
-		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
 			if action.GetVerb() == "create" {
@@ -913,7 +913,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, true)
+		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -972,7 +972,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}

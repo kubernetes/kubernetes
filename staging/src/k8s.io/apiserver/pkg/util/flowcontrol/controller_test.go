@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,11 +35,17 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
+
+// Some tests print a lot of debug logs which slows down tests considerably,
+// causing them to even timeout.
+var testDebugLogs = false
 
 func TestMain(m *testing.M) {
 	klog.InitFlags(nil)
@@ -64,7 +70,7 @@ func (cfgCtlr *configController) hasPriorityLevelState(plName string) bool {
 type ctlrTestState struct {
 	t               *testing.T
 	cfgCtlr         *configController
-	fcIfc           fcclient.FlowcontrolV1beta1Interface
+	fcIfc           fcclient.FlowcontrolV1beta2Interface
 	existingPLs     map[string]*flowcontrol.PriorityLevelConfiguration
 	existingFSs     map[string]*flowcontrol.FlowSchema
 	heldRequestsMap map[string][]heldRequest
@@ -99,7 +105,7 @@ type ctlrTestRequest struct {
 	descr1, descr2 interface{}
 }
 
-func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, ip metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, rip metrics.RatioedChangeObserverPair, eso metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
 	return ctlrTestQueueSetCompleter{cts, nil, qc}, nil
 }
 
@@ -134,11 +140,13 @@ func (cqs *ctlrTestQueueSet) IsIdle() bool {
 	return cqs.countActive == 0
 }
 
-func (cqs *ctlrTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (req fq.Request, idle bool) {
+func (cqs *ctlrTestQueueSet) StartRequest(ctx context.Context, width *fcrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (req fq.Request, idle bool) {
 	cqs.cts.lock.Lock()
 	defer cqs.cts.lock.Unlock()
 	cqs.countActive++
-	cqs.cts.t.Logf("Queued %q %#+v %#+v for %p QS=%s, countActive:=%d", fsName, descr1, descr2, cqs, cqs.qc.Name, cqs.countActive)
+	if testDebugLogs {
+		cqs.cts.t.Logf("Queued %q %#+v %#+v for %p QS=%s, countActive:=%d", fsName, descr1, descr2, cqs, cqs.qc.Name, cqs.countActive)
+	}
 	return &ctlrTestRequest{cqs, cqs.qc.Name, descr1, descr2}, false
 }
 
@@ -147,7 +155,9 @@ func (ctr *ctlrTestRequest) Finish(execute func()) bool {
 	ctr.cqs.cts.lock.Lock()
 	defer ctr.cqs.cts.lock.Unlock()
 	ctr.cqs.countActive--
-	ctr.cqs.cts.t.Logf("Finished %#+v %#+v for %p QS=%s, countActive:=%d", ctr.descr1, ctr.descr2, ctr.cqs, ctr.cqs.qc.Name, ctr.cqs.countActive)
+	if testDebugLogs {
+		ctr.cqs.cts.t.Logf("Finished %#+v %#+v for %p QS=%s, countActive:=%d", ctr.descr1, ctr.descr2, ctr.cqs, ctr.cqs.qc.Name, ctr.cqs.countActive)
+	}
 	return ctr.cqs.countActive == 0
 }
 
@@ -182,7 +192,9 @@ func (cts *ctlrTestState) addHeldRequest(plName string, rd RequestDigest, finish
 	hrs := cts.heldRequestsMap[plName]
 	hrs = append(hrs, heldRequest{rd, finishCh})
 	cts.heldRequestsMap[plName] = hrs
-	cts.t.Logf("Holding %#+v for %s, count:=%d", rd, plName, len(hrs))
+	if testDebugLogs {
+		cts.t.Logf("Holding %#+v for %s, count:=%d", rd, plName, len(hrs))
+	}
 }
 
 func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCount int) {
@@ -227,12 +239,12 @@ var mandQueueSetNames, exclQueueSetNames = func() (sets.String, sets.String) {
 
 func TestConfigConsumer(t *testing.T) {
 	rngOuter := rand.New(rand.NewSource(1234567890123456789))
-	for i := 1; i <= 20; i++ {
+	for i := 1; i <= 10; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
-			flowcontrolClient := clientset.FlowcontrolV1beta1()
+			flowcontrolClient := clientset.FlowcontrolV1beta2()
 			cts := &ctlrTestState{t: t,
 				fcIfc:           flowcontrolClient,
 				existingFSs:     map[string]*flowcontrol.FlowSchema{},
@@ -241,11 +253,16 @@ func TestConfigConsumer(t *testing.T) {
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
 			ctlr := newTestableController(TestableConfig{
+				Name:                   "Controller",
+				Clock:                  clock.RealClock{},
+				AsFieldManager:         ConfigConsumerAsFieldManager,
+				FoundToDangling:        func(found bool) bool { return !found },
 				InformerFactory:        informerFactory,
 				FlowcontrolClient:      flowcontrolClient,
-				ServerConcurrencyLimit: 100,
-				RequestWaitLimit:       time.Minute,
-				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				ServerConcurrencyLimit: 100,         // server concurrency limit
+				RequestWaitLimit:       time.Minute, // request wait limit
+				ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
 				QueueSetFactory:        cts,
 			})
 			cts.cfgCtlr = ctlr
@@ -254,8 +271,10 @@ func TestConfigConsumer(t *testing.T) {
 			_, _, desiredPLNames, newBadPLNames := genPLs(rng, trialStep, persistingPLNames, 0)
 			_, _, newFTRs, newCatchAlls := genFSs(t, rng, trialStep, desiredPLNames, newBadPLNames, 0)
 			for j := 0; ; {
-				t.Logf("For %s, desiredPLNames=%#+v", trialStep, desiredPLNames)
-				t.Logf("For %s, newFTRs=%#+v", trialStep, newFTRs)
+				if testDebugLogs {
+					t.Logf("For %s, desiredPLNames=%#+v", trialStep, desiredPLNames)
+					t.Logf("For %s, newFTRs=%#+v", trialStep, newFTRs)
+				}
 				// Check that the latest digestion did the right thing
 				nextPLNames := sets.NewString()
 				for oldPLName := range persistingPLNames {
@@ -277,7 +296,9 @@ func TestConfigConsumer(t *testing.T) {
 				}
 				for plName, hr, nCount := cts.popHeldRequest(); hr != nil; plName, hr, nCount = cts.popHeldRequest() {
 					desired := desiredPLNames.Has(plName) || mandPLs[plName] != nil
-					t.Logf("Releasing held request %#+v, desired=%v, plName=%s, count:=%d", hr.rd, desired, plName, nCount)
+					if testDebugLogs {
+						t.Logf("Releasing held request %#+v, desired=%v, plName=%s, count:=%d", hr.rd, desired, plName, nCount)
+					}
 					close(hr.finishCh)
 				}
 				cts.requestWG.Wait()
@@ -299,17 +320,21 @@ func TestConfigConsumer(t *testing.T) {
 				newPLs, _, desiredPLNames, newBadPLNames = genPLs(rng, trialStep, persistingPLNames, 1+rng.Intn(4))
 				newFSs, _, newFTRs, newCatchAlls = genFSs(t, rng, trialStep, desiredPLNames, newBadPLNames, 1+rng.Intn(6))
 
-				for _, newPL := range newPLs {
-					t.Logf("For %s, digesting newPL=%s", trialStep, fcfmt.Fmt(newPL))
-				}
-				for _, newFS := range newFSs {
-					t.Logf("For %s, digesting newFS=%s", trialStep, fcfmt.Fmt(newFS))
+				if testDebugLogs {
+					for _, newPL := range newPLs {
+						t.Logf("For %s, digesting newPL=%s", trialStep, fcfmt.Fmt(newPL))
+					}
+					for _, newFS := range newFSs {
+						t.Logf("For %s, digesting newFS=%s", trialStep, fcfmt.Fmt(newFS))
+					}
 				}
 				_ = ctlr.lockAndDigestConfigObjects(newPLs, newFSs)
 			}
 			for plName, hr, nCount := cts.popHeldRequest(); hr != nil; plName, hr, nCount = cts.popHeldRequest() {
-				desired := desiredPLNames.Has(plName) || mandPLs[plName] != nil
-				t.Logf("Releasing held request %#+v, desired=%v, plName=%s, count:=%d", hr.rd, desired, plName, nCount)
+				if testDebugLogs {
+					desired := desiredPLNames.Has(plName) || mandPLs[plName] != nil
+					t.Logf("Releasing held request %#+v, desired=%v, plName=%s, count:=%d", hr.rd, desired, plName, nCount)
+				}
 				close(hr.finishCh)
 			}
 			cts.requestWG.Wait()
@@ -351,7 +376,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 
 	clientset := clientsetfake.NewSimpleClientset(fs, pl)
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-	flowcontrolClient := clientset.FlowcontrolV1beta1()
+	flowcontrolClient := clientset.FlowcontrolV1beta2()
 	cts := &ctlrTestState{t: t,
 		fcIfc:           flowcontrolClient,
 		existingFSs:     map[string]*flowcontrol.FlowSchema{},
@@ -360,12 +385,17 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		queues:          map[string]*ctlrTestQueueSet{},
 	}
 	controller := newTestableController(TestableConfig{
-		informerFactory,
-		flowcontrolClient,
-		100,
-		time.Minute,
-		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		cts,
+		Name:                   "Controller",
+		Clock:                  clock.RealClock{},
+		AsFieldManager:         ConfigConsumerAsFieldManager,
+		FoundToDangling:        func(found bool) bool { return !found },
+		InformerFactory:        informerFactory,
+		FlowcontrolClient:      flowcontrolClient,
+		ServerConcurrencyLimit: 100,
+		RequestWaitLimit:       time.Minute,
+		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		QueueSetFactory:        cts,
 	})
 
 	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})
@@ -432,9 +462,11 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 				startWG.Add(1)
 				go func(matches, isResource bool, rdu RequestDigest) {
 					expectedMatch := matches && ftr.wellFormed && (fsPrecedes(fs, catchAlls[isResource]) || fs.Name == catchAlls[isResource].Name)
-					ctlr.Handle(ctx, rdu, func(matchFS *flowcontrol.FlowSchema, matchPL *flowcontrol.PriorityLevelConfiguration) {
+					ctlr.Handle(ctx, rdu, func(matchFS *flowcontrol.FlowSchema, matchPL *flowcontrol.PriorityLevelConfiguration, _ string) fcrequest.WorkEstimate {
 						matchIsExempt := matchPL.Spec.Type == flowcontrol.PriorityLevelEnablementExempt
-						t.Logf("Considering FlowSchema %s, expectedMatch=%v, isResource=%v: Handle(%#+v) => note(fs=%s, pl=%s, isExempt=%v)", fs.Name, expectedMatch, isResource, rdu, matchFS.Name, matchPL.Name, matchIsExempt)
+						if testDebugLogs {
+							t.Logf("Considering FlowSchema %s, expectedMatch=%v, isResource=%v: Handle(%#+v) => note(fs=%s, pl=%s, isExempt=%v)", fs.Name, expectedMatch, isResource, rdu, matchFS.Name, matchPL.Name, matchIsExempt)
+						}
 						if a := matchFS.Name == fs.Name; expectedMatch != a {
 							t.Errorf("Fail at %s/%s: rd=%#+v, expectedMatch=%v, actualMatch=%v, matchFSName=%q, catchAlls=%#+v", trialName, fs.Name, rdu, expectedMatch, a, matchFS.Name, catchAlls)
 						}
@@ -443,6 +475,7 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 								t.Errorf("Fail at %s/%s: expected=%v, actual=%v", trialName, fs.Name, fs.Spec.PriorityLevelConfiguration.Name, matchPL.Name)
 							}
 						}
+						return fcrequest.WorkEstimate{InitialSeats: 1}
 					}, func(inQueue bool) {
 					}, func() {
 						startWG.Done()
@@ -451,7 +484,9 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 					cts.requestWG.Done()
 				}(matches, isResource, rdu)
 				if rng.Float32() < 0.8 {
-					t.Logf("Immediate request %#+v, plName=%s", rdu, expectedPLName)
+					if testDebugLogs {
+						t.Logf("Immediate request %#+v, plName=%s", rdu, expectedPLName)
+					}
 					close(finishCh)
 				} else {
 					cts.addHeldRequest(expectedPLName, rdu, finishCh)
@@ -511,7 +546,9 @@ func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames 
 				catchAlls[true] = ftr.fs
 			}
 		}
-		t.Logf("For trial %s, adding wf=%v FlowSchema %s", trial, ftr.wellFormed, fcfmt.Fmt(ftr.fs))
+		if testDebugLogs {
+			t.Logf("For trial %s, adding wf=%v FlowSchema %s", trial, ftr.wellFormed, fcfmt.Fmt(ftr.fs))
+		}
 	}
 	if n == 0 || rng.Float32() < 0.5 {
 		add(mandFTRCatchAll)

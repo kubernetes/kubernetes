@@ -23,15 +23,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 func TestHandlerScope(t *testing.T) {
@@ -41,15 +40,32 @@ func TestHandlerScope(t *testing.T) {
 	}
 	defer tearDown()
 
-	for _, scope := range []apiextensionsv1beta1.ResourceScope{apiextensionsv1beta1.ClusterScoped, apiextensionsv1beta1.NamespaceScoped} {
+	for _, scope := range []apiextensionsv1.ResourceScope{apiextensionsv1.ClusterScoped, apiextensionsv1.NamespaceScoped} {
 		t.Run(string(scope), func(t *testing.T) {
 
-			crd := &apiextensionsv1beta1.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: strings.ToLower(string(scope)) + "s.test.apiextensions-apiserver.k8s.io"},
-				Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-					Group:   "test.apiextensions-apiserver.k8s.io",
-					Version: "v1beta1",
-					Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			crd := &apiextensionsv1.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        strings.ToLower(string(scope)) + "s.test.apiextensions-apiserver.k8s.io",
+					Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
+				},
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Group: "test.apiextensions-apiserver.k8s.io",
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1beta1",
+							Served:  true,
+							Storage: true,
+							Subresources: &apiextensionsv1.CustomResourceSubresources{
+								Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+								Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+									SpecReplicasPath:   ".spec.replicas",
+									StatusReplicasPath: ".status.replicas",
+								},
+							},
+							Schema: fixtures.AllowAllSchema(),
+						},
+					},
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
 						Plural:   strings.ToLower(string(scope)) + "s",
 						Singular: strings.ToLower(string(scope)),
 						Kind:     string(scope),
@@ -58,14 +74,7 @@ func TestHandlerScope(t *testing.T) {
 					Scope: scope,
 				},
 			}
-			crd.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-				Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-					SpecReplicasPath:   ".spec.replicas",
-					StatusReplicasPath: ".status.replicas",
-				},
-			}
-			crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -75,7 +84,7 @@ func TestHandlerScope(t *testing.T) {
 			ns := "test"
 			var client dynamic.ResourceInterface = dynamicClient.Resource(gvr)
 			var otherScopeClient dynamic.ResourceInterface = dynamicClient.Resource(gvr).Namespace(ns)
-			if crd.Spec.Scope == apiextensionsv1beta1.NamespaceScoped {
+			if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 				client, otherScopeClient = otherScopeClient, client
 			}
 
@@ -141,7 +150,7 @@ func TestHandlerScope(t *testing.T) {
 			err = otherScopeClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 			assert.True(t, apierrors.IsNotFound(err))
 
-			if scope == apiextensionsv1beta1.ClusterScoped {
+			if scope == apiextensionsv1.ClusterScoped {
 				_, err = otherScopeClient.List(context.TODO(), metav1.ListOptions{})
 				assert.True(t, apierrors.IsNotFound(err))
 

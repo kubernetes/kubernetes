@@ -18,10 +18,17 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+var (
+	labelValueAllowLists = map[string]*MetricLabelAllowList{}
+	allowListLock        sync.RWMutex
 )
 
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure
@@ -31,15 +38,16 @@ import (
 // Name must be set to a non-empty string. DeprecatedVersion is defined only
 // if the metric for which this options applies is, in fact, deprecated.
 type KubeOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       map[string]string
-	DeprecatedVersion string
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // BuildFQName joins the given three name components by "_". Empty name
@@ -140,16 +148,17 @@ func (o *GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 // and can safely be left at their zero value, although it is strongly
 // encouraged to set a Help string.
 type HistogramOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       map[string]string
-	Buckets           []float64
-	DeprecatedVersion string
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Buckets              []float64
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -186,19 +195,20 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 // a help string and to explicitly set the Objectives field to the desired value
 // as the default value will change in the upcoming v0.10 of the library.
 type SummaryOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       map[string]string
-	Objectives        map[float64]float64
-	MaxAge            time.Duration
-	AgeBuckets        uint32
-	BufCap            uint32
-	DeprecatedVersion string
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Objectives           map[float64]float64
+	MaxAge               time.Duration
+	AgeBuckets           uint32
+	BufCap               uint32
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -241,5 +251,51 @@ func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
 		MaxAge:      o.MaxAge,
 		AgeBuckets:  o.AgeBuckets,
 		BufCap:      o.BufCap,
+	}
+}
+
+type MetricLabelAllowList struct {
+	labelToAllowList map[string]sets.String
+}
+
+func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, labelValueList []string) {
+	for index, value := range labelValueList {
+		name := labelNameList[index]
+		if allowValues, ok := allowList.labelToAllowList[name]; ok {
+			if !allowValues.Has(value) {
+				labelValueList[index] = "unexpected"
+			}
+		}
+	}
+}
+
+func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]string) {
+	for name, value := range labels {
+		if allowValues, ok := allowList.labelToAllowList[name]; ok {
+			if !allowValues.Has(value) {
+				labels[name] = "unexpected"
+			}
+		}
+	}
+}
+
+func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
+	allowListLock.Lock()
+	defer allowListLock.Unlock()
+	for metricLabelName, labelValues := range allowListMapping {
+		metricName := strings.Split(metricLabelName, ",")[0]
+		labelName := strings.Split(metricLabelName, ",")[1]
+		valueSet := sets.NewString(strings.Split(labelValues, ",")...)
+
+		allowList, ok := labelValueAllowLists[metricName]
+		if ok {
+			allowList.labelToAllowList[labelName] = valueSet
+		} else {
+			labelToAllowList := make(map[string]sets.String)
+			labelToAllowList[labelName] = valueSet
+			labelValueAllowLists[metricName] = &MetricLabelAllowList{
+				labelToAllowList,
+			}
+		}
 	}
 }

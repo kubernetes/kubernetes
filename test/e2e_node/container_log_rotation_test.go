@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
@@ -41,7 +40,7 @@ const (
 	rotationConsistentlyTimeout = 2 * time.Minute
 )
 
-var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
+var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
 	ginkgo.Context("when a container generates a lot of log", func() {
 		ginkgo.BeforeEach(func() {
@@ -51,7 +50,6 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 		})
 
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.CRIContainerLogRotation)] = true
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})

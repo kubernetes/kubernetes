@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"testing"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -46,7 +46,9 @@ func TestMatching(t *testing.T) {
 
 func checkFTR(t *testing.T, ftr *fsTestingRecord) {
 	for expectMatch, digests1 := range ftr.digests {
-		t.Logf("%s.digests[%v] = %#+v", ftr.fs.Name, expectMatch, digests1)
+		if testDebugLogs {
+			t.Logf("%s.digests[%v] = %#+v", ftr.fs.Name, expectMatch, digests1)
+		}
 		for _, digests2 := range digests1 {
 			for _, digest := range digests2 {
 				actualMatch := matchesFlowSchema(digest, ftr.fs)
@@ -66,7 +68,9 @@ func TestPolicyRules(t *testing.T) {
 			r := rng.Float32()
 			n := rng.Float32()
 			policyRule, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("t%d", i), rng.Float32() < 0.2, r < 0.10, n < 0.10, r < 0.05, n < 0.05)
-			t.Logf("policyRule=%s, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
+			if testDebugLogs {
+				t.Logf("policyRule=%s, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
+			}
 			for _, digest := range append(matchingRDigests, matchingNDigests...) {
 				if !matchesPolicyRule(digest, &policyRule) {
 					t.Errorf("Fail: expected %s to match %#+v but it did not", fcfmt.Fmt(policyRule), digest)
@@ -85,7 +89,7 @@ func TestLiterals(t *testing.T) {
 	ui := &user.DefaultInfo{Name: "goodu", UID: "1",
 		Groups: []string{"goodg1", "goodg2"}}
 	reqRN := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: true,
 			Path:              "/apis/goodapig/v1/namespaces/goodns/goodrscs",
 			Verb:              "goodverb",
@@ -95,10 +99,12 @@ func TestLiterals(t *testing.T) {
 			Namespace:         "goodns",
 			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goodrscs", "eman"}},
-		ui}
+			Parts:             []string{"goodrscs", "eman"},
+		},
+		User: ui,
+	}
 	reqRU := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: true,
 			Path:              "/apis/goodapig/v1/goodrscs",
 			Verb:              "goodverb",
@@ -108,14 +114,18 @@ func TestLiterals(t *testing.T) {
 			Namespace:         "",
 			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goodrscs", "eman"}},
-		ui}
+			Parts:             []string{"goodrscs", "eman"},
+		},
+		User: ui,
+	}
 	reqN := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: false,
 			Path:              "/openapi/v2",
-			Verb:              "goodverb"},
-		ui}
+			Verb:              "goodverb",
+		},
+		User: ui,
+	}
 	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
 		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
 			User: &flowcontrol.UserSubject{"goodu"}}},

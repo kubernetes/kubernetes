@@ -18,14 +18,14 @@ package kubemark
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -33,8 +33,8 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -69,8 +69,8 @@ func NewHollowProxyOrDie(
 	iptInterface utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	execer utilexec.Interface,
-	broadcaster record.EventBroadcaster,
-	recorder record.EventRecorder,
+	broadcaster events.EventBroadcaster,
+	recorder events.EventRecorder,
 	useRealProxier bool,
 	proxierSyncPeriod time.Duration,
 	proxierMinSyncPeriod time.Duration,
@@ -83,7 +83,7 @@ func NewHollowProxyOrDie(
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
 		if nodeIP == nil {
 			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1")
-			nodeIP = net.ParseIP("127.0.0.1")
+			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
@@ -132,8 +132,9 @@ func NewHollowProxyOrDie(
 	}, nil
 }
 
-func (hp *HollowProxy) Run() {
+func (hp *HollowProxy) Run() error {
 	if err := hp.ProxyServer.Run(); err != nil {
-		klog.Fatalf("Error while running proxy: %v\n", err)
+		return fmt.Errorf("Error while running proxy: %w", err)
 	}
+	return nil
 }

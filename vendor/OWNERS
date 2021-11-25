@@ -2,3 +2,5 @@
 
 approvers:
 - dep-approvers
+reviewers:
+- dep-reviewers

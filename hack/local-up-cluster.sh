@@ -38,6 +38,8 @@ KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
+# Name of the dns addon, eg: "kube-dns" or "coredns"
+DNS_ADDON=${DNS_ADDON:-"coredns"}
 # Place the config files and binaries required by NET_PLUGIN in these directory,
 # eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
 CNI_CONF_DIR=${CNI_CONF_DIR:-""}
@@ -78,6 +80,7 @@ HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
 EXTERNAL_CLOUD_PROVIDER_BINARY=${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}
 EXTERNAL_CLOUD_VOLUME_PLUGIN=${EXTERNAL_CLOUD_VOLUME_PLUGIN:-""}
+CONFIGURE_CLOUD_ROUTES=${CONFIGURE_CLOUD_ROUTES:-true}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
@@ -219,6 +222,7 @@ API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
+KUBELET_RESOLV_CONF=${KUBELET_RESOLV_CONF:-"/etc/resolv.conf"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
@@ -232,7 +236,6 @@ CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
@@ -378,6 +381,9 @@ cleanup()
   if [[ "${PRESERVE_ETCD}" == "false" ]]; then
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
+
+  # Drop the rule we added
+  iptables -t nat -D OUTPUT -m addrtype --dst-type LOCAL -j DOCKER || true
   exit 0
 }
 
@@ -540,6 +546,24 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
+    if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
+      cat <<EOF > /tmp/kube_egress_selector_configuration.yaml
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: Direct
+- name: controlplane
+  connection:
+    proxyProtocol: Direct
+- name: etcd
+  connection:
+    proxyProtocol: Direct
+EOF
+      EGRESS_SELECTOR_CONFIG_FILE="/tmp/kube_egress_selector_configuration.yaml"
+    fi
+
     if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
       cat <<EOF > /tmp/kube-audit-policy-file
 # Log all requests at the Metadata level.
@@ -564,12 +588,14 @@ EOF
       --authorization-webhook-config-file="${AUTHORIZATION_WEBHOOK_CONFIG_FILE}" \
       --authentication-token-webhook-config-file="${AUTHENTICATION_WEBHOOK_CONFIG_FILE}" \
       --cert-dir="${CERT_DIR}" \
+      --egress-selector-config-file="${EGRESS_SELECTOR_CONFIG_FILE:-}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --service-account-issuer="https://kubernetes.default.svc" \
+      --service-account-jwks-uri="https://kubernetes.default.svc/openid/v1/jwks" \
       --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
       --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
       --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
@@ -629,6 +655,7 @@ function start_controller_manager {
     fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
+    cloud_config_arg+=("--configure-cloud-routes=${CONFIGURE_CLOUD_ROUTES}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
       cloud_config_arg=("--cloud-provider=external")
       cloud_config_arg+=("--external-cloud-volume-plugin=${EXTERNAL_CLOUD_VOLUME_PLUGIN}")
@@ -649,6 +676,8 @@ function start_controller_manager {
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
+      --authentication-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
+      --authorization-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
@@ -681,6 +710,7 @@ function start_cloud_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
+      --configure-cloud-routes="${CONFIGURE_CLOUD_ROUTES}" \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --leader-elect=false \
@@ -745,7 +775,6 @@ function start_kubelet {
     all_kubelet_flags=(
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
-      "--chaos-chance=${CHAOS_CHANCE}"
       "--container-runtime=${CONTAINER_RUNTIME}"
       "--hostname-override=${HOSTNAME_OVERRIDE}"
       "${cloud_config_arg[@]}"
@@ -761,7 +790,7 @@ function start_kubelet {
 
     # warn if users are running with swap allowed
     if [ "${FAIL_SWAP_ON}" == "false" ]; then
-        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
+        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap unless testing NodeSwap feature."
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
@@ -787,6 +816,7 @@ readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 rotateCertificates: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
+resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
     {
       # authentication
@@ -870,6 +900,13 @@ clientConnection:
   kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
+conntrack:
+# Skip setting sysctl value "net.netfilter.nf_conntrack_max"
+  maxPerCore: 0
+# Skip setting "net.netfilter.nf_conntrack_tcp_timeout_established"
+  tcpEstablishedTimeout: 0s
+# Skip setting "net.netfilter.nf_conntrack_tcp_timeout_close"
+  tcpCloseWaitTimeout: 0s
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
@@ -895,7 +932,7 @@ function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
     cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
@@ -906,26 +943,28 @@ EOF
       --v="${LOG_LEVEL}" \
       --config=/tmp/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
+      --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
+      --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
 
-function start_kubedns {
+function start_dns_addon {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" kube-dns.yaml
-        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" kube-dns.yaml
-        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
+        cp "${KUBE_ROOT}/cluster/addons/dns/${DNS_ADDON}/${DNS_ADDON}.yaml.in" dns.yaml
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" dns.yaml
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" dns.yaml
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" dns.yaml
         # TODO update to dns role once we have one.
-        # use kubectl to create kubedns addon
-        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml ; then
-       		echo "Kube-dns addon successfully deployed."
+        # use kubectl to create dns addon
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f dns.yaml ; then
+            echo "${DNS_ADDON} addon successfully deployed."
         else
 		echo "Something is wrong with your DNS input"
-		cat kube-dns.yaml
+		cat dns.yaml
 		exit 1
         fi
-        rm kube-dns.yaml
+        rm dns.yaml
     fi
 }
 
@@ -1086,8 +1125,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
 fi
 
-if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
-  exit 1
+if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
+  if ! kube::util::ensure_docker_daemon_connectivity; then
+    exit 1
+  else
+    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
+    # so we append a new rule on top of the docker one
+    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
+    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
+      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
+    fi
+  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1118,7 +1166,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     start_cloud_controller_manager
   fi
   start_kubescheduler
-  start_kubedns
+  start_dns_addon
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
     start_nodelocaldns
   fi
@@ -1145,9 +1193,22 @@ fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${START_MODE}" != "nokubeproxy" ]]; then
-    start_kubeproxy
+    ## TODO remove this check if/when kubelet is supported on darwin
+    # Detect the OS name/arch and display appropriate error.
+    case "$(uname -s)" in
+      Darwin)
+        print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
+        ;;
+      Linux)
+        start_kubeproxy
+        ;;
+      *)
+        print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
+        ;;
+    esac
   fi
 fi
+
 if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi

@@ -224,6 +224,8 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 // It adds an entry "update" into the internal method call record.
 func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
 	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
 	return f.Err
 }

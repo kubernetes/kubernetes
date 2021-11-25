@@ -169,8 +169,8 @@ message DaemonSetStatus {
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
   optional int32 desiredNumberScheduled = 3;
 
-  // The number of nodes that should be running the daemon pod and have one
-  // or more of the daemon pod running and ready.
+  // Total number of nodes that should be running the daemon pod and have one
+  // or more of the daemon pod running with a Ready Condition by passing the readinessProbe.
   optional int32 numberReady = 4;
 
   // The most recent generation observed by the daemon set controller.
@@ -327,7 +327,7 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of ready pods targeted by this deployment.
+  // readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
@@ -463,7 +463,7 @@ message ReplicaSetStatus {
   // +optional
   optional int32 fullyLabeledReplicas = 2;
 
-  // The number of ready replicas for this replica set.
+  // readyReplicas is the number of pods targeted by this ReplicaSet controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 4;
 
@@ -487,7 +487,7 @@ message RollingUpdateDaemonSet {
   // The maximum number of DaemonSet pods that can be unavailable during the
   // update. Value can be an absolute number (ex: 5) or a percentage of total
   // number of DaemonSet pods at the start of the update (ex: 10%). Absolute
-  // number is calculated from percentage by rounding down to a minimum of one.
+  // number is calculated from percentage by rounding up.
   // This cannot be 0 if MaxSurge is 0
   // Default value is 1.
   // Example: when this is set to 30%, at most 30% of the total number of nodes
@@ -519,7 +519,7 @@ message RollingUpdateDaemonSet {
   // daemonset on any given node can double if the readiness check fails, and
   // so resource intensive daemonsets should take into account that they may
   // cause evictions during disruption.
-  // This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
+  // This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
@@ -592,6 +592,7 @@ message ScaleStatus {
 
   // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
+  // +mapType=atomic
   map<string, string> selector = 2;
 
   // label selector for pods that should match the replicas count. This is a serializated
@@ -655,6 +656,23 @@ message StatefulSetList {
   repeated StatefulSet items = 2;
 }
 
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
+message StatefulSetPersistentVolumeClaimRetentionPolicy {
+  // WhenDeleted specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+  // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+  // `Delete` policy causes those PVCs to be deleted.
+  optional string whenDeleted = 1;
+
+  // WhenScaled specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is scaled down. The default
+  // policy of `Retain` causes PVCs to not be affected by a scaledown. The
+  // `Delete` policy causes the associated PVCs for any excess pods above
+  // the replica count to be deleted.
+  optional string whenScaled = 2;
+}
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 message StatefulSetSpec {
   // replicas is the desired number of replicas of the given Template.
@@ -714,6 +732,19 @@ message StatefulSetSpec {
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
   optional int32 revisionHistoryLimit = 8;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+  // +optional
+  optional int32 minReadySeconds = 9;
+
+  // PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
+  // the StatefulSet VolumeClaimTemplates. This requires the
+  // StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+  // +optional
+  optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -726,7 +757,7 @@ message StatefulSetStatus {
   // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
 
-  // readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+  // readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.
   optional int32 readyReplicas = 3;
 
   // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
@@ -756,6 +787,10 @@ message StatefulSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated StatefulSetCondition conditions = 10;
+
+  // Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
+  // This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
+  optional int32 availableReplicas = 11;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

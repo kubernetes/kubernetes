@@ -46,7 +46,7 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 // initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
 func initializeGCETestSpec(c clientset.Interface, t *framework.TimeoutContext, ns string, pvConfig e2epv.PersistentVolumeConfig, pvcConfig e2epv.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	ginkgo.By("Creating the PV and PVC")
-	pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
+	pv, pvc, err := e2epv.CreatePVPVC(c, t, pvConfig, pvcConfig, ns, isPrebound)
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, t, ns, pv, pvc))
 
@@ -57,7 +57,7 @@ func initializeGCETestSpec(c clientset.Interface, t *framework.TimeoutContext, n
 }
 
 // Testing configurations of single a PV/PVC pair attached to a GCE PD
-var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
+var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", func() {
 	var (
 		c         clientset.Interface
 		diskName  string
@@ -86,13 +86,14 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		ginkgo.By("Initializing Test Spec")
 		diskName, err = e2epv.CreatePDWithRetry()
 		framework.ExpectNoError(err)
+
 		pvConfig = e2epv.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volLabel,
 			PVSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   diskName,
-					FSType:   "ext3",
+					FSType:   e2epv.GetDefaultFSType(),
 					ReadOnly: false,
 				},
 			},

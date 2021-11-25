@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/klog/v2"
+
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -143,7 +144,7 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		return
 	}
 
-	utillog.Infof("updating Node.Status.Config")
+	klog.InfoS("Kubelet config controller updating Node.Status.Config")
 
 	// grab the lock
 	s.mux.Lock()
@@ -153,7 +154,7 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 	var err error
 	defer func() {
 		if err != nil {
-			utillog.Errorf(err.Error())
+			klog.ErrorS(err, "Kubelet config controller")
 			s.sync()
 		}
 	}()
@@ -198,6 +199,6 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 
 	// patch the node with the new status
 	if _, _, err := nodeutil.PatchNodeStatus(client.CoreV1(), types.NodeName(nodeName), oldNode, newNode); err != nil {
-		utillog.Errorf("failed to patch node status, error: %v", err)
+		klog.ErrorS(err, "Kubelet config controller failed to patch node status")
 	}
 }

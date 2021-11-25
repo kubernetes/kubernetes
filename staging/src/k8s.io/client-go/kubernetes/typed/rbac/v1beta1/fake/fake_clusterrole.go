@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -99,7 +102,7 @@ func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *v1beta1.Clus
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolesResource, name, opts), &v1beta1.ClusterRole{})
 	return err
 }
 
@@ -115,6 +118,27 @@ func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &v1beta1.ClusterRole{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ClusterRole), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterRole.
+func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *rbacv1beta1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ClusterRole, err error) {
+	if clusterRole == nil {
+		return nil, fmt.Errorf("clusterRole provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterRole)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterRole.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &v1beta1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}

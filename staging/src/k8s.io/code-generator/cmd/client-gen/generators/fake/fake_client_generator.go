@@ -29,7 +29,7 @@ import (
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
-func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, inputPackage string, boilerplate []byte) generator.Package {
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, inputPackage string, applyBuilderPackage string, boilerplate []byte) generator.Package {
 	outputPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()), "fake")
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
@@ -54,13 +54,14 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
-					outputPackage: outputPackage,
-					inputPackage:  inputPackage,
-					group:         gv.Group.NonEmpty(),
-					version:       gv.Version.String(),
-					groupGoName:   groupGoName,
-					typeToMatch:   t,
-					imports:       generator.NewImportTracker(),
+					outputPackage:             outputPackage,
+					inputPackage:              inputPackage,
+					group:                     gv.Group.NonEmpty(),
+					version:                   gv.Version.String(),
+					groupGoName:               groupGoName,
+					typeToMatch:               t,
+					imports:                   generator.NewImportTracker(),
+					applyConfigurationPackage: applyBuilderPackage,
 				})
 			}
 

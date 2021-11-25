@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,11 +78,12 @@ func TestForbidden(t *testing.T) {
 		observer := httptest.NewRecorder()
 		scheme := runtime.NewScheme()
 		negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
-		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{}, test.reason, negotiatedSerializer)
+		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{URL: &url.URL{Path: "/path"}}, test.reason, negotiatedSerializer)
 		result := string(observer.Body.Bytes())
 		if result != test.expected {
 			t.Errorf("Forbidden response body(%#v...)\n expected: %v\ngot:       %v", test.attributes, test.expected, result)
 		}
+		//nolint:staticcheck // SA1019 backwards compatibility
 		resultType := observer.HeaderMap.Get("Content-Type")
 		if resultType != test.contentType {
 			t.Errorf("Forbidden content type(%#v...) != %#v, got %#v", test.attributes, test.expected, result)

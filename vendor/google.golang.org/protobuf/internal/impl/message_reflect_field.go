@@ -28,6 +28,39 @@ type fieldInfo struct {
 	newField   func() pref.Value
 }
 
+func fieldInfoForMissing(fd pref.FieldDescriptor) fieldInfo {
+	// This never occurs for generated message types.
+	// It implies that a hand-crafted type has missing Go fields
+	// for specific protobuf message fields.
+	return fieldInfo{
+		fieldDesc: fd,
+		has: func(p pointer) bool {
+			return false
+		},
+		clear: func(p pointer) {
+			panic("missing Go struct field for " + string(fd.FullName()))
+		},
+		get: func(p pointer) pref.Value {
+			return fd.Default()
+		},
+		set: func(p pointer, v pref.Value) {
+			panic("missing Go struct field for " + string(fd.FullName()))
+		},
+		mutable: func(p pointer) pref.Value {
+			panic("missing Go struct field for " + string(fd.FullName()))
+		},
+		newMessage: func() pref.Message {
+			panic("missing Go struct field for " + string(fd.FullName()))
+		},
+		newField: func() pref.Value {
+			if v := fd.Default(); v.IsValid() {
+				return v
+			}
+			panic("missing Go struct field for " + string(fd.FullName()))
+		},
+	}
+}
+
 func fieldInfoForOneof(fd pref.FieldDescriptor, fs reflect.StructField, x exporter, ot reflect.Type) fieldInfo {
 	ft := fs.Type
 	if ft.Kind() != reflect.Interface {
@@ -97,7 +130,7 @@ func fieldInfoForOneof(fd pref.FieldDescriptor, fs reflect.StructField, x export
 				rv.Set(reflect.New(ot))
 			}
 			rv = rv.Elem().Elem().Field(0)
-			if rv.IsNil() {
+			if rv.Kind() == reflect.Ptr && rv.IsNil() {
 				rv.Set(conv.GoValueOf(pref.ValueOfMessage(conv.New().Message())))
 			}
 			return conv.PBValueOf(rv)
@@ -225,7 +258,10 @@ func fieldInfoForScalar(fd pref.FieldDescriptor, fs reflect.StructField, x expor
 	isBytes := ft.Kind() == reflect.Slice && ft.Elem().Kind() == reflect.Uint8
 	if nullable {
 		if ft.Kind() != reflect.Ptr && ft.Kind() != reflect.Slice {
-			panic(fmt.Sprintf("field %v has invalid type: got %v, want pointer", fd.FullName(), ft))
+			// This never occurs for generated message types.
+			// Despite the protobuf type system specifying presence,
+			// the Go field type cannot represent it.
+			nullable = false
 		}
 		if ft.Kind() == reflect.Ptr {
 			ft = ft.Elem()
@@ -388,6 +424,9 @@ func fieldInfoForMessage(fd pref.FieldDescriptor, fs reflect.StructField, x expo
 				return false
 			}
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
+			if fs.Type.Kind() != reflect.Ptr {
+				return !isZero(rv)
+			}
 			return !rv.IsNil()
 		},
 		clear: func(p pointer) {
@@ -404,13 +443,13 @@ func fieldInfoForMessage(fd pref.FieldDescriptor, fs reflect.StructField, x expo
 		set: func(p pointer, v pref.Value) {
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			rv.Set(conv.GoValueOf(v))
-			if rv.IsNil() {
+			if fs.Type.Kind() == reflect.Ptr && rv.IsNil() {
 				panic(fmt.Sprintf("field %v has invalid nil pointer", fd.FullName()))
 			}
 		},
 		mutable: func(p pointer) pref.Value {
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
-			if rv.IsNil() {
+			if fs.Type.Kind() == reflect.Ptr && rv.IsNil() {
 				rv.Set(conv.GoValueOf(conv.New()))
 			}
 			return conv.PBValueOf(rv)
@@ -463,4 +502,42 @@ func makeOneofInfo(od pref.OneofDescriptor, si structInfo, x exporter) *oneofInf
 		}
 	}
 	return oi
+}
+
+// isZero is identical to reflect.Value.IsZero.
+// TODO: Remove this when Go1.13 is the minimally supported Go version.
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return math.Float64bits(v.Float()) == 0
+	case reflect.Complex64, reflect.Complex128:
+		c := v.Complex()
+		return math.Float64bits(real(c)) == 0 && math.Float64bits(imag(c)) == 0
+	case reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			if !isZero(v.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
+		return v.IsNil()
+	case reflect.String:
+		return v.Len() == 0
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			if !isZero(v.Field(i)) {
+				return false
+			}
+		}
+		return true
+	default:
+		panic(&reflect.ValueError{"reflect.Value.IsZero", v.Kind()})
+	}
 }

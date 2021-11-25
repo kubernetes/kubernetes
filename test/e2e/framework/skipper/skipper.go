@@ -43,9 +43,6 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-// New local storage types to support local storage capacity isolation
-var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
-
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	framework.Logf(msg)
@@ -121,6 +118,7 @@ func pruneStack(skip int) string {
 // Skipf skips with information about why the test is being skipped.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
+	panic("unreachable")
 }
 
 // SkipUnlessAtLeast skips if the value is less than the minValue.
@@ -130,10 +128,17 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 	}
 }
 
-// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
-func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
+// SkipUnlessFeatureGateEnabled skips if the feature is disabled
+func SkipUnlessFeatureGateEnabled(gate featuregate.Feature) {
+	if !utilfeature.DefaultFeatureGate.Enabled(gate) {
+		skipInternalf(1, "Only supported when %v feature is enabled", gate)
+	}
+}
+
+// SkipIfFeatureGateEnabled skips if the feature is enabled
+func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
+	if utilfeature.DefaultFeatureGate.Enabled(gate) {
+		skipInternalf(1, "Only supported when %v feature is disabled", gate)
 	}
 }
 

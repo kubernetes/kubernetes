@@ -18,10 +18,10 @@ package helper
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -97,8 +97,8 @@ func TestGetPodServices(t *testing.T) {
 			get, err := GetPodServices(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
 			if err != nil {
 				t.Errorf("Error from GetPodServices: %v", err)
-			} else if !reflect.DeepEqual(get, test.expect) {
-				t.Errorf("Expect services %v, but got %v", test.expect, get)
+			} else if diff := cmp.Diff(test.expect, get); diff != "" {
+				t.Errorf("Unexpected services (-want, +got):\n%s", diff)
 			}
 		})
 	}

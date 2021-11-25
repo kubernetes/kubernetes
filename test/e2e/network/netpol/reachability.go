@@ -25,7 +25,6 @@ import (
 
 // TestCase describes the data for a netpol test
 type TestCase struct {
-	FromPort     int
 	ToPort       int
 	Protocol     v1.Protocol
 	Reachability *Reachability
@@ -173,7 +172,7 @@ func (r *Reachability) Summary(ignoreLoopback bool) (trueObs int, falseObs int, 
 func (r *Reachability) PrintSummary(printExpected bool, printObserved bool, printComparison bool) {
 	right, wrong, ignored, comparison := r.Summary(ignoreLoopback)
 	if ignored > 0 {
-		framework.Logf("warning: the results of %d pod->pod cases have been ignored", ignored)
+		framework.Logf("warning: this test doesn't take into consideration hairpin traffic, i.e. traffic whose source and destination is the same pod: %d cases ignored", ignored)
 	}
 	framework.Logf("reachability: correct:%v, incorrect:%v, result=%t\n\n", right, wrong, wrong == 0)
 	if printExpected {

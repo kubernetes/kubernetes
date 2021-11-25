@@ -35,6 +35,9 @@ import (
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
 	// eventTime is the time when this Event was first observed. It is required.

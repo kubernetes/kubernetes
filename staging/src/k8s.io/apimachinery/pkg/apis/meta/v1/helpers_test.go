@@ -93,6 +93,26 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 	}
 }
 
+func BenchmarkLabelSelectorAsSelector(b *testing.B) {
+	selector := &LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "foo",
+			"bar": "bar",
+		},
+		MatchExpressions: []LabelSelectorRequirement{{
+			Key:      "baz",
+			Operator: LabelSelectorOpExists,
+		}},
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := LabelSelectorAsSelector(selector)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestLabelSelectorAsMap(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
 	matchExpressions := func(operator LabelSelectorOperator, values []string) []LabelSelectorRequirement {

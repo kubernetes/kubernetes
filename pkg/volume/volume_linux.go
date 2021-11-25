@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -26,9 +27,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -40,30 +40,18 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(*error)) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
 	if fsGroup == nil {
 		return nil
 	}
-
-	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
 
 	timer := time.AfterFunc(30*time.Second, func() {
 		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 	})
 	defer timer.Stop()
 
-	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
-	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
-	if !fsGroupPolicyEnabled {
-		err := legacyOwnershipChange(mounter, fsGroup)
-		if completeFunc != nil {
-			completeFunc(&err)
-		}
-		return err
-	}
-
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
-		klog.V(3).Infof("skipping permission and ownership change for volume %s", mounter.GetPath())
+		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", mounter.GetPath())
 		return nil
 	}
 
@@ -74,45 +62,28 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 	})
 	if completeFunc != nil {
-		completeFunc(&err)
+		completeFunc(types.CompleteFuncParam{
+			Err: &err,
+		})
 	}
 	return err
 }
 
-func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
-	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
-}
-
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
-	// chown and chmod pass through to the underlying file for symlinks.
+	err := os.Lchown(filename, -1, int(*fsGroup))
+	if err != nil {
+		klog.ErrorS(err, "Lchown failed", "path", filename)
+	}
+
+	// chmod passes through to the underlying file for symlinks.
 	// Symlinks have a mode of 777 but this really doesn't mean anything.
 	// The permissions of the underlying file are what matter.
 	// However, if one reads the mode of a symlink then chmods the symlink
 	// with that mode, it changes the mode of the underlying file, overridden
 	// the defaultMode and permissions initialized by the volume plugin, which
-	// is not what we want; thus, we skip chown/chmod for symlinks.
+	// is not what we want; thus, we skip chmod for symlinks.
 	if info.Mode()&os.ModeSymlink != 0 {
 		return nil
-	}
-
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return nil
-	}
-
-	if stat == nil {
-		klog.Errorf("Got nil stat_t for path %v while setting ownership of volume", filename)
-		return nil
-	}
-
-	err := os.Chown(filename, int(stat.Uid), int(*fsGroup))
-	if err != nil {
-		klog.Errorf("Chown failed on %v: %v", filename, err)
 	}
 
 	mask := rwMask
@@ -127,7 +98,7 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 
 	err = os.Chmod(filename, info.Mode()|mask)
 	if err != nil {
-		klog.Errorf("Chmod failed on %v: %v", filename, err)
+		klog.ErrorS(err, "Chown failed", "path", filename)
 	}
 
 	return nil
@@ -137,7 +108,7 @@ func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *
 	dir := mounter.GetPath()
 
 	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
-		klog.V(4).Infof("perform recursive ownership change for %s", dir)
+		klog.V(4).InfoS("Perform recursive ownership change for directory", "path", dir)
 		return false
 	}
 	return !requiresPermissionChange(mounter.GetPath(), fsGroup, mounter.GetAttributes().ReadOnly)
@@ -146,17 +117,17 @@ func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *
 func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) bool {
 	fsInfo, err := os.Stat(rootDir)
 	if err != nil {
-		klog.Errorf("performing recursive ownership change on %s because reading permissions of root volume failed: %v", rootDir, err)
+		klog.ErrorS(err, "Performing recursive ownership change on rootDir because reading permissions of root volume failed", "path", rootDir)
 		return true
 	}
 	stat, ok := fsInfo.Sys().(*syscall.Stat_t)
 	if !ok || stat == nil {
-		klog.Errorf("performing recursive ownership change on %s because reading permissions of root volume failed", rootDir)
+		klog.ErrorS(nil, "Performing recursive ownership change on rootDir because reading permissions of root volume failed", "path", rootDir)
 		return true
 	}
 
 	if int(stat.Gid) != int(*fsGroup) {
-		klog.V(4).Infof("expected group ownership of volume %s did not match with: %d", rootDir, stat.Gid)
+		klog.V(4).InfoS("Expected group ownership of volume did not match with Gid", "path", rootDir, "GID", stat.Gid)
 		return true
 	}
 	unixPerms := rwMask
@@ -180,7 +151,7 @@ func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) boo
 	//     unixPerms: 770, filePerms: 750 : 770&750 = 750 (perms on directory is NOT a superset)
 	// We also need to check if setgid bits are set in permissions of the directory.
 	if (unixPerms&filePerm != unixPerms) || (fsInfo.Mode()&os.ModeSetgid == 0) {
-		klog.V(4).Infof("performing recursive ownership change on %s because of mismatching mode", rootDir)
+		klog.V(4).InfoS("Performing recursive ownership change on rootDir because of mismatching mode", "path", rootDir)
 		return true
 	}
 	return false

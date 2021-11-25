@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func alwaysReady() bool { return true }
@@ -43,7 +43,7 @@ func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(context.TODO(), kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -145,7 +145,7 @@ func TestGCTerminated(t *testing.T) {
 				})
 			}
 
-			gcc.gc()
+			gcc.gc(context.TODO())
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
@@ -322,7 +322,7 @@ func TestGCOrphaned(t *testing.T) {
 				podInformer.Informer().GetStore().Add(pod)
 			}
 			// Overwrite queue
-			fakeClock := clock.NewFakeClock(time.Now())
+			fakeClock := testingclock.NewFakeClock(time.Now())
 			gcc.nodeQueue.ShutDown()
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 
@@ -336,7 +336,7 @@ func TestGCOrphaned(t *testing.T) {
 			}
 
 			// First GC of orphaned pods
-			gcc.gc()
+			gcc.gc(context.TODO())
 			if len(deletedPodNames) > 0 {
 				t.Errorf("no pods should be deleted at this point.\n\tactual: %v", deletedPodNames)
 			}
@@ -367,7 +367,7 @@ func TestGCOrphaned(t *testing.T) {
 			}
 
 			// Actual pod deletion
-			gcc.gc()
+			gcc.gc(context.TODO())
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",

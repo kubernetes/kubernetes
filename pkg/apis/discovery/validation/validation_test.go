@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
@@ -48,6 +49,21 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 				Endpoints: []discovery.Endpoint{{
 					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"good-ipv6": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv6,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"a00:100::4"},
 					Hostname:  utilpointer.StringPtr("valid-123"),
 				}},
 			},
@@ -197,8 +213,25 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
+					Addresses:          generateIPAddresses(1),
+					DeprecatedTopology: generateTopology(maxTopologyLabels),
+				}},
+			},
+		},
+		"valid-hints": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
 					Addresses: generateIPAddresses(1),
-					Topology:  generateTopology(maxTopologyLabels),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
 				}},
 			},
 		},
@@ -321,8 +354,8 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(1),
-					Topology:  map[string]string{"--INVALID": "example"},
+					Addresses:          generateIPAddresses(1),
+					DeprecatedTopology: map[string]string{"--INVALID": "example"},
 				}},
 			},
 		},
@@ -336,8 +369,8 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(1),
-					Topology:  generateTopology(maxTopologyLabels + 1),
+					Addresses:          generateIPAddresses(1),
+					DeprecatedTopology: generateTopology(maxTopologyLabels + 1),
 				}},
 			},
 		},
@@ -375,7 +408,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ip": {
-			expectedErrors: 1,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -390,7 +423,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv4": {
-			expectedErrors: 2,
+			expectedErrors: 3,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -405,7 +438,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv6": {
-			expectedErrors: 2,
+			expectedErrors: 4,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
@@ -450,9 +483,119 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"invalid-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "inv@lid"}},
+					},
+				}},
+			},
+		},
+		"overlapping-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{
+							{Name: "zone-a"},
+							{Name: "zone-b"},
+							{Name: "zone-a"},
+						},
+					},
+				}},
+			},
+		},
+		"too-many-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{
+							{Name: "zone-a"},
+							{Name: "zone-b"},
+							{Name: "zone-c"},
+							{Name: "zone-d"},
+							{Name: "zone-e"},
+							{Name: "zone-f"},
+							{Name: "zone-g"},
+							{Name: "zone-h"},
+							{Name: "zone-i"},
+						},
+					},
+				}},
+			},
+		},
 		"empty-everything": {
 			expectedErrors: 3,
 			endpointSlice:  &discovery.EndpointSlice{},
+		},
+		"zone-key-topology": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses:          generateIPAddresses(1),
+					DeprecatedTopology: map[string]string{corev1.LabelTopologyZone: "zone1"},
+				}},
+			},
+		},
+		"special-ipv4": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"127.0.0.1"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"special-ipv6": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv6,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"fe80::9656:d028:8652:66b6"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
 		},
 	}
 

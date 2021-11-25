@@ -1,6 +1,6 @@
 // Copyright 2019, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
@@ -26,8 +26,6 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 		return false // No differences detected
 	case !v.ValueX.IsValid() || !v.ValueY.IsValid():
 		return false // Both values must be valid
-	case v.Type.Kind() == reflect.Slice && (v.ValueX.Len() == 0 || v.ValueY.Len() == 0):
-		return false // Both slice values have to be non-empty
 	case v.NumIgnored > 0:
 		return false // Some ignore option was used
 	case v.NumTransformed > 0:
@@ -45,7 +43,16 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 		return false
 	}
 
-	switch t := v.Type; t.Kind() {
+	// Check whether this is an interface with the same concrete types.
+	t := v.Type
+	vx, vy := v.ValueX, v.ValueY
+	if t.Kind() == reflect.Interface && !vx.IsNil() && !vy.IsNil() && vx.Elem().Type() == vy.Elem().Type() {
+		vx, vy = vx.Elem(), vy.Elem()
+		t = vx.Type()
+	}
+
+	// Check whether we provide specialized diffing for this type.
+	switch t.Kind() {
 	case reflect.String:
 	case reflect.Array, reflect.Slice:
 		// Only slices of primitive types have specialized handling.
@@ -54,6 +61,11 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 			reflect.Bool, reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
 		default:
+			return false
+		}
+
+		// Both slice values have to be non-empty.
+		if t.Kind() == reflect.Slice && (vx.Len() == 0 || vy.Len() == 0) {
 			return false
 		}
 
@@ -68,7 +80,7 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 
 	// Use specialized string diffing for longer slices or strings.
 	const minLength = 64
-	return v.ValueX.Len() >= minLength && v.ValueY.Len() >= minLength
+	return vx.Len() >= minLength && vy.Len() >= minLength
 }
 
 // FormatDiffSlice prints a diff for the slices (or strings) represented by v.
@@ -77,6 +89,11 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	assert(opts.DiffMode == diffUnknown)
 	t, vx, vy := v.Type, v.ValueX, v.ValueY
+	if t.Kind() == reflect.Interface {
+		vx, vy = vx.Elem(), vy.Elem()
+		t = vx.Type()
+		opts = opts.WithTypeMode(emitType)
+	}
 
 	// Auto-detect the type of the data.
 	var isLinedText, isText, isBinary bool

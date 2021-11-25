@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -22,8 +23,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -32,7 +35,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -237,7 +240,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		// lead to retries of the same failure, so just fail hard.
 		return nil, err
 	}
-	klog.Infof("Hairpin mode set to %q", pluginSettings.HairpinMode)
+	klog.InfoS("Hairpin mode is set", "hairpinMode", pluginSettings.HairpinMode)
 
 	// dockershim currently only supports CNI plugins.
 	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
@@ -252,26 +255,31 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
 	ds.network = network.NewPluginManager(plug)
-	klog.Infof("Docker cri networking managed by %v", plug.Name())
+	klog.InfoS("Docker cri networking managed by the network plugin", "networkPluginName", plug.Name())
 
-	// NOTE: cgroup driver is only detectable in docker 1.11+
-	cgroupDriver := defaultCgroupDriver
 	dockerInfo, err := ds.client.Info()
-	klog.Infof("Docker Info: %+v", dockerInfo)
 	if err != nil {
-		klog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		klog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
-	} else if len(dockerInfo.CgroupDriver) == 0 {
-		klog.Warningf("No cgroup driver is set in Docker")
-		klog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
-	} else {
-		cgroupDriver = dockerInfo.CgroupDriver
+		return nil, fmt.Errorf("Failed to execute Info() call to the Docker client")
 	}
-	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
-		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+	klog.InfoS("Docker Info", "dockerInfo", dockerInfo)
+	ds.dockerRootDir = dockerInfo.DockerRootDir
+
+	// skipping cgroup driver checks for Windows
+	if runtime.GOOS == "linux" {
+		cgroupDriver := defaultCgroupDriver
+		if len(dockerInfo.CgroupDriver) == 0 {
+			klog.InfoS("No cgroup driver is set in Docker")
+			klog.InfoS("Falling back to use the default driver", "cgroupDriver", cgroupDriver)
+		} else {
+			cgroupDriver = dockerInfo.CgroupDriver
+		}
+		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+			return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+		}
+		klog.InfoS("Setting cgroupDriver", "cgroupDriver", cgroupDriver)
+		ds.cgroupDriver = cgroupDriver
 	}
-	klog.Infof("Setting cgroupDriver to %s", cgroupDriver)
-	ds.cgroupDriver = cgroupDriver
+
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
 			return ds.getDockerVersion()
@@ -306,6 +314,9 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
+
+	// docker root directory
+	dockerRootDir string
 
 	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
 	// needed to clean up after containers have been removed.
@@ -350,7 +361,7 @@ func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.Up
 		return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 	}
 
-	klog.Infof("docker cri received runtime config %+v", runtimeConfig)
+	klog.InfoS("Docker cri received runtime config", "runtimeConfig", runtimeConfig)
 	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
 		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
@@ -383,7 +394,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		}
 		errRem := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
 		if errRem != nil {
-			klog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, errRem)
+			klog.ErrorS(errRem, "Failed to delete corrupt checkpoint for sandbox", "podSandboxID", podSandboxID)
 		}
 		return nil, err
 	}
@@ -407,7 +418,8 @@ func (ds *dockerService) Start() error {
 
 	go func() {
 		if err := ds.streamingServer.Start(true); err != nil {
-			klog.Fatalf("Streaming server stopped unexpectedly: %v", err)
+			klog.ErrorS(err, "Streaming server stopped unexpectedly")
+			os.Exit(1)
 		}
 	}()
 
@@ -420,7 +432,7 @@ func (ds *dockerService) initCleanup() {
 	errors := ds.platformSpecificContainerInitCleanup()
 
 	for _, err := range errors {
-		klog.Warningf("initialization error: %v", err)
+		klog.InfoS("Initialization error", "err", err)
 	}
 }
 
@@ -469,7 +481,7 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 			cgroupParent = path.Base(cgroupParent)
 		}
 	}
-	klog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
+	klog.V(3).InfoS("Setting cgroup parent", "cgroupParent", cgroupParent)
 	return cgroupParent, nil
 }
 
@@ -537,7 +549,7 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 	case protocolSCTP:
 		return v1.ProtocolSCTP
 	}
-	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
 	return v1.ProtocolTCP
 }
 
@@ -556,7 +568,7 @@ func effectiveHairpinMode(s *NetworkPluginSettings) error {
 			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
-			klog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", s.HairpinMode, kubeletconfig.HairpinVeth)
+			klog.InfoS("Hairpin mode is set but kubenet is not enabled, falling back to HairpinVeth", "hairpinMode", s.HairpinMode)
 			s.HairpinMode = kubeletconfig.HairpinVeth
 			return nil
 		}

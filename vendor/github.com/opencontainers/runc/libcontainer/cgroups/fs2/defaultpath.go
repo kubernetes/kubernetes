@@ -82,9 +82,7 @@ func parseCgroupFile(path string) (string, error) {
 }
 
 func parseCgroupFromReader(r io.Reader) (string, error) {
-	var (
-		s = bufio.NewScanner(r)
-	)
+	s := bufio.NewScanner(r)
 	for s.Scan() {
 		var (
 			text  = s.Text()

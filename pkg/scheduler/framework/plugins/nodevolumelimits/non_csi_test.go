@@ -28,8 +28,106 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+func TestEphemeralLimits(t *testing.T) {
+	// We have to specify a valid filter and arbitrarily pick Cinder here.
+	// It doesn't matter for the test cases.
+	filterName := cinderVolumeFilterType
+	driverName := csilibplugins.CinderInTreePluginName
+
+	ephemeralVolumePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "abc",
+			UID:       "12345",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "xyz",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	controller := true
+	ephemeralClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ephemeralVolumePod.Namespace,
+			Name:      ephemeralVolumePod.Name + "-" + ephemeralVolumePod.Spec.Volumes[0].Name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind:       "Pod",
+					Name:       ephemeralVolumePod.Name,
+					UID:        ephemeralVolumePod.UID,
+					Controller: &controller,
+				},
+			},
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName:       "missing",
+			StorageClassName: &filterName,
+		},
+	}
+	conflictingClaim := ephemeralClaim.DeepCopy()
+	conflictingClaim.OwnerReferences = nil
+
+	tests := []struct {
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		extraClaims      []v1.PersistentVolumeClaim
+		ephemeralEnabled bool
+		maxVols          int
+		test             string
+		wantStatus       *framework.Status
+	}{
+		{
+			newPod:           ephemeralVolumePod,
+			ephemeralEnabled: true,
+			test:             "volume missing",
+			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
+			test:             "volume not owned",
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			maxVols:          1,
+			test:             "volume unbound, allowed",
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			maxVols:          0,
+			test:             "volume unbound, exceeds limit",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			fts := feature.Features{}
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
+			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
 
 func TestAzureDiskLimits(t *testing.T) {
 	oneVolPod := &v1.Pod{
@@ -360,7 +458,7 @@ func TestAzureDiskLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -427,7 +525,7 @@ func TestCinderLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -834,7 +932,7 @@ func TestEBSLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -1172,7 +1270,7 @@ func TestGCEPDLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)

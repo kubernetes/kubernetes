@@ -139,8 +139,7 @@ func (m *Stub) Start() error {
 		return lastDialErr
 	}
 
-	klog.Infof("Starting to serve on %v", m.socket)
-
+	klog.InfoS("Starting to serve on socket", "socket", m.socket)
 	return nil
 }
 
@@ -161,7 +160,7 @@ func (m *Stub) Stop() error {
 
 // GetInfo is the RPC which return pluginInfo
 func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
-	klog.Info("GetInfo")
+	klog.InfoS("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
@@ -175,7 +174,7 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 		m.registrationStatus <- *status
 	}
 	if !status.PluginRegistered {
-		klog.Infof("Registration failed: %v", status.Error)
+		klog.InfoS("Registration failed", "err", status.Error)
 	}
 	return &watcherapi.RegistrationStatusResponse{}, nil
 }
@@ -184,11 +183,11 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
 	if pluginSockDir != "" {
 		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
-			klog.Info("Deprecation file found. Skip registration.")
+			klog.InfoS("Deprecation file found. Skip registration")
 			return nil
 		}
 	}
-	klog.Info("Deprecation file not found. Invoke registration")
+	klog.InfoS("Deprecation file not found. Invoke registration")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -229,13 +228,13 @@ func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (
 
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
-	klog.Infof("PreStartContainer, %+v", r)
+	klog.InfoS("PreStartContainer", "request", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	klog.Info("ListAndWatch")
+	klog.InfoS("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
@@ -256,7 +255,7 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 
 // GetPreferredAllocation gets the preferred allocation from a set of available devices
 func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
-	klog.Infof("GetPreferredAllocation, %+v", r)
+	klog.InfoS("GetPreferredAllocation", "request", r)
 
 	devs := make(map[string]pluginapi.Device)
 
@@ -269,7 +268,7 @@ func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.Preferre
 
 // Allocate does a mock allocation
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	klog.Infof("Allocate, %+v", r)
+	klog.InfoS("Allocate", "request", r)
 
 	devs := make(map[string]pluginapi.Device)
 

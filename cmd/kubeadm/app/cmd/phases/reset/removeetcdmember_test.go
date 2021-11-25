@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )

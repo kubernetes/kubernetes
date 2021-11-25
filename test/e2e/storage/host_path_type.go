@@ -481,7 +481,7 @@ func verifyPodHostPathType(f *framework.Framework, nodeSelector map[string]strin
 	newPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 		newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStartShort))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStart))
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), newPod.Name, *metav1.NewDeleteOptions(0))
 }

@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -114,10 +113,9 @@ func AssertError(t *testing.T, err error, expected string) {
 
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
-	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta2.InitConfiguration{}, &kubeadmapiv1beta2.ClusterConfiguration{})
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		t.Fatalf("unexpected error getting default config: %v", err)
 	}
-
 	return internalcfg
 }

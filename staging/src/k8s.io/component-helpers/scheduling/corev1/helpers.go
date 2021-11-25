@@ -17,6 +17,8 @@ limitations under the License.
 package corev1
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
@@ -42,4 +44,58 @@ func MatchNodeSelectorTerms(
 		return false, nil
 	}
 	return nodeaffinity.NewLazyErrorNodeSelector(nodeSelector).Match(node)
+}
+
+// GetAvoidPodsFromNodeAnnotations scans the list of annotations and
+// returns the pods that needs to be avoided for this node from scheduling
+func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
+	var avoidPods v1.AvoidPods
+	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[v1.PreferAvoidPodsAnnotationKey]), &avoidPods)
+		if err != nil {
+			return avoidPods, err
+		}
+	}
+	return avoidPods, nil
+}
+
+// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
+func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) bool {
+	for i := range tolerations {
+		if tolerations[i].ToleratesTaint(taint) {
+			return true
+		}
+	}
+	return false
+}
+
+type taintsFilterFunc func(*v1.Taint) bool
+
+// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
+// all the filtered taints, and returns the first taint without a toleration
+// Returns true if there is an untolerated taint
+// Returns false if all taints are tolerated
+func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	for _, taint := range filteredTaints {
+		if !TolerationsTolerateTaint(tolerations, &taint) {
+			return taint, true
+		}
+	}
+	return v1.Taint{}, false
+}
+
+// getFilteredTaints returns a list of taints satisfying the filter predicate
+func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1.Taint {
+	if inclusionFilter == nil {
+		return taints
+	}
+	filteredTaints := []v1.Taint{}
+	for _, taint := range taints {
+		if !inclusionFilter(&taint) {
+			continue
+		}
+		filteredTaints = append(filteredTaints, taint)
+	}
+	return filteredTaints
 }

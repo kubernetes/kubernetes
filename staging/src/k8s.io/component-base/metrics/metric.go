@@ -87,10 +87,24 @@ func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
 	r.self = self
 }
 
-// determineDeprecationStatus figures out whether the lazy metric should be deprecated or not.
+// preprocessMetric figures out whether the lazy metric should be hidden or not.
 // This method takes a Version argument which should be the version of the binary in which
-// this code is currently being executed.
-func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
+// this code is currently being executed. A metric can be hidden under two conditions:
+//      1.  if the metric is deprecated and is outside the grace period (i.e. has been
+// 			deprecated for more than one release
+//		2. if the metric is manually disabled via a CLI flag.
+//
+// Disclaimer:  disabling a metric via a CLI flag has higher precedence than
+// 			  	deprecation and will override show-hidden-metrics for the explicitly
+//				disabled metric.
+func (r *lazyMetric) preprocessMetric(version semver.Version) {
+	disabledMetricsLock.RLock()
+	defer disabledMetricsLock.RUnlock()
+	// disabling metrics is higher in precedence than showing hidden metrics
+	if _, ok := disabledMetrics[r.fqName]; ok {
+		r.isHidden = true
+		return
+	}
 	selfVersion := r.self.DeprecatedVersion()
 	if selfVersion == nil {
 		return
@@ -99,6 +113,7 @@ func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
 		if selfVersion.LTE(version) {
 			r.isDeprecated = true
 		}
+
 		if ShouldShowHidden() {
 			klog.Warningf("Hidden metrics (%s) have been manually overridden, showing this very deprecated metric.", r.fqName)
 			return
@@ -126,7 +141,7 @@ func (r *lazyMetric) IsDeprecated() bool {
 // created.
 func (r *lazyMetric) Create(version *semver.Version) bool {
 	if version != nil {
-		r.determineDeprecationStatus(*version)
+		r.preprocessMetric(*version)
 	}
 	// let's not create if this metric is slated to be hidden
 	if r.IsHidden() {

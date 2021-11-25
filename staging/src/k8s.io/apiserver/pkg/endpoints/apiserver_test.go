@@ -142,10 +142,10 @@ func init() {
 
 func addGrouplessTypes() {
 	scheme.AddKnownTypes(grouplessGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 
 	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
@@ -153,20 +153,20 @@ func addGrouplessTypes() {
 
 func addTestTypes() {
 	scheme.AddKnownTypes(testGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testGroupVersion, &examplev1.Pod{})
 	scheme.AddKnownTypes(testInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testInternalGroupVersion, &example.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
-	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
+	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{})
+	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{})
 	metav1.AddToGroupVersion(scheme, testGroupVersion)
 
 	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
@@ -174,7 +174,7 @@ func addTestTypes() {
 
 func addNewTestTypes() {
 	scheme.AddKnownTypes(newGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&examplev1.Pod{},
 	)
@@ -282,10 +282,13 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
-	handler := genericapifilters.WithAudit(mux, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	longRunningCheck := func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
-	})
+	}
+	fakeRuleEvaluator := auditpolicy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
+	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}
@@ -353,11 +356,7 @@ type SimpleRESTStorage struct {
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
-	// The id requested, and location to return for ResourceLocation
-	requestedResourceLocationID string
-	resourceLocation            *url.URL
-	resourceLocationTransport   http.RoundTripper
-	expectedResourceNamespace   string
+	expectedResourceNamespace string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
@@ -366,21 +365,6 @@ type SimpleRESTStorage struct {
 
 func (storage *SimpleRESTStorage) NamespaceScoped() bool {
 	return true
-}
-
-func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	s, ok := obj.(*genericapitesting.Simple)
-	if !ok {
-		return nil, fmt.Errorf("unexpected object")
-	}
-
-	// Set a marker to verify the method was called
-	s.Other = "exported"
-	return obj, storage.errors["export"]
 }
 
 func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
@@ -1553,55 +1537,6 @@ func TestMetadata(t *testing.T) {
 		if c() {
 			t.Errorf("[%d]unexpected mime types: %#v", i, matches)
 		}
-	}
-}
-
-func TestExport(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		item: genericapitesting.Simple{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion:   "1234",
-				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
-			},
-			Other: "foo",
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?export=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		data, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if itemOut.Other != "exported" {
-		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 

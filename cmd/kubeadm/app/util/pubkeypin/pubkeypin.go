@@ -59,7 +59,9 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 
 		switch strings.ToLower(format) {
 		case "sha256":
-			return s.allowSHA256(value)
+			if err := s.allowSHA256(value); err != nil {
+				return errors.Errorf("invalid hash %q, %v", pubKeyHash, err)
+			}
 		default:
 			return errors.Errorf("unknown hash format %q. Known format(s) are: %s", format, supportedFormats)
 		}

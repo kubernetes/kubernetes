@@ -202,6 +202,9 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
 	attempt := 0
 	return func() (bool, error) {
+		if allowedNotReadyNodes == -1 {
+			return true, nil
+		}
 		attempt++
 		var nodesNotReadyYet []v1.Node
 		opts := metav1.ListOptions{
@@ -211,8 +214,12 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 		}
 		allNodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
+			var terminalListNodesErr error
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			return false, err
+			if attempt >= 3 {
+				terminalListNodesErr = err
+			}
+			return false, terminalListNodesErr
 		}
 		for _, node := range allNodes.Items {
 			if !readyForTests(&node, nonblockingTaints) {

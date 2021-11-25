@@ -509,40 +509,6 @@ func getReplicaSetFraction(rs apps.ReplicaSet, d apps.Deployment) int32 {
 	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
 }
 
-// GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
-// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-// The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
-func GetAllReplicaSets(deployment *apps.Deployment, c appsclient.AppsV1Interface) ([]*apps.ReplicaSet, []*apps.ReplicaSet, *apps.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
-	newRS := FindNewReplicaSet(deployment, rsList)
-	return oldRSes, allOldRSes, newRS, nil
-}
-
-// GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
-// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func GetOldReplicaSets(deployment *apps.Deployment, c appsclient.AppsV1Interface) ([]*apps.ReplicaSet, []*apps.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
-	if err != nil {
-		return nil, nil, err
-	}
-	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
-	return oldRSes, allOldRSes, nil
-}
-
-// GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
-// Returns nil if the new replica set doesn't exist yet.
-func GetNewReplicaSet(deployment *apps.Deployment, c appsclient.AppsV1Interface) (*apps.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
-	if err != nil {
-		return nil, err
-	}
-	return FindNewReplicaSet(deployment, rsList), nil
-}
-
 // RsListFromClient returns an rsListFunc that wraps the given client.
 func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 	return func(namespace string, options metav1.ListOptions) ([]*apps.ReplicaSet, error) {
@@ -948,4 +914,19 @@ func GetDeploymentsForReplicaSet(deploymentLister appslisters.DeploymentLister, 
 	}
 
 	return deployments, nil
+}
+
+// ReplicaSetsByRevision sorts a list of ReplicaSet by revision, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsByRevision []*apps.ReplicaSet
+
+func (o ReplicaSetsByRevision) Len() int      { return len(o) }
+func (o ReplicaSetsByRevision) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsByRevision) Less(i, j int) bool {
+	revision1, err1 := Revision(o[i])
+	revision2, err2 := Revision(o[j])
+	if err1 != nil || err2 != nil || revision1 == revision2 {
+		return controller.ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return revision1 < revision2
 }

@@ -26,8 +26,7 @@ import (
 	"strings"
 	"time"
 
-	clientv2 "go.etcd.io/etcd/client"
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
@@ -57,14 +56,6 @@ func (e *CombinedEtcdClient) SetEtcdVersionKeyValue(version *EtcdVersion) error 
 
 // Put write a single key value pair to etcd.
 func (e *CombinedEtcdClient) Put(version *EtcdVersion, key, value string) error {
-	if version.Major == 2 {
-		v2client, err := e.clientV2()
-		if err != nil {
-			return err
-		}
-		_, err = v2client.Set(context.Background(), key, value, nil)
-		return err
-	}
 	v3client, err := e.clientV3()
 	if err != nil {
 		return err
@@ -76,17 +67,6 @@ func (e *CombinedEtcdClient) Put(version *EtcdVersion, key, value string) error 
 
 // Get reads a single value for a given key.
 func (e *CombinedEtcdClient) Get(version *EtcdVersion, key string) (string, error) {
-	if version.Major == 2 {
-		v2client, err := e.clientV2()
-		if err != nil {
-			return "", err
-		}
-		resp, err := v2client.Get(context.Background(), key, nil)
-		if err != nil {
-			return "", err
-		}
-		return resp.Node.Value, nil
-	}
 	v3client, err := e.clientV3()
 	if err != nil {
 		return "", err
@@ -102,14 +82,6 @@ func (e *CombinedEtcdClient) Get(version *EtcdVersion, key string) (string, erro
 	}
 
 	return string(kvs[0].Value), nil
-}
-
-func (e *CombinedEtcdClient) clientV2() (clientv2.KeysAPI, error) {
-	v2client, err := clientv2.New(clientv2.Config{Endpoints: []string{e.endpoint()}})
-	if err != nil {
-		return nil, err
-	}
-	return clientv2.NewKeysAPI(v2client), nil
 }
 
 func (e *CombinedEtcdClient) clientV3() (*clientv3.Client, error) {

@@ -18,6 +18,7 @@ package filters
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
 )
 
@@ -92,18 +94,27 @@ func TestTimeout(t *testing.T) {
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
+	var ctx context.Context
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = req.WithContext(ctx)
+			handler.ServeHTTP(w, req)
+		})
+	}
+
 	handler := newHandler(sendResponse, doPanic, writeErrors)
-	ts := httptest.NewServer(withPanicRecovery(
-		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
-			return req, timeout, record.Record, timeoutErr
+	ts := httptest.NewServer(withDeadline(withPanicRecovery(
+		WithTimeout(handler, func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+			return req, false, record.Record, timeoutErr
 		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
 			gotPanic <- err
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
 		}),
-	)
+	))
 	defer ts.Close()
 
 	// No timeouts
+	ctx = context.Background()
 	sendResponse <- resp
 	res, err := http.Get(ts.URL)
 	if err != nil {
@@ -124,6 +135,8 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Times out
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 	timeout <- time.Time{}
 	res, err = http.Get(ts.URL)
 	if err != nil {
@@ -145,6 +158,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Now try to send a response
+	ctx = context.Background()
 	sendResponse <- resp
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
@@ -170,6 +184,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Panics with http.ErrAbortHandler
+	ctx = context.Background()
 	doPanic <- http.ErrAbortHandler
 	res, err = http.Get(ts.URL)
 	if err != nil {
@@ -244,12 +259,13 @@ func TestErrConnKilled(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if strings.Count(capturedOutput, "\n") != 1 {
-		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+
+	// We don't expect stack trace from the panic to be included in the log.
+	if isStackTraceLoggedByRuntime(capturedOutput) {
+		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -334,12 +350,13 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if strings.Count(capturedOutput, "\n") != 1 {
-		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+
+	// We don't expect stack trace from the panic to be included in the log.
+	if isStackTraceLoggedByRuntime(capturedOutput) {
+		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 
@@ -350,6 +367,31 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected to receive an error")
 	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &baseTimeoutWriter{
+		w: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
+}
+
+func isStackTraceLoggedByRuntime(message string) bool {
+	// Check the captured output for the following patterns to find out if the
+	// stack trace is included in the log:
+	// - 'Observed a panic' (apimachinery runtime.go logs panic with this message)
+	// - 'goroutine 44 [running]:' (stack trace always starts with this)
+	if strings.Contains(message, "Observed a panic") &&
+		strings.Contains(message, "goroutine") &&
+		strings.Contains(message, "[running]:") {
+		return true
+	}
+
+	return false
 }
 
 var tsCrt = []byte(`-----BEGIN CERTIFICATE-----

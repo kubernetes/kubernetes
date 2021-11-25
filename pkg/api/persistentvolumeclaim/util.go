@@ -29,9 +29,63 @@ const (
 
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
-func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
-	if !dataSourceIsEnabled(pvcSpec) && !dataSourceInUse(oldPVCSpec) {
+func DropDisabledFields(pvcSpec *core.PersistentVolumeClaimSpec) {
+	// Drop the contents of the dataSourceRef field if the AnyVolumeDataSource
+	// feature gate is disabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
+		pvcSpec.DataSourceRef = nil
+	}
+}
+
+// EnforceDataSourceBackwardsCompatibility drops the data source field under certain conditions
+// to maintain backwards compatibility with old behavior.
+// See KEP 1495 for details.
+// Specifically, if this is an update of a PVC with no data source, or a creation of a new PVC,
+// and the dataSourceRef field is not filled in, then we will drop "invalid" data sources
+// (anything other than a PVC or a VolumeSnapshot) from this request as if an empty PVC had
+// been requested.
+// This should be called after DropDisabledFields so that if the AnyVolumeDataSource feature
+// gate is disabled, dataSourceRef will be forced to empty, ensuring pre-1.22 behavior.
+// This should be called before NormalizeDataSources, so that data sources other than PVCs
+// and VolumeSnapshots can only be set through the dataSourceRef field and not the dataSource
+// field.
+func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
+	// Check if the old PVC has a data source here is so that on updates from old clients
+	// that omit dataSourceRef, we preserve the data source, even if it would have been
+	// invalid to specify it at using the dataSource field at create.
+	if dataSourceInUse(oldPVCSpec) {
+		return
+	}
+
+	// Check if dataSourceRef is empty is because if it's not empty, then there is
+	// definitely a newer client and it definitely either wants to create a non-empty
+	// volume, or it wants to update a PVC that has a data source. Whether the
+	// specified data source is valid or satisfiable is a matter for validation and
+	// the volume populator code, but we can say with certainty that the client is
+	// not expecting the legacy behavior of ignoring invalid data sources.
+	if pvcSpec.DataSourceRef != nil {
+		return
+	}
+
+	// Historically, we only allow PVCs and VolumeSnapshots in the dataSource field.
+	// All other values are silently dropped.
+	if !dataSourceIsPvcOrSnapshot(pvcSpec.DataSource) {
 		pvcSpec.DataSource = nil
+	}
+}
+
+func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && oldPVC.Status.Conditions == nil {
+		pvc.Status.Conditions = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		if !allocatedResourcesInUse(oldPVC) {
+			pvc.Status.AllocatedResources = nil
+		}
+		if !resizeStatusInUse(oldPVC) {
+			pvc.Status.ResizeStatus = nil
+		}
 	}
 }
 
@@ -39,31 +93,65 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 	if oldPVCSpec == nil {
 		return false
 	}
-	if oldPVCSpec.DataSource != nil {
+	if oldPVCSpec.DataSource != nil || oldPVCSpec.DataSourceRef != nil {
 		return true
 	}
 	return false
 }
 
-func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
-	if pvcSpec.DataSource != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
-			return true
-		}
-
+func dataSourceIsPvcOrSnapshot(dataSource *core.TypedLocalObjectReference) bool {
+	if dataSource != nil {
 		apiGroup := ""
-		if pvcSpec.DataSource.APIGroup != nil {
-			apiGroup = *pvcSpec.DataSource.APIGroup
+		if dataSource.APIGroup != nil {
+			apiGroup = *dataSource.APIGroup
 		}
-		if pvcSpec.DataSource.Kind == pvc &&
+		if dataSource.Kind == pvc &&
 			apiGroup == "" {
 			return true
-
 		}
 
-		if pvcSpec.DataSource.Kind == volumeSnapshot && apiGroup == "snapshot.storage.k8s.io" {
+		if dataSource.Kind == volumeSnapshot && apiGroup == "snapshot.storage.k8s.io" {
 			return true
 		}
 	}
+	return false
+}
+
+// NormalizeDataSources ensures that DataSource and DataSourceRef have the same contents
+// as long as both are not explicitly set.
+// This should be used by creates/gets of PVCs, but not updates
+func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
+	// Don't enable this behavior if the feature gate is not on
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
+		return
+	}
+	if pvcSpec.DataSource != nil && pvcSpec.DataSourceRef == nil {
+		// Using the old way of setting a data source
+		pvcSpec.DataSourceRef = pvcSpec.DataSource.DeepCopy()
+	} else if pvcSpec.DataSourceRef != nil && pvcSpec.DataSource == nil {
+		// Using the new way of setting a data source
+		pvcSpec.DataSource = pvcSpec.DataSourceRef.DeepCopy()
+	}
+}
+
+func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+	if oldPVC.Status.ResizeStatus != nil {
+		return true
+	}
+	return false
+}
+
+func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+
+	if oldPVC.Status.AllocatedResources != nil {
+		return true
+	}
+
 	return false
 }

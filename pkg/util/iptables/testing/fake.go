@@ -38,6 +38,8 @@ const (
 	Jump = "-j "
 	// Reject specifies the reject target
 	Reject = "REJECT"
+	// Accept specifies the accept target
+	Accept = "ACCEPT"
 	// ToDest represents the flag used to specify the destination address in DNAT
 	ToDest = "--to-destination "
 	// Recent represents the sub-command recent that allows to dynamically create list of IP address to match against
@@ -89,6 +91,11 @@ func (*FakeIPTables) FlushChain(table iptables.Table, chain iptables.Chain) erro
 // DeleteChain is part of iptables.Interface
 func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
+}
+
+// ChainExists is part of iptables.Interface
+func (*FakeIPTables) ChainExists(table iptables.Table, chain iptables.Chain) (bool, error) {
+	return true, nil
 }
 
 // EnsureRule is part of iptables.Interface
@@ -167,6 +174,10 @@ func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
 // HasRandomFully is part of iptables.Interface
 func (f *FakeIPTables) HasRandomFully() bool {
 	return f.hasRandomFully
+}
+
+func (f *FakeIPTables) Present() bool {
+	return true
 }
 
 var _ = iptables.Interface(&FakeIPTables{})

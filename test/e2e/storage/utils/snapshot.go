@@ -100,12 +100,21 @@ func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured
 
 }
 
+// DeleteSnapshotWithoutWaiting deletes a VolumeSnapshot and return directly without waiting
+func DeleteSnapshotWithoutWaiting(dc dynamic.Interface, ns string, snapshotName string) error {
+	ginkgo.By("deleting the snapshot")
+	err := dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 // DeleteAndWaitSnapshot deletes a VolumeSnapshot and waits for it to be deleted or until timeout occurs, whichever comes first
 func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
 	var err error
-	ginkgo.By("deleting the snapshot")
-	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	err = DeleteSnapshotWithoutWaiting(dc, ns, snapshotName)
+	if err != nil {
 		return err
 	}
 
@@ -121,7 +130,6 @@ func GenerateSnapshotClassSpec(
 	snapshotter string,
 	parameters map[string]string,
 	ns string,
-	suffix string,
 ) *unstructured.Unstructured {
 	snapshotClass := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -129,8 +137,7 @@ func GenerateSnapshotClassSpec(
 			"apiVersion": SnapshotAPIVersion,
 			"metadata": map[string]interface{}{
 				// Name must be unique, so let's base it on namespace name and use GenerateName
-				// TODO(#96234): Remove unnecessary suffix.
-				"name": names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+				"name": names.SimpleNameGenerator.GenerateName(ns),
 			},
 			"driver":         snapshotter,
 			"parameters":     parameters,

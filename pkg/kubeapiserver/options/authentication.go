@@ -32,7 +32,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -40,7 +39,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
@@ -89,7 +87,7 @@ type OIDCAuthenticationOptions struct {
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles         []string
 	Lookup           bool
-	Issuer           string
+	Issuers          []string
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
@@ -187,51 +185,56 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 
 // Validate checks invalid config combination
 func (o *BuiltInAuthenticationOptions) Validate() []error {
-	allErrors := []error{}
+	var allErrors []error
 
 	if o.OIDC != nil && (len(o.OIDC.IssuerURL) > 0) != (len(o.OIDC.ClientID) > 0) {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
-	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuer) > 0 && strings.Contains(o.ServiceAccounts.Issuer, ":") {
-		if _, err := url.Parse(o.ServiceAccounts.Issuer); err != nil {
-			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
-		}
-	}
-
-	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
-			allErrors = append(allErrors, errors.New("BoundServiceAccountTokenVolume feature depends on RootCAConfigMap feature, but RootCAConfigMap features is not enabled"))
+	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) > 0 {
+		seen := make(map[string]bool)
+		for _, issuer := range o.ServiceAccounts.Issuers {
+			if strings.Contains(issuer, ":") {
+				if _, err := url.Parse(issuer); err != nil {
+					allErrors = append(allErrors, fmt.Errorf("service-account-issuer %q contained a ':' but was not a valid URL: %v", issuer, err))
+					continue
+				}
+			}
+			if issuer == "" {
+				allErrors = append(allErrors, fmt.Errorf("service-account-issuer should not be an empty string"))
+				continue
+			}
+			if seen[issuer] {
+				allErrors = append(allErrors, fmt.Errorf("service-account-issuer %q is already specified", issuer))
+				continue
+			}
+			seen[issuer] = true
 		}
 	}
 
 	if o.ServiceAccounts != nil {
-		if len(o.ServiceAccounts.Issuer) == 0 {
+		if len(o.ServiceAccounts.Issuers) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
 		if len(o.ServiceAccounts.KeyFiles) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-			// Validate the JWKS URI when it is explicitly set.
-			// When unset, it is later derived from ExternalHost.
-			if o.ServiceAccounts.JWKSURI != "" {
-				if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
-				} else if u.Scheme != "https" {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
-				}
+		// Validate the JWKS URI when it is explicitly set.
+		// When unset, it is later derived from ExternalHost.
+		if o.ServiceAccounts.JWKSURI != "" {
+			if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
+			} else if u.Scheme != "https" {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
 			}
-		} else if len(o.ServiceAccounts.JWKSURI) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
 		}
 	}
 
 	if o.WebHook != nil {
 		retryBackoff := o.WebHook.RetryBackoff
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
-			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", retryBackoff.Steps))
+			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 0, but is: %d", retryBackoff.Steps))
 		}
 	}
 
@@ -296,7 +299,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.StringSliceVar(&o.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
-			"'alg' header value not in this list will be rejected. "+
+			"supported 'alg' header values are: RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 
 		fs.Var(cliflag.NewMapStringStringNoSplit(&o.OIDC.RequiredClaims), "oidc-required-claim", ""+
@@ -320,7 +323,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.BoolVar(&o.ServiceAccounts.Lookup, "service-account-lookup", o.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
 
-		fs.StringVar(&o.ServiceAccounts.Issuer, "service-account-issuer", o.ServiceAccounts.Issuer, ""+
+		fs.StringArrayVar(&o.ServiceAccounts.Issuers, "service-account-issuer", o.ServiceAccounts.Issuers, ""+
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
 			"in \"iss\" claim of issued tokens. This value is a string or URI. If this option is not "+
 			"a valid URI per the OpenID Discovery 1.0 spec, the ServiceAccountIssuerDiscovery feature "+
@@ -328,14 +331,15 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"that this value comply with the OpenID spec: https://openid.net/specs/openid-connect-discovery-1_0.html. "+
 			"In practice, this means that service-account-issuer must be an https URL. It is also highly "+
 			"recommended that this URL be capable of serving OpenID discovery documents at "+
-			"{service-account-issuer}/.well-known/openid-configuration.")
+			"{service-account-issuer}/.well-known/openid-configuration. "+
+			"When this flag is specified multiple times, the first is used to generate tokens "+
+			"and all are used to determine which issuers are accepted.")
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
 			"/.well-known/openid-configuration. This flag is useful if the discovery doc"+
 			"and key set are served to relying parties from a URL other than the "+
-			"API server's external (as auto-detected or overridden with external-hostname). "+
-			"Only valid if the ServiceAccountIssuerDiscovery feature gate is enabled.")
+			"API server's external (as auto-detected or overridden with external-hostname). ")
 
 		// Deprecated in 1.13
 		fs.StringSliceVar(&o.APIAudiences, "service-account-api-audiences", o.APIAudiences, ""+
@@ -418,11 +422,11 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 	ret.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil {
-		if o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-			ret.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+		if len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
+			ret.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
 		}
 		ret.ServiceAccountKeyFiles = o.ServiceAccounts.KeyFiles
-		ret.ServiceAccountIssuer = o.ServiceAccounts.Issuer
+		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
 	}
 
@@ -476,8 +480,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	}
 
 	authInfo.APIAudiences = o.APIAudiences
-	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
+		authInfo.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
 	}
 
 	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(

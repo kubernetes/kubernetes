@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -25,10 +26,12 @@ import (
 	"sync"
 
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog/v2"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
@@ -201,10 +204,24 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 				if vm != nil {
 					klog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						node.Name, vm, res.vc, res.datacenter.Name())
-
+					var vmObj mo.VirtualMachine
+					err := vm.Properties(ctx, vm.Reference(), []string{"config"}, &vmObj)
+					if err != nil || vmObj.Config == nil {
+						klog.Errorf("failed to retrieve guest vmconfig for node: %s Err: %v", node.Name, err)
+					} else {
+						klog.V(4).Infof("vm hardware version for node:%s is %s", node.Name, vmObj.Config.Version)
+						// vmconfig.Version returns vm hardware version as vmx-11, vmx-13, vmx-14, vmx-15 etc.
+						vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated(vmObj.Config.Version)
+						if err != nil {
+							klog.Errorf("failed to check if vm hardware version is deprecated. VM Hardware Version: %s Err: %v", vmObj.Config.Version, err)
+						}
+						if vmhardwaredeprecated {
+							klog.Warningf("VM Hardware version: %s from node: %s is deprecated. Please consider upgrading virtual machine hardware version to vmx-15 or higher", vmObj.Config.Version, node.Name)
+						}
+					}
 					// Get the node zone information
-					nodeFd := node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
-					nodeRegion := node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion]
+					nodeFd := node.ObjectMeta.Labels[v1.LabelTopologyZone]
+					nodeRegion := node.ObjectMeta.Labels[v1.LabelTopologyRegion]
 					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)

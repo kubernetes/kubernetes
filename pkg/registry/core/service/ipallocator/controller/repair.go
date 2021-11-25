@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	netutil "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -82,7 +82,7 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 
 	primary := v1.IPv4Protocol
 	secondary := v1.IPv6Protocol
-	if netutil.IsIPv6(network.IP) {
+	if netutils.IsIPv6(network.IP) {
 		primary = v1.IPv6Protocol
 	}
 
@@ -178,7 +178,7 @@ func (c *Repair) runOnce() error {
 	rebuiltByFamily := make(map[v1.IPFamily]*ipallocator.Range)
 
 	for family, network := range c.networkByFamily {
-		rebuilt, err := ipallocator.NewCIDRRange(network)
+		rebuilt, err := ipallocator.NewInMemory(network)
 		if err != nil {
 			return fmt.Errorf("unable to create CIDR range for family %v: %v", family, err)
 		}
@@ -196,7 +196,7 @@ func (c *Repair) runOnce() error {
 	}
 
 	getFamilyByIP := func(ip net.IP) v1.IPFamily {
-		if netutil.IsIPv6(ip) {
+		if netutils.IsIPv6(ip) {
 			return v1.IPv6Protocol
 		}
 		return v1.IPv4Protocol
@@ -210,7 +210,7 @@ func (c *Repair) runOnce() error {
 		}
 
 		for _, ip := range svc.Spec.ClusterIPs {
-			ip := net.ParseIP(ip)
+			ip := netutils.ParseIPSloppy(ip)
 			if ip == nil {
 				// cluster IP is corrupt
 				c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPNotValid", "Cluster IP %s is not a valid IP; please recreate service", ip)

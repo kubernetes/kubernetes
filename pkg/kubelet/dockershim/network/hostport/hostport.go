@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -21,6 +22,7 @@ package hostport
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -53,7 +55,18 @@ type PodPortMapping struct {
 	IP           net.IP
 }
 
+// ipFamily refers to a specific family if not empty, i.e. "4" or "6".
+type ipFamily string
+
+// Constants for valid IPFamily:
+const (
+	IPv4 ipFamily = "4"
+	IPv6 ipFamily = "6"
+)
+
 type hostport struct {
+	ipFamily ipFamily
+	ip       string
 	port     int32
 	protocol string
 }
@@ -78,19 +91,23 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	// bind()ed but not listen()ed, and at least the default debian netcat
 	// has no way to avoid about 10 seconds of retries.
 	var socket closeable
+	// open the socket on the HostIP and HostPort specified
+	address := net.JoinHostPort(hp.ip, strconv.Itoa(int(hp.port)))
 	switch hp.protocol {
 	case "tcp":
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", hp.port))
+		network := "tcp" + string(hp.ipFamily)
+		listener, err := net.Listen(network, address)
 		if err != nil {
 			return nil, err
 		}
 		socket = listener
 	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", hp.port))
+		network := "udp" + string(hp.ipFamily)
+		addr, err := net.ResolveUDPAddr(network, address)
 		if err != nil {
 			return nil, err
 		}
-		conn, err := net.ListenUDP("udp", addr)
+		conn, err := net.ListenUDP(network, addr)
 		if err != nil {
 			return nil, err
 		}
@@ -98,13 +115,15 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	default:
 		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
 	}
-	klog.V(3).Infof("Opened local port %s", hp.String())
+	klog.V(3).InfoS("Opened local port", "port", hp.String())
 	return socket, nil
 }
 
 // portMappingToHostport creates hostport structure based on input portmapping
-func portMappingToHostport(portMapping *PortMapping) hostport {
+func portMappingToHostport(portMapping *PortMapping, family ipFamily) hostport {
 	return hostport{
+		ipFamily: family,
+		ip:       portMapping.HostIP,
 		port:     portMapping.HostPort,
 		protocol: strings.ToLower(string(portMapping.Protocol)),
 	}
@@ -112,7 +131,7 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 
 // ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly
 func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string) error {
-	klog.V(4).Info("Ensuring kubelet hostport chains")
+	klog.V(4).InfoS("Ensuring kubelet hostport chains")
 	// Ensure kubeHostportChain
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
 		return fmt.Errorf("failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)
@@ -124,9 +143,11 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 		{utiliptables.TableNAT, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 	}
-	args := []string{"-m", "comment", "--comment", "kube hostport portals",
+	args := []string{
+		"-m", "comment", "--comment", "kube hostport portals",
 		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubeHostportsChain)}
+		"-j", string(kubeHostportsChain),
+	}
 	for _, tc := range tableChainsNeedJumpServices {
 		// KUBE-HOSTPORTS chain needs to be appended to the system chains.
 		// This ensures KUBE-SERVICES chain gets processed first.

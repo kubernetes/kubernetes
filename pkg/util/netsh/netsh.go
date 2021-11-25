@@ -66,7 +66,7 @@ func New(exec utilexec.Interface) Interface {
 
 // EnsurePortProxyRule checks if the specified redirect exists, if not creates it.
 func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
-	klog.V(4).Infof("running netsh interface portproxy add v4tov4 %v", args)
+	klog.V(4).InfoS("Running netsh interface portproxy add v4tov4", "arguments", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -85,7 +85,7 @@ func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
 
 // DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
 func (runner *runner) DeletePortProxyRule(args []string) error {
-	klog.V(4).Infof("running netsh interface portproxy delete v4tov4 %v", args)
+	klog.V(4).InfoS("Running netsh interface portproxy delete v4tov4", "arguments", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -114,20 +114,20 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 
 	exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner)
 	if exists == true {
-		klog.V(4).Infof("not adding IP address %q as it already exists", ipToCheck)
+		klog.V(4).InfoS("Not adding IP address, as it already exists", "IP", ipToCheck)
 		return true, nil
 	}
 
 	// IP Address is not already added, add it now
-	klog.V(4).Infof("running netsh interface ipv4 add address %v", args)
+	klog.V(4).InfoS("Running netsh interface IPv4 add address", "IP", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
 		// Once the IP Address is added, it takes a bit to initialize and show up when querying for it
 		// Query all the IP addresses and see if the one we added is present
-		// PS: We are using netsh interface ipv4 show address here to query all the IP addresses, instead of
+		// PS: We are using netsh interface IPv4 show address here to query all the IP addresses, instead of
 		// querying net.InterfaceAddrs() as it returns the IP address as soon as it is added even though it is uninitialized
-		klog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToCheck)
+		klog.V(3).InfoS("Waiting until IP is added to the network adapter", "IP", ipToCheck)
 		for {
 			if exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner); exists {
 				return true, nil
@@ -142,12 +142,12 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 			return false, nil
 		}
 	}
-	return false, fmt.Errorf("error adding ipv4 address: %v: %s", err, out)
+	return false, fmt.Errorf("error adding IPv4 address: %v: %s", err, out)
 }
 
 // DeleteIPAddress checks if the specified IP address is present and, if so, deletes it.
 func (runner *runner) DeleteIPAddress(args []string) error {
-	klog.V(4).Infof("running netsh interface ipv4 delete address %v", args)
+	klog.V(4).InfoS("Running netsh interface IPv4 delete address", "IP", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -160,7 +160,7 @@ func (runner *runner) DeleteIPAddress(args []string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("error deleting ipv4 address: %v: %s", err, out)
+	return fmt.Errorf("error deleting IPv4 address: %v: %s", err, out)
 }
 
 // GetInterfaceToAddIP returns the interface name where Service IP needs to be added
@@ -178,14 +178,14 @@ func (runner *runner) Restore(args []string) error {
 	return nil
 }
 
-// checkIPExists checks if an IP address exists in 'netsh interface ipv4 show address' output
+// checkIPExists checks if an IP address exists in 'netsh interface IPv4 show address' output
 func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error) {
 	ipAddress, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 	if err != nil {
 		return false, err
 	}
 	ipAddressString := string(ipAddress[:])
-	klog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToCheck, ipAddressString)
+	klog.V(3).InfoS("Searching for IP in IP dump", "IP", ipToCheck, "IPDump", ipAddressString)
 	showAddressArray := strings.Split(ipAddressString, "\n")
 	for _, showAddress := range showAddressArray {
 		if strings.Contains(showAddress, "IP") {

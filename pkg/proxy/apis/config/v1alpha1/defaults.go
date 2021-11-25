@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
 
@@ -131,7 +131,7 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 // based on the given bind address. IPv6 addresses are enclosed in square
 // brackets for appending port.
 func getDefaultAddresses(bindAddress string) (defaultHealthzAddress, defaultMetricsAddress string) {
-	if net.ParseIP(bindAddress).To4() != nil {
+	if netutils.ParseIPSloppy(bindAddress).To4() != nil {
 		return "0.0.0.0", "127.0.0.1"
 	}
 	return "[::]", "[::1]"

@@ -412,6 +412,17 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 	if err != nil {
 		return err
 	}
+
+	if idx < 0 {
+		if !SupportNegativeIndices {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+		if idx < -len(*d) {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+		idx += len(*d)
+	}
+
 	(*d)[idx] = val
 	return nil
 }
@@ -460,6 +471,16 @@ func (d *partialArray) get(key string) (*lazyNode, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	if idx < 0 {
+		if !SupportNegativeIndices {
+			return nil, errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+		if idx < -len(*d) {
+			return nil, errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+		idx += len(*d)
 	}
 
 	if idx >= len(*d) {
@@ -547,6 +568,29 @@ func (p Patch) replace(doc *container, op Operation) error {
 		return errors.Wrapf(err, "replace operation failed to decode path")
 	}
 
+	if path == "" {
+		val := op.value()
+
+		if val.which == eRaw {
+			if !val.tryDoc() {
+				if !val.tryAry() {
+					return errors.Wrapf(err, "replace operation value must be object or array")
+				}
+			}
+		}
+
+		switch val.which {
+		case eAry:
+			*doc = &val.ary
+		case eDoc:
+			*doc = &val.doc
+		case eRaw:
+			return errors.Wrapf(err, "replace operation hit impossible case")
+		}
+
+		return nil
+	}
+
 	con, key := findObject(doc, path)
 
 	if con == nil {
@@ -611,6 +655,25 @@ func (p Patch) test(doc *container, op Operation) error {
 	path, err := op.Path()
 	if err != nil {
 		return errors.Wrapf(err, "test operation failed to decode path")
+	}
+
+	if path == "" {
+		var self lazyNode
+
+		switch sv := (*doc).(type) {
+		case *partialDoc:
+			self.doc = *sv
+			self.which = eDoc
+		case *partialArray:
+			self.ary = *sv
+			self.which = eAry
+		}
+
+		if self.equal(op.value()) {
+			return nil
+		}
+
+		return errors.Wrapf(ErrTestFailed, "testing value %s failed", path)
 	}
 
 	con, key := findObject(doc, path)
@@ -721,6 +784,10 @@ func (p Patch) Apply(doc []byte) ([]byte, error) {
 // ApplyIndent mutates a JSON document according to the patch, and returns the new
 // document indented.
 func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
+	if len(doc) == 0 {
+		return doc, nil
+	}
+
 	var pd container
 	if doc[0] == '[' {
 		pd = &partialArray{}

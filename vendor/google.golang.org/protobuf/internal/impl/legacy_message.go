@@ -24,12 +24,22 @@ import (
 // legacyWrapMessage wraps v as a protoreflect.Message,
 // where v must be a *struct kind and not implement the v2 API already.
 func legacyWrapMessage(v reflect.Value) pref.Message {
-	typ := v.Type()
-	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
+	t := v.Type()
+	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
 		return aberrantMessage{v: v}
 	}
-	mt := legacyLoadMessageInfo(typ, "")
+	mt := legacyLoadMessageInfo(t, "")
 	return mt.MessageOf(v.Interface())
+}
+
+// legacyLoadMessageType dynamically loads a protoreflect.Type for t,
+// where t must be not implement the v2 API already.
+// The provided name is used if it cannot be determined from the message.
+func legacyLoadMessageType(t reflect.Type, name pref.FullName) protoreflect.MessageType {
+	if t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
+		return aberrantMessageType{t}
+	}
+	return legacyLoadMessageInfo(t, name)
 }
 
 var legacyMessageTypeCache sync.Map // map[reflect.Type]*MessageInfo
@@ -49,8 +59,9 @@ func legacyLoadMessageInfo(t reflect.Type, name pref.FullName) *MessageInfo {
 		GoReflectType: t,
 	}
 
+	var hasMarshal, hasUnmarshal bool
 	v := reflect.Zero(t).Interface()
-	if _, ok := v.(legacyMarshaler); ok {
+	if _, hasMarshal = v.(legacyMarshaler); hasMarshal {
 		mi.methods.Marshal = legacyMarshal
 
 		// We have no way to tell whether the type's Marshal method
@@ -59,10 +70,10 @@ func legacyLoadMessageInfo(t reflect.Type, name pref.FullName) *MessageInfo {
 		// calling Marshal methods when present.
 		mi.methods.Flags |= piface.SupportMarshalDeterministic
 	}
-	if _, ok := v.(legacyUnmarshaler); ok {
+	if _, hasUnmarshal = v.(legacyUnmarshaler); hasUnmarshal {
 		mi.methods.Unmarshal = legacyUnmarshal
 	}
-	if _, ok := v.(legacyMerger); ok {
+	if _, hasMerge := v.(legacyMerger); hasMerge || (hasMarshal && hasUnmarshal) {
 		mi.methods.Merge = legacyMerge
 	}
 
@@ -75,7 +86,7 @@ func legacyLoadMessageInfo(t reflect.Type, name pref.FullName) *MessageInfo {
 var legacyMessageDescCache sync.Map // map[reflect.Type]protoreflect.MessageDescriptor
 
 // LegacyLoadMessageDesc returns an MessageDescriptor derived from the Go type,
-// which must be a *struct kind and not implement the v2 API already.
+// which should be a *struct kind and must not implement the v2 API already.
 //
 // This is exported for testing purposes.
 func LegacyLoadMessageDesc(t reflect.Type) pref.MessageDescriptor {
@@ -114,17 +125,19 @@ func legacyLoadMessageDesc(t reflect.Type, name pref.FullName) pref.MessageDescr
 	// If the Go type has no fields, then this might be a proto3 empty message
 	// from before the size cache was added. If there are any fields, check to
 	// see that at least one of them looks like something we generated.
-	if nfield := t.Elem().NumField(); nfield > 0 {
-		hasProtoField := false
-		for i := 0; i < nfield; i++ {
-			f := t.Elem().Field(i)
-			if f.Tag.Get("protobuf") != "" || f.Tag.Get("protobuf_oneof") != "" || strings.HasPrefix(f.Name, "XXX_") {
-				hasProtoField = true
-				break
+	if t.Elem().Kind() == reflect.Struct {
+		if nfield := t.Elem().NumField(); nfield > 0 {
+			hasProtoField := false
+			for i := 0; i < nfield; i++ {
+				f := t.Elem().Field(i)
+				if f.Tag.Get("protobuf") != "" || f.Tag.Get("protobuf_oneof") != "" || strings.HasPrefix(f.Name, "XXX_") {
+					hasProtoField = true
+					break
+				}
 			}
-		}
-		if !hasProtoField {
-			return aberrantLoadMessageDesc(t, name)
+			if !hasProtoField {
+				return aberrantLoadMessageDesc(t, name)
+			}
 		}
 	}
 
@@ -370,7 +383,7 @@ type legacyMerger interface {
 	Merge(protoiface.MessageV1)
 }
 
-var legacyProtoMethods = &piface.Methods{
+var aberrantProtoMethods = &piface.Methods{
 	Marshal:   legacyMarshal,
 	Unmarshal: legacyUnmarshal,
 	Merge:     legacyMerge,
@@ -401,18 +414,47 @@ func legacyUnmarshal(in piface.UnmarshalInput) (piface.UnmarshalOutput, error) {
 	v := in.Message.(unwrapper).protoUnwrap()
 	unmarshaler, ok := v.(legacyUnmarshaler)
 	if !ok {
-		return piface.UnmarshalOutput{}, errors.New("%T does not implement Marshal", v)
+		return piface.UnmarshalOutput{}, errors.New("%T does not implement Unmarshal", v)
 	}
 	return piface.UnmarshalOutput{}, unmarshaler.Unmarshal(in.Buf)
 }
 
 func legacyMerge(in piface.MergeInput) piface.MergeOutput {
+	// Check whether this supports the legacy merger.
 	dstv := in.Destination.(unwrapper).protoUnwrap()
 	merger, ok := dstv.(legacyMerger)
+	if ok {
+		merger.Merge(Export{}.ProtoMessageV1Of(in.Source))
+		return piface.MergeOutput{Flags: piface.MergeComplete}
+	}
+
+	// If legacy merger is unavailable, implement merge in terms of
+	// a marshal and unmarshal operation.
+	srcv := in.Source.(unwrapper).protoUnwrap()
+	marshaler, ok := srcv.(legacyMarshaler)
 	if !ok {
 		return piface.MergeOutput{}
 	}
-	merger.Merge(Export{}.ProtoMessageV1Of(in.Source))
+	dstv = in.Destination.(unwrapper).protoUnwrap()
+	unmarshaler, ok := dstv.(legacyUnmarshaler)
+	if !ok {
+		return piface.MergeOutput{}
+	}
+	if !in.Source.IsValid() {
+		// Legacy Marshal methods may not function on nil messages.
+		// Check for a typed nil source only after we confirm that
+		// legacy Marshal/Unmarshal methods are present, for
+		// consistency.
+		return piface.MergeOutput{Flags: piface.MergeComplete}
+	}
+	b, err := marshaler.Marshal()
+	if err != nil {
+		return piface.MergeOutput{}
+	}
+	err = unmarshaler.Unmarshal(b)
+	if err != nil {
+		return piface.MergeOutput{}
+	}
 	return piface.MergeOutput{Flags: piface.MergeComplete}
 }
 
@@ -422,6 +464,9 @@ type aberrantMessageType struct {
 }
 
 func (mt aberrantMessageType) New() pref.Message {
+	if mt.t.Kind() == reflect.Ptr {
+		return aberrantMessage{reflect.New(mt.t.Elem())}
+	}
 	return aberrantMessage{reflect.Zero(mt.t)}
 }
 func (mt aberrantMessageType) Zero() pref.Message {
@@ -443,6 +488,17 @@ type aberrantMessage struct {
 	v reflect.Value
 }
 
+// Reset implements the v1 proto.Message.Reset method.
+func (m aberrantMessage) Reset() {
+	if mr, ok := m.v.Interface().(interface{ Reset() }); ok {
+		mr.Reset()
+		return
+	}
+	if m.v.Kind() == reflect.Ptr && !m.v.IsNil() {
+		m.v.Elem().Set(reflect.Zero(m.v.Type().Elem()))
+	}
+}
+
 func (m aberrantMessage) ProtoReflect() pref.Message {
 	return m
 }
@@ -454,33 +510,40 @@ func (m aberrantMessage) Type() pref.MessageType {
 	return aberrantMessageType{m.v.Type()}
 }
 func (m aberrantMessage) New() pref.Message {
+	if m.v.Type().Kind() == reflect.Ptr {
+		return aberrantMessage{reflect.New(m.v.Type().Elem())}
+	}
 	return aberrantMessage{reflect.Zero(m.v.Type())}
 }
 func (m aberrantMessage) Interface() pref.ProtoMessage {
 	return m
 }
 func (m aberrantMessage) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
+	return
 }
 func (m aberrantMessage) Has(pref.FieldDescriptor) bool {
-	panic("invalid field descriptor")
+	return false
 }
 func (m aberrantMessage) Clear(pref.FieldDescriptor) {
-	panic("invalid field descriptor")
+	panic("invalid Message.Clear on " + string(m.Descriptor().FullName()))
 }
-func (m aberrantMessage) Get(pref.FieldDescriptor) pref.Value {
-	panic("invalid field descriptor")
+func (m aberrantMessage) Get(fd pref.FieldDescriptor) pref.Value {
+	if fd.Default().IsValid() {
+		return fd.Default()
+	}
+	panic("invalid Message.Get on " + string(m.Descriptor().FullName()))
 }
 func (m aberrantMessage) Set(pref.FieldDescriptor, pref.Value) {
-	panic("invalid field descriptor")
+	panic("invalid Message.Set on " + string(m.Descriptor().FullName()))
 }
 func (m aberrantMessage) Mutable(pref.FieldDescriptor) pref.Value {
-	panic("invalid field descriptor")
+	panic("invalid Message.Mutable on " + string(m.Descriptor().FullName()))
 }
 func (m aberrantMessage) NewField(pref.FieldDescriptor) pref.Value {
-	panic("invalid field descriptor")
+	panic("invalid Message.NewField on " + string(m.Descriptor().FullName()))
 }
 func (m aberrantMessage) WhichOneof(pref.OneofDescriptor) pref.FieldDescriptor {
-	panic("invalid oneof descriptor")
+	panic("invalid Message.WhichOneof descriptor on " + string(m.Descriptor().FullName()))
 }
 func (m aberrantMessage) GetUnknown() pref.RawFields {
 	return nil
@@ -489,13 +552,13 @@ func (m aberrantMessage) SetUnknown(pref.RawFields) {
 	// SetUnknown discards its input on messages which don't support unknown field storage.
 }
 func (m aberrantMessage) IsValid() bool {
-	// An invalid message is a read-only, empty message. Since we don't know anything
-	// about the alleged contents of this message, we can't say with confidence that
-	// it is invalid in this sense. Therefore, report it as valid.
-	return true
+	if m.v.Kind() == reflect.Ptr {
+		return !m.v.IsNil()
+	}
+	return false
 }
 func (m aberrantMessage) ProtoMethods() *piface.Methods {
-	return legacyProtoMethods
+	return aberrantProtoMethods
 }
 func (m aberrantMessage) protoUnwrap() interface{} {
 	return m.v.Interface()

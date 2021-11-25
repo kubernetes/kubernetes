@@ -26,7 +26,7 @@ import (
 // utils.go contains functions used across test suites.
 
 const (
-	cniVersion       = "v0.8.7"
+	cniVersion       = "v0.9.1"
 	cniArch          = "amd64"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"

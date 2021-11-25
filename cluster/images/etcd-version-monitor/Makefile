@@ -30,7 +30,7 @@ build:
 	cp etcd-version-monitor.go Dockerfile $(TEMP_DIR)
 
 	# Compile etcd-version-monitor.
-	docker run -it \
+	docker run --rm -it \
 	    -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes \
 	    -v $(TEMP_DIR):/build \
 	    -e GOARCH=$(ARCH) \

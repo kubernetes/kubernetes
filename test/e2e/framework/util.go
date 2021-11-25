@@ -63,6 +63,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -898,7 +899,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
@@ -1022,10 +1023,13 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become scheduable.
+// (but TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
 
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
@@ -1118,11 +1122,16 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 	}
 }
 
-// AllNodesReady checks whether all registered nodes are ready.
+// AllNodesReady checks whether all registered nodes are ready. Setting -1 on
+// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
+
 	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
@@ -1257,7 +1266,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(hostURL.Host) != nil {
+	if netutils.ParseIPSloppy(hostURL.Host) != nil {
 		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
 		hostnames = append(hostnames, hostURL.Host)
@@ -1368,7 +1377,7 @@ retriesLoop:
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
-		ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
+		gomega.Expect(len(expectedWatchEvents)).To(gomega.BeNumerically("<=", len(actualWatchEvents)), "Did not get enough watch events")
 
 		totalValidWatchEvents := 0
 		foundEventIndexes := map[int]*int{}
@@ -1397,7 +1406,9 @@ retriesLoop:
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
 			continue retriesLoop
 		}
-		ExpectEqual(errs.Len() > 0, false, strings.Join(errs.List(), "\n - "))
+		if errs.Len() > 0 {
+			Failf("Unexpected error(s): %v", strings.Join(errs.List(), "\n - "))
+		}
 		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}

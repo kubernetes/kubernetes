@@ -17,26 +17,40 @@ limitations under the License.
 package exec
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
 	clientauthenticationv1alpha1 "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	clientcmdv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-// TestV1beta1ClusterTypesAreSynced ensures that clientauthenticationv1beta1.Cluster stays in sync
-// with clientcmdv1.Cluster.
-//
-// We want clientauthenticationv1beta1.Cluster to offer the same knobs as clientcmdv1.Cluster to
-// allow someone to connect to the kubernetes API. This test should fail if a new field is added to
-// one of the structs without updating the other.
-func TestV1beta1ClusterTypesAreSynced(t *testing.T) {
+func TestClientAuthenticationClusterTypesAreSynced(t *testing.T) {
 	t.Parallel()
 
-	execType := reflect.TypeOf(clientauthenticationv1beta1.Cluster{})
+	for _, cluster := range []interface{}{
+		clientauthenticationv1beta1.Cluster{},
+		clientauthenticationv1.Cluster{},
+	} {
+		t.Run(fmt.Sprintf("%T", cluster), func(t *testing.T) {
+			t.Parallel()
+			testClientAuthenticationClusterTypesAreSynced(t, cluster)
+		})
+	}
+}
+
+// testClusterTypesAreSynced ensures that the provided cluster type stays in sync
+// with clientcmdv1.Cluster.
+//
+// We want clientauthentication*.Cluster types to offer the same knobs as clientcmdv1.Cluster to
+// allow someone to connect to the kubernetes API. This test should fail if a new field is added to
+// one of the structs without updating the other.
+func testClientAuthenticationClusterTypesAreSynced(t *testing.T, cluster interface{}) {
+	execType := reflect.TypeOf(cluster)
 	clientcmdType := reflect.TypeOf(clientcmdv1.Cluster{})
 
 	t.Run("exec cluster fields match clientcmd cluster fields", func(t *testing.T) {
@@ -136,6 +150,8 @@ func TestAllClusterTypesAreSynced(t *testing.T) {
 		clientauthenticationv1alpha1.SchemeGroupVersion.Version,
 		// We have a test for v1beta1 above.
 		clientauthenticationv1beta1.SchemeGroupVersion.Version,
+		// We have a test for v1 above.
+		clientauthenticationv1.SchemeGroupVersion.Version,
 	)
 	for gvk := range scheme.AllKnownTypes() {
 		if gvk.Group == clientauthenticationv1beta1.SchemeGroupVersion.Group &&

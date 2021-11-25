@@ -86,7 +86,13 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly]", func() {
+	/*
+		Release: v1.21
+		Testname: Security Context, test RunAsGroup at pod level
+		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at pod level. Pod MUST be in Succeeded phase.
+		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
+	*/
+	framework.ConformanceIt("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		groupID := int64(2002)
@@ -115,7 +121,13 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]", func() {
+	/*
+		Release: v1.21
+		Testname: Security Context, test RunAsGroup at container level
+		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at containr level. Pod MUST be in Succeeded phase.
+		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
+	*/
+	framework.ConformanceIt("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		groupID := int64(2001)

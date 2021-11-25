@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -99,7 +102,7 @@ func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolebindingsResource, name), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolebindingsResource, name, opts), &v1alpha1.ClusterRoleBinding{})
 	return err
 }
 
@@ -115,6 +118,27 @@ func (c *FakeClusterRoleBindings) DeleteCollection(ctx context.Context, opts v1.
 func (c *FakeClusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, pt, data, subresources...), &v1alpha1.ClusterRoleBinding{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterRoleBinding), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterRoleBinding.
+func (c *FakeClusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding *rbacv1alpha1.ClusterRoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+	if clusterRoleBinding == nil {
+		return nil, fmt.Errorf("clusterRoleBinding provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterRoleBinding)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterRoleBinding.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterRoleBinding.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterRoleBinding{})
 	if obj == nil {
 		return nil, err
 	}

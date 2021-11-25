@@ -31,13 +31,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestCachedTokenAuthenticator(t *testing.T) {
@@ -52,7 +52,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 		calledWithToken = append(calledWithToken, token)
 		return &authenticator.Response{User: resultUsers[token]}, resultOk, resultErr
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -126,7 +126,7 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 		auds, _ := authenticator.AudiencesFrom(ctx)
 		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -308,7 +308,9 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				if randomChoice {
 					ctx = audit.WithAuditAnnotations(ctx)
 				} else {
-					ctx = request.WithAuditEvent(ctx, &auditinternal.Event{Level: auditinternal.LevelMetadata})
+					ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
+						Event: &auditinternal.Event{Level: auditinternal.LevelMetadata},
+					})
 				}
 
 				_, _, _ = a.AuthenticateToken(ctx, "token")
@@ -316,7 +318,7 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				if randomChoice {
 					allAnnotations <- extractAnnotations(ctx)
 				} else {
-					allAnnotations <- request.AuditEventFrom(ctx).Annotations
+					allAnnotations <- audit.AuditEventFrom(ctx).Annotations
 				}
 			}()
 		}
@@ -546,7 +548,7 @@ func (s *singleBenchmark) bench(b *testing.B) {
 		true,
 		4*time.Second,
 		500*time.Millisecond,
-		utilclock.RealClock{},
+		clock.RealClock{},
 	)
 
 	b.ResetTimer()

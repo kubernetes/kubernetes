@@ -6,3 +6,4 @@ ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
 {{if .CloudKMSIntegration}}
   readonly CLOUD_KMS_INTEGRATION=true
 {{end}}
+readonly KUBE_API_SERVER_RUNASUSER={{.KubeAPIServerRunAsUser}}

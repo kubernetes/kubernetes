@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -153,4 +154,19 @@ func TestUndeltaStore(t *testing.T) {
 
 func TestIndex(t *testing.T) {
 	doTestIndex(t, NewIndexer(testStoreKeyFunc, testStoreIndexers()))
+}
+
+func TestKeyError(t *testing.T) {
+	obj := 100
+	err := errors.New("error")
+	keyErr := KeyError{obj, err}
+
+	if errors.Unwrap(keyErr) != err {
+		t.Errorf("expected unwrap error: %v", err)
+	}
+
+	nestedKeyErr := KeyError{obj, keyErr}
+	if !errors.Is(keyErr, err) || !errors.Is(nestedKeyErr, err) {
+		t.Errorf("not match target error: %v", err)
+	}
 }

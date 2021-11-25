@@ -58,6 +58,7 @@ type ServerRunOptions struct {
 	EgressSelector          *genericoptions.EgressSelectorOptions
 	Metrics                 *metrics.Options
 	Logs                    *logs.Options
+	Traces                  *genericoptions.TracingOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -71,10 +72,10 @@ type ServerRunOptions struct {
 	// of parsing ServiceClusterIPRange into actual values
 	PrimaryServiceClusterIPRange   net.IPNet
 	SecondaryServiceClusterIPRange net.IPNet
+	// APIServerServiceIP is the first valid IP from PrimaryServiceClusterIPRange
+	APIServerServiceIP net.IP
 
 	ServiceNodePortRange utilnet.PortRange
-	SSHKeyfile           string
-	SSHUser              string
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
@@ -110,6 +111,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
 		Metrics:                 metrics.NewOptions(),
 		Logs:                    logs.NewOptions(),
+		Traces:                  genericoptions.NewTracingOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
@@ -180,6 +182,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
+	s.Traces.AddFlags(fss.FlagSet("traces"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
@@ -193,16 +196,6 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
 	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
-
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
-		"If non-empty, use secure SSH proxy to the nodes, using this user name")
-	fs.MarkDeprecated("ssh-user", "This flag will be removed in a future version.")
-
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
-		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
-	fs.MarkDeprecated("ssh-keyfile", "This flag will be removed in a future version.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -227,20 +220,15 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
 
-	// TODO (khenidak) change documentation as we move IPv6DualStack feature from ALPHA to BETA
 	fs.StringVar(&s.ServiceClusterIPRanges, "service-cluster-ip-range", s.ServiceClusterIPRanges, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
-		"overlap with any IP ranges assigned to nodes or pods.")
+		"overlap with any IP ranges assigned to nodes or pods. Max of two dual-stack CIDRs is allowed.")
 
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
 		"A port range to reserve for services with NodePort visibility. "+
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 
 	// Kubelet related flags:
-	kubeletHTTPS := true
-	fs.BoolVar(&kubeletHTTPS, "kubelet-https", kubeletHTTPS, "Use https for kubelet connections.")
-	fs.MarkDeprecated("kubelet-https", "API Server connections to kubelets always use https. This flag will be removed in 1.22.")
-
 	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
 		"List of the preferred NodeAddressTypes to use for kubelet connections.")
 

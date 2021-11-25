@@ -1431,7 +1431,7 @@ Service Level Indicators (SLIs) and Service Level Objectives (SLOs) for the syst
 Here's the release [scalability validation report].
 
 [SIG Scalability]: https://github.com/kubernetes/community/tree/master/sig-scalability
-[scalability validation report]: https://github.com/kubernetes/enhancements/tree/master/release-1.8/scalability_validation_report.md
+[scalability validation report]: https://github.com/kubernetes/sig-release/blob/master/releases/release-1.8/scalability_validation_report.md
 
 ### SIG Scheduling
 

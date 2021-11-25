@@ -151,7 +151,7 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLockConfig, kubeconfig *restclient.Config, renewDeadline time.Duration) (Interface, error) {
 	// shallow copy, do not modify the kubeconfig
 	config := *kubeconfig
-	timeout := ((renewDeadline / time.Millisecond) / 2) * time.Millisecond
+	timeout := renewDeadline / 2
 	if timeout < time.Second {
 		timeout = time.Second
 	}

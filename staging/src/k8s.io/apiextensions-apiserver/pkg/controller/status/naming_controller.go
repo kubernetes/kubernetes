@@ -288,8 +288,8 @@ func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting NamingConditionController")
-	defer klog.Infof("Shutting down NamingConditionController")
+	klog.Info("Starting NamingConditionController")
+	defer klog.Info("Shutting down NamingConditionController")
 
 	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return

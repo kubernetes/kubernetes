@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,17 +47,13 @@ type Controller struct {
 	pvListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
-
-	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
-	storageObjectInUseProtectionEnabled bool
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
+func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
-		client:                              cl,
-		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
-		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
+		client: cl,
+		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -76,31 +72,31 @@ func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer
 }
 
 // Run runs the controller goroutines.
-func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting PV protection controller")
 	defer klog.Infof("Shutting down PV protection controller")
 
-	if !cache.WaitForNamedCacheSync("PV protection", stopCh, c.pvListerSynced) {
+	if !cache.WaitForNamedCacheSync("PV protection", ctx.Done(), c.pvListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *Controller) runWorker() {
-	for c.processNextWorkItem() {
+func (c *Controller) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one pvcKey off the queue.  It returns false when it's time to quit.
-func (c *Controller) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	pvKey, quit := c.queue.Get()
 	if quit {
 		return false
@@ -109,7 +105,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	pvName := pvKey.(string)
 
-	err := c.processPV(pvName)
+	err := c.processPV(ctx, pvName)
 	if err == nil {
 		c.queue.Forget(pvKey)
 		return true
@@ -121,7 +117,7 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Controller) processPV(pvName string) error {
+func (c *Controller) processPV(ctx context.Context, pvName string) error {
 	klog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
 	defer func() {
@@ -142,8 +138,9 @@ func (c *Controller) processPV(pvName string) error {
 		// it's not.
 		isUsed := c.isBeingUsed(pv)
 		if !isUsed {
-			return c.removeFinalizer(pv)
+			return c.removeFinalizer(ctx, pv)
 		}
+		klog.V(4).Infof("Keeping PV %s because it is being used", pvName)
 	}
 
 	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) {
@@ -151,19 +148,15 @@ func (c *Controller) processPV(pvName string) error {
 		// finalizer should be added by admission plugin, this is just to add
 		// the finalizer to old PVs that were created before the admission
 		// plugin was enabled.
-		return c.addFinalizer(pv)
+		return c.addFinalizer(ctx, pv)
 	}
 	return nil
 }
 
-func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
-	// Skip adding Finalizer in case the StorageObjectInUseProtection feature is not enabled
-	if !c.storageObjectInUseProtectionEnabled {
-		return nil
-	}
+func (c *Controller) addFinalizer(ctx context.Context, pv *v1.PersistentVolume) error {
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone, metav1.UpdateOptions{})
+	_, err := c.client.CoreV1().PersistentVolumes().Update(ctx, pvClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
@@ -172,10 +165,10 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	return nil
 }
 
-func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
+func (c *Controller) removeFinalizer(ctx context.Context, pv *v1.PersistentVolume) error {
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone, metav1.UpdateOptions{})
+	_, err := c.client.CoreV1().PersistentVolumes().Update(ctx, pvClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
 		return err

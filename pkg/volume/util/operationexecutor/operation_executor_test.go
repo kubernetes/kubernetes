@@ -77,6 +77,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachableAndNonDevi
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -102,6 +104,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForDeviceMountablePlugins(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -161,6 +165,8 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins(t *testi
 }
 
 func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numDevicesToUnmount)
@@ -182,6 +188,8 @@ func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
 }
 
 func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -210,6 +218,8 @@ func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToSameNode(t *testi
 }
 
 func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -238,6 +248,8 @@ func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToSameNode(t *testin
 }
 
 func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToDifferentNodes(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -294,6 +306,8 @@ func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToDifferentNodes(t *
 }
 
 func TestOperationExecutor_DetachSingleNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
@@ -322,6 +336,8 @@ func TestOperationExecutor_DetachSingleNodeVolumeConcurrentlyFromSameNode(t *tes
 }
 
 func TestOperationExecutor_DetachMultiNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
@@ -411,6 +427,8 @@ func TestOperationExecutor_VerifyVolumesAreAttachedConcurrentlyOnDifferentNodes(
 }
 
 func TestOperationExecutor_VerifyControllerAttachedVolumeConcurrently(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToVerifyControllerAttached)
@@ -460,6 +478,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins_Vo
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins_VolumeMode_Block(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -527,6 +547,8 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins_VolumeMo
 }
 
 func TestOperationExecutor_UnmountDeviceConcurrently_VolumeMode_Block(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numDevicesToUnmap)
@@ -563,63 +585,63 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 }
 
 func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}
 }
 func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}
 }
 func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -627,9 +649,19 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(v
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() volumetypes.OperationContext {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -637,9 +669,9 @@ func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentV
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -651,9 +683,9 @@ func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(
 	pluginNane string,
 	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
 	actualStateOfWorldAttacherUpdater ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -661,9 +693,9 @@ func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(
 }
 
 func (fopg *fakeOperationGenerator) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -671,9 +703,9 @@ func (fopg *fakeOperationGenerator) GenerateMapVolumeFunc(waitForAttachTimeout t
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
@@ -681,9 +713,9 @@ func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount Moun
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() (error, error) {
+	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,

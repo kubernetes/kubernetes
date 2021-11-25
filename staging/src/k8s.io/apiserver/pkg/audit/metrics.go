@@ -17,6 +17,7 @@ limitations under the License.
 package audit
 
 import (
+	"context"
 	"fmt"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -31,7 +32,7 @@ const (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -84,13 +85,13 @@ func init() {
 }
 
 // ObserveEvent updates the relevant prometheus metrics for the generated audit event.
-func ObserveEvent() {
-	eventCounter.Inc()
+func ObserveEvent(ctx context.Context) {
+	eventCounter.WithContext(ctx).Inc()
 }
 
 // ObservePolicyLevel updates the relevant prometheus metrics with the audit level for a request.
-func ObservePolicyLevel(level auditinternal.Level) {
-	levelCounter.WithLabelValues(string(level)).Inc()
+func ObservePolicyLevel(ctx context.Context, level auditinternal.Level) {
+	levelCounter.WithContext(ctx).WithLabelValues(string(level)).Inc()
 }
 
 // HandlePluginError handles an error that occurred in an audit plugin. This method should only be

@@ -11,11 +11,12 @@
 },
 "spec":{
 "securityContext": {
+  {{runAsUser}}
+  {{runAsGroup}}
+  {{supplementalGroups}}
   "seccompProfile": {
       "type": "RuntimeDefault"
-  },
-  "runAsUser": {{runAsUser}},
-  "runAsGroup": {{runAsGroup}}
+  }
 },
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
@@ -46,7 +47,8 @@
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
-        "port": 10252,
+        "port": 10257,
+        "scheme": "HTTPS",
         "path": "/healthz"
       },
       "initialDelaySeconds": 15,

@@ -86,7 +86,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1041-9}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1308-1}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -419,7 +419,7 @@ EVICTION_HARD="${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,node
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 
 # Optional: install a default StorageClass
-ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
+ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-false}"
 
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
@@ -513,14 +513,6 @@ CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
 
 export SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
 
-# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
-# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
-ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
-# Override default Node Termination Handler Image
-if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
-fi
-
 # Taint Windows nodes by default to prevent Linux workloads from being
 # scheduled onto them.
 WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSchedule}"
@@ -552,7 +544,7 @@ export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
 
 # ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
-export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-5s}"
 
 # Optional: Install Pigz on Windows.
 # Pigz is a multi-core optimized version of unzip.exe.
@@ -560,6 +552,18 @@ export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
 # unzipping the image layers to disk.
 export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 
-# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. 
+# Enable Windows DSR (Direct Server Return)
+export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
+
+# Install Node Problem Detector (NPD) on Windows nodes.
+# NPD analyzes the host for problems that can disrupt workloads.
+export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
+export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
+# Enable Windows Hyper-V
+# sig-storage uses it to create Virtual Hard Disks in tests
+export WINDOWS_ENABLE_HYPERV="${WINDOWS_ENABLE_HYPERV:-false}"
+
+# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""

@@ -1,3 +1,3 @@
 # redis
 
-Image to run Redis for our guestbook application.
+Image used to run Redis for our guestbook application.

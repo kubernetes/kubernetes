@@ -1,0 +1,13 @@
+.DS_Store
+Thumbs.db
+
+.tools/
+.idea/
+.vscode/
+*.iml
+*.so
+coverage.*
+example
+
+instrumentation/google.golang.org/grpc/otelgrpc/example/server/server
+instrumentation/google.golang.org/grpc/otelgrpc/example/client/client

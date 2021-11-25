@@ -1,3 +1,4 @@
+//go:build !windows && !dockerless
 // +build !windows,!dockerless
 
 /*
@@ -20,7 +21,7 @@ package dockershim
 
 import (
 	dockertypes "github.com/docker/docker/api/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type containerCleanupInfo struct{}

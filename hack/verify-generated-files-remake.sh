@@ -33,7 +33,7 @@ _tmpdir="$(kube::realpath "$(mktemp -d -t verify-generated-files.XXXXXX)")"
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
 mkdir -p "${_tmp_kuberoot}/.."
-git worktree add "${_tmp_kuberoot}"
+git worktree add "${_tmp_kuberoot}" HEAD
 kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot} && rm -rf ${_tmpdir}" EXIT
 cd "${_tmp_kuberoot}"
 
@@ -301,7 +301,7 @@ make generated_files >/dev/null
 X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
-./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after touching src file:"
@@ -346,7 +346,7 @@ make generated_files UPDATE_API_KNOWN_VIOLATIONS=true >/dev/null
 X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
-./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after updating violation files:"

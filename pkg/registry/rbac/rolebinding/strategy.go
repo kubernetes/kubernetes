@@ -74,6 +74,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateRoleBinding(roleBinding)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*rbac.RoleBinding)
@@ -84,6 +87,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*rbac.RoleBinding)
 	errorList := validation.ValidateRoleBinding(newObj)
 	return append(errorList, validation.ValidateRoleBindingUpdate(newObj, old.(*rbac.RoleBinding))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by

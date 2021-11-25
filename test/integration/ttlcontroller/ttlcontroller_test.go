@@ -134,17 +134,17 @@ func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, 
 
 // Test whether ttlcontroller sets correct ttl annotations.
 func TestTTLAnnotations(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()
 	ttlc := ttl.NewTTLController(nodeInformer, testClient)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go nodeInformer.Informer().Run(stopCh)
-	go ttlc.Run(1, stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go nodeInformer.Informer().Run(ctx.Done())
+	go ttlc.Run(ctx, 1)
 
 	// Create 100 nodes all should have annotation equal to 0.
 	createNodes(t, testClient, 0, 100)

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -23,9 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
@@ -33,27 +32,29 @@ import (
 
 func (kl *Kubelet) initNetworkUtil() {
 	exec := utilexec.New()
-
-	// At this point in startup we don't know the actual node IPs, so we configure dual stack iptables
-	// rules if the node _might_ be dual-stack, and single-stack based on requested nodeIPs[0] otherwise.
-	maybeDualStack := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
+	// TODO: @khenidak review when there is no IPv6 iptables exec  what should happen here (note: no error returned from this func)
 	ipv6Primary := kl.nodeIPs != nil && utilnet.IsIPv6(kl.nodeIPs[0])
 
 	var iptClients []utiliptables.Interface
 	var protocols []utiliptables.Protocol
-	if maybeDualStack || !ipv6Primary {
-		protocols = append(protocols, utiliptables.ProtocolIPv4)
-		iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv4))
-	}
-	if maybeDualStack || ipv6Primary {
-		protocols = append(protocols, utiliptables.ProtocolIPv6)
-		iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv6))
+
+	// assume 4,6
+	protocols = append(protocols, utiliptables.ProtocolIPv4)
+	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv4))
+
+	protocols = append(protocols, utiliptables.ProtocolIPv6)
+	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv6))
+
+	// and if they are not
+	if ipv6Primary {
+		protocols[0], protocols[1] = protocols[1], protocols[0]
+		iptClients[0], iptClients[1] = iptClients[1], iptClients[0]
 	}
 
 	for i := range iptClients {
 		iptClient := iptClients[i]
 		if kl.syncNetworkUtil(iptClient) {
-			klog.Infof("Initialized %s iptables rules.", protocols[i])
+			klog.InfoS("Initialized protocol iptables rules.", "protocol", protocols[i])
 			go iptClient.Monitor(
 				utiliptables.Chain("KUBE-KUBELET-CANARY"),
 				[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
@@ -61,7 +62,7 @@ func (kl *Kubelet) initNetworkUtil() {
 				1*time.Minute, wait.NeverStop,
 			)
 		} else {
-			klog.Warningf("Failed to initialize %s iptables rules; some functionality may be missing.", protocols[i])
+			klog.InfoS("Failed to initialize protocol iptables rules; some functionality may be missing.", "protocol", protocols[i])
 		}
 	}
 }
@@ -76,22 +77,22 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 	// Setup KUBE-MARK-DROP rules
 	dropMark := getIPTablesMark(kl.iptablesDropBit)
 	if _, err := iptClient.EnsureChain(utiliptables.TableNAT, KubeMarkDropChain); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubeMarkDropChain, err)
+		klog.ErrorS(err, "Failed to ensure that nat chain exists KUBE-MARK-DROP chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubeMarkDropChain, "-j", "MARK", "--or-mark", dropMark); err != nil {
-		klog.Errorf("Failed to ensure marking rule for %v: %v", KubeMarkDropChain, err)
+		klog.ErrorS(err, "Failed to ensure marking rule for KUBE-MARK-DROP chain")
 		return false
 	}
 	if _, err := iptClient.EnsureChain(utiliptables.TableFilter, KubeFirewallChain); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableFilter, KubeFirewallChain, err)
+		klog.ErrorS(err, "Failed to ensure that filter table exists KUBE-FIREWALL chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
 		"-m", "comment", "--comment", "kubernetes firewall for dropping marked packets",
 		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", dropMark, dropMark),
 		"-j", "DROP"); err != nil {
-		klog.Errorf("Failed to ensure rule to drop packet marked by %v in %v chain %v: %v", KubeMarkDropChain, utiliptables.TableFilter, KubeFirewallChain, err)
+		klog.ErrorS(err, "Failed to ensure rule to drop packet marked by the KUBE-MARK-DROP in KUBE-FIREWALL chain")
 		return false
 	}
 
@@ -105,37 +106,37 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 			"-m", "conntrack",
 			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
 			"-j", "DROP"); err != nil {
-			klog.Errorf("Failed to ensure rule to drop invalid localhost packets in %v chain %v: %v", utiliptables.TableFilter, KubeFirewallChain, err)
+			klog.ErrorS(err, "Failed to ensure rule to drop invalid localhost packets in filter table KUBE-FIREWALL chain")
 			return false
 		}
 	}
 
 	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainOutput, "-j", string(KubeFirewallChain)); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableFilter, utiliptables.ChainOutput, KubeFirewallChain, err)
+		klog.ErrorS(err, "Failed to ensure that filter table  from OUTPUT chain jumps to KUBE-FIREWALL chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainInput, "-j", string(KubeFirewallChain)); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableFilter, utiliptables.ChainInput, KubeFirewallChain, err)
+		klog.ErrorS(err, "Failed to ensure that filter table INPUT chain jumps to KUBE-FIREWALL chain")
 		return false
 	}
 
 	// Setup KUBE-MARK-MASQ rules
 	masqueradeMark := getIPTablesMark(kl.iptablesMasqueradeBit)
 	if _, err := iptClient.EnsureChain(utiliptables.TableNAT, KubeMarkMasqChain); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubeMarkMasqChain, err)
+		klog.ErrorS(err, "Failed to ensure that nat table exists KUBE-MARK-MASQ chain")
 		return false
 	}
 	if _, err := iptClient.EnsureChain(utiliptables.TableNAT, KubePostroutingChain); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubePostroutingChain, err)
+		klog.ErrorS(err, "Failed to ensure that nat table exists kube POSTROUTING chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubeMarkMasqChain, "-j", "MARK", "--or-mark", masqueradeMark); err != nil {
-		klog.Errorf("Failed to ensure marking rule for %v: %v", KubeMarkMasqChain, err)
+		klog.ErrorS(err, "Failed to ensure marking rule for KUBE-MARK-MASQ chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPostrouting,
 		"-m", "comment", "--comment", "kubernetes postrouting rules", "-j", string(KubePostroutingChain)); err != nil {
-		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, KubePostroutingChain, err)
+		klog.ErrorS(err, "Failed to ensure that nat table from POSTROUTING chain jumps to KUBE-POSTROUTING chain")
 		return false
 	}
 
@@ -145,7 +146,7 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain,
 		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", masqueradeMark, masqueradeMark),
 		"-j", "RETURN"); err != nil {
-		klog.Errorf("Failed to ensure filtering rule for %v: %v", KubePostroutingChain, err)
+		klog.ErrorS(err, "Failed to ensure filtering rule for KUBE-POSTROUTING chain")
 		return false
 	}
 	// Clear the mark to avoid re-masquerading if the packet re-traverses the network stack.
@@ -153,7 +154,7 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 	// to Sprintf another bitmask).
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain,
 		"-j", "MARK", "--xor-mark", masqueradeMark); err != nil {
-		klog.Errorf("Failed to ensure unmarking rule for %v: %v", KubePostroutingChain, err)
+		klog.ErrorS(err, "Failed to ensure unmarking rule for KUBE-POSTROUTING chain")
 		return false
 	}
 	masqRule := []string{
@@ -164,7 +165,7 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 		masqRule = append(masqRule, "--random-fully")
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain, masqRule...); err != nil {
-		klog.Errorf("Failed to ensure SNAT rule for packets marked by %v in %v chain %v: %v", KubeMarkMasqChain, utiliptables.TableNAT, KubePostroutingChain, err)
+		klog.ErrorS(err, "Failed to ensure SNAT rule for packets marked by KUBE-MARK-MASQ chain in nat table KUBE-POSTROUTING chain")
 		return false
 	}
 

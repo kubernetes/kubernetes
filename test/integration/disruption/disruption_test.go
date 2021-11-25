@@ -22,9 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/api/policy/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -78,7 +82,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 
 	pdbc := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
@@ -86,6 +90,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		client,
 		mapper,
 		scaleClient,
+		client.Discovery(),
 	)
 	return server, pdbc, informers, clientSet, apiExtensionClient, dynamicClient
 }
@@ -104,17 +109,16 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 
 	crdDefinition := newCustomResourceDefinition()
 	etcd.CreateTestCRDs(t, apiExtensionClient, true, crdDefinition)
-	gvr := schema.GroupVersionResource{Group: crdDefinition.Spec.Group, Version: crdDefinition.Spec.Version, Resource: crdDefinition.Spec.Names.Plural}
+	gvr := schema.GroupVersionResource{Group: crdDefinition.Spec.Group, Version: crdDefinition.Spec.Versions[0].Name, Resource: crdDefinition.Spec.Names.Plural}
 	resourceClient := dynamicClient.Resource(gvr).Namespace(nsName)
 
 	replicas := 4
 	maxUnavailable := int32(2)
-	podLabelValue := "test-crd"
 
 	resource := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crdDefinition.Spec.Names.Kind,
-			"apiVersion": crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Version,
+			"apiVersion": crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      "resource",
 				"namespace": nsName,
@@ -130,40 +134,42 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	}
 
 	trueValue := true
-	ownerRef := metav1.OwnerReference{
-		Name:       resource.GetName(),
-		Kind:       crdDefinition.Spec.Names.Kind,
-		APIVersion: crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Version,
-		UID:        createdResource.GetUID(),
-		Controller: &trueValue,
+	ownerRefs := []metav1.OwnerReference{
+		{
+			Name:       resource.GetName(),
+			Kind:       crdDefinition.Spec.Names.Kind,
+			APIVersion: crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Versions[0].Name,
+			UID:        createdResource.GetUID(),
+			Controller: &trueValue,
+		},
 	}
 	for i := 0; i < replicas; i++ {
-		createPod(t, fmt.Sprintf("pod-%d", i), nsName, podLabelValue, clientSet, ownerRef)
+		createPod(t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
 	}
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
 
-	pdb := &v1beta1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pdb",
 		},
-		Spec: v1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: maxUnavailable,
 			},
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": podLabelValue},
+				MatchLabels: map[string]string{"app": "test-crd"},
 			},
 		},
 	}
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Error creating PodDisruptionBudget: %v", err)
 	}
 
 	waitPDBStable(t, clientSet, 4, nsName, pdb.Name)
 
-	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdb.Name, metav1.GetOptions{})
+	newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdb.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Error getting PodDisruptionBudget: %v", err)
 	}
@@ -179,15 +185,211 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	}
 }
 
-func createPod(t *testing.T, name, namespace, labelValue string, clientSet clientset.Interface, ownerRef metav1.OwnerReference) {
+func TestEmptySelector(t *testing.T) {
+	testcases := []struct {
+		name                   string
+		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		expectedCurrentHealthy int32
+	}{
+		{
+			name: "v1beta1 should not target any pods",
+			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+				pdb := &v1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: v1beta1.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvailable,
+						Selector:     &metav1.LabelSelector{},
+					},
+				}
+				_, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				return err
+			},
+			expectedCurrentHealthy: 0,
+		},
+		{
+			name: "v1 should target all pods",
+			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+				pdb := &policyv1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: policyv1.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvailable,
+						Selector:     &metav1.LabelSelector{},
+					},
+				}
+				_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				return err
+			},
+			expectedCurrentHealthy: 4,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, pdbc, informers, clientSet, _, _ := setup(t)
+			defer s.TearDownFn()
+
+			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
+			createNs(t, nsName, clientSet)
+
+			stopCh := make(chan struct{})
+			informers.Start(stopCh)
+			go pdbc.Run(stopCh)
+			defer close(stopCh)
+
+			replicas := 4
+			minAvailable := intstr.FromInt(2)
+
+			for j := 0; j < replicas; j++ {
+				createPod(t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
+					clientSet, []metav1.OwnerReference{})
+			}
+
+			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
+
+			pdbName := "test-pdb"
+			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+				t.Errorf("Error creating PodDisruptionBudget: %v", err)
+			}
+
+			waitPDBStable(t, clientSet, tc.expectedCurrentHealthy, nsName, pdbName)
+
+			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdbName, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Error getting PodDisruptionBudget: %v", err)
+			}
+
+			if expected, found := tc.expectedCurrentHealthy, newPdb.Status.CurrentHealthy; expected != found {
+				t.Errorf("Expected %d, but found %d", expected, found)
+			}
+		})
+	}
+}
+
+func TestSelectorsForPodsWithoutLabels(t *testing.T) {
+	testcases := []struct {
+		name                   string
+		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		expectedCurrentHealthy int32
+	}{
+		{
+			name: "pods with no labels can be targeted by v1 PDBs with empty selector",
+			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+				pdb := &policyv1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: policyv1.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvailable,
+						Selector:     &metav1.LabelSelector{},
+					},
+				}
+				_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				return err
+			},
+			expectedCurrentHealthy: 1,
+		},
+		{
+			name: "pods with no labels can be targeted by v1 PDBs with DoesNotExist selector",
+			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+				pdb := &policyv1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: policyv1.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvailable,
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "DoesNotExist",
+									Operator: metav1.LabelSelectorOpDoesNotExist,
+								},
+							},
+						},
+					},
+				}
+				_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				return err
+			},
+			expectedCurrentHealthy: 1,
+		},
+		{
+			name: "pods with no labels can be targeted by v1beta1 PDBs with DoesNotExist selector",
+			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+				pdb := &v1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: v1beta1.PodDisruptionBudgetSpec{
+						MinAvailable: &minAvailable,
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "DoesNotExist",
+									Operator: metav1.LabelSelectorOpDoesNotExist,
+								},
+							},
+						},
+					},
+				}
+				_, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				return err
+			},
+			expectedCurrentHealthy: 1,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, pdbc, informers, clientSet, _, _ := setup(t)
+			defer s.TearDownFn()
+
+			nsName := fmt.Sprintf("pdb-selectors-%d", i)
+			createNs(t, nsName, clientSet)
+
+			stopCh := make(chan struct{})
+			informers.Start(stopCh)
+			go pdbc.Run(stopCh)
+			defer close(stopCh)
+
+			minAvailable := intstr.FromInt(1)
+
+			// Create the PDB first and wait for it to settle.
+			pdbName := "test-pdb"
+			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+				t.Errorf("Error creating PodDisruptionBudget: %v", err)
+			}
+			waitPDBStable(t, clientSet, 0, nsName, pdbName)
+
+			// Create a pod and wait for it be reach the running phase.
+			createPod(t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
+			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodRunning)
+
+			// Then verify that the added pod are picked up by the disruption controller.
+			waitPDBStable(t, clientSet, 1, nsName, pdbName)
+
+			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdbName, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Error getting PodDisruptionBudget: %v", err)
+			}
+
+			if expected, found := tc.expectedCurrentHealthy, newPdb.Status.CurrentHealthy; expected != found {
+				t.Errorf("Expected %d, but found %d", expected, found)
+			}
+		})
+	}
+}
+
+func createPod(t *testing.T, name, namespace string, labels map[string]string, clientSet clientset.Interface, ownerRefs []metav1.OwnerReference) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    map[string]string{"app": labelValue},
-			OwnerReferences: []metav1.OwnerReference{
-				ownerRef,
-			},
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			OwnerReferences: ownerRefs,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -231,23 +433,30 @@ func addPodConditionReady(pod *v1.Pod) {
 	}
 }
 
-func newCustomResourceDefinition() *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+func newCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "crds.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   "crds",
 				Singular: "crd",
 				Kind:     "Crd",
 				ListKind: "CrdList",
 			},
-			Scope: apiextensionsv1beta1.NamespaceScoped,
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-					SpecReplicasPath:   ".spec.replicas",
-					StatusReplicasPath: ".status.replicas",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+						},
+					},
 				},
 			},
 		},
@@ -260,7 +469,7 @@ func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns
 		if err != nil {
 			return false, err
 		}
-		if pdb.Status.CurrentHealthy != podNum {
+		if pdb.Status.ObservedGeneration == 0 || pdb.Status.CurrentHealthy != podNum {
 			return false, nil
 		}
 		return true, nil

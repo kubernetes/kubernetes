@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -43,7 +44,7 @@ import (
 // `DockerLegacyService`, and we want to be able to build the `kubelet` without
 // relying on `github.com/docker/docker` or `pkg/kubelet/dockershim`.
 //
-// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20200205-build-kubelet-without-docker.md
+// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/1547-building-kubelet-without-docker/README.md
 // for details.
 
 // GetContainerLogs get container logs directly from docker daemon.
@@ -85,7 +86,7 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 	}
 	err = d.client.Logs(containerID.ID, opts, sopts)
 	if errors.Is(err, errMaximumWrite) {
-		klog.V(2).Infof("finished logs, hit byte limit %d", *logOptions.LimitBytes)
+		klog.V(2).InfoS("Finished logs, hit byte limit", "byteLimit", *logOptions.LimitBytes)
 		err = nil
 	}
 	return err

@@ -279,9 +279,7 @@ func printMissingMetricsNodeLine(out io.Writer, nodeName string) {
 	unknownMetricsStatus := "<unknown>"
 	for i := 0; i < len(MeasuredResources); i++ {
 		printValue(out, unknownMetricsStatus)
-		printValue(out, "\t")
 		printValue(out, unknownMetricsStatus)
-		printValue(out, "\t")
 	}
 	fmt.Fprint(out, "\n")
 }

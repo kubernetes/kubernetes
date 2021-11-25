@@ -91,12 +91,11 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
-	allInfos := infos
-	infos = removeTerminatedContainerInfo(infos)
+
+	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
-	for key, cinfo := range infos {
+	for key, cinfo := range filteredInfos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
 		// entries in our summary. For details on .mount units:
@@ -144,11 +143,11 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 		logStats, err := p.hostStatsProvider.getPodLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, &rootFsInfo)
 		if err != nil {
-			klog.Errorf("Unable to fetch pod log stats: %v", err)
+			klog.ErrorS(err, "Unable to fetch pod log stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
 		}
 		etcHostsStats, err := p.hostStatsProvider.getPodEtcHostsStats(podUID, &rootFsInfo)
 		if err != nil {
-			klog.Errorf("unable to fetch pod etc hosts stats: %v", err)
+			klog.ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
 		}
 
 		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, logStats, etcHostsStats, false)
@@ -186,12 +185,10 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
-	allInfos := infos
-	infos = removeTerminatedContainerInfo(infos)
+	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
-	for key, cinfo := range infos {
+	for key, cinfo := range filteredInfos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
 		// entries in our summary. For details on .mount units:
@@ -294,39 +291,41 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		klog.Warningf(
-			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
-			podName, podNamespace)
+		klog.InfoS(
+			"Expect container to have either both podName and podNamespace labels, or neither",
+			"podNameLabel", podName, "podNamespaceLabel", podNamespace)
 	}
 	return managed
 }
 
 // getCadvisorPodInfoFromPodUID returns a pod cgroup information by matching the podUID with its CgroupName identifier base name
 func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapiv2.ContainerInfo) *cadvisorapiv2.ContainerInfo {
-	for key, info := range infos {
-		if cm.IsSystemdStyleName(key) {
-			// Convert to internal cgroup name and take the last component only.
-			internalCgroupName := cm.ParseSystemdToCgroupName(key)
-			key = internalCgroupName[len(internalCgroupName)-1]
-		} else {
-			// Take last component only.
-			key = path.Base(key)
-		}
-		if cm.GetPodCgroupNameSuffix(podUID) == key {
-			return &info
-		}
+	if info, found := infos[cm.GetPodCgroupNameSuffix(podUID)]; found {
+		return &info
 	}
 	return nil
 }
 
-// removeTerminatedContainerInfo returns the specified containerInfo but with
-// the stats of the terminated containers removed.
-//
+// filterTerminatedContainerInfoAndAssembleByPodCgroupKey returns the specified containerInfo but with
+// the stats of the terminated containers removed and all containerInfos assembled by pod cgroup key.
+// the first return map is container cgroup name <-> ContainerInfo and
+// the second return map is pod cgroup key <-> ContainerInfo.
 // A ContainerInfo is considered to be of a terminated container if it has an
 // older CreationTime and zero CPU instantaneous and memory RSS usage.
-func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.ContainerInfo) map[string]cadvisorapiv2.ContainerInfo {
+func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
 	cinfoMap := make(map[containerID][]containerInfoWithCgroup)
+	cinfosByPodCgroupKey := make(map[string]cadvisorapiv2.ContainerInfo)
 	for key, cinfo := range containerInfo {
+		var podCgroupKey string
+		if cm.IsSystemdStyleName(key) {
+			// Convert to internal cgroup name and take the last component only.
+			internalCgroupName := cm.ParseSystemdToCgroupName(key)
+			podCgroupKey = internalCgroupName[len(internalCgroupName)-1]
+		} else {
+			// Take last component only.
+			podCgroupKey = path.Base(key)
+		}
+		cinfosByPodCgroupKey[podCgroupKey] = cinfo
 		if !isPodManagedContainer(&cinfo) {
 			continue
 		}
@@ -353,7 +352,7 @@ func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.Contai
 			}
 		}
 	}
-	return result
+	return result, cinfosByPodCgroupKey
 }
 
 // ByCreationTime implements sort.Interface for []containerInfoWithCgroup based
@@ -412,7 +411,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			klog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+			klog.ErrorS(err, "Partial failure issuing cadvisor.ContainerInfoV2")
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}

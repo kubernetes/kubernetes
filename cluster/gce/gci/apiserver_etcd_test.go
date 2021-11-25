@@ -17,26 +17,29 @@ limitations under the License.
 package gci
 
 import (
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 type kubeAPIServeETCDEnv struct {
-	KubeHome            string
-	ETCDServers         string
-	ETCDServersOverride string
-	CAKey               string
-	CACert              string
-	CACertPath          string
-	APIServerKey        string
-	APIServerCert       string
-	APIServerCertPath   string
-	APIServerKeyPath    string
-	ETCDKey             string
-	ETCDCert            string
-	StorageBackend      string
-	StorageMediaType    string
-	CompactionInterval  string
+	KubeHome               string
+	KubeAPIServerRunAsUser string
+	ETCDServers            string
+	ETCDServersOverride    string
+	CAKey                  string
+	CACert                 string
+	CACertPath             string
+	APIServerKey           string
+	APIServerCert          string
+	APIServerCertPath      string
+	APIServerKeyPath       string
+	ETCDKey                string
+	ETCDCert               string
+	StorageBackend         string
+	StorageMediaType       string
+	CompactionInterval     string
 }
 
 func TestServerOverride(t *testing.T) {
@@ -52,7 +55,7 @@ func TestServerOverride(t *testing.T) {
 			},
 		},
 		{
-			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES iare set",
+			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES are set",
 			env: kubeAPIServeETCDEnv{
 				ETCDServers:         "ETCDServers",
 				ETCDServersOverride: "ETCDServersOverrides",
@@ -68,6 +71,7 @@ func TestServerOverride(t *testing.T) {
 			c := newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil)
 			defer c.tearDown()
 			tc.env.KubeHome = c.kubeHome
+			tc.env.KubeAPIServerRunAsUser = strconv.Itoa(os.Getuid())
 
 			c.mustInvokeFunc(
 				tc.env,
@@ -109,7 +113,7 @@ func TestStorageOptions(t *testing.T) {
 			},
 		},
 		{
-			desc: "storage options not not supplied",
+			desc: "storage options are not supplied",
 			env:  kubeAPIServeETCDEnv{},
 			dontWant: []string{
 				"--storage-backend",
@@ -124,6 +128,7 @@ func TestStorageOptions(t *testing.T) {
 			c := newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil)
 			defer c.tearDown()
 			tc.env.KubeHome = c.kubeHome
+			tc.env.KubeAPIServerRunAsUser = strconv.Itoa(os.Getuid())
 
 			c.mustInvokeFunc(
 				tc.env,
@@ -188,6 +193,7 @@ func TestTLSFlags(t *testing.T) {
 			c := newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil)
 			defer c.tearDown()
 			tc.env.KubeHome = c.kubeHome
+			tc.env.KubeAPIServerRunAsUser = strconv.Itoa(os.Getuid())
 
 			c.mustInvokeFunc(
 				tc.env,

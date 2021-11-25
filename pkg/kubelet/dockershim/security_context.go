@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -24,7 +25,7 @@ import (
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
@@ -43,6 +44,7 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 			ReadonlyRootfs:     lc.SecurityContext.ReadonlyRootfs,
 			SelinuxOptions:     lc.SecurityContext.SelinuxOptions,
 			NamespaceOptions:   lc.SecurityContext.NamespaceOptions,
+			Privileged:         lc.SecurityContext.Privileged,
 		}
 	}
 

@@ -38,12 +38,5 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
-
-	// TODO (SergeyKanzhelev): priority should change after 1.21. See https://github.com/kubernetes/kubernetes/pull/95718#discussion_r520969477
-	// This is what controls the preferred serialization version. Add both v1beta1 and v1 here, and prefer v1beta1 over v1 until 1.21. See the comment on test/integration/etcd around serialized version.
-	//
-	// Details on why we can't advance the storage version for a release are at https://kubernetes.io/docs/reference/using-api/deprecation-policy/:
-	//
-	// > Rule #4b: The "preferred" API version and the "storage version" for a given group may not advance until after a release has been made that supports both the new version and the previous version
-	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion))
 }

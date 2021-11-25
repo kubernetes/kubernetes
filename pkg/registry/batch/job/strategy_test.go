@@ -20,8 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -31,18 +35,42 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
-func newBool(a bool) *bool {
-	return &a
-}
-
-func newInt32(i int32) *int32 {
-	return &i
-}
+var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
 func TestJobStrategy(t *testing.T) {
-	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
+	cases := map[string]struct {
+		indexedJobEnabled             bool
+		suspendJobEnabled             bool
+		trackingWithFinalizersEnabled bool
+	}{
+		"features disabled": {},
+		"indexed job enabled": {
+			indexedJobEnabled: true,
+		},
+		"suspend job enabled": {
+			suspendJobEnabled: true,
+		},
+		"new job tracking enabled": {
+			trackingWithFinalizersEnabled: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
+			testJobStrategy(t)
+		})
+	}
+}
+
+func testJobStrategy(t *testing.T) {
+	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
+	suspendJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob)
+	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -68,12 +96,20 @@ func TestJobStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob",
 			Namespace: metav1.NamespaceDefault,
+			Annotations: map[string]string{
+				"foo": "bar",
+			},
+			ResourceVersion: "0",
 		},
 		Spec: batch.JobSpec{
-			Selector:                validSelector,
-			Template:                validPodTemplateSpec,
-			TTLSecondsAfterFinished: newInt32(0), // Set TTL
-			ManualSelector:          newBool(true),
+			Selector:       validSelector,
+			Template:       validPodTemplateSpec,
+			ManualSelector: pointer.BoolPtr(true),
+			Completions:    pointer.Int32Ptr(2),
+			// Set gated values.
+			Suspend:                 pointer.BoolPtr(true),
+			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+			CompletionMode:          completionModePtr(batch.IndexedCompletion),
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -84,60 +120,103 @@ func TestJobStrategy(t *testing.T) {
 	if job.Status.Active != 0 {
 		t.Errorf("Job does not allow setting status on create")
 	}
+	if job.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", job.Generation)
+	}
 	errs := Strategy.Validate(ctx, job)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	if ttlEnabled && job.Spec.TTLSecondsAfterFinished == nil {
-		// When the TTL feature is enabled, the TTL field can be set
-		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
+		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
 	}
-	if !ttlEnabled && job.Spec.TTLSecondsAfterFinished != nil {
-		// When the TTL feature is disabled, the TTL field cannot be set
-		t.Errorf("Job should not allow setting .spec.ttlSecondsAfterFinished when %v feature is disabled", features.TTLAfterFinished)
+	if !suspendJobEnabled && (job.Spec.Suspend != nil) {
+		t.Errorf("Job should allow setting .spec.suspend only when %v feature is enabled", features.SuspendJob)
+	}
+	wantAnnotations := map[string]string{"foo": "bar"}
+	if trackingWithFinalizersEnabled {
+		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	}
+	if diff := cmp.Diff(wantAnnotations, job.Annotations); diff != "" {
+		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
 	}
 
 	parallelism := int32(10)
+
+	// ensure we do not change generation for non-spec updates
+	updatedLabelJob := job.DeepCopy()
+	updatedLabelJob.Labels = map[string]string{"a": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedLabelJob, job)
+	if updatedLabelJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", updatedLabelJob.Generation)
+	}
+	errs = Strategy.ValidateUpdate(ctx, updatedLabelJob, job)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected update validation error")
+	}
+
 	updatedJob := &batch.Job{
-		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "bar",
+			ResourceVersion: "4",
+			// remove one annotation and try to enforce the job tracking finalizer.
+			Annotations: map[string]string{batchv1.JobTrackingFinalizer: ""},
+		},
 		Spec: batch.JobSpec{
-			Parallelism:             &parallelism,
-			TTLSecondsAfterFinished: newInt32(1), // Update TTL
+			Parallelism: &parallelism,
+			Completions: pointer.Int32Ptr(2),
+			// Update gated features.
+			TTLSecondsAfterFinished: pointer.Int32Ptr(1),
+			CompletionMode:          completionModePtr(batch.IndexedCompletion), // No change because field is immutable.
 		},
 		Status: batch.JobStatus{
 			Active: 11,
 		},
 	}
-	// ensure we do not change status
+	// Ensure we do not change status
 	job.Status.Active = 10
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if updatedJob.Status.Active != 10 {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
+	if updatedJob.Generation != 2 {
+		t.Errorf("expected Generation=2, got %d", updatedJob.Generation)
+	}
+	wantAnnotations = make(map[string]string)
+	if trackingWithFinalizersEnabled {
+		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	}
+	if diff := cmp.Diff(wantAnnotations, updatedJob.Annotations); diff != "" {
+		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
+	}
+
 	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
-	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil || updatedJob.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+
+	// Ensure going from legacy tracking Job to tracking with finalizers is
+	// disallowed.
+	job = job.DeepCopy()
+	job.Annotations = nil
+	updatedJob = job.DeepCopy()
+	updatedJob.Annotations = map[string]string{batch.JobTrackingFinalizer: ""}
+	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
+	if len(errs) != 1 {
+		t.Errorf("Expected update validation error")
 	}
 
-	// set TTLSecondsAfterFinished on both old and new jobs
-	job.Spec.TTLSecondsAfterFinished = newInt32(1)
-	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
-
-	// Existing TTLSecondsAfterFinished should be preserved when feature is on
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, true)()
+	// Test updating suspend false->true and nil-> true when the feature gate is
+	// disabled. We don't care about other combinations.
+	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.BoolPtr(false), pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
-		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	if !suspendJobEnabled && *updatedJob.Spec.Suspend {
+		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from false to true", suspendJobEnabled)
 	}
-
-	// Existing TTLSecondsAfterFinished should be preserved when feature is off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, false)()
+	job.Spec.Suspend, updatedJob.Spec.Suspend = nil, pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
-		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	if !suspendJobEnabled && updatedJob.Spec.Suspend != nil {
+		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from nil to non-nil", suspendJobEnabled)
 	}
 
 	// Make sure we correctly implement the interface.
@@ -156,6 +235,246 @@ func TestJobStrategy(t *testing.T) {
 	}
 	if got, want := gcds.DefaultGarbageCollectionPolicy(otherVersionCtx), rest.DeleteDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	}
+}
+
+func TestJobStrategyValidateUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	validSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
+	validPodTemplateSpec := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	now := metav1.Now()
+	cases := map[string]struct {
+		job                                *batch.Job
+		update                             func(*batch.Job)
+		wantErrs                           field.ErrorList
+		trackingWithFinalizersEnabled      bool
+		mutableSchedulingDirectivesEnabled bool
+	}{
+		"update parallelism": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = pointer.Int32Ptr(2)
+			},
+		},
+		"update completions disallowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+					Completions:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
+			},
+		},
+		"adding tracking annotation disallowed, gate disabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations[batch.JobTrackingFinalizer] = ""
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
+			},
+		},
+		"adding tracking annotation disallowed, gate enabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations[batch.JobTrackingFinalizer] = ""
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
+			},
+			trackingWithFinalizersEnabled: true,
+		},
+		"preserving tracking annotation, feature disabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations: map[string]string{
+						batch.JobTrackingFinalizer: "",
+					},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				// change something.
+				job.Annotations["foo"] = "bar"
+			},
+		},
+		"updating node selector for unsuspended job disallowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+			mutableSchedulingDirectivesEnabled: true,
+		},
+		"updating node selector for suspended but previously started job disallowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+					Suspend:        pointer.BoolPtr(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+			mutableSchedulingDirectivesEnabled: true,
+		},
+		"updating node selector for suspended and not previously started job allowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+					Suspend:        pointer.BoolPtr(true),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			mutableSchedulingDirectivesEnabled: true,
+		},
+		"updating node selector whilte gate disabled disallowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+					Suspend:        pointer.BoolPtr(true),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+			mutableSchedulingDirectivesEnabled: false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, tc.mutableSchedulingDirectivesEnabled)()
+			newJob := tc.job.DeepCopy()
+			tc.update(newJob)
+			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -286,4 +605,8 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		JobToSelectableFields(&batch.Job{}),
 		nil,
 	)
+}
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
 }

@@ -34,36 +34,63 @@ func ExampleIsEnvironmentArgument_false() {
 	// Output: false
 }
 
-func ExampleIsValidEnvironmentArgument_true() {
-	test := "wordcharacters=true"
-	fmt.Println(IsValidEnvironmentArgument(test))
-	// Output: true
-}
-
-func ExampleIsValidEnvironmentArgument_false() {
-	test := "not$word^characters=test"
-	fmt.Println(IsValidEnvironmentArgument(test))
-	// Output: false
-}
-
 func ExampleSplitEnvironmentFromResources() {
 	args := []string{`resource`, "ENV\\=ARG", `ONE\=MORE`, `DASH-`}
 	fmt.Println(SplitEnvironmentFromResources(args))
 	// Output: [resource] [ENV\=ARG ONE\=MORE DASH-] true
 }
 
-func ExampleParseEnv_good() {
+func ExampleParseEnv_good_with_stdin() {
 	r := strings.NewReader("FROM=READER")
-	ss := []string{"ENV=VARIABLE", "AND=ANOTHER", "REMOVE-", "-"}
+	ss := []string{"ENV=VARIABLE", "ENV.TEST=VARIABLE", "AND=ANOTHER", "REMOVE-", "-"}
 	fmt.Println(ParseEnv(ss, r))
 	// Output:
-	// [{ENV VARIABLE nil} {AND ANOTHER nil} {FROM READER nil}] [REMOVE] <nil>
+	// [{ENV VARIABLE nil} {ENV.TEST VARIABLE nil} {AND ANOTHER nil} {FROM READER nil}] [REMOVE] true <nil>
 }
 
-func ExampleParseEnv_bad() {
+func ExampleParseEnv_good_with_stdin_and_error() {
+	r := strings.NewReader("FROM=READER")
+	ss := []string{"-", "This not in the key=value format."}
+	fmt.Println(ParseEnv(ss, r))
+	// Output:
+	// [] [] true "This not in the key" is not a valid key name: a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit (e.g. 'my.env-name',  or 'MY_ENV.NAME',  or 'MyEnvName1', regex used for validation is '[-._a-zA-Z][-._a-zA-Z0-9]*')
+}
+
+func ExampleParseEnv_good_without_stdin() {
+	ss := []string{"ENV=VARIABLE", "ENV.TEST=VARIABLE", "AND=ANOTHER", "REMOVE-"}
+	fmt.Println(ParseEnv(ss, nil))
+	// Output:
+	// [{ENV VARIABLE nil} {ENV.TEST VARIABLE nil} {AND ANOTHER nil}] [REMOVE] false <nil>
+}
+
+func ExampleParseEnv_bad_first() {
 	var r io.Reader
 	bad := []string{"This not in the key=value format."}
 	fmt.Println(ParseEnv(bad, r))
 	// Output:
-	// [] [] environment variables must be of the form key=value and can only contain letters, numbers, and underscores
+	// [] [] false "This not in the key" is not a valid key name: a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit (e.g. 'my.env-name',  or 'MY_ENV.NAME',  or 'MyEnvName1', regex used for validation is '[-._a-zA-Z][-._a-zA-Z0-9]*')
+}
+
+func ExampleParseEnv_bad_second() {
+	var r io.Reader
+	bad := []string{".=VARIABLE"}
+	fmt.Println(ParseEnv(bad, r))
+	// Output:
+	// [] [] false "." is not a valid key name: must not be '.'
+}
+
+func ExampleParseEnv_bad_third() {
+	var r io.Reader
+	bad := []string{"..=VARIABLE"}
+	fmt.Println(ParseEnv(bad, r))
+	// Output:
+	// [] [] false ".." is not a valid key name: must not be '..'
+}
+
+func ExampleParseEnv_bad_fourth() {
+	var r io.Reader
+	bad := []string{"..ENV=VARIABLE"}
+	fmt.Println(ParseEnv(bad, r))
+	// Output:
+	// [] [] false "..ENV" is not a valid key name: must not start with '..'
 }

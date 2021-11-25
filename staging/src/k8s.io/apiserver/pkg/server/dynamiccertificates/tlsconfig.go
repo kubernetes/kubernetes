@@ -175,7 +175,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 			return fmt.Errorf("unable to load client CA file %q: %v", string(newContent.clientCA.caBundle), err)
 		}
 		for i, cert := range newClientCAs {
-			klog.V(2).Infof("loaded client CA [%d/%q]: %s", i, c.clientCA.Name(), GetHumanCertDetail(cert))
+			klog.V(2).InfoS("Loaded client CA", "index", i, "certName", c.clientCA.Name(), "certDetail", GetHumanCertDetail(cert))
 			if c.eventRecorder != nil {
 				c.eventRecorder.Eventf(&corev1.ObjectReference{Name: c.clientCA.Name()}, nil, corev1.EventTypeWarning, "TLSConfigChanged", "CACertificateReload", "loaded client CA [%d/%q]: %s", i, c.clientCA.Name(), GetHumanCertDetail(cert))
 			}
@@ -197,7 +197,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 			return fmt.Errorf("invalid serving cert: %v", err)
 		}
 
-		klog.V(2).Infof("loaded serving cert [%q]: %s", c.servingCert.Name(), GetHumanCertDetail(x509Cert))
+		klog.V(2).InfoS("Loaded serving cert", "certName", c.servingCert.Name(), "certDetail", GetHumanCertDetail(x509Cert))
 		if c.eventRecorder != nil {
 			c.eventRecorder.Eventf(&corev1.ObjectReference{Name: c.servingCert.Name()}, nil, corev1.EventTypeWarning, "TLSConfigChanged", "ServingCertificateReload", "loaded serving cert [%q]: %s", c.servingCert.Name(), GetHumanCertDetail(x509Cert))
 		}
@@ -237,8 +237,8 @@ func (c *DynamicServingCertificateController) Run(workers int, stopCh <-chan str
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting DynamicServingCertificateController")
-	defer klog.Infof("Shutting down DynamicServingCertificateController")
+	klog.InfoS("Starting DynamicServingCertificateController")
+	defer klog.InfoS("Shutting down DynamicServingCertificateController")
 
 	// synchronously load once.  We will trigger again, so ignoring any error is fine
 	_ = c.RunOnce()

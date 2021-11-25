@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 )
@@ -210,8 +209,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
-				Image:     "nginx",
-				Generator: generateversioned.RunPodV1GeneratorName,
+				Image: "nginx",
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
@@ -234,20 +232,18 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 func TestGenerateService(t *testing.T) {
 	tests := []struct {
-		name             string
-		port             string
-		args             []string
-		serviceGenerator string
-		params           map[string]interface{}
-		expectErr        bool
-		service          corev1.Service
-		expectPOST       bool
+		name       string
+		port       string
+		args       []string
+		params     map[string]interface{}
+		expectErr  bool
+		service    corev1.Service
+		expectPOST bool
 	}{
 		{
-			name:             "basic",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "basic",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -276,10 +272,9 @@ func TestGenerateService(t *testing.T) {
 			expectPOST: true,
 		},
 		{
-			name:             "custom labels",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "custom labels",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name":   "foo",
 				"labels": "app=bar",
@@ -315,10 +310,9 @@ func TestGenerateService(t *testing.T) {
 			expectPOST: false,
 		},
 		{
-			name:             "dry-run",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "dry-run",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -411,7 +405,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params)
+			_, err = opts.generateService(tf, cmd, test.params)
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
@@ -500,6 +494,16 @@ func TestRunValidations(t *testing.T) {
 				"tty":   "true",
 			},
 			expectedErr: "stdin is required for containers with -t/--tty",
+		},
+		{
+			name: "test invalid override type error",
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":         "busybox",
+				"overrides":     "{}",
+				"override-type": "foo",
+			},
+			expectedErr: "invalid override type: foo",
 		},
 	}
 	for _, test := range tests {
@@ -633,5 +637,134 @@ func TestExpose(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestRunOverride(t *testing.T) {
+	tests := []struct {
+		name           string
+		overrides      string
+		overrideType   string
+		expectedOutput string
+	}{
+		{
+			name:         "run with merge override type should replace spec",
+			overrides:    `{"spec":{"containers":[{"name":"test","resources":{"limits":{"cpu":"200m"}}}]}}`,
+			overrideType: "merge",
+			expectedOutput: `apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: test
+  name: test
+  namespace: ns
+spec:
+  containers:
+  - name: test
+    resources:
+      limits:
+        cpu: 200m
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+`,
+		},
+		{
+			name:         "run with no override type specified, should perform an RFC7396 JSON Merge Patch",
+			overrides:    `{"spec":{"containers":[{"name":"test","resources":{"limits":{"cpu":"200m"}}}]}}`,
+			overrideType: "",
+			expectedOutput: `apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: test
+  name: test
+  namespace: ns
+spec:
+  containers:
+  - name: test
+    resources:
+      limits:
+        cpu: 200m
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+`,
+		},
+		{
+			name:         "run with strategic override type should merge spec, preserving container image",
+			overrides:    `{"spec":{"containers":[{"name":"test","resources":{"limits":{"cpu":"200m"}}}]}}`,
+			overrideType: "strategic",
+			expectedOutput: `apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: test
+  name: test
+  namespace: ns
+spec:
+  containers:
+  - image: busybox
+    name: test
+    resources:
+      limits:
+        cpu: 200m
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+`,
+		},
+		{
+			name: "run with json override type should perform add, replace, and remove operations",
+			overrides: `[
+				{"op": "add", "path": "/metadata/labels/foo", "value": "bar"},
+				{"op": "replace", "path": "/spec/containers/0/resources", "value": {"limits": {"cpu": "200m"}}},
+				{"op": "remove", "path": "/spec/dnsPolicy"}
+			]`,
+			overrideType: "json",
+			expectedOutput: `apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    foo: bar
+    run: test
+  name: test
+  namespace: ns
+spec:
+  containers:
+  - image: busybox
+    name: test
+    resources:
+      limits:
+        cpu: 200m
+  restartPolicy: Always
+status: {}
+`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("ns")
+			defer tf.Cleanup()
+
+			streams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+
+			cmd := NewCmdRun(tf, streams)
+			cmd.Flags().Set("dry-run", "client")
+			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("image", "busybox")
+			cmd.Flags().Set("overrides", test.overrides)
+			cmd.Flags().Set("override-type", test.overrideType)
+			cmd.Run(cmd, []string{"test"})
+
+			actualOutput := bufOut.String()
+			if actualOutput != test.expectedOutput {
+				t.Errorf("unexpected output.\n\nExpected:\n%v\nActual:\n%v", test.expectedOutput, actualOutput)
+			}
+		})
 	}
 }

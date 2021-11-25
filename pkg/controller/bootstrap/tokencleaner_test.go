@@ -17,11 +17,13 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -56,7 +58,7 @@ func TestCleanerNoExpiration(t *testing.T) {
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{}
 
@@ -73,13 +75,16 @@ func TestCleanerExpired(t *testing.T) {
 	addSecretExpiration(secret, timeString(-time.Hour))
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{
-		core.NewDeleteAction(
+		core.NewDeleteActionWithOptions(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			api.NamespaceSystem,
-			secret.ObjectMeta.Name),
+			secret.ObjectMeta.Name,
+			metav1.DeleteOptions{
+				Preconditions: metav1.NewUIDPreconditions(string(secret.UID)),
+			}),
 	}
 
 	verifyActions(t, expected, cl.Actions())
@@ -95,7 +100,7 @@ func TestCleanerNotExpired(t *testing.T) {
 	addSecretExpiration(secret, timeString(time.Hour))
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{}
 
@@ -114,7 +119,7 @@ func TestCleanerExpiredAt(t *testing.T) {
 	cleaner.enqueueSecrets(secret)
 	expected := []core.Action{}
 	verifyFunc := func() {
-		cleaner.processNextWorkItem()
+		cleaner.processNextWorkItem(context.TODO())
 		verifyActions(t, expected, cl.Actions())
 	}
 	// token has not expired currently
@@ -138,10 +143,13 @@ func TestCleanerExpiredAt(t *testing.T) {
 
 	// secret was eventually deleted
 	expected = []core.Action{
-		core.NewDeleteAction(
+		core.NewDeleteActionWithOptions(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			api.NamespaceSystem,
-			secret.ObjectMeta.Name),
+			secret.ObjectMeta.Name,
+			metav1.DeleteOptions{
+				Preconditions: metav1.NewUIDPreconditions(string(secret.UID)),
+			}),
 	}
 	verifyFunc()
 }

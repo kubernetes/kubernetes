@@ -42,6 +42,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -83,13 +84,13 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
-			klog.V(4).Infof("Using node IP: %q", nodeIP.String())
+			klog.V(4).InfoS("Using node IP", "IP", nodeIP.String())
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
 				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
 			}
-			klog.V(4).Infof("Using secondary node IP: %q", secondaryNodeIP.String())
+			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
 		if externalCloudProvider {
@@ -149,13 +150,13 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				// prefer addresses of the matching family
 				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
 				for _, nodeAddress := range cloudNodeAddresses {
-					ip := net.ParseIP(nodeAddress.Address)
+					ip := netutils.ParseIPSloppy(nodeAddress.Address)
 					if ip == nil || isPreferredIPFamily(ip) {
 						sortedAddresses = append(sortedAddresses, nodeAddress)
 					}
 				}
 				for _, nodeAddress := range cloudNodeAddresses {
-					ip := net.ParseIP(nodeAddress.Address)
+					ip := netutils.ParseIPSloppy(nodeAddress.Address)
 					if ip != nil && !isPreferredIPFamily(ip) {
 						sortedAddresses = append(sortedAddresses, nodeAddress)
 					}
@@ -191,11 +192,11 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 
 				if existingHostnameAddress == nil {
 					// no existing Hostname address found, add it
-					klog.Warningf("adding overridden hostname of %v to cloudprovider-reported addresses", hostname)
+					klog.InfoS("Adding overridden hostname to cloudprovider-reported addresses", "hostname", hostname)
 					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
 				} else if existingHostnameAddress.Address != hostname {
 					// override the Hostname address reported by the cloud provider
-					klog.Warningf("replacing cloudprovider-reported hostname of %v with overridden hostname of %v", existingHostnameAddress.Address, hostname)
+					klog.InfoS("Replacing cloudprovider-reported hostname with overridden hostname", "cloudProviderHostname", existingHostnameAddress.Address, "overriddenHostname", hostname)
 					existingHostnameAddress.Address = hostname
 				}
 			}
@@ -219,7 +220,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			// unless nodeIP is "::", in which case it is reversed.
 			if nodeIPSpecified {
 				ipAddr = nodeIP
-			} else if addr := net.ParseIP(hostname); addr != nil {
+			} else if addr := netutils.ParseIPSloppy(hostname); addr != nil {
 				ipAddr = addr
 			} else {
 				var addrs []net.IP
@@ -300,7 +301,7 @@ func MachineInfo(nodeName string,
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
-			klog.Errorf("Error getting machine info: %v", err)
+			klog.ErrorS(err, "Error getting machine info")
 		} else {
 			node.Status.NodeInfo.MachineID = info.MachineID
 			node.Status.NodeInfo.SystemUUID = info.SystemUUID
@@ -340,13 +341,13 @@ func MachineInfo(nodeName string,
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
 				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-					klog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
+					klog.V(2).InfoS("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
 				}
 				node.Status.Capacity[k] = v
 			}
 
 			for _, removedResource := range removedDevicePlugins {
-				klog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
+				klog.V(2).InfoS("Set capacity for removed resource to 0 on device removal", "device", removedResource)
 				// Set the capacity of the removed resource to 0 instead of
 				// removing the resource from the node status. This is to indicate
 				// that the resource is managed by device plugin and had been
@@ -386,7 +387,7 @@ func MachineInfo(nodeName string,
 
 		for k, v := range devicePluginAllocatable {
 			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-				klog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+				klog.V(2).InfoS("Updated allocatable", "device", k, "allocatable", v.Value())
 			}
 			node.Status.Allocatable[k] = v
 		}
@@ -574,7 +575,7 @@ func ReadyCondition(
 				recordEventFunc(v1.EventTypeNormal, events.NodeReady)
 			} else {
 				recordEventFunc(v1.EventTypeNormal, events.NodeNotReady)
-				klog.Infof("Node became not ready: %+v", newNodeReadyCondition)
+				klog.InfoS("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
 			}
 		}
 		return nil
@@ -792,7 +793,7 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 		for _, volumePlugin := range pluginWithLimits {
 			attachLimits, err := volumePlugin.GetVolumeLimits()
 			if err != nil {
-				klog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+				klog.V(4).InfoS("Skipping volume limits for volume plugin", "plugin", volumePlugin.GetPluginName())
 				continue
 			}
 			for limitKey, value := range attachLimits {

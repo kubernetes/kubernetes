@@ -33,6 +33,7 @@ const (
 // unlockpt should be called before opening the slave side of a pty.
 func unlockpt(f *os.File) error {
 	var u int32
+	// XXX do not use unix.IoctlSetPointerInt here, see commit dbd69c59b81.
 	if _, _, err := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.TIOCSPTLCK, uintptr(unsafe.Pointer(&u))); err != 0 {
 		return err
 	}
@@ -42,6 +43,7 @@ func unlockpt(f *os.File) error {
 // ptsname retrieves the name of the first available pts for the given master.
 func ptsname(f *os.File) (string, error) {
 	var u uint32
+	// XXX do not use unix.IoctlGetInt here, see commit dbd69c59b81.
 	if _, _, err := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.TIOCGPTN, uintptr(unsafe.Pointer(&u))); err != 0 {
 		return "", err
 	}

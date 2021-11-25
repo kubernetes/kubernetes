@@ -26,6 +26,27 @@ import (
 	"k8s.io/client-go/transport"
 )
 
+// HTTPClientFor returns an http.Client that will provide the authentication
+// or transport level security defined by the provided Config. Will return the
+// default http.DefaultClient if no special case behavior is needed.
+func HTTPClientFor(config *Config) (*http.Client, error) {
+	transport, err := TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+	var httpClient *http.Client
+	if transport != http.DefaultTransport || config.Timeout > 0 {
+		httpClient = &http.Client{
+			Transport: transport,
+			Timeout:   config.Timeout,
+		}
+	} else {
+		httpClient = http.DefaultClient
+	}
+
+	return httpClient, nil
+}
+
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func TLSConfigFor(config *Config) (*tls.Config, error) {
@@ -83,6 +104,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		BearerTokenFile: c.BearerTokenFile,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
+			UID:      c.Impersonate.UID,
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},

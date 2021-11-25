@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -43,23 +44,36 @@ func TestNormalizeWindowsPath(t *testing.T) {
 }
 
 func TestValidateDiskNumber(t *testing.T) {
-	diskNum := "0"
-	if err := ValidateDiskNumber(diskNum); err != nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
+	tests := []struct {
+		diskNum     string
+		expectError bool
+	}{
+		{
+			diskNum:     "0",
+			expectError: false,
+		},
+		{
+			diskNum:     "invalid",
+			expectError: true,
+		},
+		{
+			diskNum:     "99",
+			expectError: false,
+		},
+		{
+			diskNum:     "100",
+			expectError: false,
+		},
+		{
+			diskNum:     "200",
+			expectError: false,
+		},
 	}
 
-	diskNum = "99"
-	if err := ValidateDiskNumber(diskNum); err != nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-
-	diskNum = "ab"
-	if err := ValidateDiskNumber(diskNum); err == nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-
-	diskNum = "100"
-	if err := ValidateDiskNumber(diskNum); err == nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
+	for _, test := range tests {
+		err := ValidateDiskNumber(test.diskNum)
+		if (err != nil) != test.expectError {
+			t.Errorf("TestValidateDiskNumber test failed, disk number: %s, error: %v", test.diskNum, err)
+		}
 	}
 }

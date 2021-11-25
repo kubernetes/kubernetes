@@ -45,7 +45,7 @@ func TestGetMetrics(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.google.gcepd",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
@@ -114,7 +114,7 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.simple.SimpleDriver",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(false /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())

@@ -51,17 +51,17 @@ import (
 
 var (
 	diffLong = templates.LongDesc(i18n.T(`
-		Diff configurations specified by filename or stdin between the current online
+		Diff configurations specified by file name or stdin between the current online
 		configuration, and the configuration as it would be if applied.
 
-		Output is always YAML.
+		The output is always YAML.
 
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. Users can use external commands with params too, example:
 		KUBECTL_EXTERNAL_DIFF="colordiff -N -u"
 
 		By default, the "diff" command available in your path will be
-		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.
+		run with the "-u" (unified diff) and "-N" (treat absent files as empty) options.
 
 		Exit status:
 		 0
@@ -74,7 +74,7 @@ var (
 		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.`))
 
 	diffExample = templates.Examples(i18n.T(`
-		# Diff resources included in pod.json.
+		# Diff resources included in pod.json
 		kubectl diff -f pod.json
 
 		# Diff file read from stdin
@@ -83,6 +83,13 @@ var (
 
 // Number of times we try to diff before giving-up
 const maxRetries = 4
+
+// Constants for masking sensitive values
+const (
+	sensitiveMaskDefault = "***"
+	sensitiveMaskBefore  = "*** (before)"
+	sensitiveMaskAfter   = "*** (after)"
+)
 
 // diffError returns the ExitError if the status code is less than 1,
 // nil otherwise.
@@ -132,7 +139,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Diff live version against would-be applied version"),
+		Short:                 i18n.T("Diff the live version against a would-be applied version"),
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -152,6 +159,14 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			}
 		},
 	}
+
+	// Flag errors exit with code 1, however according to the diff
+	// command it means changes were found.
+	// Thus, it should return status code greater than 1.
+	cmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
+		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, err.Error()))
+		return nil
+	})
 
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -177,8 +192,8 @@ func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 		diff = diffCommand[0]
 
 		if len(diffCommand) > 1 {
-			// Regex accepts: Alphanumeric (case-insensitive) and dash
-			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-]+$`).MatchString
+			// Regex accepts: Alphanumeric (case-insensitive), dash and equal
+			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-=]+$`).MatchString
 			for i := 1; i < len(diffCommand); i++ {
 				if isValidChar(diffCommand[i]) {
 					args = append(args, diffCommand[i])
@@ -257,17 +272,13 @@ func (v *DiffVersion) getObject(obj Object) (runtime.Object, error) {
 }
 
 // Print prints the object using the printer into a new file in the directory.
-func (v *DiffVersion) Print(obj Object, printer Printer) error {
-	vobj, err := v.getObject(obj)
-	if err != nil {
-		return err
-	}
-	f, err := v.Dir.NewFile(obj.Name())
+func (v *DiffVersion) Print(name string, obj runtime.Object, printer Printer) error {
+	f, err := v.Dir.NewFile(name)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	return printer.Print(vobj, f)
+	return printer.Print(obj, f)
 }
 
 // Directory creates a new temp directory, and allows to easily create new files.
@@ -407,6 +418,125 @@ func (obj InfoObject) Name() string {
 	)
 }
 
+// toUnstructured converts a runtime.Object into an unstructured.Unstructured object.
+func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	c, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj.DeepCopyObject())
+	if err != nil {
+		return nil, fmt.Errorf("convert to unstructured: %w", err)
+	}
+	u := &unstructured.Unstructured{}
+	u.SetUnstructuredContent(c)
+	return u, nil
+}
+
+// Masker masks sensitive values in an object while preserving diff-able
+// changes.
+//
+// All sensitive values in the object will be masked with a fixed-length
+// asterisk mask. If two values are different, an additional suffix will
+// be added so they can be diff-ed.
+type Masker struct {
+	from *unstructured.Unstructured
+	to   *unstructured.Unstructured
+}
+
+func NewMasker(from, to runtime.Object) (*Masker, error) {
+	// Convert objects to unstructured
+	f, err := toUnstructured(from)
+	if err != nil {
+		return nil, fmt.Errorf("convert to unstructured: %w", err)
+	}
+	t, err := toUnstructured(to)
+	if err != nil {
+		return nil, fmt.Errorf("convert to unstructured: %w", err)
+	}
+
+	// Run masker
+	m := &Masker{
+		from: f,
+		to:   t,
+	}
+	if err := m.run(); err != nil {
+		return nil, fmt.Errorf("run masker: %w", err)
+	}
+	return m, nil
+}
+
+// dataFromUnstructured returns the underlying nested map in the data key.
+func (m Masker) dataFromUnstructured(u *unstructured.Unstructured) (map[string]interface{}, error) {
+	if u == nil {
+		return nil, nil
+	}
+	data, found, err := unstructured.NestedMap(u.UnstructuredContent(), "data")
+	if err != nil {
+		return nil, fmt.Errorf("get nested map: %w", err)
+	}
+	if !found {
+		return nil, nil
+	}
+	return data, nil
+}
+
+// run compares and patches sensitive values.
+func (m *Masker) run() error {
+	// Extract nested map object
+	from, err := m.dataFromUnstructured(m.from)
+	if err != nil {
+		return fmt.Errorf("extract 'data' field: %w", err)
+	}
+	to, err := m.dataFromUnstructured(m.to)
+	if err != nil {
+		return fmt.Errorf("extract 'data' field: %w", err)
+	}
+
+	for k := range from {
+		// Add before/after suffix when key exists on both
+		// objects and are not equal, so that it will be
+		// visible in diffs.
+		if _, ok := to[k]; ok {
+			if from[k] != to[k] {
+				from[k] = sensitiveMaskBefore
+				to[k] = sensitiveMaskAfter
+				continue
+			}
+			to[k] = sensitiveMaskDefault
+		}
+		from[k] = sensitiveMaskDefault
+	}
+	for k := range to {
+		// Mask remaining keys that were not in 'from'
+		if _, ok := from[k]; !ok {
+			to[k] = sensitiveMaskDefault
+		}
+	}
+
+	// Patch objects with masked data
+	if m.from != nil && from != nil {
+		if err := unstructured.SetNestedMap(m.from.UnstructuredContent(), from, "data"); err != nil {
+			return fmt.Errorf("patch masked data: %w", err)
+		}
+	}
+	if m.to != nil && to != nil {
+		if err := unstructured.SetNestedMap(m.to.UnstructuredContent(), to, "data"); err != nil {
+			return fmt.Errorf("patch masked data: %w", err)
+		}
+	}
+	return nil
+}
+
+// From returns the masked version of the 'from' object.
+func (m *Masker) From() runtime.Object {
+	return m.from
+}
+
+// To returns the masked version of the 'to' object.
+func (m *Masker) To() runtime.Object {
+	return m.to
+}
+
 // Differ creates two DiffVersion and diffs them.
 type Differ struct {
 	From *DiffVersion
@@ -431,10 +561,28 @@ func NewDiffer(from, to string) (*Differ, error) {
 
 // Diff diffs to versions of a specific object, and print both versions to directories.
 func (d *Differ) Diff(obj Object, printer Printer) error {
-	if err := d.From.Print(obj, printer); err != nil {
+	from, err := d.From.getObject(obj)
+	if err != nil {
 		return err
 	}
-	if err := d.To.Print(obj, printer); err != nil {
+	to, err := d.To.getObject(obj)
+	if err != nil {
+		return err
+	}
+
+	// Mask secret values if object is V1Secret
+	if gvk := to.GetObjectKind().GroupVersionKind(); gvk.Version == "v1" && gvk.Kind == "Secret" {
+		m, err := NewMasker(from, to)
+		if err != nil {
+			return err
+		}
+		from, to = m.From(), m.To()
+	}
+
+	if err := d.From.Print(obj.Name(), from, printer); err != nil {
+		return err
+	}
+	if err := d.To.Print(obj.Name(), to, printer); err != nil {
 		return err
 	}
 	return nil
@@ -487,7 +635,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, o.DiscoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, f.OpenAPIGetter())
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

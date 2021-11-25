@@ -62,8 +62,8 @@ function configure-etcd-params {
 #   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
-  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
-  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}"
+  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
+  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -95,6 +95,9 @@ function start-kube-apiserver {
   if [[ -n "${TLS_CIPHER_SUITES:-}" ]]; then
     params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
   fi
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    params+=" $(gke-kube-apiserver-internal-sni-param)"
+  fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
@@ -113,7 +116,11 @@ function start-kube-apiserver {
   if [[ -n "${SERVICEACCOUNT_CERT_PATH:-}" ]]; then
     params+=" --service-account-key-file=${SERVICEACCOUNT_CERT_PATH}"
   fi
-  params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  local known_tokens_file='/etc/srv/kubernetes/known_tokens.csv'
+  if [[ -f "${known_tokens_file}" ]]; then
+    chown "${KUBE_API_SERVER_RUNASUSER:-0}":"${KUBE_API_SERVER_RUNASGROUP:-0}" "${known_tokens_file}"
+  fi
+  params+=" --token-auth-file=${known_tokens_file}"
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"
@@ -269,16 +276,11 @@ function start-kube-apiserver {
   fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
-    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
-      params+=" --ssh-user=${PROXY_SSH_USER}"
-      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
-    fi
   elif [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(get-metadata-value "instance/network-interfaces/0/access-configs/0/external-ip")
-    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
-      params+=" --advertise-address=${vm_external_ip}"
-      params+=" --ssh-user=${PROXY_SSH_USER}"
-      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    params+=" --advertise-address=${vm_external_ip}"
+    if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" ]]; then
+      chown -R "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy/
     fi
   fi
 
@@ -404,6 +406,25 @@ function start-kube-apiserver {
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
   sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
+
+  if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" && -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
+    sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_API_SERVER_RUNASUSER},@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@\"runAsGroup\": ${KUBE_API_SERVER_RUNASGROUP},@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@\"securityContext\": { \"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"] } },@g" "${src_file}"
+    local supplementalGroups="${KUBE_PKI_READERS_GROUP}"
+    if [[ -n "${KMS_PLUGIN_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KMS_PLUGIN_SOCKET_WRITER_GROUP}"
+    fi
+    if [[ -n "${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP}"
+    fi
+    sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${supplementalGroups} ],@g" "${src_file}"
+  else
+    sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
+  fi
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

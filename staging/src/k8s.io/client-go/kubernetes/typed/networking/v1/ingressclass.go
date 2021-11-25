@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type IngressClassInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.IngressClassList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.IngressClass, err error)
+	Apply(ctx context.Context, ingressClass *networkingv1.IngressClassApplyConfiguration, opts metav1.ApplyOptions) (result *v1.IngressClass, err error)
 	IngressClassExpansion
 }
 
@@ -161,6 +165,31 @@ func (c *ingressClasses) Patch(ctx context.Context, name string, pt types.PatchT
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied ingressClass.
+func (c *ingressClasses) Apply(ctx context.Context, ingressClass *networkingv1.IngressClassApplyConfiguration, opts metav1.ApplyOptions) (result *v1.IngressClass, err error) {
+	if ingressClass == nil {
+		return nil, fmt.Errorf("ingressClass provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(ingressClass)
+	if err != nil {
+		return nil, err
+	}
+	name := ingressClass.Name
+	if name == nil {
+		return nil, fmt.Errorf("ingressClass.Name must be provided to Apply")
+	}
+	result = &v1.IngressClass{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("ingressclasses").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

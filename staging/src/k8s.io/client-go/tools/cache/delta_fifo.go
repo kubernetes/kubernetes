@@ -20,10 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/klog/v2"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // DeltaFIFOOptions is the configuration parameters for DeltaFIFO. All are
@@ -121,7 +123,7 @@ type DeltaFIFO struct {
 	knownObjects KeyListerGetter
 
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
-	// Currently, not used to gate any of CRED operations.
+	// Currently, not used to gate any of CRUD operations.
 	closed bool
 
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
@@ -153,7 +155,7 @@ const (
 // change happened, and the object's state after* that change.
 //
 // [*] Unless the change is a deletion, and then you'll get the final
-//     state of the object before it was deleted.
+// state of the object before it was deleted.
 type Delta struct {
 	Type   DeltaType
 	Object interface{}
@@ -174,9 +176,10 @@ type Deltas []Delta
 // modifications.
 //
 // TODO: consider merging keyLister with this object, tracking a list of
-//       "known" keys when Pop() is called. Have to think about how that
-//       affects error retrying.
-// NOTE: It is possible to misuse this and cause a race when using an
+// "known" keys when Pop() is called. Have to think about how that
+// affects error retrying.
+//
+//       NOTE: It is possible to misuse this and cause a race when using an
 //       external known object source.
 //       Whether there is a potential race depends on how the consumer
 //       modifies knownObjects. In Pop(), process function is called under
@@ -185,8 +188,7 @@ type Deltas []Delta
 //
 //       Example:
 //       In case of sharedIndexInformer being a consumer
-//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
-//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
 //       there is no race as knownObjects (s.indexer) is modified safely
 //       under DeltaFIFO's lock. The only exceptions are GetStore() and
 //       GetIndexer() methods, which expose ways to modify the underlying
@@ -340,7 +342,7 @@ func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
 	}
-	id, err := f.KeyOf(deltas.Newest().Object)
+	id, err := f.KeyOf(deltas)
 	if err != nil {
 		return KeyError{obj, err}
 	}
@@ -373,13 +375,8 @@ func dedupDeltas(deltas Deltas) Deltas {
 	a := &deltas[n-1]
 	b := &deltas[n-2]
 	if out := isDup(a, b); out != nil {
-		// `a` and `b` are duplicates. Only keep the one returned from isDup().
-		// TODO: This extra array allocation and copy seems unnecessary if
-		// all we do to dedup is compare the new delta with the last element
-		// in `items`, which could be done by mutating `items` directly.
-		// Might be worth profiling and investigating if it is safe to optimize.
-		d := append(Deltas{}, deltas[:n-2]...)
-		return append(d, *out)
+		deltas[n-2] = *out
+		return deltas[:n-1]
 	}
 	return deltas
 }
@@ -461,8 +458,8 @@ func (f *DeltaFIFO) listLocked() []interface{} {
 func (f *DeltaFIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
+	list := make([]string, 0, len(f.queue))
+	for _, key := range f.queue {
 		list = append(list, key)
 	}
 	return list
@@ -531,6 +528,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		}
 		id := f.queue[0]
 		f.queue = f.queue[1:]
+		depth := len(f.queue)
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
 		}
@@ -541,6 +539,18 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			continue
 		}
 		delete(f.items, id)
+		// Only log traces if the queue depth is greater than 10 and it takes more than
+		// 100 milliseconds to process one item from the queue.
+		// Queue depth never goes high because processing an item is locking the queue,
+		// and new items can't be added until processing finish.
+		// https://github.com/kubernetes/kubernetes/issues/103789
+		if depth > 10 {
+			trace := utiltrace.New("DeltaFIFO Pop Process",
+				utiltrace.Field{Key: "ID", Value: id},
+				utiltrace.Field{Key: "Depth", Value: depth},
+				utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
+			defer trace.LogIfLong(100 * time.Millisecond)
+		}
 		err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
 			f.addIfNotPresent(id, item)
@@ -562,7 +572,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // of the Deltas associated with K.  Otherwise the pre-existing keys
 // are those listed by `f.knownObjects` and the current object of K is
 // what `f.knownObjects.GetByKey(K)` returns.
-func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
+func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	keys := make(sets.String, len(list))

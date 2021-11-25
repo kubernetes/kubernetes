@@ -39,16 +39,20 @@ type ResourceID struct {
 
 // Equal returns true if two resource IDs are equal.
 func (r *ResourceID) Equal(other *ResourceID) bool {
-	if r.ProjectID != other.ProjectID || r.Resource != other.Resource {
-		return false
+	switch {
+	case r == nil && other == nil:
+	  return true
+	case r == nil || other == nil:
+	  return false
+	case r.ProjectID != other.ProjectID || r.Resource != other.Resource:
+	  return false
+	case r.Key != nil && other.Key != nil:
+	  return *r.Key == *other.Key
+	case r.Key == nil && other.Key == nil:
+	  return true
+	default:
+	  return false
 	}
-	if r.Key != nil && other.Key != nil {
-		return *r.Key == *other.Key
-	}
-	if r.Key == nil && other.Key == nil {
-		return true
-	}
-	return false
 }
 
 // RelativeResourceName returns the relative resource name string

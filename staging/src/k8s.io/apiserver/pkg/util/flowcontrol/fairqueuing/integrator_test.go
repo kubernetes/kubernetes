@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testclock "k8s.io/utils/clock/testing"
 )
 
 func TestIntegrator(t *testing.T) {
 	now := time.Now()
-	clk := clock.NewFakeClock(now)
+	clk := testclock.NewFakeClock(now)
 	igr := NewIntegrator(clk)
 	igr.Add(3)
 	clk.Step(time.Second)
@@ -38,7 +38,7 @@ func TestIntegrator(t *testing.T) {
 	if !results.Equal(&rToo) {
 		t.Errorf("expected %#+v, got %#+v", results, rToo)
 	}
-	igr.Set(2)
+	igr.Observe(2)
 	results = igr.GetResults()
 	if e := (IntegratorResults{Duration: 0, Average: math.NaN(), Deviation: math.NaN(), Min: 2, Max: 3}); !e.Equal(&results) {
 		t.Errorf("expected %#+v, got %#+v", e, results)

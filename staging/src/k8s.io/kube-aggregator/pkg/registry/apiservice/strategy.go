@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type apiServerStrategy struct {
@@ -40,14 +41,28 @@ type apiServerStrategy struct {
 
 // apiServerStrategy must implement rest.RESTCreateUpdateStrategy
 var _ rest.RESTCreateUpdateStrategy = apiServerStrategy{}
+var Strategy = apiServerStrategy{}
 
 // NewStrategy creates a new apiServerStrategy.
-func NewStrategy(typer runtime.ObjectTyper) rest.RESTCreateUpdateStrategy {
+func NewStrategy(typer runtime.ObjectTyper) rest.CreateUpdateResetFieldsStrategy {
 	return apiServerStrategy{typer, names.SimpleNameGenerator}
 }
 
 func (apiServerStrategy) NamespaceScoped() bool {
 	return false
+}
+
+func (apiServerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"apiregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
@@ -70,6 +85,11 @@ func (apiServerStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidateAPIService(obj.(*apiregistration.APIService))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (apiServerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 func (apiServerStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
@@ -85,18 +105,38 @@ func (apiServerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (apiServerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type apiServerStatusStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // NewStatusStrategy creates a new apiServerStatusStrategy.
-func NewStatusStrategy(typer runtime.ObjectTyper) rest.RESTUpdateStrategy {
+func NewStatusStrategy(typer runtime.ObjectTyper) rest.UpdateResetFieldsStrategy {
 	return apiServerStatusStrategy{typer, names.SimpleNameGenerator}
 }
 
 func (apiServerStatusStrategy) NamespaceScoped() bool {
 	return false
+}
+
+func (apiServerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"apiregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+	}
+
+	return fields
 }
 
 func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -124,6 +164,11 @@ func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
 // ValidateUpdate validates an update of apiServerStatusStrategy.
 func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (apiServerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns the labels and fields of an API server for filtering purposes.

@@ -26,7 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -136,11 +136,11 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	}
 }
 
-func newCRDInstance(definition *apiextensionsv1beta1.CustomResourceDefinition, namespace, name string) *unstructured.Unstructured {
+func newCRDInstance(definition *apiextensionsv1.CustomResourceDefinition, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       definition.Spec.Names.Kind,
-			"apiVersion": definition.Spec.Group + "/" + definition.Spec.Version,
+			"apiVersion": definition.Spec.Group + "/" + definition.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      name,
 				"namespace": namespace,
@@ -180,18 +180,18 @@ func createRandomCustomResourceDefinition(
 	t *testing.T, apiExtensionClient apiextensionsclientset.Interface,
 	dynamicClient dynamic.Interface,
 	namespace string,
-) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.ResourceInterface) {
+) (*apiextensionsv1.CustomResourceDefinition, dynamic.ResourceInterface) {
 	// Create a random custom resource definition and ensure it's available for
 	// use.
-	definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
 
-	definition, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
 
 	// Get a client for the custom resource.
-	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Versions[0].Name, Resource: definition.Spec.Names.Plural}
 
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 
@@ -226,7 +226,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	if err != nil {
 		t.Fatalf("error creating extension clientset: %v", err)
 	}
-	// CreateNewCustomResourceDefinition wants to use this namespace for verifying
+	// CreateCRDUsingRemovedAPI wants to use this namespace for verifying
 	// namespace-scoped CRD creation.
 	createNamespaceOrDie("aval", clientSet, t)
 
@@ -258,9 +258,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	tearDown := func() {
-		close(stopCh)
+		cancel()
 		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
@@ -270,9 +270,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
-		}, syncPeriod, stopCh)
-		go gc.Run(workers, stopCh)
-		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
+		}, syncPeriod, ctx.Done())
+		go gc.Run(ctx, workers)
+		go gc.Sync(clientSet.Discovery(), syncPeriod, ctx.Done())
 	}
 
 	if workerCount > 0 {
@@ -366,17 +366,16 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	}
 	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)})
 
-	invalidUIDs := []types.UID{}
 	for i := 0; i < workers; i++ {
-		invalidChildType1, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		_, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		invalidChildType2, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-a-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		_, err = clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-a-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		invalidChildType3, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{
+		_, err = clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels:          map[string]string{"single-bad-reference": "true"},
 				GenerateName:    "invalid-child-b-",
@@ -386,7 +385,6 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		invalidUIDs = append(invalidUIDs, invalidChildType1.UID, invalidChildType2.UID, invalidChildType3.UID)
 	}
 
 	// start GC with existing objects in place to simulate controller-manager restart
@@ -572,7 +570,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	}
 }
 
-func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
+func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID, errs chan string) {
 	defer wg.Done()
 	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
 	podClient := clientSet.CoreV1().Pods(namespace)
@@ -582,7 +580,8 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	rc.ObjectMeta.Finalizers = initialFinalizers
 	rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to create replication controller: %v", err)
+		errs <- fmt.Sprintf("Failed to create replication controller: %v", err)
+		return
 	}
 	rcUIDs <- rc.ObjectMeta.UID
 	// create pods.
@@ -592,18 +591,19 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 		pod := newPod(podName, namespace, []metav1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
 		createdPod, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
-			t.Fatalf("Failed to create Pod: %v", err)
+			errs <- fmt.Sprintf("Failed to create Pod: %v", err)
+			return
 		}
 		podUIDs = append(podUIDs, createdPod.ObjectMeta.UID)
 	}
 	orphan := false
 	switch {
-	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0:
+	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0: //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 		// if there are no deletion options, the default policy for replication controllers is orphan
 		orphan = true
-	case options.OrphanDependents != nil:
+	case options.OrphanDependents != nil: //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 		// if the deletion options explicitly specify whether to orphan, that controls
-		orphan = *options.OrphanDependents
+		orphan = *options.OrphanDependents //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 	case options.PropagationPolicy != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.PropagationPolicy == metav1.DeletePropagationOrphan
@@ -624,12 +624,14 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 			return true, nil
 		})
 		if err != nil {
-			t.Fatalf("failed to observe the expected pods in the GC graph for rc %s", rcName)
+			errs <- fmt.Sprintf("failed to observe the expected pods in the GC graph for rc %s", rcName)
+			return
 		}
 	}
 	// delete the rc
 	if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, options); err != nil {
-		t.Fatalf("failed to delete replication controller: %v", err)
+		errs <- fmt.Sprintf("failed to delete replication controller: %v", err)
+		return
 	}
 }
 
@@ -672,19 +674,24 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(collections * 5)
 	rcUIDs := make(chan types.UID, collections*5)
+	errs := make(chan string, 5)
 	for i := 0; i < collections; i++ {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, metav1.DeleteOptions{}, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, metav1.DeleteOptions{}, &wg, rcUIDs, errs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, metav1.DeleteOptions{}, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, metav1.DeleteOptions{}, &wg, rcUIDs, errs)
 		// rc is created with the orphan finalizer, deleted with DeleteOptions.OrphanDependents=false, pods will be deleted.
-		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, getNonOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, getNonOrphanOptions(), &wg, rcUIDs, errs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs, errs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.PropagationPolicy=Orphan, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection5-"+strconv.Itoa(i), ns.Name, []string{}, getPropagateOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection5-"+strconv.Itoa(i), ns.Name, []string{}, getPropagateOrphanOptions(), &wg, rcUIDs, errs)
 	}
 	wg.Wait()
+	close(errs)
+	for errString := range errs {
+		t.Fatalf(errString)
+	}
 	t.Logf("all pods are created, all replications controllers are created then deleted")
 	// wait for the RCs and Pods to reach the expected numbers.
 	if err := wait.Poll(1*time.Second, 300*time.Second, func() (bool, error) {
@@ -1017,12 +1024,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	// dependency graph before handling the foreground deletion of the rc.
 	ctx.startGC(5)
 	timeout := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(5 * time.Second):
-			close(timeout)
-		}
-	}()
+	time.AfterFunc(5*time.Second, func() { close(timeout) })
 	if !cache.WaitForCacheSync(timeout, gc.IsSynced) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}
@@ -1223,14 +1225,14 @@ func TestCRDDeletionCascading(t *testing.T) {
 	t.Logf("Second pass CRD cascading deletion")
 	accessor := meta.NewAccessor()
 	accessor.SetResourceVersion(definition, "")
-	_, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
 	testCRDDeletion(t, ctx, ns, definition, resourceClient)
 }
 
-func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definition *apiextensionsv1beta1.CustomResourceDefinition, resourceClient dynamic.ResourceInterface) {
+func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definition *apiextensionsv1.CustomResourceDefinition, resourceClient dynamic.ResourceInterface) {
 	clientSet, apiExtensionClient := ctx.clientSet, ctx.apiExtensionClient
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
@@ -1254,7 +1256,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	time.Sleep(ctx.syncPeriod + 5*time.Second)
 
 	// Delete the definition, which should cascade to the owner and ultimately its dependents.
-	if err := apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient); err != nil {
+	if err := apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient); err != nil {
 		t.Fatalf("failed to delete %q: %v", definition.Name, err)
 	}
 

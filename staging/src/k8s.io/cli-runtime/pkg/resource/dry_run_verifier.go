@@ -27,17 +27,10 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// VerifyDryRun returns nil if a resource group-version-kind supports
-// server-side dry-run. Otherwise, an error is returned.
-func VerifyDryRun(gvk schema.GroupVersionKind, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) error {
-	verifier := NewDryRunVerifier(dynamicClient, discoveryClient)
-	return verifier.HasSupport(gvk)
-}
-
-func NewDryRunVerifier(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *DryRunVerifier {
+func NewDryRunVerifier(dynamicClient dynamic.Interface, openAPIGetter discovery.OpenAPISchemaInterface) *DryRunVerifier {
 	return &DryRunVerifier{
 		finder:        NewCRDFinder(CRDFromDynamic(dynamicClient)),
-		openAPIGetter: discoveryClient,
+		openAPIGetter: openAPIGetter,
 	}
 }
 

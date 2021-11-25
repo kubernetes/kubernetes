@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -38,8 +38,9 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// Policy Type string describes the NetworkPolicy type
+// PolicyType string describes the NetworkPolicy type
 // This type is beta-level in 1.8
+// +enum
 type PolicyType string
 
 const (
@@ -80,7 +81,7 @@ type NetworkPolicySpec struct {
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
-	// Valid options are "Ingress", "Egress", or "Ingress,Egress".
+	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
 	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -141,10 +142,21 @@ type NetworkPolicyPort struct {
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
-	// The port on the given protocol. This can either be a numerical or named port on
-	// a pod. If this field is not provided, this matches all port names and numbers.
+	// The port on the given protocol. This can either be a numerical or named
+	// port on a pod. If this field is not provided, this matches all port names and
+	// numbers.
+	// If present, only traffic on the specified protocol AND port will be matched.
 	// +optional
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+
+	// If set, indicates that the range of ports from port to endPort, inclusive,
+	// should be allowed by the policy. This field cannot be defined if the port field
+	// is not defined or if the port field is defined as a named (string) port.
+	// The endPort must be equal or greater than port.
+	// This feature is in Beta state and is enabled by default.
+	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
+	// +optional
+	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 
 // IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
@@ -362,6 +374,7 @@ type HTTPIngressRuleValue struct {
 }
 
 // PathType represents the type of path referred to by a HTTPIngressPath.
+// +enum
 type PathType string
 
 const (
@@ -396,8 +409,8 @@ const (
 type HTTPIngressPath struct {
 	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
-	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
-	// all paths from incoming requests are matched.
+	// as defined by RFC 3986. Paths must begin with a '/' and must be present
+	// when using PathType with value "Exact" or "Prefix".
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 
@@ -415,7 +428,7 @@ type HTTPIngressPath struct {
 	//   the IngressClass. Implementations can treat this as a separate PathType
 	//   or treat it identically to Prefix or Exact path types.
 	// Implementations are required to support all path types.
-	PathType *PathType `json:"pathType,omitempty" protobuf:"bytes,3,opt,name=pathType"`
+	PathType *PathType `json:"pathType" protobuf:"bytes,3,opt,name=pathType"`
 
 	// Backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
@@ -497,7 +510,39 @@ type IngressClassSpec struct {
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
-	Parameters *v1.TypedLocalObjectReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
+	Parameters *IngressClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
+}
+
+const (
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is namespace-scoped.
+	IngressClassParametersReferenceScopeNamespace = "Namespace"
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is cluster-scoped.
+	IngressClassParametersReferenceScopeCluster = "Cluster"
+)
+
+// IngressClassParametersReference identifies an API object. This can be used
+// to specify a cluster or namespace-scoped resource.
+type IngressClassParametersReference struct {
+	// APIGroup is the group for the resource being referenced. If APIGroup is
+	// not specified, the specified Kind must be in the core API group. For any
+	// other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
+	// Kind is the type of resource being referenced.
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
+	// Scope represents if this refers to a cluster or namespace scoped resource.
+	// This may be set to "Cluster" (default) or "Namespace".
+	// +optional
+	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
+	// Namespace is the namespace of the resource being referenced. This field is
+	// required when scope is set to "Namespace" and must be unset when scope is set to
+	// "Cluster".
+	// +optional
+	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,5,opt,name=namespace"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

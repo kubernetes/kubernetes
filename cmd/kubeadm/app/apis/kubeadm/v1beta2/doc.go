@@ -121,7 +121,7 @@ limitations under the License.
 // including settings for:
 //
 // - Networking, that holds configuration for the networking topology of the cluster; use it e.g. to customize
-// node subnet or services subnet.
+// pod subnet or services subnet.
 //
 // - Etcd configurations; use it e.g. to customize the local etcd or to configure the API server
 // for using an external etcd cluster.
@@ -173,7 +173,7 @@ limitations under the License.
 // 	    value: "master"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
-// 	    cgroup-driver: "cgroupfs"
+// 	    v: 4
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
 // 	localAPIEndpoint:
@@ -203,8 +203,8 @@ limitations under the License.
 // 	    # certFile: "/etcd/kubernetes/pki/etcd/etcd.crt"
 // 	    # keyFile: "/etcd/kubernetes/pki/etcd/etcd.key"
 // 	networking:
-// 	  serviceSubnet: "10.96.0.0/12"
-// 	  podSubnet: "10.100.0.1/24"
+// 	  serviceSubnet: "10.96.0.0/16"
+// 	  podSubnet: "10.244.0.0/24"
 // 	  dnsDomain: "cluster.local"
 // 	kubernetesVersion: "v1.12.0"
 // 	controlPlaneEndpoint: "10.100.0.1:6443"

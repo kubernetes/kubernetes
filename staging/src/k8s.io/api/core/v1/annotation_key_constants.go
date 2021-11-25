@@ -23,9 +23,6 @@ const (
 	// webhook backend fails.
 	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
 
-	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
-	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
-
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
@@ -123,9 +120,32 @@ const (
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 
+	// EndpointsOverCapacity will be set on an Endpoints resource when it
+	// exceeds the maximum capacity of 1000 addresses. Initially the Endpoints
+	// controller will set this annotation with a value of "warning". In a
+	// future release, the controller may set this annotation with a value of
+	// "truncated" to indicate that any addresses exceeding the limit of 1000
+	// have been truncated from the Endpoints resource.
+	EndpointsOverCapacity = "endpoints.kubernetes.io/over-capacity"
+
 	// MigratedPluginsAnnotationKey is the annotation key, set for CSINode objects, that is a comma-separated
 	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
 	// CSI Backend for a volume plugin on a specific node.
 	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+
+	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
+	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
+	// deletion cost are preferred to be deleted before pods with higher deletion cost.
+	// Note that this is honored on a best-effort basis, and so it does not offer guarantees on
+	// pod deletion order.
+	// The implicit deletion cost for pods that don't set the annotation is 0, negative values are permitted.
+	//
+	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
+	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
+
+	// AnnotationTopologyAwareHints can be used to enable or disable Topology
+	// Aware Hints for a Service. This may be set to "Auto" or "Disabled". Any
+	// other value is treated as "Disabled".
+	AnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
 )

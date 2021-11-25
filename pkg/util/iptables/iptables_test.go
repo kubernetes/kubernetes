@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -797,8 +798,8 @@ COMMIT
 		t.Fatalf("%s: Expected success, got %v", protocol, err)
 	}
 
-	if string(buffer.Bytes()) != output {
-		t.Errorf("%s: Expected output '%s', got '%v'", protocol, output, string(buffer.Bytes()))
+	if buffer.String() != output {
+		t.Errorf("%s: Expected output '%s', got '%v'", protocol, output, buffer.String())
 	}
 
 	if fcmd.CombinedOutputCalls != 1 {
@@ -817,8 +818,8 @@ COMMIT
 	if err == nil {
 		t.Errorf("%s: Expected failure", protocol)
 	}
-	if string(buffer.Bytes()) != stderrOutput {
-		t.Errorf("%s: Expected output '%s', got '%v'", protocol, stderrOutput, string(buffer.Bytes()))
+	if buffer.String() != stderrOutput {
+		t.Errorf("%s: Expected output '%s', got '%v'", protocol, stderrOutput, buffer.String())
 	}
 }
 
@@ -1025,6 +1026,9 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 		},
 	}
 	lockPath14x, lockPath16x := getLockPaths()
+	// the lockPath14x is a UNIX socket which is cleaned up automatically on close, but the
+	// lockPath16x is a plain file which is not cleaned up.
+	defer os.Remove(lockPath16x)
 	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
@@ -1077,7 +1081,10 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected to open %s, got %v", lockPath16x, err)
 	}
-	defer runLock.Close()
+	defer func() {
+		runLock.Close()
+		os.Remove(lockPath16x)
+	}()
 
 	if err := grabIptablesFileLock(runLock); err != nil {
 		t.Errorf("expected to lock %s, got %v", lockPath16x, err)
@@ -1111,6 +1118,9 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 		},
 	}
 	lockPath14x, lockPath16x := getLockPaths()
+	// the lockPath14x is a UNIX socket which is cleaned up automatically on close, but the
+	// lockPath16x is a plain file which is not cleaned up.
+	defer os.Remove(lockPath16x)
 	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	var runLock *net.UnixListener

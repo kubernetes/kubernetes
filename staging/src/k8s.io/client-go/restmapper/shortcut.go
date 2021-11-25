@@ -34,7 +34,7 @@ type shortcutExpander struct {
 	discoveryClient discovery.DiscoveryInterface
 }
 
-var _ meta.RESTMapper = &shortcutExpander{}
+var _ meta.ResettableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
@@ -162,6 +162,10 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 	}
 
 	return resource
+}
+
+func (e shortcutExpander) Reset() {
+	meta.MaybeResetRESTMapper(e.RESTMapper)
 }
 
 // ResourceShortcuts represents a structure that holds the information how to

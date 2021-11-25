@@ -20,23 +20,33 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"reflect"
+	"strconv"
 	"testing"
+	"time"
 
+	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
+
+const benchmarkSeed = 100
 
 func TestSerializeObjectParallel(t *testing.T) {
 	largePayload := bytes.Repeat([]byte("0123456789abcdef"), defaultGzipThresholdBytes/16+1)
@@ -54,7 +64,6 @@ func TestSerializeObjectParallel(t *testing.T) {
 
 		wantCode    int
 		wantHeaders http.Header
-		wantBody    []byte
 	}
 	newTest := func() test {
 		return test{
@@ -62,9 +71,12 @@ func TestSerializeObjectParallel(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -130,7 +142,7 @@ func TestSerializeObject(t *testing.T) {
 		{
 			name:        "serialize object",
 			out:         smallPayload,
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{""}},
 			wantBody:    smallPayload,
@@ -140,7 +152,7 @@ func TestSerializeObject(t *testing.T) {
 			name:        "return content type",
 			out:         smallPayload,
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -151,7 +163,7 @@ func TestSerializeObject(t *testing.T) {
 			statusCode:  http.StatusBadRequest,
 			out:         smallPayload,
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusBadRequest,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -162,7 +174,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{fmt.Errorf("bad")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusInternalServerError,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -173,7 +185,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{fmt.Errorf("bad"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusInternalServerError,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
 			wantBody:    []byte(": bad"),
@@ -184,7 +196,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{kerrors.NewNotFound(schema.GroupResource{}, "test"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			statusCode:  http.StatusOK,
 			wantCode:    http.StatusNotFound,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
@@ -196,7 +208,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{kerrors.NewNotFound(schema.GroupResource{}, "test"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			statusCode:  http.StatusNotAcceptable,
 			wantCode:    http.StatusNotAcceptable,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
@@ -207,9 +219,12 @@ func TestSerializeObject(t *testing.T) {
 			name:      "compression requires feature gate",
 			out:       largePayload,
 			mediaType: "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    largePayload,
@@ -220,9 +235,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -237,9 +255,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                smallPayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -252,9 +273,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"deflate, , gzip,"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"deflate, , gzip,"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -269,9 +293,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"deflate"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"deflate"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -284,9 +311,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{", ,  other, nothing, what, "},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{", ,  other, nothing, what, "},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -301,9 +331,12 @@ func TestSerializeObject(t *testing.T) {
 			out:                smallPayload,
 			outErrs:            []error{fmt.Errorf(string(largePayload)), fmt.Errorf("bad2")},
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusInternalServerError,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"text/plain"},
@@ -339,6 +372,131 @@ func TestSerializeObject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func randTime(t *time.Time, r *rand.Rand) {
+	*t = time.Unix(r.Int63n(1000*365*24*60*60), r.Int63())
+}
+
+func randIP(s *string, r *rand.Rand) {
+	*s = fmt.Sprintf("10.20.%d.%d", r.Int31n(256), r.Int31n(256))
+}
+
+// randPod changes fields in pod to mimic another pod from the same replicaset.
+// The list fields here has been generated by picking two pods in the same replicaset
+// and checking diff of their jsons.
+func randPod(b *testing.B, pod *v1.Pod, r *rand.Rand) {
+	pod.Name = fmt.Sprintf("%s-%x", pod.GenerateName, r.Int63n(1000))
+	pod.UID = uuid.NewUUID()
+	pod.ResourceVersion = strconv.Itoa(r.Int())
+	pod.Spec.NodeName = fmt.Sprintf("some-node-prefix-%x", r.Int63n(1000))
+
+	randTime(&pod.CreationTimestamp.Time, r)
+	randTime(&pod.Status.StartTime.Time, r)
+	for i := range pod.Status.Conditions {
+		randTime(&pod.Status.Conditions[i].LastTransitionTime.Time, r)
+	}
+	for i := range pod.Status.ContainerStatuses {
+		containerStatus := &pod.Status.ContainerStatuses[i]
+		state := &containerStatus.State
+		if state.Running != nil {
+			randTime(&state.Running.StartedAt.Time, r)
+		}
+		containerStatus.ContainerID = fmt.Sprintf("docker://%x%x%x%x", r.Int63(), r.Int63(), r.Int63(), r.Int63())
+	}
+	for i := range pod.ManagedFields {
+		randTime(&pod.ManagedFields[i].Time.Time, r)
+	}
+
+	randIP(&pod.Status.HostIP, r)
+	randIP(&pod.Status.PodIP, r)
+}
+
+func benchmarkItems(b *testing.B, file string, n int) *v1.PodList {
+	pod := v1.Pod{}
+	f, err := os.Open(file)
+	if err != nil {
+		b.Fatalf("Failed to open %q: %v", file, err)
+	}
+	defer f.Close()
+	err = json.NewDecoder(f).Decode(&pod)
+	if err != nil {
+		b.Fatalf("Failed to decode %q: %v", file, err)
+	}
+
+	list := &v1.PodList{
+		Items: make([]v1.Pod, n),
+	}
+
+	r := rand.New(rand.NewSource(benchmarkSeed))
+	for i := 0; i < n; i++ {
+		list.Items[i] = *pod.DeepCopy()
+		randPod(b, &list.Items[i], r)
+	}
+	return list
+}
+
+func toProtoBuf(b *testing.B, list *v1.PodList) []byte {
+	out, err := list.Marshal()
+	if err != nil {
+		b.Fatalf("Failed to marshal list to protobuf: %v", err)
+	}
+	return out
+}
+
+func toJSON(b *testing.B, list *v1.PodList) []byte {
+	out, err := json.Marshal(list)
+	if err != nil {
+		b.Fatalf("Failed to marshal list to json: %v", err)
+	}
+	return out
+}
+
+func benchmarkSerializeObject(b *testing.B, payload []byte) {
+	input, output := len(payload), len(gzipContent(payload, defaultGzipContentEncodingLevel))
+	b.Logf("Payload size: %d, expected output size: %d, ratio: %.2f", input, output, float64(output)/float64(input))
+
+	req := &http.Request{
+		Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		},
+		URL: &url.URL{Path: "/path"},
+	}
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)()
+
+	encoder := &fakeEncoder{
+		buf: payload,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		recorder := httptest.NewRecorder()
+		SerializeObject("application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
+		result := recorder.Result()
+		if result.StatusCode != http.StatusOK {
+			b.Fatalf("incorrect status code: got %v;  want: %v", result.StatusCode, http.StatusOK)
+		}
+	}
+}
+
+func BenchmarkSerializeObject1000PodsPB(b *testing.B) {
+	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 1000)))
+}
+func BenchmarkSerializeObject10000PodsPB(b *testing.B) {
+	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 10000)))
+}
+func BenchmarkSerializeObject100000PodsPB(b *testing.B) {
+	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 100000)))
+}
+
+func BenchmarkSerializeObject1000PodsJSON(b *testing.B) {
+	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 1000)))
+}
+func BenchmarkSerializeObject10000PodsJSON(b *testing.B) {
+	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 10000)))
+}
+func BenchmarkSerializeObject100000PodsJSON(b *testing.B) {
+	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 100000)))
 }
 
 type fakeResponseRecorder struct {

@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsstoragev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -99,7 +102,7 @@ func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode, o
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
 func (c *FakeCSINodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(csinodesResource, name), &storagev1.CSINode{})
+		Invokes(testing.NewRootDeleteActionWithOptions(csinodesResource, name, opts), &storagev1.CSINode{})
 	return err
 }
 
@@ -115,6 +118,27 @@ func (c *FakeCSINodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeCSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, name, pt, data, subresources...), &storagev1.CSINode{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*storagev1.CSINode), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cSINode.
+func (c *FakeCSINodes) Apply(ctx context.Context, cSINode *applyconfigurationsstoragev1.CSINodeApplyConfiguration, opts v1.ApplyOptions) (result *storagev1.CSINode, err error) {
+	if cSINode == nil {
+		return nil, fmt.Errorf("cSINode provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(cSINode)
+	if err != nil {
+		return nil, err
+	}
+	name := cSINode.Name
+	if name == nil {
+		return nil, fmt.Errorf("cSINode.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, *name, types.ApplyPatchType, data), &storagev1.CSINode{})
 	if obj == nil {
 		return nil, err
 	}

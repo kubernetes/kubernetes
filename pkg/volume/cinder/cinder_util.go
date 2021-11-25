@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -77,7 +78,7 @@ func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) er
 		}
 		numTries++
 		if numTries == 10 {
-			return errors.New("Could not attach disk: Timeout after 60s")
+			return errors.New("could not attach disk: Timeout after 60s")
 		}
 		time.Sleep(time.Second * 6)
 	}
@@ -156,7 +157,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
+		if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -229,10 +230,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
-			volumeLabels[v1.LabelFailureDomainBetaZone] = volumeAZ
+			volumeLabels[v1.LabelTopologyZone] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[v1.LabelFailureDomainBetaRegion] = volumeRegion
+			volumeLabels[v1.LabelTopologyRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

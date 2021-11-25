@@ -38,7 +38,8 @@ type containerState interface {
 }
 
 func destroy(c *linuxContainer) error {
-	if !c.config.Namespaces.Contains(configs.NEWPID) {
+	if !c.config.Namespaces.Contains(configs.NEWPID) ||
+		c.config.Namespaces.PathOf(configs.NEWPID) != "" {
 		if err := signalAllProcesses(c.cgroupManager, unix.SIGKILL); err != nil {
 			logrus.Warn(err)
 		}
@@ -156,7 +157,7 @@ func (i *createdState) transition(s containerState) error {
 }
 
 func (i *createdState) destroy() error {
-	i.c.initProcess.signal(unix.SIGKILL)
+	_ = i.c.initProcess.signal(unix.SIGKILL)
 	return destroy(i.c)
 }
 

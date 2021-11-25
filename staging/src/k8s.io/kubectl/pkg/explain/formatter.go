@@ -122,7 +122,7 @@ func shouldStartNewLine(lastWord, str string) bool {
 		return true
 	}
 	// preserve lines that look like they're starting lists
-	if bullet.MatchString(str) == true {
+	if bullet.MatchString(str) {
 		return true
 	}
 	// otherwise combine

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
 )
 
 type simpleCache struct {

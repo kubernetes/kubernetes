@@ -17,13 +17,20 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -112,7 +119,7 @@ func TestValidateDefaultPreemptionArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateDefaultPreemptionArgs(tc.args)
+			err := ValidateDefaultPreemptionArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateDefaultPreemptionArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -152,90 +159,9 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateInterPodAffinityArgs(tc.args)
+			err := ValidateInterPodAffinityArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateInterPodAffinityArgs returned err (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestValidateNodeLabelArgs(t *testing.T) {
-	cases := map[string]struct {
-		args     config.NodeLabelArgs
-		wantErrs field.ErrorList
-	}{
-		"valid config": {
-			args: config.NodeLabelArgs{
-				PresentLabels:           []string{"present"},
-				AbsentLabels:            []string{"absent"},
-				PresentLabelsPreference: []string{"present-preference"},
-				AbsentLabelsPreference:  []string{"absent-preference"},
-			},
-		},
-		"labels conflict": {
-			args: config.NodeLabelArgs{
-				PresentLabels: []string{"label"},
-				AbsentLabels:  []string{"label"},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabels[0]",
-				},
-			},
-		},
-		"multiple labels conflict": {
-			args: config.NodeLabelArgs{
-				PresentLabels: []string{"label", "label3"},
-				AbsentLabels:  []string{"label", "label2", "label3"},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabels[0]",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabels[1]",
-				},
-			},
-		},
-		"labels preference conflict": {
-			args: config.NodeLabelArgs{
-				PresentLabelsPreference: []string{"label"},
-				AbsentLabelsPreference:  []string{"label"},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabelsPreference[0]",
-				},
-			},
-		},
-		"multiple labels preference conflict": {
-			args: config.NodeLabelArgs{
-				PresentLabelsPreference: []string{"label", "label3"},
-				AbsentLabelsPreference:  []string{"label", "label2", "label3"},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabelsPreference[0]",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "presentLabelsPreference[1]",
-				},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeLabelArgs(tc.args)
-			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Errorf("ValidateNodeLabelArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -424,7 +350,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidatePodTopologySpreadArgs(tc.args)
+			err := ValidatePodTopologySpreadArgs(nil, tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidatePodTopologySpreadArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -432,192 +358,35 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 	}
 }
 
-func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
+func TestValidateNodeResourcesBalancedAllocationArgs(t *testing.T) {
 	cases := map[string]struct {
-		args     config.RequestedToCapacityRatioArgs
+		args     *config.NodeResourcesBalancedAllocationArgs
 		wantErrs field.ErrorList
 	}{
 		"valid config": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 20,
-						Score:       5,
-					},
-					{
-						Utilization: 30,
-						Score:       3,
-					},
-					{
-						Utilization: 50,
-						Score:       2,
-					},
-				},
+			args: &config.NodeResourcesBalancedAllocationArgs{
 				Resources: []config.ResourceSpec{
 					{
-						Name:   "custom-resource",
-						Weight: 5,
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "memory",
+						Weight: 1,
 					},
 				},
 			},
 		},
-		"no shape points": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{},
+		"invalid config": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
 				Resources: []config.ResourceSpec{
 					{
-						Name:   "custom",
-						Weight: 5,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeRequired,
-					Field: "shape",
-				},
-			},
-		},
-		"utilization less than min": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: -10,
-						Score:       3,
+						Name:   "cpu",
+						Weight: 2,
 					},
 					{
-						Utilization: 10,
-						Score:       2,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].utilization",
-				},
-			},
-		},
-		"utilization greater than max": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 10,
-						Score:       3,
-					},
-					{
-						Utilization: 110,
-						Score:       2,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[1].utilization",
-				},
-			},
-		},
-		"utilization values in non-increasing order": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 30,
-						Score:       3,
-					},
-					{
-						Utilization: 20,
-						Score:       2,
-					},
-					{
-						Utilization: 10,
-						Score:       1,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[1].utilization",
-				},
-			},
-		},
-		"duplicated utilization values": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 10,
-						Score:       3,
-					},
-					{
-						Utilization: 20,
-						Score:       2,
-					},
-					{
-						Utilization: 20,
-						Score:       1,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[2].utilization",
-				},
-			},
-		},
-		"score less than min": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 10,
-						Score:       -1,
-					},
-					{
-						Utilization: 20,
-						Score:       2,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].score",
-				},
-			},
-		},
-		"score greater than max": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 10,
-						Score:       3,
-					},
-					{
-						Utilization: 20,
-						Score:       11,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[1].score",
-				},
-			},
-		},
-		"resources weight less than 1": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 10,
-						Score:       1,
-					},
-				},
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "custom",
-						Weight: 0,
+						Name:   "memory",
+						Weight: 1,
 					},
 				},
 			},
@@ -628,37 +397,23 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 				},
 			},
 		},
-		"multiple errors": {
-			args: config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 20,
-						Score:       -1,
-					},
-					{
-						Utilization: 10,
-						Score:       2,
-					},
-				},
+		"repeated resources": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
 				Resources: []config.ResourceSpec{
 					{
-						Name:   "custom",
-						Weight: 0,
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "cpu",
+						Weight: 1,
 					},
 				},
 			},
 			wantErrs: field.ErrorList{
 				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[1].utilization",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].score",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Type:  field.ErrorTypeDuplicate,
+					Field: "resources[1].name",
 				},
 			},
 		},
@@ -666,183 +421,9 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateRequestedToCapacityRatioArgs(tc.args)
+			err := ValidateNodeResourcesBalancedAllocationArgs(nil, tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Errorf("ValidateRequestedToCapacityRatioArgs returned err (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
-	cases := map[string]struct {
-		args     *config.NodeResourcesLeastAllocatedArgs
-		wantErrs field.ErrorList
-	}{
-		"valid config": {
-			args: &config.NodeResourcesLeastAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "cpu",
-						Weight: 50,
-					},
-					{
-						Name:   "memory",
-						Weight: 30,
-					},
-				},
-			},
-		},
-		"weight less than min": {
-			args: &config.NodeResourcesLeastAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "cpu",
-						Weight: 0,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-			},
-		},
-		"weight more than max": {
-			args: &config.NodeResourcesLeastAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "memory",
-						Weight: 101,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-			},
-		},
-		"multiple error": {
-			args: &config.NodeResourcesLeastAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "memory",
-						Weight: 0,
-					},
-					{
-						Name:   "cpu",
-						Weight: 101,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
-				},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeResourcesLeastAllocatedArgs(tc.args)
-			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
-	cases := map[string]struct {
-		args     *config.NodeResourcesMostAllocatedArgs
-		wantErrs field.ErrorList
-	}{
-		"valid config": {
-			args: &config.NodeResourcesMostAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "cpu",
-						Weight: 70,
-					},
-					{
-						Name:   "memory",
-						Weight: 40,
-					},
-				},
-			},
-		},
-		"weight less than min": {
-			args: &config.NodeResourcesMostAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "cpu",
-						Weight: -1,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-			},
-		},
-		"weight more than max": {
-			args: &config.NodeResourcesMostAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "memory",
-						Weight: 110,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-			},
-		},
-		"multiple error": {
-			args: &config.NodeResourcesMostAllocatedArgs{
-				Resources: []config.ResourceSpec{
-					{
-						Name:   "memory",
-						Weight: -1,
-					},
-					{
-						Name:   "cpu",
-						Weight: 110,
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
-				},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
-			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateNodeResourcesBalancedAllocationArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -938,9 +519,629 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateNodeAffinityArgs(&tc.args)
+			err := ValidateNodeAffinityArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateVolumeBindingArgs(t *testing.T) {
+	cases := []struct {
+		name     string
+		args     config.VolumeBindingArgs
+		features map[featuregate.Feature]bool
+		wantErr  error
+	}{
+		{
+			name: "zero is a valid config",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 0,
+			},
+		},
+		{
+			name: "positive value is valid config",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+			},
+		},
+		{
+			name: "negative value is invalid config ",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: -10,
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "bindTimeoutSeconds",
+				BadValue: int64(-10),
+				Detail:   "invalid BindTimeoutSeconds, should not be a negative value",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=off] shape should be nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              nil,
+			},
+		},
+		{
+			name: "[VolumeCapacityPriority=off] error if the shape is not nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 1, Score: 1},
+					{Utilization: 3, Score: 3},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape should not be empty",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              []config.UtilizationShapePoint{},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeRequired,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape points must be sorted in increasing order",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 3, Score: 3},
+					{Utilization: 1, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:   field.ErrorTypeInvalid,
+				Field:  "shape[1].utilization",
+				Detail: "Invalid value: 1: utilization values must be sorted in increasing order",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape point: invalid utilization and score",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: -1, Score: 1},
+					{Utilization: 10, Score: -1},
+					{Utilization: 20, Score: 11},
+					{Utilization: 101, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[2].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[3].utilization",
+				},
+			}),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
+			err := ValidateVolumeBindingArgs(nil, &tc.args)
+			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateFitArgs(t *testing.T) {
+	defaultScoringStrategy := &config.ScoringStrategy{
+		Type: config.LeastAllocated,
+		Resources: []config.ResourceSpec{
+			{Name: "cpu", Weight: 1},
+			{Name: "memory", Weight: 1},
+		},
+	}
+	argsTest := []struct {
+		name   string
+		args   config.NodeResourcesFitArgs
+		expect string
+	}{
+		{
+			name: "IgnoredResources: too long value",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
+				ScoringStrategy:  defaultScoringStrategy,
+			},
+			expect: "name part must be no more than 63 characters",
+		},
+		{
+			name: "IgnoredResources: name is empty",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com/"},
+				ScoringStrategy:  defaultScoringStrategy,
+			},
+			expect: "name part must be non-empty",
+		},
+		{
+			name: "IgnoredResources: name has too many slash",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com/aaa/bbb"},
+				ScoringStrategy:  defaultScoringStrategy,
+			},
+			expect: "a qualified name must consist of alphanumeric characters",
+		},
+		{
+			name: "IgnoredResources: valid args",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com"},
+				ScoringStrategy:  defaultScoringStrategy,
+			},
+		},
+		{
+			name: "IgnoredResourceGroups: valid args ",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com"},
+				ScoringStrategy:       defaultScoringStrategy,
+			},
+		},
+		{
+			name: "IgnoredResourceGroups: illegal args",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com/"},
+				ScoringStrategy:       defaultScoringStrategy,
+			},
+			expect: "name part must be non-empty",
+		},
+		{
+			name: "IgnoredResourceGroups: name is too long",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
+				ScoringStrategy:       defaultScoringStrategy,
+			},
+			expect: "name part must be no more than 63 characters",
+		},
+		{
+			name: "IgnoredResourceGroups: name cannot be contain slash",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com/aa"},
+				ScoringStrategy:       defaultScoringStrategy,
+			},
+			expect: "resource group name can't contain '/'",
+		},
+		{
+			name:   "ScoringStrategy: field is required",
+			args:   config.NodeResourcesFitArgs{},
+			expect: "ScoringStrategy field is required",
+		},
+	}
+
+	for _, test := range argsTest {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
+				t.Errorf("case[%v]: error details do not include %v", test.name, err)
+			}
+		})
+	}
+}
+
+func TestValidateLeastAllocatedScoringStrategy(t *testing.T) {
+	tests := []struct {
+		name      string
+		resources []config.ResourceSpec
+		wantErrs  field.ErrorList
+	}{
+		{
+			name:     "default config",
+			wantErrs: nil,
+		},
+		{
+			name: "multi valid resources",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 1,
+				},
+				{
+					Name:   "memory",
+					Weight: 10,
+				},
+			},
+			wantErrs: nil,
+		},
+		{
+			name: "weight less than min",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 0,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name: "weight greater than max",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 101,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name: "multi invalid resources",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 0,
+				},
+				{
+					Name:   "memory",
+					Weight: 101,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[1].weight",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: test.resources,
+				},
+			}
+			err := ValidateNodeResourcesFitArgs(nil, &args)
+			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
+	tests := []struct {
+		name      string
+		resources []config.ResourceSpec
+		wantErrs  field.ErrorList
+	}{
+		{
+			name:     "default config",
+			wantErrs: nil,
+		},
+		{
+			name: "multi valid resources",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 1,
+				},
+				{
+					Name:   "memory",
+					Weight: 10,
+				},
+			},
+			wantErrs: nil,
+		},
+		{
+			name: "weight less than min",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 0,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name: "weight greater than max",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 101,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name: "multi invalid resources",
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 0,
+				},
+				{
+					Name:   "memory",
+					Weight: 101,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[1].weight",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: test.resources,
+				},
+			}
+			err := ValidateNodeResourcesFitArgs(nil, &args)
+			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
+	defaultShape := []config.UtilizationShapePoint{
+		{
+			Utilization: 30,
+			Score:       3,
+		},
+	}
+	tests := []struct {
+		name      string
+		resources []config.ResourceSpec
+		shapes    []config.UtilizationShapePoint
+		wantErrs  field.ErrorList
+	}{
+		{
+			name:   "no shapes",
+			shapes: nil,
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeRequired,
+					Field: "shape",
+				},
+			},
+		},
+		{
+			name:   "weight greater than max",
+			shapes: defaultShape,
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 101,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name:   "weight less than min",
+			shapes: defaultShape,
+			resources: []config.ResourceSpec{
+				{
+					Name:   "cpu",
+					Weight: 0,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		{
+			name:     "valid shapes",
+			shapes:   defaultShape,
+			wantErrs: nil,
+		},
+		{
+			name: "utilization less than min",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: -1,
+					Score:       3,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+			},
+		},
+		{
+			name: "utilization greater than max",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 101,
+					Score:       3,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+			},
+		},
+		{
+			name: "duplicated utilization values",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 10,
+					Score:       3,
+				},
+				{
+					Utilization: 10,
+					Score:       3,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].utilization",
+				},
+			},
+		},
+		{
+			name: "increasing utilization values",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 10,
+					Score:       3,
+				},
+				{
+					Utilization: 20,
+					Score:       3,
+				},
+				{
+					Utilization: 30,
+					Score:       3,
+				},
+			},
+			wantErrs: nil,
+		},
+		{
+			name: "non-increasing utilization values",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 10,
+					Score:       3,
+				},
+				{
+					Utilization: 20,
+					Score:       3,
+				},
+				{
+					Utilization: 15,
+					Score:       3,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[2].utilization",
+				},
+			},
+		},
+		{
+			name: "score less than min",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 10,
+					Score:       -1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].score",
+				},
+			},
+		},
+		{
+			name: "score greater than max",
+			shapes: []config.UtilizationShapePoint{
+				{
+					Utilization: 10,
+					Score:       11,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].score",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: test.resources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: test.shapes,
+					},
+				},
+			}
+			err := ValidateNodeResourcesFitArgs(nil, &args)
+			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}

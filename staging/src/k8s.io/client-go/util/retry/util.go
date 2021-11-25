@@ -79,7 +79,7 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 //         // if you got a conflict on the last update attempt then you need to get
 //         // the current version before making your own changes.
 //         pod, err := c.Pods("mynamespace").Get(name, metav1.GetOptions{})
-//         if err ! nil {
+//         if err != nil {
 //             return err
 //         }
 //

@@ -36,12 +36,14 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of argum
 var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	// Build dependencies - ginkgo, kubelet and apiserver.
+	// Build dependencies - ginkgo, kubelet, e2e_node.test, and mounter.
 	if *buildDependencies {
 		if err := builder.BuildGo(); err != nil {
 			klog.Fatalf("Failed to build the dependencies: %v", err)
@@ -57,7 +59,7 @@ func main() {
 	ginkgo := filepath.Join(outputDir, "ginkgo")
 	test := filepath.Join(outputDir, "e2e_node.test")
 
-	args := []string{*ginkgoFlags, test, "--", *testFlags}
+	args := []string{*ginkgoFlags, test, "--", *testFlags, fmt.Sprintf("--runtime-config=%s", *runtimeConfig)}
 	if *systemSpecName != "" {
 		rootDir, err := utils.GetK8sRootDir()
 		if err != nil {
@@ -65,6 +67,9 @@ func main() {
 		}
 		systemSpecFile := filepath.Join(rootDir, system.SystemSpecPath, *systemSpecName+".yaml")
 		args = append(args, fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s --extra-envs=%s", *systemSpecName, systemSpecFile, *extraEnvs))
+	}
+	if *kubeletConfigFile != "" {
+		args = append(args, fmt.Sprintf("--kubelet-config-file=\"%s\"", *kubeletConfigFile))
 	}
 	if err := runCommand(ginkgo, args...); err != nil {
 		klog.Exitf("Test failed: %v", err)

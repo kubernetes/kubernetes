@@ -21,15 +21,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// An EntityValidator is an interface for things that can validate entities
-type EntityValidator interface {
-	Validate(interface{}) *Result
-}
-
+// valueValidator validates the values it applies to.
 type valueValidator interface {
+	// SetPath sets the exact path of the validator prior to calling Validate.
+	// The exact path contains the map keys and array indices to locate the
+	// value to be validated from the root data element.
 	SetPath(path string)
-	Applies(interface{}, reflect.Kind) bool
-	Validate(interface{}) *Result
+	// Applies returns true if the validator applies to the valueKind
+	// from source. Validate will be called if and only if Applies returns true.
+	Applies(source interface{}, valueKind reflect.Kind) bool
+	// Validate validates the value.
+	Validate(value interface{}) *Result
 }
 
 type basicCommonValidator struct {

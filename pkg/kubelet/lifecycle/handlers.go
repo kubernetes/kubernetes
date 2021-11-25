@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -56,7 +56,7 @@ func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontain
 	}
 }
 
-func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -64,20 +64,20 @@ func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			klog.V(1).Infof(msg)
+			klog.V(1).ErrorS(err, "Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output))
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
-			klog.V(1).Infof(msg)
+			msg = fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			klog.V(1).ErrorS(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
 		}
 		return msg, err
 	default:
 		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
-		klog.Errorf(msg)
+		klog.ErrorS(err, "Cannot run handler")
 		return msg, err
 	}
 }
@@ -105,12 +105,12 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
+			klog.ErrorS(err, "Unable to get pod info, event handlers may be invalid.")
 			return "", err
 		}
 		if len(status.IPs) == 0 {

@@ -1,3 +1,4 @@
+//go:build !linux && !windows && !dockerless
 // +build !linux,!windows,!dockerless
 
 /*
@@ -21,9 +22,9 @@ package dockershim
 import (
 	"fmt"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (ds *dockerService) getContainerStats(c *runtimeapi.Container) (*runtimeapi.ContainerStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }

@@ -47,6 +47,7 @@ type TestSuite interface {
 	// * systemSpecName is the name of the system spec used for validating the
 	//   image on which the test runs.
 	// * extraEnvs is the extra environment variables needed for node e2e tests.
+	// * runtimeConfig is the API runtime configuration used for node e2e tests.
 	// * timeout is the test timeout.
-	RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error)
+	RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string, timeout time.Duration) (string, error)
 }

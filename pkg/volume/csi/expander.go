@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -71,7 +70,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 	fsVolume bool) (bool, error) {
 	driverName := csiSource.Driver
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(resizeOptions.VolumeSpec, csiTimeout)
 	defer cancel()
 
 	nodeExpandSet, err := csClient.NodeSupportsNodeExpand(ctx)
@@ -144,8 +143,5 @@ func inUseError(err error) bool {
 	// if this is a failed precondition error then that means driver does not support expansion
 	// of in-use volumes
 	// More info - https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerexpandvolume-errors
-	if st.Code() == codes.FailedPrecondition {
-		return true
-	}
-	return false
+	return st.Code() == codes.FailedPrecondition
 }

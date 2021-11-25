@@ -134,6 +134,31 @@ message APIVersions {
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
 }
 
+// ApplyOptions may be provided when applying an API object.
+// FieldManager is required for apply requests.
+// ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation
+// that speaks specifically to how the options fields relate to apply.
+message ApplyOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+
+  // Force is going to "force" Apply requests. It means user will
+  // re-acquire conflicting fields owned by other people.
+  optional bool force = 2;
+
+  // fieldManager is a name associated with the actor or entity
+  // that is making these changes. The value must be less than or
+  // 128 characters long, and only contain printable characters,
+  // as defined by https://golang.org/pkg/unicode/#IsPrint. This
+  // field is required.
+  optional string fieldManager = 3;
+}
+
 // Condition contains details for one aspect of the current state of this API Resource.
 // ---
 // This struct is intended for direct use as an array at the field path .status.conditions.  For example,
@@ -217,6 +242,19 @@ message CreateOptions {
   // as defined by https://golang.org/pkg/unicode/#IsPrint.
   // +optional
   optional string fieldManager = 3;
+
+  // fieldValidation determines how the server should respond to
+  // unknown/duplicate fields in the object in the request.
+  // Introduced as alpha in 1.23, older servers or servers with the
+  // `ServerSideFieldValidation` feature disabled will discard valid values
+  // specified in  this param and not perform any server side field validation.
+  // Valid values are:
+  // - Ignore: ignores unknown/duplicate fields.
+  // - Warn: responds with a warning for each
+  // unknown/duplicate field, but successfully serves the request.
+  // - Strict: fails the request on unknown/duplicate fields.
+  // +optional
+  optional string fieldValidation = 4;
 }
 
 // DeleteOptions may be provided when deleting an API object.
@@ -266,18 +304,6 @@ message DeleteOptions {
 // can be used as map keys in json.
 message Duration {
   optional int64 duration = 1;
-}
-
-// ExportOptions is the query options to the standard REST get call.
-// Deprecated. Planned for removal in 1.18.
-message ExportOptions {
-  // Should this value be exported.  Export strips fields that a user can not specify.
-  // Deprecated. Planned for removal in 1.18.
-  optional bool export = 1;
-
-  // Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
-  // Deprecated. Planned for removal in 1.18.
-  optional bool exact = 2;
 }
 
 // FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
@@ -349,7 +375,7 @@ message GroupVersionForDiscovery {
 }
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+// to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupVersionKind {
@@ -361,7 +387,7 @@ message GroupVersionKind {
 }
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+// to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupVersionResource {
@@ -486,8 +512,6 @@ message ListOptions {
   // assume bookmarks are returned at any specific interval, nor may they
   // assume the server will send any BOOKMARK event during a session.
   // If this is not a watch, this field is ignored.
-  // If the feature gate WatchBookmarks is not enabled in apiserver,
-  // this field is ignored.
   // +optional
   optional bool allowWatchBookmarks = 9;
 
@@ -576,6 +600,15 @@ message ManagedFieldsEntry {
   // FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
   // +optional
   optional FieldsV1 fieldsV1 = 7;
+
+  // Subresource is the name of the subresource used to update that object, or
+  // empty string if the object was updated through the main resource. The
+  // value of this field is used to distinguish between managers, even if they
+  // share the same name. For example, a status update will be distinct from a
+  // regular update using the same manager name.
+  // Note that the APIVersion field is not related to the Subresource field and
+  // it always corresponds to the version of the main resource.
+  optional string subresource = 8;
 }
 
 // MicroTime is version of Time with microsecond level precision.
@@ -775,6 +808,7 @@ message ObjectMeta {
 // OwnerReference contains enough information to let you identify an owning
 // object. An owning object must be in the same namespace as the dependent, or
 // be cluster-scoped, so there is no namespace field.
+// +structType=atomic
 message OwnerReference {
   // API version of the referent.
   optional string apiVersion = 5;
@@ -857,6 +891,19 @@ message PatchOptions {
   // types (JsonPatch, MergePatch, StrategicMergePatch).
   // +optional
   optional string fieldManager = 3;
+
+  // fieldValidation determines how the server should respond to
+  // unknown/duplicate fields in the object in the request.
+  // Introduced as alpha in 1.23, older servers or servers with the
+  // `ServerSideFieldValidation` feature disabled will discard valid values
+  // specified in  this param and not perform any server side field validation.
+  // Valid values are:
+  // - Ignore: ignores unknown/duplicate fields.
+  // - Warn: responds with a warning for each
+  // unknown/duplicate field, but successfully serves the request.
+  // - Strict: fails the request on unknown/duplicate fields.
+  // +optional
+  optional string fieldValidation = 4;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -1074,6 +1121,19 @@ message UpdateOptions {
   // as defined by https://golang.org/pkg/unicode/#IsPrint.
   // +optional
   optional string fieldManager = 2;
+
+  // fieldValidation determines how the server should respond to
+  // unknown/duplicate fields in the object in the request.
+  // Introduced as alpha in 1.23, older servers or servers with the
+  // `ServerSideFieldValidation` feature disabled will discard valid values
+  // specified in  this param and not perform any server side field validation.
+  // Valid values are:
+  // - Ignore: ignores unknown/duplicate fields.
+  // - Warn: responds with a warning for each
+  // unknown/duplicate field, but successfully serves the request.
+  // - Strict: fails the request on unknown/duplicate fields.
+  // +optional
+  optional string fieldValidation = 3;
 }
 
 // Verbs masks the value so protobuf can generate

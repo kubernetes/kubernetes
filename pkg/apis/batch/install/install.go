@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/batch/v1beta1"
-	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 func init() {
@@ -37,6 +36,5 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(batch.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
-	utilruntime.Must(v2alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v2alpha1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion))
 }

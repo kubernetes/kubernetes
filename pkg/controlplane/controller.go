@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/storage"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -42,7 +43,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 )
 
-const kubernetesServiceName = "kubernetes"
+const (
+	kubernetesServiceName = "kubernetes"
+)
 
 // Controller is the controller manager for the core bootstrap Kubernetes
 // controller loops, which manage creating the "kubernetes" service, the
@@ -110,11 +113,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
 		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
 
-		ServiceClusterIPInterval: 3 * time.Minute,
+		ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: 3 * time.Minute,
+		ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
@@ -148,8 +151,10 @@ func (c *Controller) Start() {
 
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
+	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
+		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
+	} else if !storage.IsNotFound(err) {
+		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
 	}
 
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
@@ -181,7 +186,7 @@ func (c *Controller) Stop() {
 		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
 		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-			klog.Error(err)
+			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
 	}()
 

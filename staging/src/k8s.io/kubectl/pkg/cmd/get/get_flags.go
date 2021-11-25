@@ -17,6 +17,7 @@ limitations under the License.
 package get
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/openapi"
 )
 
@@ -160,7 +162,19 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.CustomColumnsFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s See custom columns [https://kubernetes.io/docs/reference/kubectl/overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [https://kubernetes.io/docs/reference/kubectl/jsonpath/].", strings.Join(f.AllowedFormats(), "|")))
+		util.CheckErr(cmd.RegisterFlagCompletionFunc(
+			"output",
+			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+				var comps []string
+				for _, format := range f.AllowedFormats() {
+					if strings.HasPrefix(format, toComplete) {
+						comps = append(comps, format)
+					}
+				}
+				return comps, cobra.ShellCompDirectiveNoFileComp
+			},
+		))
 	}
 	if f.NoHeaders != nil {
 		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")

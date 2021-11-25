@@ -87,6 +87,9 @@ func (x *Extensions) toKubeOpenAPI(ret *spec.Schema) {
 	if x.XMapType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
 	}
+	if len(x.XValidations) > 0 {
+		ret.VendorExtensible.AddExtension("x-kubernetes-validations", x.XValidations)
+	}
 }
 
 func (v *ValueValidation) toKubeOpenAPI(ret *spec.Schema) {

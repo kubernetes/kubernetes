@@ -81,6 +81,9 @@ func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return validation.ValidateFlunder(flunder)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (flunderStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (flunderStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
@@ -94,4 +97,9 @@ func (flunderStrategy) Canonicalize(obj runtime.Object) {
 
 func (flunderStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (flunderStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

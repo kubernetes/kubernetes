@@ -93,7 +93,9 @@ type csiBlockMapper struct {
 	volumeID   string
 	readOnly   bool
 	spec       *volume.Spec
+	pod        *v1.Pod
 	podUID     types.UID
+	volume.MetricsProvider
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}
@@ -111,6 +113,12 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{specName}
 func (m *csiBlockMapper) GetStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
+}
+
+// SupportsMetrics returns true for csiBlockMapper as it initializes the
+// MetricsProvider.
+func (m *csiBlockMapper) SupportsMetrics() bool {
+	return true
 }
 
 // getPublishDir returns path to a directory, where the volume is published to each pod.
@@ -185,7 +193,8 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		accessMode,
 		nodeStageSecrets,
 		csiSource.VolumeAttributes,
-		nil /* MountOptions */)
+		nil, /* MountOptions */
+		nil /* fsGroup */)
 
 	if err != nil {
 		return "", err
@@ -210,8 +219,21 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishVolumeInfo = attachment.Status.AttachmentMetadata
 	}
 
+	// Inject pod information into volume_attributes
+	volAttribs := csiSource.VolumeAttributes
+	podInfoEnabled, err := m.plugin.podInfoEnabled(string(m.driverName))
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to assemble volume attributes: %v", err))
+	}
+	volumeLifecycleMode, err := m.plugin.getVolumeLifecycleMode(m.spec)
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to get VolumeLifecycleMode: %v", err))
+	}
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(m.pod, volumeLifecycleMode))
+	}
+
 	nodePublishSecrets := map[string]string{}
-	var err error
 	if csiSource.NodePublishSecretRef != nil {
 		nodePublishSecrets, err = getCredentialsFromSecret(m.k8s, csiSource.NodePublishSecretRef)
 		if err != nil {
@@ -241,10 +263,11 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishPath,
 		accessMode,
 		publishVolumeInfo,
-		csiSource.VolumeAttributes,
+		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
-		[]string{},
+		[]string{}, /* mountOptions */
+		nil,        /* fsGroup */
 	)
 
 	if err != nil {
@@ -256,9 +279,6 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 
 // SetUpDevice ensures the device is attached returns path where the device is located.
 func (m *csiBlockMapper) SetUpDevice() (string, error) {
-	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
-	}
 	klog.V(4).Infof(log("blockMapper.SetUpDevice called"))
 
 	// Get csiSource from spec
@@ -319,9 +339,6 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 }
 
 func (m *csiBlockMapper) MapPodDevice() (string, error) {
-	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
-	}
 	klog.V(4).Infof(log("blockMapper.MapPodDevice called"))
 
 	// Get csiSource from spec
@@ -357,7 +374,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	csiClient, err := m.csiClientGetter.Get()
@@ -422,11 +439,7 @@ func (m *csiBlockMapper) unstageVolumeForBlock(ctx context.Context, csi csiClien
 
 // TearDownDevice removes traces of the SetUpDevice.
 func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error {
-	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	csiClient, err := m.csiClientGetter.Get()
@@ -489,9 +502,6 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 
 // UnmapPodDevice unmaps the block device path.
 func (m *csiBlockMapper) UnmapPodDevice() error {
-	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
-	}
 	publishPath := m.getPublishPath()
 
 	csiClient, err := m.csiClientGetter.Get()
@@ -499,7 +509,7 @@ func (m *csiBlockMapper) UnmapPodDevice() error {
 		return errors.New(log("blockMapper.UnmapPodDevice failed to get CSI client: %v", err))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	// Call NodeUnpublishVolume.
