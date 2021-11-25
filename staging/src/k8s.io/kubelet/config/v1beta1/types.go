@@ -350,6 +350,15 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
+	// dnsOptions is a list of options passed to resolv.conf. All listed options passing to
+	// resolv.conf without any checks.
+	// If DynamicKubeletConfig (deprecated; default off) is on, when
+	// dynamically updating this field, consider that
+	// changes will only take effect on Pods created after the update. Draining
+	// the node is recommended before changing this field.
+	// Default: "ndots:5"
+	// +optional
+	DNSOptions []string `json:"dnsOptions,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	// If DynamicKubeletConfig (deprecated; default off) is on, when

@@ -50,6 +50,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 			obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 			obj.CPUCFSQuota = true
+			obj.DNSOptions = []string{"ndots:5"}
 			obj.EventBurst = 10
 			obj.EventRecordQPS = 5
 			obj.EnableControllerAttachDetach = true

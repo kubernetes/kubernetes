@@ -175,6 +175,9 @@ type KubeletConfiguration struct {
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers.
 	ClusterDNS []string
+	// dnsOptions is a list of options to resolv.conf. If not set,
+	// kubelet will use default value. All options passing to resolv.conf without any checks.
+	DNSOptions []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration

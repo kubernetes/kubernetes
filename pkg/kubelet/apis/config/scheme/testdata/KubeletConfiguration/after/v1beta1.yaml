@@ -22,6 +22,8 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
+dnsOptions:
+- ndots:5
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true

@@ -180,6 +180,7 @@ var (
 		"CgroupRoot",
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
+		"DNSOptions[*]",
 		"ClusterDomain",
 		"ConfigMapAndSecretChangeDetectionStrategy",
 		"ContainerLogMaxFiles",
