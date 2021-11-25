@@ -2246,7 +2246,9 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
@@ -2260,7 +2262,9 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected networking API version, got %#v", group.Versions)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
@@ -2273,7 +2277,9 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 					foundNetPol = true
 				}
 			}
-			framework.ExpectEqual(foundNetPol, true, fmt.Sprintf("expected networkpolicies, got %#v", resources.APIResources))
+			if !foundNetPol {
+				framework.Failf("expected networkpolicies, got %#v", resources.APIResources)
+			}
 		}
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
@@ -2326,10 +2332,14 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-npWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
-				framework.ExpectEqual(isNetPol, true, fmt.Sprintf("expected NetworkPolicy, got %T", evt.Object))
+				if !isNetPol {
+					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
+				}
 				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -2346,7 +2356,9 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %#v", err)
+		}
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
