@@ -562,7 +562,7 @@ func CanonicalVerb(verb string, scope string) string {
 // LIST and APPLY from PATCH.
 func CleanVerb(verb string, request *http.Request) string {
 	reportedVerb := verb
-	if verb == "LIST" && checkIfWatch(request) {
+	if suggestedVerb := getVerbIfWatch(request); suggestedVerb == "WATCH" {
 		reportedVerb = "WATCH"
 	}
 	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
@@ -593,25 +593,17 @@ func cleanVerb(verb, suggestedVerb string, request *http.Request) string {
 	return OtherRequestMethod
 }
 
-//getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
+// getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
 func getVerbIfWatch(req *http.Request) string {
 	if strings.ToUpper(req.Method) == "GET" || strings.ToUpper(req.Method) == "LIST" {
-		if checkIfWatch(req) {
-			return "WATCH"
+		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
+		if values := req.URL.Query()["watch"]; len(values) > 0 {
+			if value := strings.ToLower(values[0]); value != "0" && value != "false" {
+				return "WATCH"
+			}
 		}
 	}
 	return ""
-}
-
-//checkIfWatch check request is watch
-func checkIfWatch(req *http.Request) bool {
-	// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
-	if values := req.URL.Query()["watch"]; len(values) > 0 {
-		if value := strings.ToLower(values[0]); value != "0" && value != "false" {
-			return true
-		}
-	}
-	return false
 }
 
 func cleanDryRun(u *url.URL) string {
