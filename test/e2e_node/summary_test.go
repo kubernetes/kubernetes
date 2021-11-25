@@ -347,6 +347,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			})
 
 			ginkgo.By("Validating /stats/summary")
+			nodesummary, _ := getNodeSummary()
+			framework.Logf("[littledriver-test] return value of getNodeSummary: %+v", *nodesummary)
 			// Give pods a minute to actually start up.
 			gomega.Eventually(getNodeSummary, 90*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
