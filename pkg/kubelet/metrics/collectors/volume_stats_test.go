@@ -85,7 +85,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 							Name:      "testpvc",
 							Namespace: "testns",
 						},
-						VolumeHealthStats: statsapi.VolumeHealthStats{
+						VolumeHealthStats: &statsapi.VolumeHealthStats{
 							Abnormal: true,
 						},
 					},
@@ -111,7 +111,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 							Name:      "testpvc",
 							Namespace: "testns",
 						},
-						VolumeHealthStats: statsapi.VolumeHealthStats{
+						VolumeHealthStats: &statsapi.VolumeHealthStats{
 							Abnormal: true,
 						},
 					},
@@ -126,7 +126,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 			kubelet_volume_stats_inodes_free{namespace="testns",persistentvolumeclaim="testpvc"} 655344
 			kubelet_volume_stats_inodes_used{namespace="testns",persistentvolumeclaim="testpvc"} 16
 			kubelet_volume_stats_used_bytes{namespace="testns",persistentvolumeclaim="testpvc"} 4.21789696e+09
-			kubelet_volume_stats_health_status{namespace="testns",persistentvolumeclaim="testpvc"} 1
+			kubelet_volume_stats_health_status{namespace="testns",persistentvolumeclaim="testpvc",volume_health_status="abnormal"} 1
 			`
 
 		metrics = []string{
