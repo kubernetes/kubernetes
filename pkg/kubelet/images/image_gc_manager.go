@@ -47,7 +47,7 @@ type StatsProvider interface {
 // ImageGCManager is an interface for managing lifecycle of all images.
 // Implementation is thread-safe.
 type ImageGCManager interface {
-	// Applies the garbage collection policy. Errors include being unable to free
+	//GarbageCollect Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
 	GarbageCollect() error
 
@@ -56,7 +56,7 @@ type ImageGCManager interface {
 
 	GetImageList() ([]container.Image, error)
 
-	// Delete all unused images.
+	// DeleteUnusedImages Delete all unused images.
 	DeleteUnusedImages() error
 }
 
@@ -98,14 +98,14 @@ type realImageGCManager struct {
 	// Track initialization
 	initialized bool
 
-	// imageCache is the cache of latest image list.
+	// imageCache is the cache of the latest image list.
 	imageCache imageCache
 
 	// sandbox image exempted from GC
 	sandboxImage string
 }
 
-// imageCache caches latest result of ListImages.
+// imageCache caches the latest result of ListImages.
 type imageCache struct {
 	// sync.Mutex is the mutex protects the image cache.
 	sync.Mutex
@@ -126,7 +126,7 @@ func (i *imageCache) set(images []container.Image) {
 	i.images = images
 }
 
-// get gets image list from image cache.
+// get image list from image cache.
 // NOTE: The caller of get() should not do mutating operations on the
 // returned list that could cause data race against other readers (e.g.
 // in-place sorting the returned list)
@@ -204,7 +204,7 @@ func (im *realImageGCManager) Start() {
 
 }
 
-// Get a list of images on this node
+// GetImageList Get a list of images on this node
 func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
