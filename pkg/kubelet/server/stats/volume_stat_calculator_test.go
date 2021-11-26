@@ -159,7 +159,8 @@ func TestPVCRef(t *testing.T) {
 			Name:      pName0 + "-" + vol3,
 			Namespace: namespace0,
 		},
-		FsStats: expectedFSStats(),
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 }
 
