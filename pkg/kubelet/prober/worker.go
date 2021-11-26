@@ -96,7 +96,7 @@ func newWorker(
 	case readiness:
 		w.spec = container.ReadinessProbe
 		w.resultsManager = m.readinessManager
-		w.initialValue = results.Failure
+		w.initialValue = results.Unknown
 	case liveness:
 		w.spec = container.LivenessProbe
 		w.resultsManager = m.livenessManager

@@ -2124,7 +2124,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			handleProbeSync(kl, update, handler, "liveness", "unhealthy")
 		}
 	case update := <-kl.readinessManager.Updates():
-		ready := update.Result == proberesults.Success
+		ready := update.Result == proberesults.Success || update.Result == proberesults.Unknown
 		kl.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 
 		status := ""
