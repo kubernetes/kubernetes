@@ -549,22 +549,19 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 
 	currState, ok := cache.podStates[key]
 	switch {
-	// An assumed pod won't have Delete/Remove event. It needs to have Add event
-	// before Remove event, in which case the state would change from Assumed to Added.
-	case ok && !cache.assumedPods[key]:
+	case ok:
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 			klog.Errorf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
-			klog.Fatalf("Schedulercache is corrupted and can badly affect scheduling decisions")
+			if pod.Spec.NodeName != "" {
+				// An empty NodeName is possible when the scheduler misses a Delete
+				// event and it gets the last known state from the informer cache.
+				klog.Fatalf("Schedulercache is corrupted and can badly affect scheduling decisions")
+			}
 		}
-		err := cache.removePod(currState.pod)
-		if err != nil {
-			return err
-		}
-		delete(cache.podStates, key)
+		return cache.expirePod(key, currState)
 	default:
 		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
 	}
-	return nil
 }
 
 func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
