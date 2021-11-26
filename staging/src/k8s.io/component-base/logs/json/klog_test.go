@@ -239,7 +239,7 @@ func TestKlogIntegration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var buffer bytes.Buffer
 			writer := zapcore.AddSync(&buffer)
-			logger, _ := NewJSONLogger(writer, writer)
+			logger, _ := NewJSONLogger(writer, nil, nil)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
 
@@ -270,7 +270,7 @@ func TestKlogIntegration(t *testing.T) {
 func TestKlogV(t *testing.T) {
 	var buffer testBuff
 	writer := zapcore.AddSync(&buffer)
-	logger, _ := NewJSONLogger(writer, writer)
+	logger, _ := NewJSONLogger(writer, nil, nil)
 	klog.SetLogger(logger)
 	defer klog.ClearLogger()
 	fs := flag.FlagSet{}

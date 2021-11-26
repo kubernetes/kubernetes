@@ -36,8 +36,20 @@ var (
 
 // NewJSONLogger creates a new json logr.Logger and its associated
 // flush function. The separate error stream is optional and may be nil.
-func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, func()) {
-	encoder := zapcore.NewJSONEncoder(encoderConfig)
+// The encoder config is also optional.
+func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
+	if encoderConfig == nil {
+		encoderConfig = &zapcore.EncoderConfig{
+			MessageKey:     "msg",
+			CallerKey:      "caller",
+			TimeKey:        "ts",
+			EncodeTime:     epochMillisTimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		}
+	}
+
+	encoder := zapcore.NewJSONEncoder(*encoderConfig)
 	var core zapcore.Core
 	if errorStream == nil {
 		core = zapcore.NewCore(encoder, infoStream, zapcore.Level(-127))
@@ -57,15 +69,6 @@ func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, fu
 	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err")), func() {
 		l.Sync()
 	}
-}
-
-var encoderConfig = zapcore.EncoderConfig{
-	MessageKey:     "msg",
-	CallerKey:      "caller",
-	TimeKey:        "ts",
-	EncodeTime:     epochMillisTimeEncoder,
-	EncodeDuration: zapcore.StringDurationEncoder,
-	EncodeCaller:   zapcore.ShortCallerEncoder,
 }
 
 func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -95,8 +98,8 @@ func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 			}
 		}
 		// stdout for info messages, stderr for errors.
-		return NewJSONLogger(stdout, stderr)
+		return NewJSONLogger(stdout, stderr, nil)
 	}
 	// Write info messages and errors to stderr to prevent mixing with normal program output.
-	return NewJSONLogger(stderr, nil)
+	return NewJSONLogger(stderr, nil, nil)
 }
