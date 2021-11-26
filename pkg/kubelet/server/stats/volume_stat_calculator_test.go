@@ -128,8 +128,9 @@ func TestPVCRef(t *testing.T) {
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
-		Name:    vol0,
-		FsStats: expectedFSStats(),
+		Name:              vol0,
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 	// Verify 'vol1' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -138,16 +139,18 @@ func TestPVCRef(t *testing.T) {
 			Name:      pvcClaimName0,
 			Namespace: namespace0,
 		},
-		FsStats: expectedFSStats(),
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
-	// Verify 'vol2' has a PVC reference
+	// // Verify 'vol2' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name: vol2,
 		PVCRef: &kubestats.PVCReference{
 			Name:      pvcClaimName1,
 			Namespace: namespace0,
 		},
-		FsStats: expectedBlockStats(),
+		FsStats:           expectedBlockStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 	// Verify 'vol3' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -260,6 +263,13 @@ func expectedFSStats() kubestats.FsStats {
 		Inodes:         &inodes,
 		InodesFree:     &inodesFree,
 		InodesUsed:     &inodesUsed,
+	}
+}
+
+func expectedVolumeHealthStats() *kubestats.VolumeHealthStats {
+	metric := expectedMetrics()
+	return &kubestats.VolumeHealthStats{
+		Abnormal: *metric.Abnormal,
 	}
 }
 
