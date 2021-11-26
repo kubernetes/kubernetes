@@ -826,59 +826,64 @@ func TestEphemeralStorageResource(t *testing.T) {
 func TestRemovePod(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced resource allocation
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
-	basePod := makeBasePod(t, "node-1", "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
-	tests := []struct {
-		nodes     []*v1.Node
-		pod       *v1.Pod
-		wNodeInfo *framework.NodeInfo
-	}{{
-		nodes: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
-			},
+	pod := makeBasePod(t, "node-1", "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
 		},
-		pod: basePod,
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			[]*v1.Pod{basePod},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}}
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
+		},
+	}
+	wNodeInfo := newNodeInfo(
+		&framework.Resource{
+			MilliCPU: 100,
+			Memory:   500,
+		},
+		&framework.Resource{
+			MilliCPU: 100,
+			Memory:   500,
+		},
+		[]*v1.Pod{pod},
+		newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+		make(map[string]*framework.ImageStateSummary),
+	)
+	tests := map[string]struct {
+		assume bool
+	}{
+		"bound":   {},
+		"assumed": {assume: true},
+	}
 
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			nodeName := tt.pod.Spec.NodeName
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			nodeName := pod.Spec.NodeName
 			cache := newSchedulerCache(time.Second, time.Second, nil)
-			// Add pod succeeds even before adding the nodes.
-			if err := cache.AddPod(tt.pod); err != nil {
-				t.Fatalf("AddPod failed: %v", err)
+			// Add/Assume pod succeeds even before adding the nodes.
+			if tt.assume {
+				if err := cache.AddPod(pod); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			} else {
+				if err := cache.AssumePod(pod); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
+				}
 			}
 			n := cache.nodes[nodeName]
-			if err := deepEqualWithoutGeneration(n, tt.wNodeInfo); err != nil {
+			if err := deepEqualWithoutGeneration(n, wNodeInfo); err != nil {
 				t.Error(err)
 			}
-			for _, n := range tt.nodes {
+			for _, n := range nodes {
 				if err := cache.AddNode(n); err != nil {
 					t.Error(err)
 				}
 			}
 
-			if err := cache.RemovePod(tt.pod); err != nil {
+			if err := cache.RemovePod(pod); err != nil {
 				t.Fatalf("RemovePod failed: %v", err)
 			}
 
-			if _, err := cache.GetPod(tt.pod); err == nil {
+			if _, err := cache.GetPod(pod); err == nil {
 				t.Errorf("pod was not deleted")
 			}
 
