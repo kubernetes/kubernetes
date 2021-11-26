@@ -5233,6 +5233,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -5366,6 +5374,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -5493,6 +5509,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -5684,6 +5708,14 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
@@ -5803,6 +5835,14 @@
             "name": "continue",
             "schema": {
               "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -6416,6 +6456,14 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
@@ -6535,6 +6583,14 @@
             "name": "continue",
             "schema": {
               "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -7393,6 +7449,14 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
@@ -7512,6 +7576,14 @@
             "name": "continue",
             "schema": {
               "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -8615,6 +8687,14 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
@@ -8734,6 +8814,14 @@
             "name": "continue",
             "schema": {
               "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -9837,6 +9925,14 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
@@ -9956,6 +10052,14 @@
             "name": "continue",
             "schema": {
               "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "consistentWatchCache",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -11007,6 +11111,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -11134,6 +11246,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -11273,6 +11393,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -11400,6 +11528,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -11539,6 +11675,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -11666,6 +11810,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -11809,6 +11961,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -11968,6 +12128,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -12105,6 +12273,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -12264,6 +12440,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -12401,6 +12585,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -12560,6 +12752,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -12697,6 +12897,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -12856,6 +13064,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -12993,6 +13209,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -13152,6 +13376,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "consistentWatchCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
           "in": "query",
           "name": "continue",
@@ -13279,6 +13511,14 @@
           "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
           "in": "query",
           "name": "allowWatchBookmarks",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "consistentWatchCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
