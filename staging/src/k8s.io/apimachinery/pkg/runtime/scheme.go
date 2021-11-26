@@ -44,11 +44,11 @@ import (
 // Schemes are not expected to change at runtime and are only threadsafe after
 // registration is complete.
 type Scheme struct {
-	// versionMap allows one to figure out the go type of an object with
+	// gvkToType allows one to figure out the go type of an object with
 	// the given version and name.
 	gvkToType map[schema.GroupVersionKind]reflect.Type
 
-	// typeToGroupVersion allows one to find metadata for a given go object.
+	// typeToGVK allows one to find metadata for a given go object.
 	// The reflect.Type we index by should *not* be a pointer.
 	typeToGVK map[reflect.Type][]schema.GroupVersionKind
 
@@ -64,7 +64,7 @@ type Scheme struct {
 	// resource field labels in that version to internal version.
 	fieldLabelConversionFuncs map[schema.GroupVersionKind]FieldLabelConversionFunc
 
-	// defaulterFuncs is an array of interfaces to be called with an object to provide defaulting
+	// defaulterFuncs is a map to funcs to be called with an object to provide defaulting
 	// the provided object must be a pointer.
 	defaulterFuncs map[reflect.Type]func(interface{})
 
