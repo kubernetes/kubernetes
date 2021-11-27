@@ -233,6 +233,23 @@ var _ = SIGDescribe("Probing container", func() {
 
 	/*
 		Release: v1.20
+		Testname: Pod liveness probe, container exec invalid, restart
+		Description: A Pod is created with liveness probe with a Exec action that is invalid on the Pod. The liveness probe MUST restart the Pod.
+	*/
+	ginkgo.It("should be restarted with an invalid exec liveness probe with [NodeConformance]", func() {
+		cmd := []string{"/bin/sh", "-c", "sleep 600"}
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        execHandler([]string{"invalid"}),
+			InitialDelaySeconds: 15,
+			TimeoutSeconds:      1,
+			FailureThreshold:    1,
+		}
+		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release: v1.20
 		Testname: Pod readiness probe, container exec timeout, not ready
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
