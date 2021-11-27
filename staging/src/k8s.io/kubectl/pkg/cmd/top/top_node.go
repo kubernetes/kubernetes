@@ -65,7 +65,10 @@ var (
 		  kubectl top node
 
 		  # Show metrics for a given node
-		  kubectl top node NODE_NAME`))
+		  kubectl top node NODE_NAME
+		  
+		  # Show metrics based on the capacity for a given node
+		  kubectl top node NODE_NAME --show-capacity`))
 )
 
 func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
