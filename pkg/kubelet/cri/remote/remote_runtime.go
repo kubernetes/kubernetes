@@ -676,7 +676,15 @@ func (r *remoteRuntimeService) execSyncV1alpha2(ctx context.Context, containerID
 		if status.Code(err) == codes.DeadlineExceeded {
 			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
-
+		// #106682 if the command doesn't exist in the container the error is nested into the GRPC error
+		// unwrap the error from the message
+		execMsg := strings.SplitAfterN(err.Error(), "starting container process caused: ", 2)
+		if len(execMsg) == 2 {
+			stdout := []byte{}
+			stderr := []byte(execMsg[1])
+			execErr := utilexec.CodeExitError{Err: err, Code: 127}
+			return stdout, stderr, execErr
+		}
 		return nil, nil, err
 	}
 
@@ -708,6 +716,15 @@ func (r *remoteRuntimeService) execSyncV1(ctx context.Context, containerID strin
 			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
 
+		// #106682 if the command doesn't exist in the container the error is nested into the GRPC error
+		// unwrap the error from the message
+		execMsg := strings.SplitAfterN(err.Error(), "starting container process caused: ", 2)
+		if len(execMsg) == 2 {
+			stdout := []byte{}
+			stderr := []byte(execMsg[1])
+			execErr := utilexec.CodeExitError{Err: err, Code: 127}
+			return stdout, stderr, execErr
+		}
 		return nil, nil, err
 	}
 
