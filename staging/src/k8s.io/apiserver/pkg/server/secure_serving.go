@@ -35,6 +35,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+
+	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/http3"
 )
 
 const (
@@ -241,6 +244,43 @@ func RunServer(
 		err := server.Serve(listener)
 
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())
+		select {
+		case <-stopCh:
+			klog.Info(msg)
+		default:
+			panic(fmt.Sprintf("%s due to error: %v", msg, err))
+		}
+	}()
+
+	// Open the listeners
+	udpAddr, err := net.ResolveUDPAddr("udp", ln.Addr().String())
+	if err != nil {
+		return serverShutdownCh, listenerStoppedCh, err
+	}
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return serverShutdownCh, listenerStoppedCh, err
+	}
+
+	quicServer := &http3.Server{
+		Server: server,
+		QuicConfig: &quic.Config{
+			KeepAlive: true,
+		},
+	}
+
+	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		quicServer.SetQuicHeaders(w.Header())
+		server.Handler.ServeHTTP(w, r)
+	})
+
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer udpConn.Close()
+		defer quicServer.Close()
+
+		err := quicServer.Serve(udpConn)
+		msg := fmt.Sprintf("Stopped listening on HTTP/3 %s", ln.Addr().String())
 		select {
 		case <-stopCh:
 			klog.Info(msg)
