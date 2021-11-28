@@ -19,8 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,7 +119,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
 	klog.V(2).InfoS("Update ready status of pods on node", "node", nodeName)
 
-	errMsg := []string{}
+	errs := []error{}
 	for i := range pods {
 		// Defensive check, also needed for tests.
 		if pods[i].Spec.NodeName != nodeName {
@@ -146,7 +144,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecor
 						continue
 					}
 					klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
-					errMsg = append(errMsg, fmt.Sprintf("%v", err))
+					errs = append(errs, err)
 				}
 				// record NodeNotReady event after updateStatus to make sure pod still exists
 				recorder.Event(pod, v1.EventTypeWarning, "NodeNotReady", "Node is not ready")
@@ -154,10 +152,8 @@ func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecor
 			}
 		}
 	}
-	if len(errMsg) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
+
+	return utilerrors.NewAggregate(errs)
 }
 
 // RecordNodeEvent records a event related to a node.
