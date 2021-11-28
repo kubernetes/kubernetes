@@ -1516,6 +1516,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // o - the SyncPodOptions for this invocation
 //
 // The workflow is:
+// * Kill the pod immediately if update type is SyncPodKill
 // * If the pod is being created, record pod worker start latency
 // * Call generateAPIPodStatus to prepare an v1.PodStatus for the pod
 // * If the pod is being seen as running for the first time, record pod
@@ -1742,7 +1743,7 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		for _, r := range result.SyncResults {
 			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
 				// Do not record an event here, as we keep all event logging for sync pod failures
-				// local to container runtime so we get better errors
+				// local to container runtime, so we get better errors.
 				return err
 			}
 		}
