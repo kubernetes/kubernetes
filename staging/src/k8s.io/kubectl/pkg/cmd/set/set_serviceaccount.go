@@ -204,6 +204,11 @@ func (o *SetServiceAccountOptions) Run() error {
 		info := patch.Info
 		name := info.ObjectName()
 		if patch.Err != nil {
+			if ee, ok := patch.Err.(polymorphichelpers.ResourceNotHavePodTemplate); ok {
+				klog.Warning(ee)
+				continue
+			}
+
 			patchErrs = append(patchErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}

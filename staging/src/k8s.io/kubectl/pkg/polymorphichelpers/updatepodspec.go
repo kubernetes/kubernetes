@@ -29,6 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type ResourceNotHavePodTemplate struct {
+	message string
+}
+
+func (e ResourceNotHavePodTemplate) Error() string { return e.message }
+
 func updatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
 	switch t := obj.(type) {
 	case *v1.Pod:
@@ -85,6 +91,8 @@ func updatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (boo
 		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
 
 	default:
-		return false, fmt.Errorf("the object is not a pod or does not have a pod template: %T", t)
+		return false, ResourceNotHavePodTemplate{
+			message: fmt.Sprintf("the object is not a pod or does not have a pod template: %T", t),
+		}
 	}
 }

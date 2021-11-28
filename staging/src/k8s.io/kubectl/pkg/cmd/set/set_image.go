@@ -244,7 +244,13 @@ func (o *SetImageOptions) Run() error {
 			}
 			return nil
 		})
+
 		if err != nil {
+			if ee, ok := err.(polymorphichelpers.ResourceNotHavePodTemplate); ok {
+				klog.Warning(ee)
+				return nil, nil
+			}
+
 			return nil, err
 		}
 		// record this change (for rollout history)
