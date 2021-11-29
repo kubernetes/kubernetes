@@ -3284,6 +3284,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			criPodIPs: []string{"192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
+				{IP: "fd01::1234"},
 			},
 		},
 		{
