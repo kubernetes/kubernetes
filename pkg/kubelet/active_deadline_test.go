@@ -23,8 +23,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 // mockPodStatusProvider returns the status on the specified pod
@@ -45,7 +45,7 @@ func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 // TestActiveDeadlineHandler verifies the active deadline handler functions as expected.
 func TestActiveDeadlineHandler(t *testing.T) {
 	pods := newTestPods(4)
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podStatusProvider := &mockPodStatusProvider{pods: pods}
 	fakeRecorder := &record.FakeRecorder{}
 	handler, err := newActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)

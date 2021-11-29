@@ -110,6 +110,14 @@ type ActualStateOfWorld interface {
 	// volumes that do not need to update contents should not fail.
 	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) (bool, string, error)
 
+	// PodRemovedFromVolume returns true if the given pod does not exist in the list of
+	// mountedPods for the given volume in the cache, indicating that the pod has
+	// fully unmounted it or it was never mounted the volume.
+	// If the volume is fully mounted or is in uncertain mount state for the pod, it is
+	// considered that the pod still exists in volume manager's actual state of the world
+	// and false is returned.
+	PodRemovedFromVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool
+
 	// VolumeExistsWithSpecName returns true if the given volume specified with the
 	// volume spec name (a.k.a., InnerVolumeSpecName) exists in the list of
 	// volumes that should be attached to this node.
@@ -136,6 +144,11 @@ type ActualStateOfWorld interface {
 	// current actual state of the world.
 	GetMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
 
+	// GetPossiblyMountedVolumesForPod generates and returns a list of volumes for
+	// the specified pod that either are attached and mounted or are "uncertain",
+	// i.e. a volume plugin may be mounting the volume right now.
+	GetPossiblyMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
+
 	// GetGloballyMountedVolumes generates and returns a list of all attached
 	// volumes that are globally mounted. This list can be used to determine
 	// which volumes should be reported as "in use" in the node's VolumesInUse
@@ -158,6 +171,10 @@ type ActualStateOfWorld interface {
 	// to the node. This list can be used to determine volumes that are either in-use
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
+
+	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
+	// the one populated from dsw , if they do not match, update this field from the value from dsw.
+	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -412,6 +429,26 @@ func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeNam
 	return podObj.volumeMountStateForPod
 }
 
+func (asw *actualStateOfWorld) IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return false
+	}
+
+	for _, podObj := range volumeObj.mountedPods {
+		if podName != podObj.podName {
+			// Treat uncertain mount state as mounted until certain.
+			if podObj.volumeMountStateForPod != operationexecutor.VolumeNotMounted {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // addVolume adds the given volume to the cache indicating the specified
 // volume is attached to this node. If no volume name is supplied, a unique
 // volume name is generated from the volumeSpec and returned on success. If a
@@ -504,6 +541,11 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	// If pod exists, reset remountRequired value
 	podObj.remountRequired = false
 	podObj.volumeMountStateForPod = markVolumeOpts.VolumeMountState
+	if mounter != nil {
+		// The mounter stored in the object may have old information,
+		// use the newest one.
+		podObj.mounter = mounter
+	}
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 	return nil
 }
@@ -681,6 +723,31 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 	return podExists, volumeObj.devicePath, nil
 }
 
+func (asw *actualStateOfWorld) PodRemovedFromVolume(
+	podName volumetypes.UniquePodName,
+	volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return true
+	}
+
+	podObj, podExists := volumeObj.mountedPods[podName]
+	if podExists {
+		// if volume mount was uncertain we should keep trying to unmount the volume
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain {
+			return false
+		}
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMounted {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (asw *actualStateOfWorld) VolumeExistsWithSpecName(podName volumetypes.UniquePodName, volumeSpecName string) bool {
 	asw.RLock()
 	defer asw.RUnlock()
@@ -757,6 +824,26 @@ func (asw *actualStateOfWorld) GetMountedVolumesForPod(
 	return mountedVolume
 }
 
+func (asw *actualStateOfWorld) GetPossiblyMountedVolumesForPod(
+	podName volumetypes.UniquePodName) []MountedVolume {
+	asw.RLock()
+	defer asw.RUnlock()
+	mountedVolume := make([]MountedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		for mountedPodName, podObj := range volumeObj.mountedPods {
+			if mountedPodName == podName &&
+				(podObj.volumeMountStateForPod == operationexecutor.VolumeMounted ||
+					podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain) {
+				mountedVolume = append(
+					mountedVolume,
+					getMountedVolume(&podObj, &volumeObj))
+			}
+		}
+	}
+
+	return mountedVolume
+}
+
 func (asw *actualStateOfWorld) GetGloballyMountedVolumes() []AttachedVolume {
 	asw.RLock()
 	defer asw.RUnlock()
@@ -800,6 +887,19 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	}
 
 	return unmountedVolumes
+}
+
+func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string) {
+	asw.Lock()
+	defer asw.Unlock()
+	if volumeObj, volumeExists := asw.attachedVolumes[volumeName]; volumeExists {
+		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
+			if podObj.outerVolumeSpecName != outerVolumeSpecName {
+				podObj.outerVolumeSpecName = outerVolumeSpecName
+				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
+			}
+		}
+	}
 }
 
 func (asw *actualStateOfWorld) newAttachedVolume(

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -94,18 +94,16 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	klog.InfoS("Attempting to evict pods in order to free up resources", "pods", podsToPreempt,
-		"insufficientResources", insufficientResources.toString())
 	for _, pod := range podsToPreempt {
-		status := v1.PodStatus{
-			Phase:   v1.PodFailed,
-			Message: message,
-			Reason:  events.PreemptContainer,
-		}
 		// record that we are evicting the pod
 		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, message)
 		// this is a blocking call and should only return when the pod and its containers are killed.
-		err := c.killPodFunc(pod, status, nil)
+		klog.V(3).InfoS("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources)
+		err := c.killPodFunc(pod, true, nil, func(status *v1.PodStatus) {
+			status.Phase = v1.PodFailed
+			status.Reason = events.PreemptContainer
+			status.Message = message
+		})
 		if err != nil {
 			klog.ErrorS(err, "Failed to evict pod", "pod", klog.KObj(pod))
 			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.

@@ -381,7 +381,8 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer t.delete(t.TestContext(), created)
-	if objectMeta.GetName() == "test-" || !strings.HasPrefix(objectMeta.GetName(), "test-") {
+	createdMeta := t.getObjectMetaOrFail(created)
+	if createdMeta.GetName() == "test-" || !strings.HasPrefix(createdMeta.GetName(), "test-") {
 		t.Errorf("unexpected name: %#v", valid)
 	}
 }
@@ -399,7 +400,8 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	defer t.delete(t.TestContext(), obj)
-	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+	createdMeta := t.getObjectMetaOrFail(obj)
+	if !metav1.HasObjectMetaSystemFieldValues(createdMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 }
@@ -501,7 +503,8 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object, opts metav1.Crea
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	defer t.delete(t.TestContext(), obj)
-	if objectMeta.GetUID() == "bad-uid" || objectMeta.GetCreationTimestamp() == now {
+	createdMeta := t.getObjectMetaOrFail(obj)
+	if createdMeta.GetUID() == "bad-uid" || createdMeta.GetCreationTimestamp() == now {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
 	}
 }

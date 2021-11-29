@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,7 +53,6 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	activeClients       *clientCache
-	dnsClients          *dnsClientCache
 	sessionAffinityType v1.ServiceAffinity
 }
 
@@ -107,8 +107,8 @@ var (
 )
 
 // Used below.
-var localhostIPv4 = net.ParseIP("127.0.0.1")
-var localhostIPv6 = net.ParseIP("::1")
+var localhostIPv4 = netutils.ParseIPSloppy("127.0.0.1")
+var localhostIPv6 = netutils.ParseIPSloppy("::1")
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen. It is assumed that there is only a single Proxier active
@@ -209,7 +209,7 @@ func (proxier *Proxier) setServiceInfo(service ServicePortPortalName, info *serv
 func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPortalName, protocol v1.Protocol, listenIP string, port int, timeout time.Duration) (*serviceInfo, error) {
 	var serviceIP net.IP
 	if listenIP != allAvailableInterfaces {
-		if serviceIP = net.ParseIP(listenIP); serviceIP == nil {
+		if serviceIP = netutils.ParseIPSloppy(listenIP); serviceIP == nil {
 			return nil, fmt.Errorf("could not parse ip '%q'", listenIP)
 		}
 		// add the IP address.  Node port binds to all interfaces.
@@ -237,7 +237,6 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		socket:              sock,
 		timeout:             timeout,
 		activeClients:       newClientCache(),
-		dnsClients:          newDNSClientCache(),
 		sessionAffinityType: v1.ServiceAffinityNone, // default
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
@@ -261,7 +260,7 @@ func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePort
 
 	// close the PortalProxy by deleting the service IP address
 	if info.portal.ip != allAvailableInterfaces {
-		serviceIP := net.ParseIP(info.portal.ip)
+		serviceIP := netutils.ParseIPSloppy(info.portal.ip)
 		args := proxier.netshIPv4AddressDeleteArgs(serviceIP)
 		if err := proxier.netsh.DeleteIPAddress(args); err != nil {
 			return err

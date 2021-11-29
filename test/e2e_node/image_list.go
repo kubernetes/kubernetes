@@ -30,7 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
@@ -46,6 +46,9 @@ const (
 	imagePullRetryDelay = time.Second
 	// Number of parallel count to pull images.
 	maxParallelImagePullCount = 5
+
+	// SampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
+	SampleDevicePluginDSYAML = "test/e2e/testing-manifests/sample-device-plugin.yaml"
 )
 
 // NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
@@ -63,6 +66,7 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
 	imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
+	imageutils.GetE2EImage(imageutils.Etcd),
 )
 
 // updateImageAllowList updates the framework.ImagePrePullList with
@@ -84,10 +88,20 @@ func updateImageAllowList() {
 	} else {
 		framework.ImagePrePullList.Insert(gpuDevicePluginImage)
 	}
+	if kubeVirtPluginImage, err := getKubeVirtDevicePluginImage(); err != nil {
+		klog.Errorln(err)
+	} else {
+		framework.ImagePrePullList.Insert(kubeVirtPluginImage)
+	}
+	if samplePluginImage, err := getSampleDevicePluginImage(); err != nil {
+		klog.Errorln(err)
+	} else {
+		framework.ImagePrePullList.Insert(samplePluginImage)
+	}
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "k8s.gcr.io/node-problem-detector:v0.6.2"
+	const defaultImage string = "k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage
@@ -236,9 +250,46 @@ func getGPUDevicePluginImage() (string, error) {
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
+func getSampleDevicePluginImage() (string, error) {
+	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the sample plugin yaml: %v", err)
+	}
+
+	ds, err := e2emanifest.DaemonSetFromData(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse daemon set for sample plugin: %v", err)
+	}
+
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		return "", fmt.Errorf("failed to parse the sample plugin image: cannot extract the container from YAML")
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
+}
+
 // getSRIOVDevicePluginImage returns the image of SRIOV device plugin.
 func getSRIOVDevicePluginImage() (string, error) {
 	data, err := e2etestfiles.Read(SRIOVDevicePluginDSYAML)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the device plugin manifest: %w", err)
+	}
+	ds, err := e2emanifest.DaemonSetFromData(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
+	}
+	if ds == nil {
+		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
+	}
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
+}
+
+//TODO generilize this function with above one
+// getKubeVirtDevicePluginImage returns the image of SRIOV device plugin.
+func getKubeVirtDevicePluginImage() (string, error) {
+	data, err := e2etestfiles.Read(KubeVirtDevicePluginDSYAML)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the device plugin manifest: %w", err)
 	}

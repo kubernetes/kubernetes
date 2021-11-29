@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=types.go -destination=testing/provider_mock.go -package=testing DevicesProvider,PodsProvider,CPUsProvider,MemoryProvider
 package podresources
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
@@ -42,4 +43,11 @@ type CPUsProvider interface {
 	GetCPUs(podUID, containerName string) []int64
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
 	GetAllocatableCPUs() []int64
+}
+
+type MemoryProvider interface {
+	// GetMemory returns information about the memory assigned to containers
+	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
+	// GetAllocatableMemory returns the allocatable memory from the node
+	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
 }

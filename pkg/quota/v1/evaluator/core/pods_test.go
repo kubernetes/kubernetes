@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -34,6 +33,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
@@ -84,7 +85,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 }
 
 func TestPodEvaluatorUsage(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	evaluator := NewPodEvaluator(nil, fakeClock)
 
 	// fields use to simulate a pod undergoing termination
@@ -513,7 +514,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 }
 
 func TestPodEvaluatorMatchingScopes(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	evaluator := NewPodEvaluator(nil, fakeClock)
 	activeDeadlineSeconds := int64(30)
 	testCases := map[string]struct {

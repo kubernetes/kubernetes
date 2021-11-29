@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -20,13 +21,27 @@ package dockershim
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+var ErrNotImplemented = errors.New("Not implemented")
+
 // ContainerStats returns stats for a container stats request based on container id.
-func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	stats, err := ds.getContainerStats(r.ContainerId)
+func (ds *dockerService) ContainerStats(ctx context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	filter := &runtimeapi.ContainerFilter{
+		Id: r.ContainerId,
+	}
+	listResp, err := ds.ListContainers(ctx, &runtimeapi.ListContainersRequest{Filter: filter})
+	if err != nil {
+		return nil, err
+	}
+	if len(listResp.Containers) != 1 {
+		return nil, fmt.Errorf("container with id %s not found", r.ContainerId)
+	}
+	stats, err := ds.getContainerStats(listResp.Containers[0])
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +66,7 @@ func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.L
 
 	var stats []*runtimeapi.ContainerStats
 	for _, container := range listResp.Containers {
-		containerStats, err := ds.getContainerStats(container.Id)
+		containerStats, err := ds.getContainerStats(container)
 		if err != nil {
 			return nil, err
 		}
@@ -61,4 +76,16 @@ func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.L
 	}
 
 	return &runtimeapi.ListContainerStatsResponse{Stats: stats}, nil
+}
+
+// PodSandboxStats returns stats for a pod sandbox based on pod sandbox id.
+// This function is not implemented for the dockershim.
+func (ds *dockerService) PodSandboxStats(_ context.Context, r *runtimeapi.PodSandboxStatsRequest) (*runtimeapi.PodSandboxStatsResponse, error) {
+	return nil, ErrNotImplemented
+}
+
+// ListPodSandboxStats returns stats for a list of pod sandboxes based on a filter.
+// This function is not implemented for the dockershim.
+func (ds *dockerService) ListPodSandboxStats(ctx context.Context, r *runtimeapi.ListPodSandboxStatsRequest) (*runtimeapi.ListPodSandboxStatsResponse, error) {
+	return nil, ErrNotImplemented
 }

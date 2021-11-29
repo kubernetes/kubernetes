@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -996,12 +997,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
-			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return New(plArgs, fh, feature.Features{
-					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
-				})
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{}, snapshot, namespaces)
+			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
+			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			state := framework.NewCycleState()
 			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -1865,10 +1862,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
-			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return New(plArgs, fh, feature.Features{})
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{}, snapshot,
+			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot,
 				[]runtime.Object{
 					&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "NS1"}},
 				})
@@ -1893,10 +1887,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-		return New(plArgs, fh, feature.Features{})
-	}
-	p := plugintesting.SetupPlugin(t, n, &config.InterPodAffinityArgs{}, cache.NewEmptySnapshot())
+	p := plugintesting.SetupPlugin(t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterInterPodAffinity" from cycleState: %w`, framework.ErrNotFound))
@@ -2164,10 +2155,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
 			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
 				snapshot := cache.NewSnapshot(pods, test.nodes)
-				n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return New(plArgs, fh, feature.Features{})
-				}
-				p := plugintesting.SetupPlugin(t, n, &config.InterPodAffinityArgs{}, snapshot)
+				p := plugintesting.SetupPlugin(t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot)
 				cycleState := framework.NewCycleState()
 				preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod)
 				if !preFilterStatus.IsSuccess() {
@@ -2450,10 +2438,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			l, _ := snapshot.NodeInfos().List()
-			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return New(plArgs, fh, feature.Features{})
-			}
-			p := plugintesting.SetupPlugin(t, n, &config.InterPodAffinityArgs{}, snapshot)
+			p := plugintesting.SetupPlugin(t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot)
 			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(framework.NewPodInfo(tt.pod), l, true)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)

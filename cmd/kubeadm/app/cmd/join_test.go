@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -203,15 +204,11 @@ func TestNewJoinData(t *testing.T) {
 		{
 			name: "--cri-socket and --node-name flags override config from file",
 			flags: map[string]string{
-				options.CfgPath:       configFilePath,
-				options.NodeCRISocket: "/var/run/crio/crio.sock",
-				options.NodeName:      "anotherName",
+				options.CfgPath:  configFilePath,
+				options.NodeName: "anotherName",
 			},
 			validate: func(t *testing.T, data *joinData) {
-				// validate that cri-socket and node-name are overwritten
-				if data.cfg.NodeRegistration.CRISocket != "/var/run/crio/crio.sock" {
-					t.Errorf("Invalid NodeRegistration.CRISocket")
-				}
+				// validate that node-name is overwritten
 				if data.cfg.NodeRegistration.Name != "anotherName" {
 					t.Errorf("Invalid NodeRegistration.Name")
 				}

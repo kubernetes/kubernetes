@@ -24,7 +24,7 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	"github.com/pkg/errors"
+	"errors"
 	"github.com/stretchr/testify/assert"
 )
 

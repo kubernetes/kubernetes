@@ -233,7 +233,7 @@ func TestGetDNSImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "foo.io/coredns:v1.8.0",
+			expected: "foo.io/coredns:v1.8.6",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{
@@ -242,7 +242,7 @@ func TestGetDNSImage(t *testing.T) {
 			},
 		},
 		{
-			expected: kubeadmapiv1beta2.DefaultImageRepository + "/coredns/coredns:v1.8.0",
+			expected: kubeadmapiv1beta2.DefaultImageRepository + "/coredns/coredns:v1.8.6",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: kubeadmapiv1beta2.DefaultImageRepository,
 				DNS: kubeadmapi.DNS{
@@ -251,7 +251,7 @@ func TestGetDNSImage(t *testing.T) {
 			},
 		},
 		{
-			expected: "foo.io/coredns/coredns:v1.8.0",
+			expected: "foo.io/coredns/coredns:v1.8.6",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{

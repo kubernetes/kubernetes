@@ -298,14 +298,14 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		ca := &authority.CertificateAuthority{
 			Certificate: s.serverCA,
 			PrivateKey:  s.serverPrivateKey,
-			Backdate:    s.backdate,
 		}
 		cr, err := capihelper.ParseCSR(csr.Spec.Request)
 		if err != nil {
 			t.Fatal(err)
 		}
 		der, err := ca.Sign(cr.Raw, authority.PermissiveSigningPolicy{
-			TTL: time.Hour,
+			TTL:      time.Hour,
+			Backdate: s.backdate,
 		})
 		if err != nil {
 			t.Fatal(err)

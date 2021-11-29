@@ -26,10 +26,12 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v0.9.1'
 DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
-DEFAULT_NPD_VERSION='v0.8.7'
-DEFAULT_NPD_HASH='853576423077bf72e7bd8e96cd782cf272f7391379f8121650c1448531c0d3a0991dfbd0784a1157423976026806ceb14ca8fb35bac1249127dbf00af45b7eea'
-DEFAULT_CRICTL_VERSION='v1.21.0'
-DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3bc3ea8642613df8542bf716fad903ed4d7528021ecb28b20c6330448cd2bd2b76bd776'
+DEFAULT_NPD_VERSION='v0.8.9'
+DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
+# TODO (SergeyKanzhelev): fill up for npd 0.8.9+
+DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
+DEFAULT_CRICTL_VERSION='v1.22.0'
+DEFAULT_CRICTL_SHA512='9ff93e9c15942c39c85dd4e8182b3e9cd47fcb15b1315b0fdfd0d73442a84111e6cf8bb74b586e34b1f382a71107eb7e7820544a98d2224ca6b6dee3ee576222'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -177,10 +179,32 @@ function download-or-bust {
     for url in "$@"; do
       local file="${url##*/}"
       rm -f "${file}"
-      # if the url belongs to GCS API we should use oauth2_token in the headers
+      # if the url belongs to GCS API we should use oauth2_token in the headers if the VM service account has storage scopes
       local curl_headers=""
-      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
-        curl_headers="Authorization: Bearer $(get-credentials)"
+
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] ; then
+        local canUseCredentials=0
+
+        echo "Getting the scope of service account configured for VM."
+        if ! valid-storage-scope ; then
+          canUseCredentials=1
+          # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
+          # and try to download without SA if scope does not exist on SA
+          echo "No service account or service account without storage scope. Attempt to download without service account token."
+        fi
+
+        if [[ "${canUseCredentials}" == "0" ]] ; then
+          echo "Getting the service account access token configured for VM."
+          local access_token="";
+          if access_token=$(get-credentials); then
+            echo "Service account access token is received. Downloading ${url} using this token."
+          else
+            echo "Cannot get a service account token. Exiting."
+            exit 1
+          fi
+
+          curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
+        fi
       fi
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
@@ -238,6 +262,18 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
+  if [[ "${HOST_ARCH}" == "amd64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
+  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
+  else
+    # no other architectures are supported currently.
+    # Assumption is that this script only runs on linux,
+    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+    # https://github.com/kubernetes/node-problem-detector/releases/
+    DEFAULT_NPD_HASH='N/A'
+  fi
+
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
@@ -245,7 +281,7 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_hash="${DEFAULT_NPD_HASH}"
   fi
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
     echo "${npd_tar} is preloaded."
@@ -298,7 +334,7 @@ function install-crictl {
     local -r crictl_hash="${CRICTL_TAR_HASH}"
   else
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
-    local -r crictl_hash="${DEFAULT_CRICTL_HASH}"
+    local -r crictl_hash="${DEFAULT_CRICTL_SHA512}"
   fi
   local -r crictl="crictl-${crictl_version}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
 
@@ -550,7 +586,7 @@ function ensure-container-runtime {
   container_runtime="${CONTAINER_RUNTIME:-docker}"
   if [[ "${container_runtime}" == "docker" ]]; then
     if ! command -v docker >/dev/null 2>&1; then
-      install-docker
+      log-wrap "InstallDocker" install-docker
       if ! command -v docker >/dev/null 2>&1; then
         echo "ERROR docker not found. Aborting."
         exit 2
@@ -560,7 +596,7 @@ function ensure-container-runtime {
   elif [[ "${container_runtime}" == "containerd" ]]; then
     # Install containerd/runc if requested
     if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-      install-containerd-ubuntu
+      log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
     fi
     # Verify presence and print versions of ctr, containerd, runc
     if ! command -v ctr >/dev/null 2>&1; then
@@ -596,7 +632,7 @@ function install-kube-binary-config {
     local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
   else
     echo "Downloading binary release sha512 (not found in env)"
-    download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
+    log-wrap "DownloadServerBinarySHA" download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
     local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha512")
   fi
 
@@ -604,8 +640,8 @@ function install-kube-binary-config {
     echo "${server_binary_tar} is preloaded."
   else
     echo "Downloading binary release tar"
-    download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
-    tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
+    log-wrap "DownloadServerBinary" download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
+    log-wrap "UntarServerBinary" tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
     # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
     local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
     local dst_dir="${KUBE_HOME}/kube-docker-files"
@@ -619,7 +655,7 @@ function install-kube-binary-config {
       cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
       cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
     fi
-    load-docker-images
+    log-wrap "LoadDockerImages" load-docker-images
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
@@ -632,31 +668,31 @@ function install-kube-binary-config {
 
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
      [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    install-node-problem-detector
+    log-wrap "InstallNodeProblemDetector" install-node-problem-detector
   fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    install-cni-binaries
+    log-wrap "InstallCNIBinaries" install-cni-binaries
   fi
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
-  install-kube-manifests
+  log-wrap "InstallKubeManifests" install-kube-manifests
   chmod -R 755 "${KUBE_BIN}"
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
-  install-gci-mounter-tools
+  log-wrap "InstallGCIMounterTools" install-gci-mounter-tools
 
   # Remount the Flexvolume directory with the "exec" option, if needed.
   if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
-    remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+    log-wrap "RemountFlexVolume" remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
 
   # Install crictl on each node.
-  install-crictl
+  log-wrap "InstallCrictl" install-crictl
 
   # TODO(awly): include the binary and license in the OS image.
-  install-exec-auth-plugin
+  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

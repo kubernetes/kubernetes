@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -23,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,6 +34,7 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -628,4 +631,29 @@ func writeFile(f *os.File, str string) error {
 		return err
 	}
 	return nil
+}
+
+// UpdatePathOwnerAndPermissions updates the owner and permissions of the given path.
+// If the path is a directory it is not recursively updated.
+func UpdatePathOwnerAndPermissions(path string, uid, gid int64, perms uint32) error {
+	if err := os.Chown(path, int(uid), int(gid)); err != nil {
+		return errors.Wrapf(err, "failed to update owner of %q to uid: %d and gid: %d", path, uid, gid)
+	}
+	fm := os.FileMode(perms)
+	if err := os.Chmod(path, fm); err != nil {
+		return errors.Wrapf(err, "failed to update permissions of %q to %s", path, fm.String())
+	}
+	return nil
+}
+
+// UpdatePathOwner recursively updates the owners of a directory.
+// It is equivalent to calling `chown -R uid:gid /path/to/dir`.
+func UpdatePathOwner(dirPath string, uid, gid int64) error {
+	err := filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
+		if err := os.Chown(path, int(uid), int(gid)); err != nil {
+			return errors.Wrapf(err, "failed to update owner of %q to uid: %d and gid: %d", path, uid, gid)
+		}
+		return nil
+	})
+	return err
 }

@@ -382,7 +382,7 @@ func (unstructuredJSONScheme) Identifier() runtime.Identifier {
 
 func (s unstructuredJSONScheme) decode(data []byte) (runtime.Object, error) {
 	type detector struct {
-		Items gojson.RawMessage
+		Items gojson.RawMessage `json:"items"`
 	}
 	var det detector
 	if err := json.Unmarshal(data, &det); err != nil {
@@ -425,7 +425,7 @@ func (unstructuredJSONScheme) decodeToUnstructured(data []byte, unstruct *Unstru
 
 func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList) error {
 	type decodeList struct {
-		Items []gojson.RawMessage
+		Items []gojson.RawMessage `json:"items"`
 	}
 
 	var dList decodeList

@@ -34,22 +34,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/purell"
 	"github.com/pkg/errors"
+
+	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	system "k8s.io/system-validators/validators"
+	utilsexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	system "k8s.io/system-validators/validators"
-	utilsexec "k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
 )
 
 const (
@@ -428,7 +432,7 @@ func (hst HTTPProxyCheck) Name() string {
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
-	if utilsnet.IsIPv6String(hst.Host) {
+	if netutils.IsIPv6String(hst.Host) {
 		u.Host = net.JoinHostPort(hst.Host, "1234")
 	}
 
@@ -470,12 +474,12 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, nil
 	}
 
-	_, cidr, err := net.ParseCIDR(subnet.CIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(subnet.CIDR)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "error parsing CIDR %q", subnet.CIDR)}
 	}
 
-	testIP, err := utilsnet.GetIndexedIP(cidr, 1)
+	testIP, err := netutils.GetIndexedIP(cidr, 1)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
 	}
@@ -602,6 +606,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	minKubeletVersion *version.Version
 	exec              utilsexec.Interface
 }
 
@@ -617,7 +622,10 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
 	}
-	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
+	if kubever.minKubeletVersion == nil {
+		kubever.minKubeletVersion = constants.MinimumKubeletVersion
+	}
+	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
 		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
 
@@ -656,11 +664,11 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 		buf = append(buf, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, []error{errors.Wrap(err, "error parsing /proc/swaps")}
+		return []error{errors.Wrap(err, "error parsing /proc/swaps")}, nil
 	}
 
 	if len(buf) > 1 {
-		return nil, []error{errors.New("running with swap on is not supported. Please disable swap")}
+		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
 	}
 
 	return nil, nil
@@ -711,7 +719,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 		resp := etcdVersionResponse{}
 		var err error
 		versionURL := fmt.Sprintf("%s/%s", endpoint, "version")
-		if tmpVersionURL, err := purell.NormalizeURLString(versionURL, purell.FlagRemoveDuplicateSlashes); err != nil {
+		if tmpVersionURL, err := normalizeURLString(versionURL); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to normalize external etcd version url %s", versionURL))
 			continue
 		} else {
@@ -800,10 +808,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 				loopCount--
 				return false, err
 			}
-			//lint:ignore SA5011 If err != nil we are already returning.
 			defer r.Body.Close()
 
-			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
+			if r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
 				return false, errors.Errorf("server responded with non-successful status: %s", r.Status)
 			}
@@ -819,8 +826,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 
 // ImagePullCheck will pull container images used by kubeadm
 type ImagePullCheck struct {
-	runtime   utilruntime.ContainerRuntime
-	imageList []string
+	runtime         utilruntime.ContainerRuntime
+	imageList       []string
+	imagePullPolicy v1.PullPolicy
 }
 
 // Name returns the label for ImagePullCheck
@@ -830,18 +838,32 @@ func (ImagePullCheck) Name() string {
 
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
+	policy := ipc.imagePullPolicy
+	klog.V(1).Infof("using image pull policy: %s", policy)
 	for _, image := range ipc.imageList {
-		ret, err := ipc.runtime.ImageExists(image)
-		if ret && err == nil {
-			klog.V(1).Infof("image exists: %s", image)
+		switch policy {
+		case v1.PullNever:
+			klog.V(1).Infof("skipping pull of image: %s", image)
 			continue
-		}
-		if err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
-		}
-		klog.V(1).Infof("pulling %s", image)
-		if err := ipc.runtime.PullImage(image); err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
+		case v1.PullIfNotPresent:
+			ret, err := ipc.runtime.ImageExists(image)
+			if ret && err == nil {
+				klog.V(1).Infof("image exists: %s", image)
+				continue
+			}
+			if err != nil {
+				errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
+			}
+			fallthrough // Proceed with pulling the image if it does not exist
+		case v1.PullAlways:
+			klog.V(1).Infof("pulling: %s", image)
+			if err := ipc.runtime.PullImage(image); err != nil {
+				errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
+			}
+		default:
+			// If the policy is unknown return early with an error
+			errorList = append(errorList, errors.Errorf("unsupported pull policy %q", policy))
+			return warnings, errorList
 		}
 	}
 	return warnings, errorList
@@ -918,8 +940,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
-		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if utilsnet.IsIPv6(ip) {
+		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
+			if netutils.IsIPv6(ip) {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -967,7 +989,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 	}
 
 	checks := []Checker{
-		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
@@ -983,8 +1004,8 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if ip := net.ParseIP(ipstr); ip != nil {
-				if utilsnet.IsIPv6(ip) {
+			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
+				if netutils.IsIPv6(ip) {
 					addIPv6Checks = true
 				}
 			}
@@ -1061,7 +1082,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration), imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
@@ -1100,4 +1121,17 @@ func setHasItemOrAll(s sets.String, item string) bool {
 		return true
 	}
 	return false
+}
+
+// normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.
+// It takes an URL string as input.
+func normalizeURLString(s string) (string, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+	if len(u.Path) > 0 {
+		u.Path = strings.ReplaceAll(u.Path, "//", "/")
+	}
+	return u.String(), nil
 }

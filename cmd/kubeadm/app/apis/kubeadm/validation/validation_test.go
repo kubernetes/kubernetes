@@ -22,11 +22,12 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -185,41 +186,28 @@ func TestValidateIPFromString(t *testing.T) {
 
 func TestValidateIPNetFromString(t *testing.T) {
 	var tests = []struct {
-		name           string
-		subnet         string
-		minaddrs       int64
-		checkDualStack bool
-		expected       bool
+		name     string
+		subnet   string
+		minaddrs int64
+		expected bool
 	}{
-		{"invalid missing CIDR", "", 0, false, false},
-		{"invalid  CIDR", "a", 0, false, false},
-		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false},
-		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false},
-		{"invalid multiple CIDR provided in a single stack cluster", "2001:db8::1/64,1.2.3.4/24", 0, false, false},
-		{"invalid multiple CIDR provided in a single stack cluster and one invalid subnet", "2001:db8::1/64,a", 0, false, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false},
-		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, true},
-		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, true},
 		// dual-stack:
-		{"invalid missing CIDR", "", 0, true, false},
-		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, true},
-		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true, true},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, true, false},
-		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, true, false},
-		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false},
-		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
-		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
-		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, true, false},
-		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, true, false},
+		{"invalid missing CIDR", "", 0, false},
+		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true},
+		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, false},
+		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, false},
+		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, false},
+		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true},
+		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, false},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, nil)
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed :\n\texpected: %t\n\t  actual: %t\n\t  err(s): %v\n\t",
@@ -234,41 +222,31 @@ func TestValidateIPNetFromString(t *testing.T) {
 
 func TestValidatePodSubnetNodeMask(t *testing.T) {
 	var tests = []struct {
-		name           string
-		subnet         string
-		cmExtraArgs    map[string]string
-		checkDualStack bool
-		expected       bool
+		name        string
+		subnet      string
+		cmExtraArgs map[string]string
+		expected    bool
 	}{
-		{"single IPv4, but mask too small. Default node-mask", "10.0.0.16/29", nil, false, false},
-		{"single IPv4, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size": "23"}, false, false},
-		{"single IPv6, but mask too small. Default node-mask", "2001:db8::1/112", nil, false, false},
-		{"single IPv6, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size": "24"}, false, false},
-		{"single IPv6, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, false, false},
-		{"single IPv6, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size": "120"}, false, false},
-		{"single IPv4 CIDR", "10.0.0.16/12", nil, false, true},
-		{"single IPv6 CIDR", "2001:db8::/48", nil, false, true},
 		// dual-stack:
-		{"dual IPv4 only, but mask too small. Default node-mask", "10.0.0.16/29", nil, true, false},
-		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size-ipv4": "23"}, true, false},
-		{"dual IPv6 only, but mask too small. Default node-mask", "2001:db8::1/112", nil, true, false},
-		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, true, false},
-		{"dual IPv6 only, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, true, false},
-		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, true, false},
-		{"dual IPv4 only CIDR", "10.0.0.16/12", nil, true, true},
-		{"dual IPv6 only CIDR", "2001:db8::/48", nil, true, true},
-		{"dual, but IPv4 mask too small. Default node-mask", "10.0.0.16/29,2001:db8::/48", nil, true, false},
-		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", map[string]string{"node-cidr-mask-size-ipv4": "23"}, true, false},
-		{"dual, but IPv6 mask too small. Default node-mask", "2001:db8::1/112,10.0.0.16/16", nil, true, false},
-		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, true, false},
-		{"dual, but mask difference greater than 16. Default node-mask", "2001:db8::1/12,10.0.0.16/16", nil, true, false},
-		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, true, false},
-		{"dual IPv4 IPv6", "2001:db8::/48,10.0.0.16/12", nil, true, true},
-		{"dual IPv6 IPv4", "2001:db8::/48,10.0.0.16/12", nil, true, true},
+		{"dual IPv4 only, but mask too small. Default node-mask", "10.0.0.16/29", nil, false},
+		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual IPv6 only, but mask too small. Default node-mask", "2001:db8::1/112", nil, false},
+		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual IPv6 only, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, false},
+		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual IPv4 only CIDR", "10.0.0.16/12", nil, true},
+		{"dual IPv6 only CIDR", "2001:db8::/48", nil, true},
+		{"dual, but IPv4 mask too small. Default node-mask", "10.0.0.16/29,2001:db8::/48", nil, false},
+		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual, but IPv6 mask too small. Default node-mask", "2001:db8::1/112,10.0.0.16/16", nil, false},
+		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual, but mask difference greater than 16. Default node-mask", "2001:db8::1/12,10.0.0.16/16", nil, false},
+		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual IPv4 IPv6", "2001:db8::/48,10.0.0.16/12", nil, true},
+		{"dual IPv6 IPv4", "2001:db8::/48,10.0.0.16/12", nil, true},
 	}
 	for _, rt := range tests {
 		cfg := &kubeadmapi.ClusterConfiguration{
-			FeatureGates: map[string]bool{features.IPv6DualStack: rt.checkDualStack},
 			ControllerManager: kubeadmapi.ControlPlaneComponent{
 				ExtraArgs: rt.cmExtraArgs,
 			},
@@ -1136,66 +1114,14 @@ func TestGetClusterNodeMask(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "ipv4 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: false},
-			},
-			isIPv6:       false,
-			expectedMask: 24,
-		},
-		{
-			name: "ipv4 custom mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: false},
-				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "23"},
-				},
-			},
-			isIPv6:       false,
-			expectedMask: 23,
-		},
-		{
-			name: "ipv4 wrong mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: false},
-				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "aa23"},
-				},
-			},
-			isIPv6:        false,
-			expectedError: true,
-		},
-		{
-			name: "ipv6 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: false},
-			},
-			isIPv6:       true,
-			expectedMask: 64,
-		},
-		{
-			name: "ipv6 custom mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: false},
-				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "83"},
-				},
-			},
-			isIPv6:       true,
-			expectedMask: 83,
-		},
-		{
-			name: "dual ipv4 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
-			},
+			name:         "dual ipv4 default mask",
+			cfg:          &kubeadmapi.ClusterConfiguration{},
 			isIPv6:       false,
 			expectedMask: 24,
 		},
 		{
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "21", "node-cidr-mask-size-ipv4": "23"},
 				},
@@ -1204,17 +1130,14 @@ func TestGetClusterNodeMask(t *testing.T) {
 			expectedMask: 23,
 		},
 		{
-			name: "dual ipv6 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
-			},
+			name:         "dual ipv6 default mask",
+			cfg:          &kubeadmapi.ClusterConfiguration{},
 			isIPv6:       true,
 			expectedMask: 64,
 		},
 		{
 			name: "dual ipv6 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv6": "83"},
 				},
@@ -1225,7 +1148,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "23"},
 				},
@@ -1236,7 +1158,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv4 wrong mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "aa"},
 				},
@@ -1247,7 +1168,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 default mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23"},
 				},
@@ -1258,7 +1178,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 custom mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "83"},
 				},
@@ -1269,7 +1188,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 custom mask and wrong flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "a83"},
 				},

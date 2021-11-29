@@ -28,13 +28,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -58,7 +59,10 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
 	// we may want to set memory capacity.
-	machineInfo := &cadvisorapi.MachineInfo{}
+	memoryCapacityQuantity := resource.MustParse(fakeNodeAllocatableMemory)
+	machineInfo := &cadvisorapi.MachineInfo{
+		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
+	}
 	osInterface := &containertest.FakeOS{}
 	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
 	return fakeRuntimeService, fakeImageService, manager, err
@@ -66,10 +70,12 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 
 // sandboxTemplate is a sandbox template to create fake sandbox.
 type sandboxTemplate struct {
-	pod       *v1.Pod
-	attempt   uint32
-	createdAt int64
-	state     runtimeapi.PodSandboxState
+	pod         *v1.Pod
+	attempt     uint32
+	createdAt   int64
+	state       runtimeapi.PodSandboxState
+	running     bool
+	terminating bool
 }
 
 // containerTemplate is a container template to create fake container.
@@ -519,6 +525,64 @@ func TestSyncPod(t *testing.T) {
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	for _, sandbox := range fakeRuntime.Sandboxes {
+		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
+	}
+	for _, c := range fakeRuntime.Containers {
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+	}
+}
+
+func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []v1.Container{
+		{
+			Name:            "foo",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+
+	securityContext := &v1.PodSecurityContext{
+		Sysctls: []v1.Sysctl{
+			{
+				Name:  "kernel/shm_rmid_forced",
+				Value: "1",
+			},
+			{
+				Name:  "net/ipv4/ip_local_port_range",
+				Value: "1024 65535",
+			},
+		},
+	}
+	exceptSysctls := []v1.Sysctl{
+		{
+			Name:  "kernel.shm_rmid_forced",
+			Value: "1",
+		},
+		{
+			Name:  "net.ipv4.ip_local_port_range",
+			Value: "1024 65535",
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:      containers,
+			SecurityContext: securityContext,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
 	}
@@ -1397,6 +1461,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	m.podStateProvider.(*fakePodStateProvider).removed = map[types.UID]struct{}{pod.UID: {}}
 
 	// GetPodStatus and the following SyncPod will not return errors in the
 	// case where the pod has been deleted. We are not adding any pods into

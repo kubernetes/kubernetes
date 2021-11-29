@@ -47,8 +47,8 @@ var (
 			Name:      "transformation_duration_seconds",
 			Help:      "Latencies in seconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
-			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
+			// external KMS is involved latencies may climb into hundreds of milliseconds.
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 25),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type"},

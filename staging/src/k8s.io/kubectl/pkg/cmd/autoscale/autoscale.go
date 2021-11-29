@@ -40,16 +40,16 @@ import (
 
 var (
 	autoscaleLong = templates.LongDesc(i18n.T(`
-		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
+		Creates an autoscaler that automatically chooses and sets the number of pods that run in a Kubernetes cluster.
 
-		Looks up a Deployment, ReplicaSet, StatefulSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		Looks up a deployment, replica set, stateful set, or replication controller by name and creates an autoscaler that uses the given resource as a reference.
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`))
 
 	autoscaleExample = templates.Examples(i18n.T(`
-		# Auto scale a deployment "foo", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:
+		# Auto scale a deployment "foo", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used
 		kubectl autoscale deployment foo --min=2 --max=10
 
-		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%:
+		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
@@ -104,15 +104,15 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, StatefulSet, or ReplicationController"),
+		Short:                 i18n.T("Auto-scale a deployment, replica set, stateful set, or replication controller"),
 		Long:                  autoscaleLong,
 		Example:               autoscaleExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs: validArgs,
 	}
 
 	// bind flag structs
@@ -121,7 +121,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
+	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, "The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
 	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")

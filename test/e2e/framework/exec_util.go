@@ -58,6 +58,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 	const tty = false
 
+	Logf("ExecWithOptions: Clientset creation")
 	req := f.ClientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
@@ -74,8 +75,8 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
+	Logf("ExecWithOptions: execute(POST %s %s)", req.URL())
 	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
-
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
 	}

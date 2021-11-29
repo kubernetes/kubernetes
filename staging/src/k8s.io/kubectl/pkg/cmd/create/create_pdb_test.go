@@ -132,8 +132,8 @@ func TestCreatePdb(t *testing.T) {
 	minAvailableNumber := intstr.Parse(podAmountNumber)
 	minAvailablePercent := intstr.Parse(podAmountPercent)
 
-	minUnavailableNumber := intstr.Parse(podAmountNumber)
-	minUnavailablePercent := intstr.Parse(podAmountPercent)
+	maxUnavailableNumber := intstr.Parse(podAmountNumber)
+	maxUnavailablePercent := intstr.Parse(podAmountPercent)
 
 	tests := map[string]struct {
 		options  *PodDisruptionBudgetOpts
@@ -181,9 +181,9 @@ func TestCreatePdb(t *testing.T) {
 		},
 		"test-valid-max-unavailable-pods-number": {
 			options: &PodDisruptionBudgetOpts{
-				Name:         "my-pdb",
-				Selector:     selectorOpts,
-				MinAvailable: podAmountNumber,
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountNumber,
 			},
 			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
@@ -194,16 +194,16 @@ func TestCreatePdb(t *testing.T) {
 					Name: "my-pdb",
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
-					Selector:     selector,
-					MinAvailable: &minUnavailableNumber,
+					Selector:       selector,
+					MaxUnavailable: &maxUnavailableNumber,
 				},
 			},
 		},
 		"test-valid-max-unavailable-pods-percentage": {
 			options: &PodDisruptionBudgetOpts{
-				Name:         "my-pdb",
-				Selector:     selectorOpts,
-				MinAvailable: podAmountPercent,
+				Name:           "my-pdb",
+				Selector:       selectorOpts,
+				MaxUnavailable: podAmountPercent,
 			},
 			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
@@ -214,8 +214,8 @@ func TestCreatePdb(t *testing.T) {
 					Name: "my-pdb",
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
-					Selector:     selector,
-					MinAvailable: &minUnavailablePercent,
+					Selector:       selector,
+					MaxUnavailable: &maxUnavailablePercent,
 				},
 			},
 		},

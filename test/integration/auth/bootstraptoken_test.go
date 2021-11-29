@@ -72,7 +72,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
-	tokenExpiredTime := time.Now().Add(-time.Hour).Format(time.RFC3339)
+	tokenExpiredTime := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
 	var expiredBootstrapToken = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
@@ -116,10 +116,10 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	for _, test := range tests {
 
 		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
-		// Set up a master
-		masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-		_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+		// Set up an API server
+		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+		_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 		defer closeFn()
 
 		ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)

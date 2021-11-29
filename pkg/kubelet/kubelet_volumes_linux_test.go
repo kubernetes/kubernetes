@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -102,6 +103,16 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
 				return validateDirNotExists(podDir)
+			},
+		},
+		"pod-doesnot-exist-with-volume-subdir": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name/subdir"), 0750)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return validateDirNotExists(filepath.Join(podDir, "volumes"))
 			},
 		},
 		"pod-doesnot-exist-with-subpath": {

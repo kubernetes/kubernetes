@@ -5,6 +5,7 @@ rules:
   - selectorRegexp: k8s[.]io/kube-openapi/
     allowedPrefixes:
       - k8s.io/kube-openapi/pkg/util/proto
+      - k8s.io/kube-openapi/pkg/schemaconv
   - selectorRegexp: k8s[.]io/kube-proxy/
     allowedPrefixes:
       - k8s.io/kube-proxy/config/v1alpha1

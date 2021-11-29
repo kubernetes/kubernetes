@@ -61,7 +61,7 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
@@ -180,7 +180,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 // TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
 func TestTerminalPodEviction(t *testing.T) {
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)
@@ -421,8 +421,8 @@ func newV1Eviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *
 }
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)

@@ -31,21 +31,20 @@ func TestFilterEndpoints(t *testing.T) {
 	type endpoint struct {
 		ip        string
 		zoneHints sets.String
+		unready   bool
 	}
 	testCases := []struct {
-		name               string
-		epsProxyingEnabled bool
-		hintsEnabled       bool
-		nodeLabels         map[string]string
-		serviceInfo        ServicePort
-		endpoints          []endpoint
-		expectedEndpoints  []endpoint
+		name              string
+		hintsEnabled      bool
+		nodeLabels        map[string]string
+		serviceInfo       ServicePort
+		endpoints         []endpoint
+		expectedEndpoints []endpoint
 	}{{
-		name:               "hints + eps proxying enabled, hints annotation == auto",
-		hintsEnabled:       true,
-		epsProxyingEnabled: true,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "auto"},
+		name:         "hints enabled, hints annotation == auto",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "auto"},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -57,29 +56,10 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
 	}, {
-		name:               "hints + eps proxying enabled, hints annotation == disabled, hints ignored",
-		hintsEnabled:       true,
-		epsProxyingEnabled: true,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "disabled"},
-		endpoints: []endpoint{
-			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
-			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
-			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
-			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
-		},
-		expectedEndpoints: []endpoint{
-			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
-			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
-			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
-			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
-		},
-	}, {
-		name:               "hints + eps proxying enabled, hints annotation == aUto (wrong capitalization), hints ignored",
-		hintsEnabled:       true,
-		epsProxyingEnabled: true,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "aUto"},
+		name:         "hints, hints annotation == disabled, hints ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "disabled"},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -93,11 +73,10 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
 	}, {
-		name:               "hints + eps proxying enabled, hints annotation empty, hints ignored",
-		hintsEnabled:       true,
-		epsProxyingEnabled: true,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false},
+		name:         "hints, hints annotation == aUto (wrong capitalization), hints ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "aUto"},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -111,11 +90,10 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
 	}, {
-		name:               "hints enabled, eps proxying not, hints are ignored",
-		hintsEnabled:       true,
-		epsProxyingEnabled: false,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false},
+		name:         "hints, hints annotation empty, hints ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: false},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -129,11 +107,10 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
 	}, {
-		name:               "node local endpoints, hints are ignored",
-		hintsEnabled:       true,
-		epsProxyingEnabled: true,
-		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: true},
+		name:         "node local endpoints, hints are ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -158,17 +135,16 @@ func TestFilterEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceProxying, tc.epsProxyingEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
 
 			endpoints := []Endpoint{}
 			for _, ep := range tc.endpoints {
-				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			expectedEndpoints := []Endpoint{}
 			for _, ep := range tc.expectedEndpoints {
-				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			filteredEndpoints := FilterEndpoints(endpoints, tc.serviceInfo, tc.nodeLabels)
@@ -186,6 +162,7 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 	type endpoint struct {
 		ip        string
 		zoneHints sets.String
+		unready   bool
 	}
 	testCases := []struct {
 		name              string
@@ -224,6 +201,35 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		expectedEndpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:            "unready endpoint",
+		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
+		hintsAnnotation: "auto",
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:            "only unready endpoints in same zone (should not filter)",
+		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
+		hintsAnnotation: "auto",
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), unready: true},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), unready: true},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
 		},
 	}, {
 		name:            "normal endpoint filtering, Auto annotation",
@@ -316,12 +322,12 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			endpoints := []Endpoint{}
 			for _, ep := range tc.endpoints {
-				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			expectedEndpoints := []Endpoint{}
 			for _, ep := range tc.expectedEndpoints {
-				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			filteredEndpoints := filterEndpointsWithHints(endpoints, tc.hintsAnnotation, tc.nodeLabels)
@@ -335,93 +341,50 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 	}
 }
 
-func Test_filterEndpointsInternalTrafficPolicy(t *testing.T) {
-	cluster := v1.ServiceInternalTrafficPolicyCluster
-	local := v1.ServiceInternalTrafficPolicyLocal
-
+func TestFilterLocalEndpoint(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
-		endpoints             []Endpoint
-		expected              []Endpoint
-		featureGateOn         bool
+		name      string
+		endpoints []Endpoint
+		expected  []Endpoint
 	}{
 		{
-			name:                  "no internalTrafficPolicy with empty endpoints",
-			internalTrafficPolicy: nil,
-			endpoints:             []Endpoint{},
-			expected:              []Endpoint{},
-			featureGateOn:         true,
+			name:      "with empty endpoints",
+			endpoints: []Endpoint{},
+			expected:  nil,
 		},
 		{
-			name:                  "no internalTrafficPolicy with non-empty endpoints",
-			internalTrafficPolicy: nil,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is cluster",
-			internalTrafficPolicy: &cluster,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
-			internalTrafficPolicy: &local,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is local with zero local endpoints",
-			internalTrafficPolicy: &local,
+			name: "all endpoints not local",
 			endpoints: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: false},
 				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
 			},
-			expected:      nil,
-			featureGateOn: true,
+			expected: nil,
 		},
 		{
-			name:                  "feature gate is off, internalTrafficPolicy is local with non-empty endpoints",
-			internalTrafficPolicy: &local,
+			name: "all endpoints are local",
 			endpoints: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: true},
 			},
 			expected: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: true},
 			},
-			featureGateOn: false,
+		},
+		{
+			name: "some endpoints are local",
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+			},
 		},
 	}
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.featureGateOn)()
 		t.Run(tc.name, func(t *testing.T) {
-			filteredEndpoint := filterEndpointsInternalTrafficPolicy(tc.internalTrafficPolicy, tc.endpoints)
+			filteredEndpoint := FilterLocalEndpoint(tc.endpoints)
 			if !reflect.DeepEqual(filteredEndpoint, tc.expected) {
 				t.Errorf("expected %v, got %v", tc.expected, filteredEndpoint)
 			}

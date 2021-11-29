@@ -18,8 +18,11 @@ package phases
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -132,6 +135,19 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 		// if external CA mode, skip certificate authority generation
 		if data.ExternalCA() {
 			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
+			// If using an external CA while dryrun, copy kubeconfig files to dryrun dir for later use
+			if data.DryRun() {
+				externalCAFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeConfigFileName)
+				fileInfo, _ := os.Stat(externalCAFile)
+				contents, err := os.ReadFile(externalCAFile)
+				if err != nil {
+					return err
+				}
+				err = os.WriteFile(filepath.Join(data.KubeConfigDir(), kubeConfigFileName), contents, fileInfo.Mode())
+				if err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 

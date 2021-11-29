@@ -56,10 +56,6 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		csiDriver.Spec.FSGroupPolicy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		csiDriver.Spec.TokenRequests = nil
-		csiDriver.Spec.RequiresRepublish = nil
-	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -99,14 +95,6 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if oldCSIDriver.Spec.FSGroupPolicy == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		newCSIDriver.Spec.FSGroupPolicy = nil
-	}
-	if oldCSIDriver.Spec.TokenRequests == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		newCSIDriver.Spec.TokenRequests = nil
-	}
-	if oldCSIDriver.Spec.RequiresRepublish == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		newCSIDriver.Spec.RequiresRepublish = nil
 	}
 
 	// Any changes to the mutable fields increment the generation number.

@@ -27,6 +27,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -160,7 +162,7 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 			Organization: []string{"sig-cluster-lifecycle"},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			AltNames: certutil.AltNames{
-				IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 				DNSNames: []string{"test-domain.space"},
 			},
 		},

@@ -435,16 +435,20 @@ func TestSetEnvRemote(t *testing.T) {
 			args:         []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
-			name: "test batchv1 Job",
-			object: &batchv1.Job{
+			name: "set image batchv1 CronJob",
+			object: &batchv1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{
+											Name:  "nginx",
+											Image: "nginx",
+										},
+									},
 								},
 							},
 						},
@@ -452,8 +456,8 @@ func TestSetEnvRemote(t *testing.T) {
 				},
 			},
 			groupVersion: batchv1.SchemeGroupVersion,
-			path:         "/namespaces/test/jobs/nginx",
-			args:         []string{"job", "nginx", "env=prod"},
+			path:         "/namespaces/test/cronjobs/nginx",
+			args:         []string{"cronjob", "nginx", "env=prod"},
 		},
 		{
 			name: "test corev1 replication controller",
@@ -764,4 +768,33 @@ func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestSetEnvDoubleStdinUsage(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+
+	streams, bufIn, _, _ := genericclioptions.NewTestIOStreams()
+	bufIn.WriteString("SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL")
+	opts := NewEnvOptions(streams)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"-"},
+	}
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"-"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.ErrorIs(t, err, resource.StdinMultiUseError)
 }

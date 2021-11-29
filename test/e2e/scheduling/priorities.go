@@ -18,7 +18,6 @@ package scheduling
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
@@ -30,7 +29,6 @@ import (
 	_ "github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,10 +41,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Resource is a collection of compute resource.
@@ -71,61 +67,6 @@ var podRequestedResource = &v1.ResourceRequirements{
 		v1.ResourceMemory: resource.MustParse("100Mi"),
 		v1.ResourceCPU:    resource.MustParse("100m"),
 	},
-}
-
-// addOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
-func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
-	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		taintsData, err := json.Marshal(avoidPods)
-		framework.ExpectNoError(err)
-
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		if err != nil {
-			if !apierrors.IsConflict(err) {
-				framework.ExpectNoError(err)
-			} else {
-				framework.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err)
-}
-
-// removeAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
-func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
-	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if node.Annotations == nil {
-			return true, nil
-		}
-		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		if err != nil {
-			if !apierrors.IsConflict(err) {
-				framework.ExpectNoError(err)
-			} else {
-				framework.Logf("Conflict when trying to remove avoidPods to %v", nodeName)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err)
 }
 
 // nodesAreTooUtilized ensures that each node can support 2*crioMinMemLimit
@@ -260,70 +201,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
-	})
-
-	ginkgo.It("Pod should avoid nodes that have avoidPod annotation", func() {
-		nodeName := nodeList.Items[0].Name
-		// make the nodes have balanced cpu,mem usage
-		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
-		defer cleanUp()
-		framework.ExpectNoError(err)
-		ginkgo.By("Create a RC, with 0 replicas")
-		rc := createRC(ns, "scheduler-priority-avoid-pod", int32(0), map[string]string{"name": "scheduler-priority-avoid-pod"}, f, podRequestedResource)
-		// Cleanup the replication controller when we are done.
-		defer func() {
-			// Resize the replication controller to zero to get rid of pods.
-			if err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
-			}
-		}()
-
-		ginkgo.By("Trying to apply avoidPod annotations on the first node.")
-		avoidPod := v1.AvoidPods{
-			PreferAvoidPods: []v1.PreferAvoidPodsEntry{
-				{
-					PodSignature: v1.PodSignature{
-						PodController: &metav1.OwnerReference{
-							APIVersion: "v1",
-							Kind:       "ReplicationController",
-							Name:       rc.Name,
-							UID:        rc.UID,
-							Controller: func() *bool { b := true; return &b }(),
-						},
-					},
-					Reason:  "some reson",
-					Message: "some message",
-				},
-			},
-		}
-		action := func() error {
-			addOrUpdateAvoidPodOnNode(cs, nodeName, avoidPod)
-			return nil
-		}
-		predicate := func(node *v1.Node) bool {
-			val, err := json.Marshal(avoidPod)
-			if err != nil {
-				return false
-			}
-			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
-		}
-		success, err := observeNodeUpdateAfterAction(f.ClientSet, nodeName, predicate, action)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(success, true)
-
-		defer removeAvoidPodsOffNode(cs, nodeName)
-
-		ginkgo.By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
-
-		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
-		testPods, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "name=scheduler-priority-avoid-pod",
-		})
-		framework.ExpectNoError(err)
-		ginkgo.By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
-		for _, pod := range testPods.Items {
-			framework.ExpectNotEqual(pod.Spec.NodeName, nodeName)
-		}
 	})
 
 	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
@@ -608,9 +485,9 @@ func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
-	for _, pod := range allPods.Items {
+	for i, pod := range allPods.Items {
 		nodeName := pod.Spec.NodeName
-		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &pod)
+		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &allPods.Items[i])
 	}
 	return nodeNameToPodList
 }
@@ -662,38 +539,6 @@ func getNonZeroRequests(pod *v1.Pod) Resource {
 		result.Memory += memory
 	}
 	return result
-}
-
-func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, f *framework.Framework, resource *v1.ResourceRequirements) *v1.ReplicationController {
-	rc := &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicationController",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: rsName,
-		},
-		Spec: v1.ReplicationControllerSpec{
-			Replicas: &replicas,
-			Template: &v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: rcPodLabels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:      rsName,
-							Image:     imageutils.GetPauseImageName(),
-							Resources: *resource,
-						},
-					},
-				},
-			},
-		},
-	}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	return rc
 }
 
 func getRandomTaint() v1.Taint {

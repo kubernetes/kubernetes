@@ -27,6 +27,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -52,16 +53,16 @@ type UndoOptions struct {
 
 var (
 	undoLong = templates.LongDesc(i18n.T(`
-		Rollback to a previous rollout.`))
+		Roll back to a previous rollout.`))
 
 	undoExample = templates.Examples(`
-		# Rollback to the previous deployment
+		# Roll back to the previous deployment
 		kubectl rollout undo deployment/abc
 
-		# Rollback to daemonset revision 3
+		# Roll back to daemonset revision 3
 		kubectl rollout undo daemonset/abc --to-revision=3
 
-		# Rollback to the previous deployment with dry-run
+		# Roll back to the previous deployment with dry-run
 		kubectl rollout undo --dry-run=server deployment/abc`)
 )
 
@@ -86,12 +87,12 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Short:                 i18n.T("Undo a previous rollout"),
 		Long:                  undoLong,
 		Example:               undoExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunUndo())
 		},
-		ValidArgs: validArgs,
 	}
 
 	cmd.Flags().Int64Var(&o.ToRevision, "to-revision", o.ToRevision, "The revision to rollback to. Default to 0 (last revision).")

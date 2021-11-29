@@ -19,9 +19,8 @@ package eventratelimit
 import (
 	"testing"
 
-	"github.com/hashicorp/golang-lru"
-
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/utils/lru"
 )
 
 func TestSingleCache(t *testing.T) {
@@ -51,10 +50,7 @@ func TestLRUCache(t *testing.T) {
 		nextRateLimiter++
 		return rateLimiter
 	}
-	underlyingCache, err := lru.New(2)
-	if err != nil {
-		t.Fatalf("Could not create LRU cache: %v", err)
-	}
+	underlyingCache := lru.New(2)
 	cache := lruCache{
 		rateLimiterFactory: rateLimiterFactory,
 		cache:              underlyingCache,

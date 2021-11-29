@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 // RecommendedDefaultHPAControllerConfiguration defaults a pointer to a
@@ -35,9 +34,6 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultHPAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.HPAControllerConfiguration) {
 	zero := metav1.Duration{}
-	if obj.HorizontalPodAutoscalerUseRESTClients == nil {
-		obj.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
-	}
 	if obj.HorizontalPodAutoscalerSyncPeriod == zero {
 		obj.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}

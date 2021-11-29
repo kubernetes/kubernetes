@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/Azure/go-autorest/logger"
 	"github.com/form3tech-oss/jwt-go"
 )
 
@@ -70,13 +71,13 @@ const (
 	defaultMaxMSIRefreshAttempts = 5
 
 	// asMSIEndpointEnv is the environment variable used to store the endpoint on App Service and Functions
-	asMSIEndpointEnv = "MSI_ENDPOINT"
+	msiEndpointEnv = "MSI_ENDPOINT"
 
 	// asMSISecretEnv is the environment variable used to store the request secret on App Service and Functions
-	asMSISecretEnv = "MSI_SECRET"
+	msiSecretEnv = "MSI_SECRET"
 
-	// the API version to use for the App Service MSI endpoint
-	appServiceAPIVersion = "2017-09-01"
+	// the API version to use for the legacy App Service MSI endpoint
+	appServiceAPIVersion2017 = "2017-09-01"
 
 	// secret header used when authenticating against app service MSI endpoint
 	secretHeader = "Secret"
@@ -292,6 +293,8 @@ func (secret ServicePrincipalCertificateSecret) MarshalJSON() ([]byte, error) {
 
 // ServicePrincipalMSISecret implements ServicePrincipalSecret for machines running the MSI Extension.
 type ServicePrincipalMSISecret struct {
+	msiType          msiType
+	clientResourceID string
 }
 
 // SetAuthenticationValues is a method of the interface ServicePrincipalSecret.
@@ -662,96 +665,173 @@ func NewServicePrincipalTokenFromAuthorizationCode(oauthConfig OAuthConfig, clie
 	)
 }
 
+type msiType int
+
+const (
+	msiTypeUnavailable msiType = iota
+	msiTypeAppServiceV20170901
+	msiTypeCloudShell
+	msiTypeIMDS
+)
+
+func (m msiType) String() string {
+	switch m {
+	case msiTypeUnavailable:
+		return "unavailable"
+	case msiTypeAppServiceV20170901:
+		return "AppServiceV20170901"
+	case msiTypeCloudShell:
+		return "CloudShell"
+	case msiTypeIMDS:
+		return "IMDS"
+	default:
+		return fmt.Sprintf("unhandled MSI type %d", m)
+	}
+}
+
+// returns the MSI type and endpoint, or an error
+func getMSIType() (msiType, string, error) {
+	if endpointEnvVar := os.Getenv(msiEndpointEnv); endpointEnvVar != "" {
+		// if the env var MSI_ENDPOINT is set
+		if secretEnvVar := os.Getenv(msiSecretEnv); secretEnvVar != "" {
+			// if BOTH the env vars MSI_ENDPOINT and MSI_SECRET are set the msiType is AppService
+			return msiTypeAppServiceV20170901, endpointEnvVar, nil
+		}
+		// if ONLY the env var MSI_ENDPOINT is set the msiType is CloudShell
+		return msiTypeCloudShell, endpointEnvVar, nil
+	} else if msiAvailableHook(context.Background(), sender()) {
+		// if MSI_ENDPOINT is NOT set AND the IMDS endpoint is available the msiType is IMDS. This will timeout after 500 milliseconds
+		return msiTypeIMDS, msiEndpoint, nil
+	} else {
+		// if MSI_ENDPOINT is NOT set and IMDS endpoint is not available Managed Identity is not available
+		return msiTypeUnavailable, "", errors.New("MSI not available")
+	}
+}
+
 // GetMSIVMEndpoint gets the MSI endpoint on Virtual Machines.
+// NOTE: this always returns the IMDS endpoint, it does not work for app services or cloud shell.
+// Deprecated: NewServicePrincipalTokenFromMSI() and variants will automatically detect the endpoint.
 func GetMSIVMEndpoint() (string, error) {
 	return msiEndpoint, nil
 }
 
-// NOTE: this only indicates if the ASE environment credentials have been set
-// which does not necessarily mean that the caller is authenticating via ASE!
-func isAppService() bool {
-	_, asMSIEndpointEnvExists := os.LookupEnv(asMSIEndpointEnv)
-	_, asMSISecretEnvExists := os.LookupEnv(asMSISecretEnv)
-
-	return asMSIEndpointEnvExists && asMSISecretEnvExists
-}
-
-// GetMSIAppServiceEndpoint get the MSI endpoint for App Service and Functions
+// GetMSIAppServiceEndpoint get the MSI endpoint for App Service and Functions.
+// It will return an error when not running in an app service/functions environment.
+// Deprecated: NewServicePrincipalTokenFromMSI() and variants will automatically detect the endpoint.
 func GetMSIAppServiceEndpoint() (string, error) {
-	asMSIEndpoint, asMSIEndpointEnvExists := os.LookupEnv(asMSIEndpointEnv)
-
-	if asMSIEndpointEnvExists {
-		return asMSIEndpoint, nil
+	msiType, endpoint, err := getMSIType()
+	if err != nil {
+		return "", err
 	}
-	return "", errors.New("MSI endpoint not found")
+	switch msiType {
+	case msiTypeAppServiceV20170901:
+		return endpoint, nil
+	default:
+		return "", fmt.Errorf("%s is not app service environment", msiType)
+	}
 }
 
 // GetMSIEndpoint get the appropriate MSI endpoint depending on the runtime environment
+// Deprecated: NewServicePrincipalTokenFromMSI() and variants will automatically detect the endpoint.
 func GetMSIEndpoint() (string, error) {
-	if isAppService() {
-		return GetMSIAppServiceEndpoint()
-	}
-	return GetMSIVMEndpoint()
+	_, endpoint, err := getMSIType()
+	return endpoint, err
 }
 
 // NewServicePrincipalTokenFromMSI creates a ServicePrincipalToken via the MSI VM Extension.
 // It will use the system assigned identity when creating the token.
+// msiEndpoint - empty string, or pass a non-empty string to override the default value.
+// Deprecated: use NewServicePrincipalTokenFromManagedIdentity() instead.
 func NewServicePrincipalTokenFromMSI(msiEndpoint, resource string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, nil, nil, callbacks...)
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, "", "", callbacks...)
 }
 
 // NewServicePrincipalTokenFromMSIWithUserAssignedID creates a ServicePrincipalToken via the MSI VM Extension.
 // It will use the clientID of specified user assigned identity when creating the token.
+// msiEndpoint - empty string, or pass a non-empty string to override the default value.
+// Deprecated: use NewServicePrincipalTokenFromManagedIdentity() instead.
 func NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint, resource string, userAssignedID string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, &userAssignedID, nil, callbacks...)
+	if err := validateStringParam(userAssignedID, "userAssignedID"); err != nil {
+		return nil, err
+	}
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, userAssignedID, "", callbacks...)
 }
 
 // NewServicePrincipalTokenFromMSIWithIdentityResourceID creates a ServicePrincipalToken via the MSI VM Extension.
 // It will use the azure resource id of user assigned identity when creating the token.
+// msiEndpoint - empty string, or pass a non-empty string to override the default value.
+// Deprecated: use NewServicePrincipalTokenFromManagedIdentity() instead.
 func NewServicePrincipalTokenFromMSIWithIdentityResourceID(msiEndpoint, resource string, identityResourceID string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, nil, &identityResourceID, callbacks...)
-}
-
-func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedID *string, identityResourceID *string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	if err := validateStringParam(msiEndpoint, "msiEndpoint"); err != nil {
+	if err := validateStringParam(identityResourceID, "identityResourceID"); err != nil {
 		return nil, err
 	}
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, "", identityResourceID, callbacks...)
+}
+
+// ManagedIdentityOptions contains optional values for configuring managed identity authentication.
+type ManagedIdentityOptions struct {
+	// ClientID is the user-assigned identity to use during authentication.
+	// It is mutually exclusive with IdentityResourceID.
+	ClientID string
+
+	// IdentityResourceID is the resource ID of the user-assigned identity to use during authentication.
+	// It is mutually exclusive with ClientID.
+	IdentityResourceID string
+}
+
+// NewServicePrincipalTokenFromManagedIdentity creates a ServicePrincipalToken using a managed identity.
+// It supports the following managed identity environments.
+// - App Service Environment (API version 2017-09-01 only)
+// - Cloud shell
+// - IMDS with a system or user assigned identity
+func NewServicePrincipalTokenFromManagedIdentity(resource string, options *ManagedIdentityOptions, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
+	if options == nil {
+		options = &ManagedIdentityOptions{}
+	}
+	return newServicePrincipalTokenFromMSI("", resource, options.ClientID, options.IdentityResourceID, callbacks...)
+}
+
+func newServicePrincipalTokenFromMSI(msiEndpoint, resource, userAssignedID, identityResourceID string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
 	if err := validateStringParam(resource, "resource"); err != nil {
 		return nil, err
 	}
-	if userAssignedID != nil {
-		if err := validateStringParam(*userAssignedID, "userAssignedID"); err != nil {
-			return nil, err
-		}
+	if userAssignedID != "" && identityResourceID != "" {
+		return nil, errors.New("cannot specify userAssignedID and identityResourceID")
 	}
-	if identityResourceID != nil {
-		if err := validateStringParam(*identityResourceID, "identityResourceID"); err != nil {
-			return nil, err
-		}
+	msiType, endpoint, err := getMSIType()
+	if err != nil {
+		logger.Instance.Writef(logger.LogError, "Error determining managed identity environment: %v", err)
+		return nil, err
 	}
-	// We set the oauth config token endpoint to be MSI's endpoint
-	msiEndpointURL, err := url.Parse(msiEndpoint)
+	logger.Instance.Writef(logger.LogInfo, "Managed identity environment is %s, endpoint is %s", msiType, endpoint)
+	if msiEndpoint != "" {
+		endpoint = msiEndpoint
+		logger.Instance.Writef(logger.LogInfo, "Managed identity custom endpoint is %s", endpoint)
+	}
+	msiEndpointURL, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err
 	}
-
-	v := url.Values{}
-	v.Set("resource", resource)
-	// we only support token API version 2017-09-01 for app services
-	clientIDParam := "client_id"
-	if isASEEndpoint(*msiEndpointURL) {
-		v.Set("api-version", appServiceAPIVersion)
-		clientIDParam = "clientid"
-	} else {
-		v.Set("api-version", msiAPIVersion)
+	// cloud shell sends its data in the request body
+	if msiType != msiTypeCloudShell {
+		v := url.Values{}
+		v.Set("resource", resource)
+		clientIDParam := "client_id"
+		switch msiType {
+		case msiTypeAppServiceV20170901:
+			clientIDParam = "clientid"
+			v.Set("api-version", appServiceAPIVersion2017)
+			break
+		case msiTypeIMDS:
+			v.Set("api-version", msiAPIVersion)
+		}
+		if userAssignedID != "" {
+			v.Set(clientIDParam, userAssignedID)
+		} else if identityResourceID != "" {
+			v.Set("mi_res_id", identityResourceID)
+		}
+		msiEndpointURL.RawQuery = v.Encode()
 	}
-	if userAssignedID != nil {
-		v.Set(clientIDParam, *userAssignedID)
-	}
-	if identityResourceID != nil {
-		v.Set("mi_res_id", *identityResourceID)
-	}
-	msiEndpointURL.RawQuery = v.Encode()
 
 	spt := &ServicePrincipalToken{
 		inner: servicePrincipalToken{
@@ -759,19 +839,19 @@ func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedI
 			OauthConfig: OAuthConfig{
 				TokenEndpoint: *msiEndpointURL,
 			},
-			Secret:        &ServicePrincipalMSISecret{},
+			Secret: &ServicePrincipalMSISecret{
+				msiType:          msiType,
+				clientResourceID: identityResourceID,
+			},
 			Resource:      resource,
 			AutoRefresh:   true,
 			RefreshWithin: defaultRefresh,
+			ClientID:      userAssignedID,
 		},
 		refreshLock:           &sync.RWMutex{},
 		sender:                sender(),
 		refreshCallbacks:      callbacks,
 		MaxMSIRefreshAttempts: defaultMaxMSIRefreshAttempts,
-	}
-
-	if userAssignedID != nil {
-		spt.inner.ClientID = *userAssignedID
 	}
 
 	return spt, nil
@@ -870,31 +950,6 @@ func (spt *ServicePrincipalToken) getGrantType() string {
 	}
 }
 
-func isIMDS(u url.URL) bool {
-	return isMSIEndpoint(u) == true || isASEEndpoint(u) == true
-}
-
-func isMSIEndpoint(endpoint url.URL) bool {
-	msi, err := url.Parse(msiEndpoint)
-	if err != nil {
-		return false
-	}
-	return endpoint.Host == msi.Host && endpoint.Path == msi.Path
-}
-
-func isASEEndpoint(endpoint url.URL) bool {
-	aseEndpoint, err := GetMSIAppServiceEndpoint()
-	if err != nil {
-		// app service environment isn't enabled
-		return false
-	}
-	ase, err := url.Parse(aseEndpoint)
-	if err != nil {
-		return false
-	}
-	return endpoint.Host == ase.Host && endpoint.Path == ase.Path
-}
-
 func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource string) error {
 	if spt.customRefreshFunc != nil {
 		token, err := spt.customRefreshFunc(ctx, resource)
@@ -909,13 +964,40 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 		return fmt.Errorf("adal: Failed to build the refresh request. Error = '%v'", err)
 	}
 	req.Header.Add("User-Agent", UserAgent())
-	// Add header when runtime is on App Service or Functions
-	if isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
-		asMSISecret, _ := os.LookupEnv(asMSISecretEnv)
-		req.Header.Add(secretHeader, asMSISecret)
-	}
 	req = req.WithContext(ctx)
-	if !isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
+	var resp *http.Response
+	authBodyFilter := func(b []byte) []byte {
+		if logger.Level() != logger.LogAuth {
+			return []byte("**REDACTED** authentication body")
+		}
+		return b
+	}
+	if msiSecret, ok := spt.inner.Secret.(*ServicePrincipalMSISecret); ok {
+		switch msiSecret.msiType {
+		case msiTypeAppServiceV20170901:
+			req.Method = http.MethodGet
+			req.Header.Set("secret", os.Getenv(msiSecretEnv))
+			break
+		case msiTypeCloudShell:
+			req.Header.Set("Metadata", "true")
+			data := url.Values{}
+			data.Set("resource", spt.inner.Resource)
+			if spt.inner.ClientID != "" {
+				data.Set("client_id", spt.inner.ClientID)
+			} else if msiSecret.clientResourceID != "" {
+				data.Set("msi_res_id", msiSecret.clientResourceID)
+			}
+			req.Body = ioutil.NopCloser(strings.NewReader(data.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			break
+		case msiTypeIMDS:
+			req.Method = http.MethodGet
+			req.Header.Set("Metadata", "true")
+			break
+		}
+		logger.Instance.WriteRequest(req, logger.Filter{Body: authBodyFilter})
+		resp, err = retryForIMDS(spt.sender, req, spt.MaxMSIRefreshAttempts)
+	} else {
 		v := url.Values{}
 		v.Set("client_id", spt.inner.ClientID)
 		v.Set("resource", resource)
@@ -944,35 +1026,18 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 		req.ContentLength = int64(len(s))
 		req.Header.Set(contentType, mimeTypeFormPost)
 		req.Body = body
-	}
-
-	if _, ok := spt.inner.Secret.(*ServicePrincipalMSISecret); ok {
-		req.Method = http.MethodGet
-		// the metadata header isn't applicable for ASE
-		if !isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
-			req.Header.Set(metadataHeader, "true")
-		}
-	}
-
-	var resp *http.Response
-	if isMSIEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
-		resp, err = getMSIEndpoint(ctx, spt.sender)
-		if err != nil {
-			// return a TokenRefreshError here so that we don't keep retrying
-			return newTokenRefreshError(fmt.Sprintf("the MSI endpoint is not available. Failed HTTP request to MSI endpoint: %v", err), nil)
-		}
-		resp.Body.Close()
-	}
-	if isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
-		resp, err = retryForIMDS(spt.sender, req, spt.MaxMSIRefreshAttempts)
-	} else {
+		logger.Instance.WriteRequest(req, logger.Filter{Body: authBodyFilter})
 		resp, err = spt.sender.Do(req)
 	}
+
+	// don't return a TokenRefreshError here; this will allow retry logic to apply
 	if err != nil {
-		// don't return a TokenRefreshError here; this will allow retry logic to apply
 		return fmt.Errorf("adal: Failed to execute the refresh request. Error = '%v'", err)
+	} else if resp == nil {
+		return fmt.Errorf("adal: received nil response and error")
 	}
 
+	logger.Instance.WriteResponse(resp, logger.Filter{Body: authBodyFilter})
 	defer resp.Body.Close()
 	rb, err := ioutil.ReadAll(resp.Body)
 
@@ -1263,4 +1328,9 @@ func MSIAvailable(ctx context.Context, sender Sender) bool {
 		resp.Body.Close()
 	}
 	return err == nil
+}
+
+// used for testing purposes
+var msiAvailableHook = func(ctx context.Context, sender Sender) bool {
+	return MSIAvailable(ctx, sender)
 }

@@ -29,26 +29,63 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
 var _ framework.FilterPlugin = &Fit{}
 var _ framework.EnqueueExtensions = &Fit{}
+var _ framework.ScorePlugin = &Fit{}
 
 const (
 	// FitName is the name of the plugin used in the plugin registry and configurations.
-	FitName = "NodeResourcesFit"
+	FitName = names.NodeResourcesFit
 
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + FitName
 )
 
+// nodeResourceStrategyTypeMap maps strategy to scorer implementation
+var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
+	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
+		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		return &resourceAllocationScorer{
+			Name:                string(config.LeastAllocated),
+			scorer:              leastResourceScorer(resToWeightMap),
+			resourceToWeightMap: resToWeightMap,
+		}
+	},
+	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
+		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		return &resourceAllocationScorer{
+			Name:                string(config.MostAllocated),
+			scorer:              mostResourceScorer(resToWeightMap),
+			resourceToWeightMap: resToWeightMap,
+		}
+	},
+	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
+		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		return &resourceAllocationScorer{
+			Name:                string(config.RequestedToCapacityRatio),
+			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			resourceToWeightMap: resToWeightMap,
+		}
+	},
+}
+
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
 	ignoredResources      sets.String
 	ignoredResourceGroups sets.String
 	enablePodOverhead     bool
+	handle                framework.Handle
+	resourceAllocationScorer
+}
+
+// ScoreExtensions of the Score plugin.
+func (f *Fit) ScoreExtensions() framework.ScoreExtensions {
+	return nil
 }
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -67,7 +104,7 @@ func (f *Fit) Name() string {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(plArgs runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
@@ -75,10 +112,23 @@ func NewFit(plArgs runtime.Object, _ framework.Handle, fts feature.Features) (fr
 	if err := validation.ValidateNodeResourcesFitArgs(nil, args); err != nil {
 		return nil, err
 	}
+
+	if args.ScoringStrategy == nil {
+		return nil, fmt.Errorf("scoring strategy not specified")
+	}
+
+	strategy := args.ScoringStrategy.Type
+	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
+	if !exists {
+		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
+	}
+
 	return &Fit{
-		ignoredResources:      sets.NewString(args.IgnoredResources...),
-		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
-		enablePodOverhead:     fts.EnablePodOverhead,
+		ignoredResources:         sets.NewString(args.IgnoredResources...),
+		ignoredResourceGroups:    sets.NewString(args.IgnoredResourceGroups...),
+		enablePodOverhead:        fts.EnablePodOverhead,
+		handle:                   h,
+		resourceAllocationScorer: *scorePlugin(args),
 	}, nil
 }
 
@@ -179,8 +229,8 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))
-		for _, r := range insufficientResources {
-			failureReasons = append(failureReasons, r.Reason)
+		for i := range insufficientResources {
+			failureReasons = append(failureReasons, insufficientResources[i].Reason)
 		}
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}
@@ -276,4 +326,14 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	return insufficientResources
+}
+
+// Score invoked at the Score extension point.
+func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := f.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
+	}
+
+	return f.score(pod, nodeInfo)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -74,7 +75,7 @@ func TestNoConfigMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}
-	signer.signConfigMap()
+	signer.signConfigMap(context.TODO())
 	verifyActions(t, []core.Action{}, cl.Actions())
 }
 
@@ -91,7 +92,7 @@ func TestSimpleSign(t *testing.T) {
 	addSecretSigningUsage(secret, "true")
 	secrets.Informer().GetIndexer().Add(secret)
 
-	signer.signConfigMap()
+	signer.signConfigMap(context.TODO())
 
 	expected := []core.Action{
 		core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
@@ -115,7 +116,7 @@ func TestNoSignNeeded(t *testing.T) {
 	addSecretSigningUsage(secret, "true")
 	secrets.Informer().GetIndexer().Add(secret)
 
-	signer.signConfigMap()
+	signer.signConfigMap(context.TODO())
 
 	verifyActions(t, []core.Action{}, cl.Actions())
 }
@@ -133,7 +134,7 @@ func TestUpdateSignature(t *testing.T) {
 	addSecretSigningUsage(secret, "true")
 	secrets.Informer().GetIndexer().Add(secret)
 
-	signer.signConfigMap()
+	signer.signConfigMap(context.TODO())
 
 	expected := []core.Action{
 		core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
@@ -153,7 +154,7 @@ func TestRemoveSignature(t *testing.T) {
 	cm := newConfigMap(testTokenID, "old signature")
 	configMaps.Informer().GetIndexer().Add(cm)
 
-	signer.signConfigMap()
+	signer.signConfigMap(context.TODO())
 
 	expected := []core.Action{
 		core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},

@@ -176,13 +176,87 @@ type Histogram struct {
 	*dto.Histogram
 }
 
-// GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// HistogramVec wraps a slice of Histogram.
+// Note that each Histogram must have the same number of buckets.
+type HistogramVec []*Histogram
+
+// GetAggregatedSampleCount aggregates the sample count of each inner Histogram.
+func (vec HistogramVec) GetAggregatedSampleCount() uint64 {
+	var count uint64
+	for _, hist := range vec {
+		count += hist.GetSampleCount()
+	}
+	return count
+}
+
+// GetAggregatedSampleSum aggregates the sample sum of each inner Histogram.
+func (vec HistogramVec) GetAggregatedSampleSum() float64 {
+	var sum float64
+	for _, hist := range vec {
+		sum += hist.GetSampleSum()
+	}
+	return sum
+}
+
+// Quantile first aggregates inner buckets of each Histogram, and then
+// computes q-th quantile of a cumulative histogram.
+func (vec HistogramVec) Quantile(q float64) float64 {
+	var buckets []bucket
+
+	for i, hist := range vec {
+		for j, bckt := range hist.Bucket {
+			if i == 0 {
+				buckets = append(buckets, bucket{
+					count:      float64(bckt.GetCumulativeCount()),
+					upperBound: bckt.GetUpperBound(),
+				})
+			} else {
+				buckets[j].count += float64(bckt.GetCumulativeCount())
+			}
+		}
+	}
+
+	if len(buckets) == 0 || buckets[len(buckets)-1].upperBound != math.Inf(+1) {
+		// The list of buckets in dto.Histogram doesn't include the final +Inf bucket, so we
+		// add it here for the rest of the samples.
+		buckets = append(buckets, bucket{
+			count:      float64(vec.GetAggregatedSampleCount()),
+			upperBound: math.Inf(+1),
+		})
+	}
+
+	return bucketQuantile(q, buckets)
+}
+
+// Average computes wrapped histograms' average value.
+func (vec HistogramVec) Average() float64 {
+	return vec.GetAggregatedSampleSum() / float64(vec.GetAggregatedSampleCount())
+}
+
+// Validate makes sure the wrapped histograms have all necessary fields set and with valid values.
+func (vec HistogramVec) Validate() error {
+	bucketSize := 0
+	for i, hist := range vec {
+		if err := hist.Validate(); err != nil {
+			return err
+		}
+		if i == 0 {
+			bucketSize = len(hist.GetBucket())
+		} else if bucketSize != len(hist.GetBucket()) {
+			return fmt.Errorf("found different bucket size: expect %v, but got %v at index %v", bucketSize, len(hist.GetBucket()), i)
+		}
+	}
+	return nil
+}
+
+// GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map,
+// from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (Histogram, error) {
+func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
 	var metricFamily *dto.MetricFamily
 	m, err := gatherer.Gather()
 	if err != nil {
-		return Histogram{}, err
+		return nil, err
 	}
 	for _, mFamily := range m {
 		if mFamily.GetName() == metricName {
@@ -192,23 +266,22 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (His
 	}
 
 	if metricFamily == nil {
-		return Histogram{}, fmt.Errorf("metric %q not found", metricName)
-	}
-
-	if metricFamily.GetMetric() == nil {
-		return Histogram{}, fmt.Errorf("metric %q is empty", metricName)
+		return nil, fmt.Errorf("metric %q not found", metricName)
 	}
 
 	if len(metricFamily.GetMetric()) == 0 {
-		return Histogram{}, fmt.Errorf("metric %q is empty", metricName)
+		return nil, fmt.Errorf("metric %q is empty", metricName)
 	}
 
-	return Histogram{
-		// Histograms are stored under the first index (based on observation).
-		// Given there's only one histogram registered per each metric name, accessing
-		// the first index is sufficient.
-		metricFamily.GetMetric()[0].GetHistogram(),
-	}, nil
+	vec := make(HistogramVec, 0)
+	for _, metric := range metricFamily.GetMetric() {
+		if LabelsMatch(metric, lvMap) {
+			if hist := metric.GetHistogram(); hist != nil {
+				vec = append(vec, &Histogram{hist})
+			}
+		}
+	}
+	return vec, nil
 }
 
 func uint64Ptr(u uint64) *uint64 {
@@ -266,7 +339,7 @@ func (hist *Histogram) Quantile(q float64) float64 {
 
 	if len(buckets) == 0 || buckets[len(buckets)-1].upperBound != math.Inf(+1) {
 		// The list of buckets in dto.Histogram doesn't include the final +Inf bucket, so we
-		// add it here for the reset of the samples.
+		// add it here for the rest of the samples.
 		buckets = append(buckets, bucket{
 			count:      float64(hist.GetSampleCount()),
 			upperBound: math.Inf(+1),

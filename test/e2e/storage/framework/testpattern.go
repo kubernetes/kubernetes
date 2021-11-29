@@ -179,9 +179,11 @@ var (
 	}
 	// Ext4DynamicPV is TestPattern for "Dynamic PV (ext4)"
 	Ext4DynamicPV = TestPattern{
-		Name:    "Dynamic PV (ext4)",
-		VolType: DynamicPV,
-		FsType:  "ext4",
+		Name:                   "Dynamic PV (ext4)",
+		VolType:                DynamicPV,
+		FsType:                 "ext4",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for xfs
@@ -216,10 +218,12 @@ var (
 	}
 	// XfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
 	XfsDynamicPV = TestPattern{
-		Name:       "Dynamic PV (xfs)",
-		VolType:    DynamicPV,
-		FsType:     "xfs",
-		FeatureTag: "[Slow]",
+		Name:                   "Dynamic PV (xfs)",
+		VolType:                DynamicPV,
+		FsType:                 "xfs",
+		FeatureTag:             "[Slow]",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for ntfs
@@ -293,6 +297,13 @@ var (
 		SnapshotType:           DynamicCreatedSnapshot,
 		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
+	// BlockVolModeGenericEphemeralVolume is for generic ephemeral inline volumes in raw block mode.
+	BlockVolModeGenericEphemeralVolume = TestPattern{
+		Name:        "Generic Ephemeral-volume (block volmode) (late-binding)",
+		VolType:     GenericEphemeralVolume,
+		VolMode:     v1.PersistentVolumeBlock,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 
 	// Definitions for snapshot case
 
@@ -310,6 +321,14 @@ var (
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		VolType:                DynamicPV,
 	}
+	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// where snapshots are deleted.
+	EphemeralSnapshotDelete = TestPattern{
+		Name:                   "Ephemeral Snapshot (delete policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                GenericEphemeralVolume,
+	}
 	// DynamicSnapshotRetain is TestPattern for "Dynamic snapshot"
 	DynamicSnapshotRetain = TestPattern{
 		Name:                   "Dynamic Snapshot (retain policy)",
@@ -323,6 +342,14 @@ var (
 		SnapshotType:           PreprovisionedCreatedSnapshot,
 		SnapshotDeletionPolicy: RetainSnapshot,
 		VolType:                DynamicPV,
+	}
+	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// where snapshots are preserved.
+	EphemeralSnapshotRetain = TestPattern{
+		Name:                   "Ephemeral Snapshot (retain policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                GenericEphemeralVolume,
 	}
 
 	// Definitions for volume expansion case

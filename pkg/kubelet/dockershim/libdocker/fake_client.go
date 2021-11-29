@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -34,8 +35,8 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/clock"
 )
 
 type CalledDetail struct {
@@ -225,6 +226,7 @@ func convertFakeContainer(f *FakeContainer) *dockertypes.ContainerJSON {
 	if f.HostConfig == nil {
 		f.HostConfig = &dockercontainer.HostConfig{}
 	}
+	fakeRWSize := int64(40)
 	return &dockertypes.ContainerJSON{
 		ContainerJSONBase: &dockertypes.ContainerJSONBase{
 			ID:    f.ID,
@@ -239,6 +241,7 @@ func convertFakeContainer(f *FakeContainer) *dockertypes.ContainerJSON {
 			},
 			Created:    dockerTimestampToString(f.CreatedAt),
 			HostConfig: f.HostConfig,
+			SizeRw:     &fakeRWSize,
 		},
 		Config:          f.Config,
 		NetworkSettings: &dockertypes.NetworkSettings{},

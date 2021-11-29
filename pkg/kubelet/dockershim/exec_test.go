@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -135,7 +136,8 @@ func TestExecInContainer(t *testing.T) {
 	}}
 
 	eh := &NativeExecHandler{}
-	ctrl := gomock.NewController(t)
+	// to avoid the default calling Finish(). More details in https://github.com/golang/mock/pull/422/
+	ctrl := gomock.NewController(struct{ gomock.TestReporter }{t})
 	container := getFakeContainerJSON()
 	cmd := []string{"/bin/bash"}
 	var stdin io.Reader

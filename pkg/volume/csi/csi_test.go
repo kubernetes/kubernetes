@@ -400,7 +400,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.GetdeviceMountPath failed %s", err)
 				}
-				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
+				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath, volume.DeviceMounterArgs{}); err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.MountDevice failed: %v", err)
 				}
 				t.Log("csiTest.VolumeAll device mounted at path:", devMountPath)
@@ -568,7 +568,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 					if err := csiDevUnmounter.UnmountDevice(devMountPath); err != nil {
 						t.Fatalf("csiTest.VolumeAll deviceMounter.UnmountDevice failed: %s", err)
 					}
-					t.Log("csiTest.VolumeAll deviceUmounter.UnmountDevice done OK for path", devMountPath)
+					t.Log("csiTest.VolumeAll deviceUnmounter.UnmountDevice done OK for path", devMountPath)
 				}
 			} else {
 				t.Log("csiTest.VolumeAll DeviceMountablePluginBySpec did not find a plugin, skipping unmounting.")

@@ -188,7 +188,7 @@ egressSelections:
 						},
 					},
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: "HTTPConnect",
 							Transport: &apiserver.Transport{
@@ -338,7 +338,7 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 				},
 				EgressSelections: []apiserver.EgressSelection{
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: apiserver.ProtocolDirect,
 							Transport:     &apiserver.Transport{},
@@ -512,7 +512,7 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name:        "both master and controlplane egress selection configured",
+			name:        "duplicate egress selections configured",
 			expectError: true,
 			contents: &apiserver.EgressSelectorConfiguration{
 				TypeMeta: metav1.TypeMeta{
@@ -527,7 +527,7 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 						},
 					},
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: apiserver.ProtocolDirect,
 						},

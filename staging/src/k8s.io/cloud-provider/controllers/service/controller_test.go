@@ -368,15 +368,17 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
-			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(context.TODO(), tc.service, metav1.CreateOptions{}); err != nil {
+			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(ctx, tc.service, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service %s for testing: %v", key, err)
 			}
 			client.ClearActions()
 
-			op, err := controller.syncLoadBalancerIfNeeded(tc.service, key)
+			op, err := controller.syncLoadBalancerIfNeeded(ctx, tc.service, key)
 			if err != nil {
 				t.Errorf("Got error: %v, want nil", err)
 			}
@@ -548,10 +550,12 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 	for _, item := range table {
 		t.Run(item.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			controller, cloud, _ := newController()
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 
-			if servicesToRetry := controller.updateLoadBalancerHosts(item.services, item.workers); servicesToRetry != nil {
+			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); servicesToRetry != nil {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
@@ -638,8 +642,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
-			servicesToRetry := controller.updateLoadBalancerHosts(services, tc.worker)
+			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
 			compareServiceList(t, tc.expectedRetryServices, servicesToRetry)
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
@@ -772,11 +778,13 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		newSvc := tc.updateFn(tc.svc)
-		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
 		}
-		obtErr := controller.processServiceCreateOrUpdate(newSvc, tc.key)
+		obtErr := controller.processServiceCreateOrUpdate(ctx, newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
 			t.Errorf("%v processServiceCreateOrUpdate() %v", tc.testName, err)
 		}
@@ -810,6 +818,8 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
@@ -818,7 +828,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 				return true, nil, tc.k8sErr
 			})
 
-			if err := controller.processServiceCreateOrUpdate(svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
+			if err := controller.processServiceCreateOrUpdate(ctx, svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
 				t.Fatalf("processServiceCreateOrUpdate() = %v, want %v", err, tc.expectErr)
 			}
 			if tc.expectErr == nil {
@@ -905,9 +915,11 @@ func TestSyncService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		tc.updateFn()
-		obtainedErr := controller.syncService(tc.key)
+		obtainedErr := controller.syncService(ctx, tc.key)
 
 		//expected matches obtained ??.
 		if exp := tc.expectedFn(obtainedErr); exp != nil {
@@ -991,10 +1003,13 @@ func TestProcessServiceDeletion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		//Create a new controller.
 		controller, cloud, _ = newController()
 		tc.updateFn(controller)
-		obtainedErr := controller.processServiceDeletion(svcKey)
+		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
 			t.Errorf("%v processServiceDeletion() %v", tc.testName, err)
 		}
@@ -1388,11 +1403,13 @@ func TestAddFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.addFinalizer(tc.svc); err != nil {
@@ -1442,11 +1459,13 @@ func TestRemoveFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.removeFinalizer(tc.svc); err != nil {
@@ -1542,11 +1561,13 @@ func TestPatchStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.patchStatus(tc.svc, &tc.svc.Status.LoadBalancer, tc.newStatus); err != nil {
@@ -1580,6 +1601,9 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 
 		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
+
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
+			Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint, Value: fmt.Sprint(time.Now().Unix()), Effect: v1.TaintEffectNoSchedule}}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

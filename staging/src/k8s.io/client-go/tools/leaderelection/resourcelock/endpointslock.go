@@ -102,7 +102,11 @@ func (el *EndpointsLock) RecordEvent(s string) {
 		return
 	}
 	events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
-	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
+	subject := &v1.Endpoints{ObjectMeta: el.e.ObjectMeta}
+	// Populate the type meta, so we don't have to get it from the schema
+	subject.Kind = "Endpoints"
+	subject.APIVersion = v1.SchemeGroupVersion.String()
+	el.LockConfig.EventRecorder.Eventf(subject, v1.EventTypeNormal, "LeaderElection", events)
 }
 
 // Describe is used to convert details on current resource lock

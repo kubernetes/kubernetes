@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
 )
 
 func TestMakeCSR(t *testing.T) {
@@ -33,7 +34,7 @@ func TestMakeCSR(t *testing.T) {
 		CommonName: "kube-worker",
 	}
 	dnsSANs := []string{"localhost"}
-	ipSANs := []net.IP{net.ParseIP("127.0.0.1")}
+	ipSANs := []net.IP{netutils.ParseIPSloppy("127.0.0.1")}
 
 	keyData, err := ioutil.ReadFile(keyFile)
 	if err != nil {

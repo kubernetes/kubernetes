@@ -46,7 +46,7 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 }
 
 func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	textCtx := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), resyncPeriod)
+	textCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
 	clientset := textCtx.clientSet
 	ns := textCtx.ns.Name
 
@@ -54,7 +54,7 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(textCtx.ctx.Done())
+	go ctrl.Run(context.TODO())
 
 	// Start informer factory after all controllers are configured and running.
 	informerFactory.Start(textCtx.ctx.Done())

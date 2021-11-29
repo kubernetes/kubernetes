@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -52,14 +53,16 @@ func TestWebhookLoopback(t *testing.T) {
 
 			// Hook into audit to watch requests
 			config.GenericConfig.AuditBackend = auditSinkFunc(func(events ...*auditinternal.Event) {})
-			config.GenericConfig.AuditPolicyChecker = auditChecker(func(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
+			config.GenericConfig.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) audit.RequestAuditConfigWithLevel {
 				if attrs.GetPath() == webhookPath {
 					if attrs.GetUser().GetName() != "system:apiserver" {
 						t.Errorf("expected user %q, got %q", "system:apiserver", attrs.GetUser().GetName())
 					}
 					atomic.AddInt32(&called, 1)
 				}
-				return auditinternal.LevelNone, nil
+				return audit.RequestAuditConfigWithLevel{
+					Level: auditinternal.LevelNone,
+				}
 			})
 		},
 	})
@@ -106,9 +109,9 @@ func TestWebhookLoopback(t *testing.T) {
 	}
 }
 
-type auditChecker func(authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage)
+type auditPolicyRuleEvaluator func(authorizer.Attributes) audit.RequestAuditConfigWithLevel
 
-func (f auditChecker) LevelAndStages(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
+func (f auditPolicyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) audit.RequestAuditConfigWithLevel {
 	return f(attrs)
 }
 

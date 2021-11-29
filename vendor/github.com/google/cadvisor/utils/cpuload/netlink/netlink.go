@@ -21,8 +21,9 @@ import (
 	"os"
 	"syscall"
 
-	info "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/unix"
+
+	info "github.com/google/cadvisor/info/v1"
 )
 
 var (

@@ -51,7 +51,7 @@ func (m *manager) getControllers() error {
 		return nil
 	}
 
-	data, err := fscommon.ReadFile(m.dirPath, "cgroup.controllers")
+	data, err := cgroups.ReadFile(m.dirPath, "cgroup.controllers")
 	if err != nil {
 		if m.rootless && m.config.Path == "" {
 			return nil
@@ -98,9 +98,7 @@ func (m *manager) GetAllPids() ([]int, error) {
 }
 
 func (m *manager) GetStats() (*cgroups.Stats, error) {
-	var (
-		errs []error
-	)
+	var errs []error
 
 	st := cgroups.NewStats()
 
@@ -199,7 +197,7 @@ func (m *manager) setUnified(res map[string]string) error {
 		if strings.Contains(k, "/") {
 			return fmt.Errorf("unified resource %q must be a file name (no slashes)", k)
 		}
-		if err := fscommon.WriteFile(m.dirPath, k, v); err != nil {
+		if err := cgroups.WriteFile(m.dirPath, k, v); err != nil {
 			errC := errors.Cause(err)
 			// Check for both EPERM and ENOENT since O_CREAT is used by WriteFile.
 			if errors.Is(errC, os.ErrPermission) || errors.Is(errC, os.ErrNotExist) {

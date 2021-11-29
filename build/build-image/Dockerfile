@@ -13,10 +13,10 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
-ARG KUBE_BUILD_IMAGE_CROSS_TAG
-ARG KUBE_BASE_IMAGE_REGISTRY
+ARG KUBE_CROSS_IMAGE
+ARG KUBE_CROSS_VERSION
 
-FROM ${KUBE_BASE_IMAGE_REGISTRY}/kube-cross:${KUBE_BUILD_IMAGE_CROSS_TAG}
+FROM ${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image

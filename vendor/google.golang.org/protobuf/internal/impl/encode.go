@@ -79,8 +79,9 @@ func (mi *MessageInfo) sizePointerSlow(p pointer, opts marshalOptions) (size int
 		size += f.funcs.size(fptr, f, opts)
 	}
 	if mi.unknownOffset.IsValid() {
-		u := *p.Apply(mi.unknownOffset).Bytes()
-		size += len(u)
+		if u := mi.getUnknownBytes(p); u != nil {
+			size += len(*u)
+		}
 	}
 	if mi.sizecacheOffset.IsValid() {
 		if size > math.MaxInt32 {
@@ -141,8 +142,9 @@ func (mi *MessageInfo) marshalAppendPointer(b []byte, p pointer, opts marshalOpt
 		}
 	}
 	if mi.unknownOffset.IsValid() && !mi.isMessageSet {
-		u := *p.Apply(mi.unknownOffset).Bytes()
-		b = append(b, u...)
+		if u := mi.getUnknownBytes(p); u != nil {
+			b = append(b, (*u)...)
+		}
 	}
 	return b, nil
 }

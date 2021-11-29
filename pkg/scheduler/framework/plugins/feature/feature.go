@@ -23,5 +23,7 @@ type Features struct {
 	EnablePodAffinityNamespaceSelector bool
 	EnablePodDisruptionBudget          bool
 	EnablePodOverhead                  bool
-	EnableBalanceAttachedNodeVolumes   bool
+	EnableReadWriteOncePod             bool
+	EnableVolumeCapacityPriority       bool
+	EnableCSIStorageCapacity           bool
 }

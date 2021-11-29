@@ -142,7 +142,7 @@ func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:                   "ingress NAME --rule=host/path=service:port[,tls[=secret]] ",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ing"},
-		Short:                 ingressLong,
+		Short:                 i18n.T("Create an ingress with the specified name"),
 		Long:                  ingressLong,
 		Example:               ingressExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -320,8 +320,7 @@ func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
 }
 
 func (o *CreateIngressOptions) buildTLSRules() []networkingv1.IngressTLS {
-	var hostAlreadyPresent map[string]struct{}
-	hostAlreadyPresent = make(map[string]struct{})
+	hostAlreadyPresent := make(map[string]struct{})
 
 	ingressTLSs := []networkingv1.IngressTLS{}
 	var secret string

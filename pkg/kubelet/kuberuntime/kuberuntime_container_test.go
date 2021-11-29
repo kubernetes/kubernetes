@@ -34,7 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -255,7 +255,7 @@ func TestLifeCycleHook(t *testing.T) {
 		},
 	}
 	cmdPostStart := &v1.Lifecycle{
-		PostStart: &v1.Handler{
+		PostStart: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"PostStartCMD"},
 			},
@@ -263,7 +263,7 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	httpLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host: "testHost.com",
 				Path: "/GracefulExit",
@@ -272,7 +272,7 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	cmdLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"PreStopCMD"},
 			},

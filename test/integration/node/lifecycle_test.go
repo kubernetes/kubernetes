@@ -120,7 +120,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	)
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testCtx := testutils.InitTestMaster(t, "taint-based-evictions", admission)
+			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
 			// Build clientset and informers for controllers.
 			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
@@ -131,7 +131,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			testCtx = testutils.InitTestScheduler(t, testCtx, nil)
+			testCtx = testutils.InitTestScheduler(t, testCtx)
 			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.NS, metav1.CreateOptions{})
@@ -141,6 +141,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
+				testCtx.Ctx,
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -167,7 +168,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testutils.SyncInformerFactory(testCtx)
 
 			// Run all controllers
-			go nc.Run(testCtx.Ctx.Done())
+			go nc.Run(testCtx.Ctx)
 			go testCtx.Scheduler.Run(testCtx.Ctx)
 
 			nodeRes := v1.ResourceList{

@@ -42,18 +42,8 @@ kube::util::require-jq
 rc=0
 
 # List of dependencies we need to avoid dragging back into kubernetes/kubernetes
-forbidden_repos=(
-  "k8s.io/klog"  # we have switched to klog v2, so avoid klog v1
-)
-for forbidden_repo in "${forbidden_repos[@]}"; do
-  deps_on_forbidden=$(go mod graph | grep " ${forbidden_repo}@" || echo "")
-  if [ -n "${deps_on_forbidden}" ]; then
-    kube::log::error "The following have transitive dependencies on ${forbidden_repo}, which is not allowed:"
-    echo "${deps_on_forbidden}"
-    echo ""
-    rc=1
-  fi
-done
+# Check if unwanted dependencies are removed
+go run k8s.io/kubernetes/cmd/dependencyverifier "${KUBE_ROOT}/hack/unwanted-dependencies.json"
 
 outdated=$(go list -m -json all | jq -r "
   select(.Replace.Version != null) |

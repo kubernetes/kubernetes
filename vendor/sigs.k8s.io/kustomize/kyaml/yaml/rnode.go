@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
+	"sigs.k8s.io/kustomize/kyaml/sliceutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
 )
 
@@ -144,6 +145,50 @@ func NewMapRNode(values *map[string]string) *RNode {
 	}
 
 	return m
+}
+
+// SyncMapNodesOrder sorts the map node keys in 'to' node to match the order of
+// map node keys in 'from' node, additional keys are moved to the end
+func SyncMapNodesOrder(from, to *RNode) {
+	to.Copy()
+	res := &RNode{value: &yaml.Node{
+		Kind:        to.YNode().Kind,
+		Style:       to.YNode().Style,
+		Tag:         to.YNode().Tag,
+		Anchor:      to.YNode().Anchor,
+		Alias:       to.YNode().Alias,
+		HeadComment: to.YNode().HeadComment,
+		LineComment: to.YNode().LineComment,
+		FootComment: to.YNode().FootComment,
+		Line:        to.YNode().Line,
+		Column:      to.YNode().Column,
+	}}
+
+	fromFieldNames, err := from.Fields()
+	if err != nil {
+		return
+	}
+
+	toFieldNames, err := to.Fields()
+	if err != nil {
+		return
+	}
+
+	for _, fieldName := range fromFieldNames {
+		if !sliceutil.Contains(toFieldNames, fieldName) {
+			continue
+		}
+		// append the common nodes in the order defined in 'from' node
+		res.value.Content = append(res.value.Content, to.Field(fieldName).Key.YNode(), to.Field(fieldName).Value.YNode())
+		toFieldNames = sliceutil.Remove(toFieldNames, fieldName)
+	}
+
+	for _, fieldName := range toFieldNames {
+		// append the residual nodes which are not present in 'from' node
+		res.value.Content = append(res.value.Content, to.Field(fieldName).Key.YNode(), to.Field(fieldName).Value.YNode())
+	}
+
+	to.SetYNode(res.YNode())
 }
 
 // NewRNode returns a new RNode pointer containing the provided Node.
@@ -546,6 +591,32 @@ func (rn *RNode) GetBinaryDataMap() map[string]string {
 	return result
 }
 
+// GetValidatedDataMap retrieves the data map and returns an error if the data
+// map contains entries which are not included in the expectedKeys set.
+func (rn *RNode) GetValidatedDataMap(expectedKeys []string) (map[string]string, error) {
+	dataMap := rn.GetDataMap()
+	err := rn.validateDataMap(dataMap, expectedKeys)
+	return dataMap, err
+}
+
+func (rn *RNode) validateDataMap(dataMap map[string]string, expectedKeys []string) error {
+	if dataMap == nil {
+		return fmt.Errorf("The datamap is unassigned")
+	}
+	for key := range dataMap {
+		found := false
+		for _, expected := range expectedKeys {
+			if expected == key {
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("an unexpected key (%v) was found", key)
+		}
+	}
+	return nil
+}
+
 func (rn *RNode) SetDataMap(m map[string]string) {
 	if rn == nil {
 		log.Fatal("cannot set data map on nil Rnode")
@@ -830,6 +901,48 @@ func (rn *RNode) UnmarshalJSON(b []byte) error {
 	}
 	rn.value = r.value
 	return nil
+}
+
+// DeAnchor inflates all YAML aliases with their anchor values.
+// All YAML anchor data is permanently removed (feel free to call Copy first).
+func (rn *RNode) DeAnchor() (err error) {
+	rn.value, err = deAnchor(rn.value)
+	return
+}
+
+// deAnchor removes all AliasNodes from the yaml.Node's tree, replacing
+// them with what they point to.  All Anchor fields (these are used to mark
+// anchor definitions) are cleared.
+func deAnchor(yn *yaml.Node) (res *yaml.Node, err error) {
+	if yn == nil {
+		return nil, nil
+	}
+	if yn.Anchor != "" {
+		// This node defines an anchor. Clear the field so that it
+		// doesn't show up when marshalling.
+		if yn.Kind == yaml.AliasNode {
+			// Maybe this is OK, but for now treating it as a bug.
+			return nil, fmt.Errorf(
+				"anchor %q defined using alias %v", yn.Anchor, yn.Alias)
+		}
+		yn.Anchor = ""
+	}
+	switch yn.Kind {
+	case yaml.ScalarNode:
+		return yn, nil
+	case yaml.AliasNode:
+		return deAnchor(yn.Alias)
+	case yaml.DocumentNode, yaml.MappingNode, yaml.SequenceNode:
+		for i := range yn.Content {
+			yn.Content[i], err = deAnchor(yn.Content[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+		return yn, nil
+	default:
+		return nil, fmt.Errorf("cannot deAnchor kind %q", yn.Kind)
+	}
 }
 
 // GetValidatedMetadata returns metadata after subjecting it to some tests.

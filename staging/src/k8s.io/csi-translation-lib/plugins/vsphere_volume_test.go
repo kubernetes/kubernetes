@@ -30,6 +30,16 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
 	topologySelectorTerm := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
 		{
+			Key:    v1.LabelTopologyZone,
+			Values: []string{"zone-a"},
+		},
+		{
+			Key:    v1.LabelTopologyRegion,
+			Values: []string{"region-a"},
+		},
+	}}
+	topologySelectorTermWithBetaLabels := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
+		{
 			Key:    v1.LabelFailureDomainBetaZone,
 			Values: []string{"zone-a"},
 		},
@@ -84,6 +94,11 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 			name:  "translate with storagepolicyname and allowedTopology",
 			sc:    NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
 			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
+		},
+		{
+			name:  "translate with storagepolicyname and allowedTopology beta labels",
+			sc:    NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name"}, []v1.TopologySelectorTerm{topologySelectorTermWithBetaLabels}),
+			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTermWithBetaLabels}),
 		},
 		{
 			name:  "translate with raw vSAN policy parameters, datastore and diskformat",

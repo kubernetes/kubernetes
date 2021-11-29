@@ -109,10 +109,16 @@ func (d *decoder) Decode(data []byte, gvk *schema.GroupVersionKind, into runtime
 	for _, r := range skipped {
 		out, actual, err := r.Decode(data, gvk, into)
 		if err != nil {
-			lastErr = err
-			continue
+			// if we got an object back from the decoder, and the
+			// error was a strict decoding error (e.g. unknown or
+			// duplicate fields), we still consider the recognizer
+			// to have understood the object
+			if out == nil || !runtime.IsStrictDecodingError(err) {
+				lastErr = err
+				continue
+			}
 		}
-		return out, actual, nil
+		return out, actual, err
 	}
 
 	if lastErr == nil {

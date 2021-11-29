@@ -37,6 +37,10 @@ spec:
     apiGroup: "28"
     kind: "29"
     name: "30"
+  dataSourceRef:
+    apiGroup: "31"
+    kind: "32"
+    name: "33"
   resources:
     limits:
       Ď儇击3ƆìQ喞艋涽託仭w-檮Ǣ: "465"
@@ -53,14 +57,17 @@ spec:
   volumeName: "26"
 status:
   accessModes:
-  - ĭÐl恕ɍȇ廄裭4懙
+  - l殛瓷雼浢Ü礽
+  allocatedResources:
+    ' u衲<¿燥': "98"
   capacity:
-    嵒ƫS捕ɷD¡轫n: "583"
+    '{囥': "721"
   conditions:
-  - lastProbeTime: "2588-10-04T08:20:38Z"
-    lastTransitionTime: "2095-10-31T02:52:44Z"
-    message: "32"
-    reason: "31"
-    status: ƣKʘńw:5塋
-    type: Ü郀
-  phase: 燴壩卄蓨MĮ?
+  - lastProbeTime: "2343-07-10T15:32:16Z"
+    lastTransitionTime: "2944-07-13T11:02:13Z"
+    message: "35"
+    reason: "34"
+    status: Ka縳讋ɮ衺勽Ƙq
+    type: n(鲼ƳÐƣKʘńw:5塋訩塶"=
+  phase: gɸ=ǤÆ碛,1ZƜ/C龷Ȫ
+  resizeStatus: '{舁吉蓨O澘'

@@ -1,3 +1,4 @@
+//go:build windows && !dockerless
 // +build windows,!dockerless
 
 /*
@@ -28,7 +29,7 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"k8s.io/klog/v2"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // DefaultMemorySwap always returns 0 for no memory swap in a sandbox

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -45,21 +46,21 @@ import (
 
 var (
 	execExample = templates.Examples(i18n.T(`
-		# Get output from running 'date' command from pod mypod, using the first container by default
+		# Get output from running the 'date' command from pod mypod, using the first container by default
 		kubectl exec mypod -- date
 
-		# Get output from running 'date' command in ruby-container from pod mypod
+		# Get output from running the 'date' command in ruby-container from pod mypod
 		kubectl exec mypod -c ruby-container -- date
 
-		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
+		# Switch to raw terminal mode; sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
 		kubectl exec mypod -c ruby-container -i -t -- bash -il
 
-		# List contents of /usr from the first container of pod mypod and sort by modification time.
+		# List contents of /usr from the first container of pod mypod and sort by modification time
 		# If the command you want to execute in the pod has any flags in common (e.g. -i),
-		# you must use two dashes (--) to separate your command's flags/arguments.
+		# you must use two dashes (--) to separate your command's flags/arguments
 		# Also note, do not surround your command and its flags/arguments with quotes
-		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr").
+		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr")
 		kubectl exec mypod -i -t -- ls -t /usr
 
 		# Get output from running 'date' command from the first pod of the deployment mydeployment, using the first container by default
@@ -88,6 +89,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  i18n.T("Execute a command in a container."),
 		Example:               execExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))

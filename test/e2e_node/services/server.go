@@ -177,7 +177,7 @@ func (s *server) start() error {
 						s.startCommand.Wait() // Release resources if necessary.
 					}
 					// This should not happen, immediately stop the e2eService process.
-					klog.Fatalf("Restart loop readinessCheck failed for %s", s)
+					klog.Fatalf("Restart loop readinessCheck failed for %q", s.name)
 				} else {
 					klog.Infof("Initial health check passed for service %q", s.name)
 				}

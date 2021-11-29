@@ -49,7 +49,7 @@ type Cgroup struct {
 func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	var err error
 
-	fields := strings.Split(cgroupStr, ":")
+	fields := strings.SplitN(cgroupStr, ":", 3)
 	if len(fields) < 3 {
 		return nil, fmt.Errorf("at least 3 fields required, found %d fields in cgroup string: %s", len(fields), cgroupStr)
 	}

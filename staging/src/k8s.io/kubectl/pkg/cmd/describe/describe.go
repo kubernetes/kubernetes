@@ -30,13 +30,14 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	describeLong = templates.LongDesc(i18n.T(`
-		Show details of a specific resource or group of resources
+		Show details of a specific resource or group of resources.
 
 		Print a detailed description of the selected resources, including related resources such
 		as events or controllers. You may select a single object by name, all objects of that
@@ -63,8 +64,8 @@ var (
 		# Describe pods by label name=myLabel
 		kubectl describe po -l name=myLabel
 
-		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-		# get the name of the rc as a prefix in the pod the name).
+		# Describe all pods managed by the 'frontend' replication controller 
+		# (rc-created pods get the name of the rc as a prefix in the pod name)
 		kubectl describe pods frontend`))
 )
 
@@ -106,6 +107,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Short:                 i18n.T("Show details of a specific resource or group of resources"),
 		Long:                  describeLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               describeExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Run())

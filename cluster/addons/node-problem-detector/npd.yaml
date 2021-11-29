@@ -26,28 +26,28 @@ subjects:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: npd-v0.8.7
+  name: npd-v0.8.9
   namespace: kube-system
   labels:
     k8s-app: node-problem-detector
-    version: v0.8.7
+    version: v0.8.9
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: node-problem-detector
-      version: v0.8.7
+      version: v0.8.9
   template:
     metadata:
       labels:
         k8s-app: node-problem-detector
-        version: v0.8.7
+        version: v0.8.9
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: node-problem-detector
-        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7
+        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.9
         command:
         - "/bin/sh"
         - "-c"

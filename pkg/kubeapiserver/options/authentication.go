@@ -299,7 +299,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.StringSliceVar(&o.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
-			"'alg' header value not in this list will be rejected. "+
+			"supported 'alg' header values are: RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 
 		fs.Var(cliflag.NewMapStringStringNoSplit(&o.OIDC.RequiredClaims), "oidc-required-claim", ""+
@@ -339,8 +339,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
 			"/.well-known/openid-configuration. This flag is useful if the discovery doc"+
 			"and key set are served to relying parties from a URL other than the "+
-			"API server's external (as auto-detected or overridden with external-hostname). "+
-			"Only valid if the ServiceAccountIssuerDiscovery feature gate is enabled.")
+			"API server's external (as auto-detected or overridden with external-hostname). ")
 
 		// Deprecated in 1.13
 		fs.StringSliceVar(&o.APIAudiences, "service-account-api-audiences", o.APIAudiences, ""+

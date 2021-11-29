@@ -47,7 +47,7 @@ func TestLoopbackHostPortIPv4(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+	if ip := netutils.ParseIPSloppy(host); ip == nil || !ip.IsLoopback() {
 		t.Fatalf("expected host to be loopback, got %q", host)
 	}
 	if port != "443" {
@@ -78,7 +78,7 @@ func TestLoopbackHostPortIPv6(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() || ip.To4() != nil {
+	if ip := netutils.ParseIPSloppy(host); ip == nil || !ip.IsLoopback() || ip.To4() != nil {
 		t.Fatalf("expected IPv6 host to be loopback, got %q", host)
 	}
 	if port != "443" {

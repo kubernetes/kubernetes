@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	netutils "k8s.io/utils/net"
 )
 
 // TCP port to listen
@@ -120,8 +122,8 @@ func probe(ip string) {
 				}
 
 				data := []byte("boom!!!")
-				remoteIP := net.ParseIP(addr.String())
-				localIP := net.ParseIP(conn.LocalAddr().String())
+				remoteIP := netutils.ParseIPSloppy(addr.String())
+				localIP := netutils.ParseIPSloppy(conn.LocalAddr().String())
 				_, err := conn.WriteTo(badPkt.encode(localIP, remoteIP, data[:]), addr)
 				if err != nil {
 					log.Printf("conn.WriteTo() error: %v", err)
@@ -141,10 +143,10 @@ func getIPs() []net.IP {
 	podIP, podIPs := os.Getenv("POD_IP"), os.Getenv("POD_IPS")
 	if podIPs != "" {
 		for _, ip := range strings.Split(podIPs, ",") {
-			ips = append(ips, net.ParseIP(ip))
+			ips = append(ips, netutils.ParseIPSloppy(ip))
 		}
 	} else if podIP != "" {
-		ips = append(ips, net.ParseIP(podIP))
+		ips = append(ips, netutils.ParseIPSloppy(podIP))
 	}
 	return ips
 }

@@ -24,7 +24,7 @@ import (
 
 func TestValidate(t *testing.T) {
 	tests := map[string]struct {
-		whitelist     []string
+		allowlist     []string
 		forbiddenSafe []string
 		allowedUnsafe []string
 		allowed       []string
@@ -32,16 +32,16 @@ func TestValidate(t *testing.T) {
 	}{
 		// no container requests
 		"with allow all": {
-			whitelist: []string{"foo"},
+			allowlist: []string{"foo"},
 			allowed:   []string{"foo"},
 		},
 		"empty": {
-			whitelist:     []string{"foo"},
+			allowlist:     []string{"foo"},
 			forbiddenSafe: []string{"*"},
 			disallowed:    []string{"foo"},
 		},
 		"without wildcard": {
-			whitelist:  []string{"a", "a.b"},
+			allowlist:  []string{"a", "a.b"},
 			allowed:    []string{"a", "a.b"},
 			disallowed: []string{"b"},
 		},
@@ -57,7 +57,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		strategy := NewMustMatchPatterns(v.whitelist, v.allowedUnsafe, v.forbiddenSafe)
+		strategy := NewMustMatchPatterns(v.allowlist, v.allowedUnsafe, v.forbiddenSafe)
 
 		pod := &api.Pod{}
 		errs := strategy.Validate(pod)

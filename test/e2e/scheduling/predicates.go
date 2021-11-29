@@ -1045,7 +1045,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 						},
 					},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
@@ -1096,5 +1096,6 @@ func getNodeHostIP(f *framework.Framework, nodeName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
+	framework.ExpectNotEqual(len(ips), 0)
 	return ips[0]
 }

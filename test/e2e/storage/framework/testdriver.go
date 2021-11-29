@@ -17,13 +17,14 @@ limitations under the License.
 package framework
 
 import (
-	"k8s.io/api/core/v1"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"time"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
@@ -150,6 +151,7 @@ const (
 	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
 	CapBlock              Capability = "block"              // raw block mode
 	CapFsGroup            Capability = "fsGroup"            // volume ownership via fsGroup
+	CapVolumeMountGroup   Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec               Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
 	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc
@@ -164,6 +166,7 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapOnlineExpansion     Capability = "onlineExpansion"     // supports online volume expansion
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
 	CapTopology            Capability = "topology"            // support topology

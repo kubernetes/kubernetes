@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -79,30 +80,26 @@ func TestGetDNSIP(t *testing.T) {
 			name:          "subnet mask 12",
 			svcSubnet:     "10.96.0.0/12",
 			expectedDNSIP: "10.96.0.10",
-			isDualStack:   false,
 		},
 		{
 			name:          "subnet mask 26",
 			svcSubnet:     "10.87.116.64/26",
 			expectedDNSIP: "10.87.116.74",
-			isDualStack:   false,
 		},
 		{
 			name:          "dual-stack ipv4 primary, subnet mask 26",
 			svcSubnet:     "10.87.116.64/26,fd03::/112",
 			expectedDNSIP: "10.87.116.74",
-			isDualStack:   true,
 		},
 		{
 			name:          "dual-stack ipv6 primary, subnet mask 112",
 			svcSubnet:     "fd03::/112,10.87.116.64/26",
 			expectedDNSIP: "fd03::a",
-			isDualStack:   true,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet, rt.isDualStack)
+			dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet)
 			if err != nil {
 				t.Fatalf("couldn't get dnsIP : %v", err)
 			}

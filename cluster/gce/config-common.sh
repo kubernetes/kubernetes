@@ -160,8 +160,8 @@ export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfi
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\node-problem-detector.kubeconfig"
 # Pause container image for Windows container.
-export WINDOWS_INFRA_CONTAINER="k8s.gcr.io/pause:3.5"
+export WINDOWS_INFRA_CONTAINER="k8s.gcr.io/pause:3.6"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
-export CSI_PROXY_VERSION="v0.2.2-gke.0"
+export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.0.1-gke.0}"

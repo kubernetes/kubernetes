@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	validTmpl    = "image: {{ .ImageRepository }}/pause:3.5"
-	validTmplOut = "image: k8s.gcr.io/pause:3.5"
-	doNothing    = "image: k8s.gcr.io/pause:3.5"
+	validTmpl    = "image: {{ .ImageRepository }}/pause:3.6"
+	validTmplOut = "image: k8s.gcr.io/pause:3.6"
+	doNothing    = "image: k8s.gcr.io/pause:3.6"
 	invalidTmpl1 = "{{ .baz }/d}"
 	invalidTmpl2 = "{{ !foobar }}"
 )

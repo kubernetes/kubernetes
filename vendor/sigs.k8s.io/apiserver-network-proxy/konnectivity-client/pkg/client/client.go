@@ -35,7 +35,7 @@ import (
 type Tunnel interface {
 	// Dial connects to the address on the named network, similar to
 	// what net.Dial does. The only supported protocol is tcp.
-	Dial(protocol, address string) (net.Conn, error)
+	DialContext(ctx context.Context, protocol, address string) (net.Conn, error)
 }
 
 type dialResult struct {
@@ -66,15 +66,15 @@ var _ clientConn = &grpc.ClientConn{}
 // gRPC based proxy service.
 // Currently, a single tunnel supports a single connection, and the tunnel is closed when the connection is terminated
 // The Dial() method of the returned tunnel should only be called once
-func CreateSingleUseGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
-	c, err := grpc.Dial(address, opts...)
+func CreateSingleUseGrpcTunnel(ctx context.Context, address string, opts ...grpc.DialOption) (Tunnel, error) {
+	c, err := grpc.DialContext(ctx, address, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	grpcClient := client.NewProxyServiceClient(c)
 
-	stream, err := grpcClient.Proxy(context.Background())
+	stream, err := grpcClient.Proxy(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (t *grpcTunnel) serve(c clientConn) {
 
 // Dial connects to the address on the named network, similar to
 // what net.Dial does. The only supported protocol is tcp.
-func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
+func (t *grpcTunnel) DialContext(ctx context.Context, protocol, address string) (net.Conn, error) {
 	if protocol != "tcp" {
 		return nil, errors.New("protocol not supported")
 	}
@@ -210,7 +210,7 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 
 	klog.V(5).Infoln("DIAL_REQ sent to proxy server")
 
-	c := &conn{stream: t.stream}
+	c := &conn{stream: t.stream, random: random}
 
 	select {
 	case res := <-resCh:
@@ -224,7 +224,9 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 		t.conns[res.connid] = c
 		t.connsLock.Unlock()
 	case <-time.After(30 * time.Second):
-		return nil, errors.New("dial timeout")
+		return nil, errors.New("dial timeout, backstop")
+	case <-ctx.Done():
+		return nil, errors.New("dial timeout, context")
 	}
 
 	return c, nil

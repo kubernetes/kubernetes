@@ -45,7 +45,7 @@ import (
 var (
 	validEnvNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_]")
 	envResources       = `
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`
 
 	envLong = templates.LongDesc(i18n.T(`
 		Update environment variables on a pod template.
@@ -270,7 +270,7 @@ func (o *EnvOptions) Validate() error {
 
 // RunEnv contains all the necessary functionality for the OpenShift cli env command
 func (o *EnvOptions) RunEnv() error {
-	env, remove, err := envutil.ParseEnv(append(o.EnvParams, o.envArgs...), o.In)
+	env, remove, envFromStdin, err := envutil.ParseEnv(append(o.EnvParams, o.envArgs...), o.In)
 	if err != nil {
 		return err
 	}
@@ -289,6 +289,10 @@ func (o *EnvOptions) RunEnv() error {
 				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
+		}
+
+		if envFromStdin {
+			b = b.StdinInUse()
 		}
 
 		infos, err := b.Do().Infos()
@@ -356,6 +360,10 @@ func (o *EnvOptions) RunEnv() error {
 		b.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.resources...).
 			Latest()
+	}
+
+	if envFromStdin {
+		b = b.StdinInUse()
 	}
 
 	infos, err := b.Do().Infos()

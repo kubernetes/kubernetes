@@ -35,7 +35,6 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
-  "verify-golangci-lint.sh"      # Experimental - intended to be run by hand periodically
   )
 
 # Exclude generated-files-remake in certain cases, if they're running in a separate job.
@@ -81,6 +80,7 @@ QUICK_PATTERNS+=(
   "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
+  "verify-non-mutating-validation.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-spelling.sh"

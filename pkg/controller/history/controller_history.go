@@ -29,6 +29,7 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -332,10 +333,14 @@ func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 }
 
 func (rh *realHistory) ReleaseControllerRevision(parent metav1.Object, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
+	dataBytes, err := controller.GenerateDeleteOwnerRefStrategicMergeBytes(revision.UID, []types.UID{parent.GetUID()})
+	if err != nil {
+		return nil, err
+	}
+
 	// Use strategic merge patch to add an owner reference indicating a controller ref
 	released, err := rh.client.AppsV1().ControllerRevisions(revision.GetNamespace()).Patch(context.TODO(), revision.GetName(),
-		types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, parent.GetUID(), revision.UID)), metav1.PatchOptions{})
+		types.StrategicMergePatchType, dataBytes, metav1.PatchOptions{})
 
 	if err != nil {
 		if errors.IsNotFound(err) {

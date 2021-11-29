@@ -18,18 +18,17 @@ package output
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// BootstrapToken represents information for the output produced by 'kubeadm token list'
-// This is a copy of BootstrapToken struct from ../kubeadm/types.go with 2 additions:
-// metav1.TypeMeta and metav1.ObjectMeta
+// BootstrapToken represents information for the bootstrap token output produced by kubeadm
 type BootstrapToken struct {
 	metav1.TypeMeta
 
-	kubeadmapiv1beta2.BootstrapToken
+	bootstraptokenv1.BootstrapToken
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

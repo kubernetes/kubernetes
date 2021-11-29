@@ -106,41 +106,35 @@ aliases:
 
   # SIG Release
   release-engineering-approvers:
-    - cpanato # Release Manager
-    - feiskyer # Release Manager
-    - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
-    - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager
-    - saschagrunert # Release Manager / SIG Chair
-    - xmudrii # Release Manager
-  release-engineering-reviewers:
-    - cpanato # Release Manager
-    - feiskyer # Release Manager
-    - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
-    - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager
-    - saschagrunert # Release Manager / SIG Chair
-    - xmudrii # Release Manager
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+  release-managers:
+    - cpanato
+    - justaugustus
+    - puerco
+    - saschagrunert
+    - xmudrii
   build-image-approvers:
     - BenTheElder
     - cblecker
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
-    - justaugustus # Release Manager / SIG Chair
-    - listx
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - xmudrii # Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
-    - cpanato # Release Manager
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
-    - feiskyer # Release Manager
-    - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
-    - justaugustus # Release Manager / SIG Chair
-    - listx
-    - puerco # Release Manager
-    - saschagrunert # Release Manager / SIG Chair
+    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
 
   sig-storage-approvers:
@@ -153,9 +147,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
-    - saad-ali
     - jsafrane
-    - rootfs
     - jingxu97
     - msau42
     - gnufied
@@ -168,6 +160,7 @@ aliases:
     - saikat-royc
   # emeritus:
   # - davidz627
+  # - rootfs
 
   sig-scheduling-maintainers:
     - alculquicondor
@@ -178,9 +171,9 @@ aliases:
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
-  # - wojtek-t  
+  # - wojtek-t
   sig-scheduling:
-    - Huang-Wei    
+    - Huang-Wei
     - ahg-g
     - alculquicondor
     - damemi
@@ -202,6 +195,8 @@ aliases:
     - soltysh
     - pwittrock
     - eddiezane
+    - brianpursley
+    - KnVerey
   # emeritus:
   # - adohe
   # - brendandburns
@@ -267,6 +262,7 @@ aliases:
     - mrunalp
     - SergeyKanzhelev
     - bobbypage
+    - pacoxu
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -281,6 +277,7 @@ aliases:
     - dcbw
     - freehan
     - johnbelamaric
+    - khenidak
     - mrhohn
     - thockin
   sig-network-reviewers:
@@ -293,6 +290,7 @@ aliases:
     - dcbw
     - freehan
     - johnbelamaric
+    - khenidak
     - m1093782566
     - mrhohn
     - rramkumar1
@@ -314,6 +312,7 @@ aliases:
     - smarterclayton
     - soltysh
     - krmayankk
+    - alculquicondor
   # sig-apps-emeritus:
   # - tnozicka
 
@@ -334,12 +333,15 @@ aliases:
     - dashpole
     - ehashman
     - s-urbaniak
-    - DirectXMan12
     - andyxning
     - coffeepac
     - logicalhan
     - RainbowMango
     - serathius
+    - lilic
+    - dgrisonnet
+  # sig-instrumentation-emeritus
+  # - DirectXMan12
 
   api-approvers:
     - erictune
@@ -375,6 +377,12 @@ aliases:
   sig-cluster-lifecycle-api-approvers:
     - liggitt
     - smarterclayton
+
+  sig-cluster-lifecycle-leads:
+    - fabriziopandini
+    - justinsb
+    - neolit123
+    - vincepri
 
   sig-network-api-approvers:
     - smarterclayton
@@ -478,9 +486,7 @@ aliases:
     - nikhita
 
   sig-docs-approvers:
-    - irvifa
     - jimangel
-    - kbarnard10
     - kbhawkey
     - onlydole
     - sftim
@@ -490,6 +496,7 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+    - ehashman
 
   sig-scalability-approvers:
     - mm4tt
@@ -520,9 +527,10 @@ aliases:
     - tabbysable
 
   sig-windows-api-reviewers:
-    - patricklang
     - ddebroy
-    - benmoss
+    - jayunit100
+    - jsturtevant
+    - marosset
 
   dep-approvers:
     - BenTheElder
@@ -547,14 +555,16 @@ aliases:
     - dims            # Architecture
     - ehashman        # Instrumentation
     - janetkuo        # Apps
+    - jayunit100      # Windows
     - jdumars         # Architecture, Release
     - jsafrane        # Storage
+    - jsturtevant     # Windows
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
     - luxas           # Cluster Lifecycle
+    - marosset        # Windows
     - mattfarina      # Apps
-    - michmike        # Windows
     - msau42          # Storage
     - mwielgus        # Autoscaling
     - prydonius       # Apps

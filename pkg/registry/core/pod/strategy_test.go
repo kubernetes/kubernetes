@@ -42,6 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -266,55 +267,82 @@ func TestGetPodQOS(t *testing.T) {
 func TestCheckGracefulDelete(t *testing.T) {
 	defaultGracePeriod := int64(30)
 	tcs := []struct {
-		in          *api.Pod
-		gracePeriod int64
+		name              string
+		pod               *api.Pod
+		deleteGracePeriod *int64
+		gracePeriod       int64
 	}{
 		{
-			in: &api.Pod{
+			name: "in pending phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-
-			gracePeriod: defaultGracePeriod,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       defaultGracePeriod,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodFailed},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in succeeded phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodSucceeded},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "no phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
+		},
+		{
+			name: "has negative grace period",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName:                      "something",
+					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				},
+				Status: api.PodStatus{},
+			},
+			gracePeriod: 1,
 		},
 	}
 	for _, tc := range tcs {
-		out := &metav1.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
-		Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.in, out)
-		if out.GracePeriodSeconds == nil {
-			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
-		}
-		if *(out.GracePeriodSeconds) != tc.gracePeriod {
-			t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			out := &metav1.DeleteOptions{}
+			if tc.deleteGracePeriod != nil {
+				out.GracePeriodSeconds = utilpointer.Int64(*tc.deleteGracePeriod)
+			}
+			Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.pod, out)
+			if out.GracePeriodSeconds == nil {
+				t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
+			}
+			if *(out.GracePeriodSeconds) != tc.gracePeriod {
+				t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
+			}
+		})
 	}
 }
 
@@ -1105,101 +1133,7 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 	}
 }
 
-// TestEphemeralVolumeEnablement checks the behavior of the API server
-// when the GenericEphemeralVolume feature is turned on and then off:
-// the Ephemeral struct must be preserved even during updates.
-func TestEphemeralVolumeEnablement(t *testing.T) {
-	// Enable the Feature Gate during the first pod creation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
-
-	pod := createPodWithGenericEphemeralVolume()
-	expectedPod := pod.DeepCopy()
-
-	Strategy.PrepareForCreate(context.Background(), pod)
-	require.Equal(t, expectedPod.Spec, pod.Spec, "pod spec")
-
-	errs := Strategy.Validate(context.Background(), pod)
-	require.Empty(t, errs, "errors from validation")
-
-	// Now let's disable the Feature Gate, update some other field from the Pod and expect the volume to remain present
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, false)()
-	updatePod := testUpdatePod(t, pod, "aaa")
-
-	// And let's enable the FG again, add another from and check if the volume is still present
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
-	testUpdatePod(t, updatePod, "bbb")
-}
-
-// TestEphemeralVolumeDisabled checks the behavior of the API server
-// when the GenericEphemeralVolume is off: the Ephemeral struct gets dropped,
-// validation fails.
-func TestEphemeralVolumeDisabled(t *testing.T) {
-	// Disable the Feature Gate during the first pod creation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, false)()
-
-	pod := createPodWithGenericEphemeralVolume()
-	expectedPod := pod.DeepCopy()
-	expectedPod.Spec.Volumes[0].VolumeSource.Ephemeral = nil
-
-	Strategy.PrepareForCreate(context.Background(), pod)
-	require.Equal(t, expectedPod.Spec, pod.Spec, "pod spec")
-
-	errs := Strategy.Validate(context.Background(), pod)
-	require.NotEmpty(t, errs, "no errors from validation")
-}
-
-func testUpdatePod(t *testing.T, oldPod *api.Pod, labelValue string) *api.Pod {
-	updatedPod := oldPod.DeepCopy()
-	updatedPod.Labels = map[string]string{"XYZ": labelValue}
-	expectedPod := updatedPod.DeepCopy()
-	Strategy.PrepareForUpdate(context.Background(), updatedPod, oldPod)
-	require.Equal(t, expectedPod.Spec, updatedPod.Spec, "updated pod spec")
-	errs := Strategy.Validate(context.Background(), updatedPod)
-	require.Empty(t, errs, "errors from validation")
-	return updatedPod
-}
-
-func createPodWithGenericEphemeralVolume() *api.Pod {
-	return &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns",
-			Name:      "pod",
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers: []api.Container{{
-				Name:                     "foo",
-				Image:                    "example",
-				TerminationMessagePolicy: api.TerminationMessageReadFile,
-				ImagePullPolicy:          api.PullAlways,
-			}},
-			Volumes: []api.Volume{
-				{
-					Name: "ephemeral",
-					VolumeSource: api.VolumeSource{
-						Ephemeral: &api.EphemeralVolumeSource{
-							VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-								Spec: api.PersistentVolumeClaimSpec{
-									AccessModes: []api.PersistentVolumeAccessMode{
-										api.ReadWriteOnce,
-									},
-									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceStorage: resource.MustParse("1Gi"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func newPodtWithHugePageValue(reousreceName api.ResourceName, value resource.Quantity) *api.Pod {
+func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "default",
@@ -1217,11 +1151,11 @@ func newPodtWithHugePageValue(reousreceName api.ResourceName, value resource.Qua
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceCPU: resource.MustParse("10"),
-						reousreceName:   value,
+						resourceName:    value,
 					},
 					Limits: api.ResourceList{
 						api.ResourceCPU: resource.MustParse("10"),
-						reousreceName:   value,
+						resourceName:    value,
 					},
 				}},
 			},
@@ -1237,7 +1171,7 @@ func TestPodStrategyValidate(t *testing.T) {
 	}{
 		{
 			name: "a new pod setting container with indivisible hugepages values",
-			pod:  newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+			pod:  newPodWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values",
@@ -1369,8 +1303,8 @@ func TestPodStrategyValidateUpdate(t *testing.T) {
 	}{
 		{
 			name:   "an existing pod with indivisible hugepages values to a new pod with indivisible hugepages values",
-			newPod: newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
-			oldPod: newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			newPod: newPodWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			oldPod: newPodWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
 		},
 	}
 

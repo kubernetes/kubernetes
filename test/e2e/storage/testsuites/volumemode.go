@@ -115,7 +115,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 	}
 
 	// manualInit initializes l.VolumeResource without creating the PV & PVC objects.
@@ -275,7 +275,8 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 					"involvedObject.namespace": l.ns.Name,
 					"reason":                   volevents.ProvisioningFailed,
 				}.AsSelector().String()
-				msg := "does not support block volume provisioning"
+				// The error message is different for each storage driver
+				msg := ""
 
 				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.ClaimProvision)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.

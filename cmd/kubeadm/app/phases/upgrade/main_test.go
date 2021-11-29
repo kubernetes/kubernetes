@@ -17,8 +17,9 @@ limitations under the License.
 package upgrade
 
 import (
-	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	"testing"
+
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 )
 
 func TestMain(m *testing.M) {

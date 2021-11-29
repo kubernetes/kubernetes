@@ -277,7 +277,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 				if err != nil {
 					return sortorder.NaturalLess(itype, jtype), nil
 				}
-				jtypeQuantity, _ := resource.ParseQuantity(jtype)
+				jtypeQuantity, err := resource.ParseQuantity(jtype)
 				if err != nil {
 					return sortorder.NaturalLess(itype, jtype), nil
 				}
@@ -329,7 +329,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
+		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
 	}
 	return less
 }
@@ -375,7 +375,7 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
+		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
 	}
 	return less
 }

@@ -31,17 +31,9 @@ type Ignored struct {
 	ID string
 }
 
-type IgnoredList struct {
-	Items []Ignored
-}
-
-func (obj *Ignored) GetObjectKind() schema.ObjectKind     { return schema.EmptyObjectKind }
-func (obj *IgnoredList) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *Ignored) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj *Ignored) DeepCopyObject() runtime.Object {
 	panic("Ignored does not support DeepCopy")
-}
-func (obj *IgnoredList) DeepCopyObject() runtime.Object {
-	panic("IgnoredList does not support DeepCopy")
 }
 
 func TestSelectionPredicate(t *testing.T) {

@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -80,7 +81,7 @@ type AnnotateOptions struct {
 
 var (
 	annotateLong = templates.LongDesc(i18n.T(`
-		Update the annotations on one or more resources
+		Update the annotations on one or more resources.
 
 		All Kubernetes objects support the ability to store additional data with the object as
 		annotations. Annotations are key/value pairs that can be larger than labels and include
@@ -92,24 +93,24 @@ var (
 		the server the command will fail.`))
 
 	annotateExample = templates.Examples(i18n.T(`
-    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
+    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'
     # If the same annotation is set multiple times, only the last value will be applied
     kubectl annotate pods foo description='my frontend'
 
     # Update a pod identified by type and name in "pod.json"
     kubectl annotate -f pod.json description='my frontend'
 
-    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
+    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value
     kubectl annotate --overwrite pods foo description='my frontend running nginx'
 
     # Update all pods in the namespace
     kubectl annotate pods --all description='my frontend running nginx'
 
-    # Update pod 'foo' only if the resource is unchanged from version 1.
+    # Update pod 'foo' only if the resource is unchanged from version 1
     kubectl annotate pods foo description='my frontend running nginx' --resource-version=1
 
-    # Update pod 'foo' by removing an annotation named 'description' if it exists.
-    # Does not require the --overwrite flag.
+    # Update pod 'foo' by removing an annotation named 'description' if it exists
+    # Does not require the --overwrite flag
     kubectl annotate pods foo description-`))
 )
 
@@ -134,6 +135,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 		Short:                 i18n.T("Update the annotations on a resource"),
 		Long:                  annotateLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               annotateExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -148,9 +150,9 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the annotations for a given resource.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"

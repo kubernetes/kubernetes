@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -29,7 +30,6 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/mount-utils"
 )
 
@@ -109,12 +109,12 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		notMount = true
 	}
 	if !notMount {
-		linuxHostUtil := hostutil.NewHostUtil()
-		mntInfo, err := linuxHostUtil.FindMountInfo(bindPathTarget)
+		// It's already mounted, so check if it's bind-mounted to the same path
+		samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
 		if err != nil {
-			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
+			return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
 		}
-		if mntInfo.Root != subpath.Path {
+		if !samePath {
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
 				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
@@ -153,6 +153,23 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		}
 	}
 	return false, bindPathTarget, nil
+}
+
+func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error) {
+	s, err := os.Lstat(subpath.Path)
+	if err != nil {
+		return false, fmt.Errorf("stat %s failed: %s", subpath.Path, err)
+	}
+
+	t, err := os.Lstat(bindMountTarget)
+	if err != nil {
+		return false, fmt.Errorf("lstat %s failed: %s", bindMountTarget, err)
+	}
+
+	if !os.SameFile(s, t) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func getSubpathBindTarget(subpath Subpath) string {
@@ -209,8 +226,9 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 
 	// Do the bind mount
 	options := []string{"bind"}
+	mountFlags := []string{"--no-canonicalize"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.MountSensitiveWithoutSystemd(mountSource, bindPathTarget, "" /*fstype*/, options, nil); err != nil {
+	if err = mounter.MountSensitiveWithoutSystemdWithMountFlags(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true

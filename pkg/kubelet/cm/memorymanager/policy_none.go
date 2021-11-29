@@ -49,8 +49,7 @@ func (p *none) Allocate(s state.State, pod *v1.Pod, container *v1.Container) err
 }
 
 // RemoveContainer call is idempotent
-func (p *none) RemoveContainer(s state.State, podUID string, containerName string) error {
-	return nil
+func (p *none) RemoveContainer(s state.State, podUID string, containerName string) {
 }
 
 // GetTopologyHints implements the topologymanager.HintProvider Interface
@@ -65,4 +64,9 @@ func (p *none) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Contai
 // and other resource controllers.
 func (p *none) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
+}
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (p *none) GetAllocatableMemory(s state.State) []state.Block {
+	return []state.Block{}
 }

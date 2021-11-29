@@ -27,7 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
@@ -52,6 +53,7 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
+	systemDefaulted    bool
 	parallelizer       parallelize.Parallelizer
 	defaultConstraints []v1.TopologySpreadConstraint
 	sharedLister       framework.SharedLister
@@ -69,7 +71,7 @@ var _ framework.EnqueueExtensions = &PodTopologySpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "PodTopologySpread"
+	Name = names.PodTopologySpread
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -96,6 +98,7 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
+		pl.systemDefaulted = true
 	}
 	if len(pl.defaultConstraints) != 0 {
 		if h.SharedInformerFactory() == nil {

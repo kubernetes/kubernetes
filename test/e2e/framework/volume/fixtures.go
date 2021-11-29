@@ -368,11 +368,17 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	var gracePeriod int64 = 1
 	var command string
 
-	if !framework.NodeOSDistroIs("windows") {
-		command = "while true ; do sleep 2; done "
-	} else {
-		command = "while(1) {sleep 2}"
+	/**
+	This condition fixes running storage e2e tests in SELinux environment.
+	HostPath Volume Plugin creates a directory within /tmp on host machine, to be mounted as volume.
+	Inject-pod writes content to the volume, and a client-pod tries the read the contents and verify.
+	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
+	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
+	*/
+	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+		privileged = true
 	}
+	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -452,14 +458,14 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	return clientPod, nil
 }
 
-func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands := generateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
@@ -468,7 +474,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
@@ -479,14 +485,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 				// Filesystem: check fsgroup
 				if fsGroup != nil {
 					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 				}
 
 				// Filesystem: check fsType
 				if fsType != "" {
 					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 				}
 			}
@@ -525,7 +531,23 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
-	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
+	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
+
+	ginkgo.By("Repeating the test on an ephemeral container (if enabled)")
+	ec := &v1.EphemeralContainer{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
+	}
+	ec.Name = "volume-ephemeral-container"
+	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
+	// The API server will return NotFound for the subresource when the feature is disabled
+	// BEGIN TODO: remove after EphemeralContainers feature gate is retired
+	if apierrors.IsNotFound(err) {
+		framework.Logf("Skipping ephemeral container re-test because feature is disabled (error: %q)", err)
+		return
+	}
+	// END TODO: remove after EphemeralContainers feature gate is retired
+	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
+	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
@@ -566,53 +588,36 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
+	testVolumeContent(f, injectorPod, "", fsGroup, fsType, tests)
 }
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
 func generateWriteCmd(content, path string) []string {
 	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
-	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + path}
-	}
+	commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
 	return commands
 }
 
 // generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
+func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
-	} else {
-		// TODO: is there a way on windows to get the first X bytes from a device?
-		commands = []string{"powershell", "/c", "type " + fullPath}
-	}
+	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
 	return commands
 }
 
 // generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func generateWriteBlockCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
 // GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateReadFileCmd(fullPath string) []string {
 	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"cat", fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "type " + fullPath}
-	}
+	commands = []string{"cat", fullPath}
 	return commands
 }
 
 // generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func generateWriteFileCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }

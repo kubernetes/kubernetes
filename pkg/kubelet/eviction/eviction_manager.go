@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -39,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -59,7 +58,7 @@ const (
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
-	clock clock.Clock
+	clock clock.WithTicker
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
@@ -113,7 +112,7 @@ func NewManager(
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock,
+	clock clock.WithTicker,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                        clock,
@@ -196,7 +195,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	go func() {
 		for {
 			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
-				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", format.Pods(evictedPods))
+				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjs(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
 				time.Sleep(monitoringInterval)
@@ -365,7 +364,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
-	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", format.Pods(activePods))
+	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjs(activePods))
 
 	//record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
@@ -400,7 +399,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	for {
 		select {
 		case <-timeout.C():
-			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", format.Pods(pods))
+			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjs(pods))
 			return
 		case <-ticker.C():
 			for i, pod := range pods {
@@ -408,7 +407,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 					break
 				}
 				if i == len(pods)-1 {
-					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", format.Pods(pods))
+					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", klog.KObjs(pods))
 					return
 				}
 			}
@@ -561,15 +560,15 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		klog.ErrorS(nil, "Eviction manager: cannot evict a critical pod", "pod", klog.KObj(pod))
 		return false
 	}
-	status := v1.PodStatus{
-		Phase:   v1.PodFailed,
-		Message: evictMsg,
-		Reason:  Reason,
-	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
-	err := m.killPodFunc(pod, status, &gracePeriodOverride)
+	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+		status.Phase = v1.PodFailed
+		status.Reason = Reason
+		status.Message = evictMsg
+	})
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 	} else {

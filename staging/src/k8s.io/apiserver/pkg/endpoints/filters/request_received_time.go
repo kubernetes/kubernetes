@@ -19,18 +19,18 @@ package filters
 import (
 	"net/http"
 
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/clock"
 )
 
 // WithRequestReceivedTimestamp attaches the ReceivedTimestamp (the time the request reached
 // the apiserver) to the context.
 func WithRequestReceivedTimestamp(handler http.Handler) http.Handler {
-	return withRequestReceivedTimestampWithClock(handler, utilclock.RealClock{})
+	return withRequestReceivedTimestampWithClock(handler, clock.RealClock{})
 }
 
 // The clock is passed as a parameter, handy for unit testing.
-func withRequestReceivedTimestampWithClock(handler http.Handler, clock utilclock.PassiveClock) http.Handler {
+func withRequestReceivedTimestampWithClock(handler http.Handler, clock clock.PassiveClock) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		req = req.WithContext(request.WithReceivedTimestamp(ctx, clock.Now()))

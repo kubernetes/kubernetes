@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -45,6 +46,17 @@ type dBusConnector interface {
 // DBusCon has functions that can be used to interact with systemd and logind over dbus.
 type DBusCon struct {
 	SystemBus dBusConnector
+}
+
+func NewDBusCon() (*DBusCon, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+
+	return &DBusCon{
+		SystemBus: conn,
+	}, nil
 }
 
 // InhibitLock is a lock obtained after creating an systemd inhibitor by calling InhibitShutdown().
@@ -138,7 +150,11 @@ func (bus *DBusCon) MonitorShutdown() (<-chan bool, error) {
 
 	go func() {
 		for {
-			event := <-busChan
+			event, ok := <-busChan
+			if !ok {
+				close(shutdownChan)
+				return
+			}
 			if event == nil || len(event.Body) == 0 {
 				klog.ErrorS(nil, "Failed obtaining shutdown event, PrepareForShutdown event was empty")
 				continue
@@ -149,7 +165,6 @@ func (bus *DBusCon) MonitorShutdown() (<-chan bool, error) {
 				continue
 			}
 			shutdownChan <- shutdownActive
-
 		}
 	}()
 

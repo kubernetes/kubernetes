@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sysctls1
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+    sysctls:
+    - name: kernel.shm_rmid_forced
+      value: "0"
+    - name: net.ipv4.ip_local_port_range
+      value: 1024 65535
+    - name: net.ipv4.tcp_syncookies
+      value: "0"
+    - name: net.ipv4.ping_group_range
+      value: 1 0
+    - name: net.ipv4.ip_unprivileged_port_start
+      value: "1024"

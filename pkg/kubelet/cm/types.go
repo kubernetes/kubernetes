@@ -35,6 +35,8 @@ type ResourceConfig struct {
 	HugePageLimit map[int64]int64
 	// Maximum number of pids
 	PidsLimit *int64
+	// Unified for cgroup v2
+	Unified map[string]string
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.

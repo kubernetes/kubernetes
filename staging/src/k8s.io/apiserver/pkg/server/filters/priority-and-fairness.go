@@ -17,17 +17,21 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"runtime"
 	"sync/atomic"
+	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
 
@@ -53,12 +57,22 @@ var atomicMutatingWaiting, atomicReadOnlyWaiting int32
 // newInitializationSignal is defined for testing purposes.
 var newInitializationSignal = utilflowcontrol.NewInitializationSignal
 
+func truncateLogField(s string) string {
+	const maxFieldLogLength = 64
+
+	if len(s) > maxFieldLogLength {
+		s = s[0:maxFieldLogLength]
+	}
+	return s
+}
+
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
 func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
+	workEstimator flowcontrolrequest.WorkEstimatorFunc,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
@@ -87,12 +101,17 @@ func WithPriorityAndFairness(
 		}
 
 		var classification *PriorityAndFairnessClassification
-		note := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration) {
+		estimateWork := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) flowcontrolrequest.WorkEstimate {
 			classification = &PriorityAndFairnessClassification{
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
 				PriorityLevelName: pl.Name,
 				PriorityLevelUID:  pl.UID}
+
+			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
+			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
+			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
+			return workEstimator(r, fs.Name, pl.Name)
 		}
 
 		var served bool
@@ -111,62 +130,145 @@ func WithPriorityAndFairness(
 				waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
 			}
 		}
-		var resultCh chan interface{}
-		if isWatchRequest {
-			resultCh = make(chan interface{})
-		}
-		execute := func() {
-			noteExecutingDelta(1)
-			defer noteExecutingDelta(-1)
-			served = true
-
-			innerCtx := ctx
-			innerReq := r
-
-			var watchInitializationSignal utilflowcontrol.InitializationSignal
-			if isWatchRequest {
-				watchInitializationSignal = newInitializationSignal()
-				innerCtx = utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
-				innerReq = r.Clone(innerCtx)
-			}
-			setResponseHeaders(classification, w)
-
-			if isWatchRequest {
-				go func() {
-					defer func() {
-						err := recover()
-						// do not wrap the sentinel ErrAbortHandler panic value
-						if err != nil && err != http.ErrAbortHandler {
-							// Same as stdlib http server code. Manually allocate stack
-							// trace buffer size to prevent excessively large logs
-							const size = 64 << 10
-							buf := make([]byte, size)
-							buf = buf[:runtime.Stack(buf, false)]
-							err = fmt.Sprintf("%v\n%s", err, buf)
-						}
-						resultCh <- err
-					}()
-
-					// Protect from the situations when request will not reach storage layer
-					// and the initialization signal will not be send.
-					defer watchInitializationSignal.Signal()
-
-					handler.ServeHTTP(w, innerReq)
-				}()
-
-				watchInitializationSignal.Wait()
-			} else {
-				handler.ServeHTTP(w, innerReq)
-			}
-		}
-		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
-		fcIfc.Handle(ctx, digest, note, func(inQueue bool) {
+		queueNote := func(inQueue bool) {
 			if inQueue {
 				noteWaitingDelta(1)
 			} else {
 				noteWaitingDelta(-1)
 			}
-		}, execute)
+		}
+
+		digest := utilflowcontrol.RequestDigest{
+			RequestInfo: requestInfo,
+			User:        user,
+		}
+
+		if isWatchRequest {
+			// This channel blocks calling handler.ServeHTTP() until closed, and is closed inside execute().
+			// If APF rejects the request, it is never closed.
+			shouldStartWatchCh := make(chan struct{})
+
+			watchInitializationSignal := newInitializationSignal()
+			// This wraps the request passed to handler.ServeHTTP(),
+			// setting a context that plumbs watchInitializationSignal to storage
+			var watchReq *http.Request
+			// This is set inside execute(), prior to closing shouldStartWatchCh.
+			// If the request is rejected by APF it is left nil.
+			var forgetWatch utilflowcontrol.ForgetWatchFunc
+
+			defer func() {
+				// Protect from the situation when request will not reach storage layer
+				// and the initialization signal will not be send.
+				if watchInitializationSignal != nil {
+					watchInitializationSignal.Signal()
+				}
+				// Forget the watcher if it was registered.
+				//
+				// // This is race-free because by this point, one of the following occurred:
+				// case <-shouldStartWatchCh: execute() completed the assignment to forgetWatch
+				// case <-resultCh: Handle() completed, and Handle() does not return
+				//   while execute() is running
+				if forgetWatch != nil {
+					forgetWatch()
+				}
+			}()
+
+			execute := func() {
+				startedAt := time.Now()
+				defer func() {
+					httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
+				}()
+				noteExecutingDelta(1)
+				defer noteExecutingDelta(-1)
+				served = true
+				setResponseHeaders(classification, w)
+
+				forgetWatch = fcIfc.RegisterWatch(r)
+
+				// Notify the main thread that we're ready to start the watch.
+				close(shouldStartWatchCh)
+
+				// Wait until the request is finished from the APF point of view
+				// (which is when its initialization is done).
+				watchInitializationSignal.Wait()
+			}
+
+			// Ensure that an item can be put to resultCh asynchronously.
+			resultCh := make(chan interface{}, 1)
+
+			// Call Handle in a separate goroutine.
+			// The reason for it is that from APF point of view, the request processing
+			// finishes as soon as watch is initialized (which is generally orders of
+			// magnitude faster then the watch request itself). This means that Handle()
+			// call finishes much faster and for performance reasons we want to reduce
+			// the number of running goroutines - so we run the shorter thing in a
+			// dedicated goroutine and the actual watch handler in the main one.
+			go func() {
+				defer func() {
+					err := recover()
+					// do not wrap the sentinel ErrAbortHandler panic value
+					if err != nil && err != http.ErrAbortHandler {
+						// Same as stdlib http server code. Manually allocate stack
+						// trace buffer size to prevent excessively large logs
+						const size = 64 << 10
+						buf := make([]byte, size)
+						buf = buf[:runtime.Stack(buf, false)]
+						err = fmt.Sprintf("%v\n%s", err, buf)
+					}
+
+					// Ensure that the result is put into resultCh independently of the panic.
+					resultCh <- err
+				}()
+
+				// We create handleCtx with explicit cancelation function.
+				// The reason for it is that Handle() underneath may start additional goroutine
+				// that is blocked on context cancellation. However, from APF point of view,
+				// we don't want to wait until the whole watch request is processed (which is
+				// when it context is actually cancelled) - we want to unblock the goroutine as
+				// soon as the request is processed from the APF point of view.
+				//
+				// Note that we explicitly do NOT call the actuall handler using that context
+				// to avoid cancelling request too early.
+				handleCtx, handleCtxCancel := context.WithCancel(ctx)
+				defer handleCtxCancel()
+
+				// Note that Handle will return irrespective of whether the request
+				// executes or is rejected. In the latter case, the function will return
+				// without calling the passed `execute` function.
+				fcIfc.Handle(handleCtx, digest, estimateWork, queueNote, execute)
+			}()
+
+			select {
+			case <-shouldStartWatchCh:
+				watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+				watchReq = r.WithContext(watchCtx)
+				handler.ServeHTTP(w, watchReq)
+				// Protect from the situation when request will not reach storage layer
+				// and the initialization signal will not be send.
+				// It has to happen before waiting on the resultCh below.
+				watchInitializationSignal.Signal()
+				// TODO: Consider finishing the request as soon as Handle call panics.
+				if err := <-resultCh; err != nil {
+					panic(err)
+				}
+			case err := <-resultCh:
+				if err != nil {
+					panic(err)
+				}
+			}
+		} else {
+			execute := func() {
+				noteExecutingDelta(1)
+				defer noteExecutingDelta(-1)
+				served = true
+				setResponseHeaders(classification, w)
+
+				handler.ServeHTTP(w, r)
+			}
+
+			fcIfc.Handle(ctx, digest, estimateWork, queueNote, execute)
+		}
+
 		if !served {
 			setResponseHeaders(classification, w)
 
@@ -176,22 +278,7 @@ func WithPriorityAndFairness(
 				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
-			if isWatchRequest {
-				close(resultCh)
-			}
 			tooManyRequests(r, w)
-		}
-
-		// For watch requests, from the APF point of view the request is already
-		// finished at this point. However, that doesn't mean it is already finished
-		// from the non-APF point of view. So we need to wait here until the request is:
-		// 1) finished being processed or
-		// 2) rejected
-		if isWatchRequest {
-			err := <-resultCh
-			if err != nil {
-				panic(err)
-			}
 		}
 	})
 }

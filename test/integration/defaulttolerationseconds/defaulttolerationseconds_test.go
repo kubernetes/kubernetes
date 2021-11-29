@@ -31,10 +31,10 @@ import (
 )
 
 func TestAdmission(t *testing.T) {
-	masterConfig := framework.NewControlPlaneConfig()
-	masterConfig.GenericConfig.EnableProfiling = true
-	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.EnableProfiling = true
+	controlPlaneConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

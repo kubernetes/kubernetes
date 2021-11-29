@@ -47,7 +47,7 @@ type ExecCredentialSpec struct {
 	Response *Response
 
 	// Interactive is true when the transport detects the command is being called from an
-	// interactive prompt.
+	// interactive prompt, i.e., when stdin has been passed to this exec plugin.
 	// +optional
 	Interactive bool
 

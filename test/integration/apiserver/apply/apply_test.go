@@ -50,16 +50,16 @@ import (
 )
 
 func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
+	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	if len(groupVersions) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
-		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
@@ -2819,14 +2819,14 @@ spec:
 
 func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
 	sharedEtcd := framework.DefaultEtcdOptions()
-	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.MasterConfigOptions{
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{
 		EtcdOptions: sharedEtcd,
 	})
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, master, closeFn := framework.RunAnAPIServer(masterConfig)
-	client, err := clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	_, instanceConfig, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	client, err := clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -2878,8 +2878,8 @@ spec:
 	// Restart server with server-side apply disabled
 	closeFn()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, master, closeFn = framework.RunAnAPIServer(masterConfig)
-	client, err = clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	_, instanceConfig, closeFn = framework.RunAnAPIServer(controlPlaneConfig)
+	client, err = clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}

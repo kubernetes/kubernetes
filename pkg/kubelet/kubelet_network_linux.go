@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -23,9 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
@@ -33,21 +32,23 @@ import (
 
 func (kl *Kubelet) initNetworkUtil() {
 	exec := utilexec.New()
-
-	// At this point in startup we don't know the actual node IPs, so we configure dual stack iptables
-	// rules if the node _might_ be dual-stack, and single-stack based on requested nodeIPs[0] otherwise.
-	maybeDualStack := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
+	// TODO: @khenidak review when there is no IPv6 iptables exec  what should happen here (note: no error returned from this func)
 	ipv6Primary := kl.nodeIPs != nil && utilnet.IsIPv6(kl.nodeIPs[0])
 
 	var iptClients []utiliptables.Interface
 	var protocols []utiliptables.Protocol
-	if maybeDualStack || !ipv6Primary {
-		protocols = append(protocols, utiliptables.ProtocolIPv4)
-		iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv4))
-	}
-	if maybeDualStack || ipv6Primary {
-		protocols = append(protocols, utiliptables.ProtocolIPv6)
-		iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv6))
+
+	// assume 4,6
+	protocols = append(protocols, utiliptables.ProtocolIPv4)
+	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv4))
+
+	protocols = append(protocols, utiliptables.ProtocolIPv6)
+	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv6))
+
+	// and if they are not
+	if ipv6Primary {
+		protocols[0], protocols[1] = protocols[1], protocols[0]
+		iptClients[0], iptClients[1] = iptClients[1], iptClients[0]
 	}
 
 	for i := range iptClients {

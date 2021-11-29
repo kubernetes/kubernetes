@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -123,8 +123,8 @@ func grantUserPermissionToSignFor(t *testing.T, client clientset.Interface, user
 	}
 	signRule := cr.Rules[0]
 	statusRule := cr.Rules[1]
-	waitForNamedAuthorizationUpdate(t, client.AuthorizationV1(), username, "", signRule.Verbs[0], signRule.ResourceNames[0], schema.GroupResource{Group: signRule.APIGroups[0], Resource: signRule.Resources[0]}, true)
-	waitForNamedAuthorizationUpdate(t, client.AuthorizationV1(), username, "", statusRule.Verbs[0], "", schema.GroupResource{Group: statusRule.APIGroups[0], Resource: statusRule.Resources[0]}, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(), username, "", signRule.Verbs[0], signRule.ResourceNames[0], schema.GroupResource{Group: signRule.APIGroups[0], Resource: signRule.Resources[0]}, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(), username, "", statusRule.Verbs[0], "", schema.GroupResource{Group: statusRule.APIGroups[0], Resource: statusRule.Resources[0]}, true)
 }
 
 func buildSigningClusterRoleForSigners(name string, signerNames ...string) *rbacv1.ClusterRole {

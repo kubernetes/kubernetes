@@ -1,3 +1,4 @@
+//go:build linux && !dockerless
 // +build linux,!dockerless
 
 /*
@@ -22,12 +23,14 @@ import (
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 func TestContainerStats(t *testing.T) {
+	labels := map[string]string{containerTypeLabelKey: containerTypeLabelContainer}
 	tests := map[string]struct {
 		containerID    string
 		container      *libdocker.FakeContainer
@@ -35,22 +38,33 @@ func TestContainerStats(t *testing.T) {
 		calledDetails  []libdocker.CalledDetail
 	}{
 		"container exists": {
-			"fake_container",
-			&libdocker.FakeContainer{ID: "fake_container"},
+			"k8s_fake_container",
+			&libdocker.FakeContainer{
+				ID:   "k8s_fake_container",
+				Name: "k8s_fake_container_1_2_1",
+				Config: &container.Config{
+					Labels: labels,
+				},
+			},
 			&dockertypes.StatsJSON{},
 			[]libdocker.CalledDetail{
+				libdocker.NewCalledDetail("list", nil),
 				libdocker.NewCalledDetail("get_container_stats", nil),
 				libdocker.NewCalledDetail("inspect_container_withsize", nil),
-				libdocker.NewCalledDetail("inspect_container", nil),
-				libdocker.NewCalledDetail("inspect_image", nil),
 			},
 		},
 		"container doesn't exists": {
-			"nonexistant_fake_container",
-			&libdocker.FakeContainer{ID: "fake_container"},
+			"k8s_nonexistant_fake_container",
+			&libdocker.FakeContainer{
+				ID:   "k8s_fake_container",
+				Name: "k8s_fake_container_1_2_1",
+				Config: &container.Config{
+					Labels: labels,
+				},
+			},
 			&dockertypes.StatsJSON{},
 			[]libdocker.CalledDetail{
-				libdocker.NewCalledDetail("get_container_stats", nil),
+				libdocker.NewCalledDetail("list", nil),
 			},
 		},
 	}

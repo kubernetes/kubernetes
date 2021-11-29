@@ -63,6 +63,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -898,7 +899,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
@@ -1265,7 +1266,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(hostURL.Host) != nil {
+	if netutils.ParseIPSloppy(hostURL.Host) != nil {
 		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
 		hostnames = append(hostnames, hostURL.Host)
@@ -1376,7 +1377,7 @@ retriesLoop:
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
-		ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
+		gomega.Expect(len(expectedWatchEvents)).To(gomega.BeNumerically("<=", len(actualWatchEvents)), "Did not get enough watch events")
 
 		totalValidWatchEvents := 0
 		foundEventIndexes := map[int]*int{}
@@ -1405,7 +1406,9 @@ retriesLoop:
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
 			continue retriesLoop
 		}
-		ExpectEqual(errs.Len() > 0, false, strings.Join(errs.List(), "\n - "))
+		if errs.Len() > 0 {
+			Failf("Unexpected error(s): %v", strings.Join(errs.List(), "\n - "))
+		}
 		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}

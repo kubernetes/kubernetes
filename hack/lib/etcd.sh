@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.4.13}
+ETCD_VERSION=${ETCD_VERSION:-3.5.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
@@ -91,7 +91,39 @@ kube::etcd::start() {
   curl -fs -X POST "${KUBE_INTEGRATION_ETCD_URL}/v3/kv/put" -d '{"key": "X3Rlc3Q=", "value": ""}'
 }
 
+kube::etcd::start_scraping() {
+  if [[ -d "${ARTIFACTS:-}" ]]; then
+    ETCD_SCRAPE_DIR="${ARTIFACTS}/etcd-scrapes"
+  else
+    ETCD_SCRAPE_DIR=$(mktemp -d -t test.XXXXXX)/etcd-scrapes
+  fi
+  kube::log::info "Periodically scraping etcd to ${ETCD_SCRAPE_DIR} ."
+  mkdir -p "${ETCD_SCRAPE_DIR}"
+  (
+    while sleep 30; do
+      kube::etcd::scrape
+    done
+  ) &
+  ETCD_SCRAPE_PID=$!
+}
+
+kube::etcd::scrape() {
+    curl -s -S "${KUBE_INTEGRATION_ETCD_URL}/metrics" > "${ETCD_SCRAPE_DIR}/next" && mv "${ETCD_SCRAPE_DIR}/next" "${ETCD_SCRAPE_DIR}/$(date +%s).scrape"
+}
+
+
 kube::etcd::stop() {
+  if [[ -n "${ETCD_SCRAPE_PID:-}" ]] && [[ -n "${ETCD_SCRAPE_DIR:-}" ]] ; then
+    kill "${ETCD_SCRAPE_PID}" &>/dev/null || :
+    wait "${ETCD_SCRAPE_PID}" &>/dev/null || :
+    kube::etcd::scrape || :
+    (
+      # shellcheck disable=SC2015
+      cd "${ETCD_SCRAPE_DIR}"/.. && \
+      tar czf etcd-scrapes.tgz etcd-scrapes && \
+      rm -rf etcd-scrapes || :
+    )
+  fi
   if [[ -n "${ETCD_PID-}" ]]; then
     kill "${ETCD_PID}" &>/dev/null || :
     wait "${ETCD_PID}" &>/dev/null || :

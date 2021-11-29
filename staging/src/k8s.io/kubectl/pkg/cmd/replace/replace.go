@@ -46,7 +46,7 @@ import (
 
 var (
 	replaceLong = templates.LongDesc(i18n.T(`
-		Replace a resource by filename or stdin.
+		Replace a resource by file name or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
 		complete resource spec must be provided. This can be obtained by
@@ -54,10 +54,10 @@ var (
 		    $ kubectl get TYPE NAME -o yaml`))
 
 	replaceExample = templates.Examples(i18n.T(`
-		# Replace a pod using the data in pod.json.
+		# Replace a pod using the data in pod.json
 		kubectl replace -f ./pod.json
 
-		# Replace a pod based on the JSON passed into stdin.
+		# Replace a pod based on the JSON passed into stdin
 		cat pod.json | kubectl replace -f -
 
 		# Update a single-container pod's image version (tag) to v4
@@ -112,7 +112,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "replace -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Replace a resource by filename or stdin"),
+		Short:                 i18n.T("Replace a resource by file name or stdin"),
 		Long:                  replaceLong,
 		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -306,6 +306,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 }
 
 func (o *ReplaceOptions) forceReplace() error {
+	stdinInUse := false
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
 			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
@@ -319,17 +320,21 @@ func (o *ReplaceOptions) forceReplace() error {
 				return err
 			}
 			o.DeleteOptions.FilenameOptions.Filenames[i] = tempFilename
+			stdinInUse = true
 		}
 	}
 
-	r := o.Builder().
+	b := o.Builder().
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
-		Flatten().
-		Do()
+		Flatten()
+	if stdinInUse {
+		b = b.StdinInUse()
+	}
+	r := b.Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -358,14 +363,17 @@ func (o *ReplaceOptions) forceReplace() error {
 		return err
 	}
 
-	r = o.Builder().
+	b = o.Builder().
 		Unstructured().
 		Schema(o.Schema).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
-		Flatten().
-		Do()
+		Flatten()
+	if stdinInUse {
+		b = b.StdinInUse()
+	}
+	r = b.Do()
 	err = r.Err()
 	if err != nil {
 		return err

@@ -234,6 +234,12 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 		},
+		csitranslationplugins.PortworxVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+		},
+		csitranslationplugins.RBDVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+		},
 	}
 
 	// Initializing the label management channels
@@ -339,9 +345,6 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		return false
-	}
 	if p.csiDriverLister == nil {
 		return false
 	}

@@ -34,131 +34,106 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
-func TestServiceAffinityEnqueue(t *testing.T) {
-	profile := schedapi.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedapi.Plugins{
-			PreFilter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: serviceaffinity.Name},
-				},
-			},
-			Filter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: serviceaffinity.Name},
-				},
-			},
-		},
-		PluginConfig: []schedapi.PluginConfig{
-			{
-				Name: serviceaffinity.Name,
-				Args: &schedapi.ServiceAffinityArgs{
-					AffinityLabels: []string{"hostname"},
-				},
-			},
-		},
-	}
+// TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
+// moved properly upon their registered events.
+func TestCoreResourceEnqueue(t *testing.T) {
 	// Use zero backoff seconds to bypass backoffQ.
+	// It's intended to not start the scheduler's queue, and hence to
+	// not start any flushing logic. We will pop and schedule the Pods manually later.
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, "serviceaffinity-enqueue", nil),
-		nil,
-		scheduler.WithProfiles(profile),
+		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
 	testutils.SyncInformerFactory(testCtx)
-	// It's intended to not start the scheduler's queue, and hence to
-	// not start any flushing logic. We will pop and schedule the Pods manually later.
+
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-	// Create two Nodes.
-	for i := 1; i <= 2; i++ {
-		nodeName := fmt.Sprintf("node%d", i)
-		capacity := map[v1.ResourceName]string{v1.ResourcePods: "1"}
-		node := st.MakeNode().Name(nodeName).Label("hostname", nodeName).Capacity(capacity).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create Node %q: %v", nodeName, err)
-		}
+	// Create one Node with a taint.
+	node := st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+	node.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create Node %q: %v", node.Name, err)
 	}
 
-	// Create a Service.
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "svc",
-		},
-		Spec: v1.ServiceSpec{
-			Ports:    []v1.ServicePort{{Port: int32(80)}},
-			Selector: map[string]string{"foo": "bar"},
-		},
-	}
-	if _, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create Service %q: %v", svc.Name, err)
-	}
-
-	// Create two Pods.
-	pause := imageutils.GetPauseImageName()
-	for i := 1; i <= 2; i++ {
-		podName := fmt.Sprintf("pod%d", i)
-		pod := st.MakePod().Namespace(ns).Name(podName).Label("foo", "bar").Container(pause).Obj()
-		// Make Pod1 an assigned Pod.
-		if i == 1 {
-			pod.Spec.NodeName = fmt.Sprintf("node%d", i)
-		}
+	// Create two Pods that are both unschedulable.
+	// - Pod1 is a best-effort Pod, but doesn't have the required toleration.
+	// - Pod2 requests a large amount of CPU resource that the node cannot fit.
+	//   Note: Pod2 will fail the tainttoleration plugin b/c that's ordered prior to noderesources.
+	// - Pod3 has the required toleration, but requests a non-existing PVC.
+	pod1 := st.MakePod().Namespace(ns).Name("pod1").Container("image").Obj()
+	pod2 := st.MakePod().Namespace(ns).Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	pod3 := st.MakePod().Namespace(ns).Name("pod3").Toleration("foo").PVC("pvc").Container("image").Obj()
+	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
 		if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 	}
 
-	// Wait for pod2 to be present in the scheduling queue.
+	// Wait for the three pods to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 1, nil
+		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 3, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	// Pop Pod2 out. It should be unschedulable.
-	podInfo := testCtx.Scheduler.NextPod()
-	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
-	if !ok {
-		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
-	}
-	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
-	// The fitError is expected to be:
-	// 0/2 nodes are available: 1 Too many pods, 1 node(s) didn't match service affinity.
-	if fitError == nil {
-		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
-	}
-	testCtx.Scheduler.Error(podInfo, fitError)
+	// Pop the three pods out. They should be unschedulable.
+	for i := 0; i < 3; i++ {
+		podInfo := nextPodOrDie(t, testCtx)
+		fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
+		if !ok {
+			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
+		}
+		// Schedule the Pod manually.
+		_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, nil, fwk, framework.NewCycleState(), podInfo.Pod)
+		if fitError == nil {
+			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
+		}
+		testCtx.Scheduler.Error(podInfo, fitError)
 
-	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
-	// pass a number larger than 1 to move Pod to unschedulableQ.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+		// Scheduling cycle is incremented by one after NextPod() is called, so
+		// pass a number larger than i to move Pod to unschedulableQ.
+		testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, int64(i+10))
+	}
 
-	// Trigger a Service event.
+	// Trigger a NodeTaintChange event.
 	// We expect this event to trigger moving the test Pod from unschedulableQ to activeQ.
-	if err := cs.CoreV1().Services(ns).Delete(ctx, "svc", metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("Failed to delete service 'svc': %v", err)
+	node.Spec.Taints = nil
+	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to remove taints off the node: %v", err)
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testCtx.Scheduler.NextPod()
+	podInfo := nextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
-		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
+		t.Fatalf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
+	}
+	if got := podInfo.Pod.Name; got != "pod1" {
+		t.Fatalf("Exepcted pod1 to be popped, but got %v", got)
+	}
+
+	// Pod2 and Pod3 are not expected to be popped out.
+	// - Although the failure reason has been lifted, Pod2 still won't be moved to active due to
+	//   the node event's preCheckForNode().
+	// - Regarding Pod3, the NodeTaintChange event is irrelevant with its scheduling failure.
+	podInfo = nextPod(t, testCtx)
+	if podInfo != nil {
+		t.Fatalf("Unexpected pod %v get popped out", podInfo.Pod.Name)
 	}
 }
 
@@ -239,16 +214,17 @@ func TestCustomResourceEnqueue(t *testing.T) {
 			return &fakeCRPlugin{}, nil
 		},
 	}
-	profile := schedapi.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedapi.Plugins{
-			Filter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: "fakeCRPlugin"},
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta3.Plugins{
+				Filter: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "fakeCRPlugin"},
+					},
 				},
 			},
-		},
-	}
+		}}})
 
 	testCtx.KubeConfig = server.ClientConfig
 	testCtx.ClientSet = kubernetes.NewForConfigOrDie(server.ClientConfig)
@@ -259,18 +235,18 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Use zero backoff seconds to bypass backoffQ.
+	// It's intended to not start the scheduler's queue, and hence to
+	// not start any flushing logic. We will pop and schedule the Pods manually later.
 	testCtx = testutils.InitTestSchedulerWithOptions(
 		t,
 		testCtx,
-		nil,
-		scheduler.WithProfiles(profile),
+		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
 	testutils.SyncInformerFactory(testCtx)
-	// It's intended to not start the scheduler's queue, and hence to
-	// not start any flushing logic. We will pop and schedule the Pods manually later.
+
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
@@ -295,13 +271,13 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	podInfo := testCtx.Scheduler.NextPod()
+	podInfo := nextPodOrDie(t, testCtx)
 	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, nil, fwk, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
@@ -327,7 +303,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testCtx.Scheduler.NextPod()
+	podInfo = nextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
 		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}

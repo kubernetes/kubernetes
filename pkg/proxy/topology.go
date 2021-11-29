@@ -27,12 +27,12 @@ import (
 // labels, and enabled feature gates. This is primarily used to enable topology
 // aware routing.
 func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) []Endpoint {
-	if svcInfo.NodeLocalExternal() || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if svcInfo.NodeLocalExternal() {
 		return endpoints
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
-		return filterEndpointsInternalTrafficPolicy(svcInfo.InternalTrafficPolicy(), endpoints)
+		return FilterLocalEndpoint(endpoints)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
@@ -54,22 +54,25 @@ func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[s
 func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, nodeLabels map[string]string) []Endpoint {
 	if hintsAnnotation != "Auto" && hintsAnnotation != "auto" {
 		if hintsAnnotation != "" && hintsAnnotation != "Disabled" && hintsAnnotation != "disabled" {
-			klog.Warningf("Skipping topology aware endpoint filtering since Service has unexpected value for %s annotation: %s", v1.AnnotationTopologyAwareHints, hintsAnnotation)
+			klog.InfoS("Skipping topology aware endpoint filtering since Service has unexpected value", "annotationTopologyAwareHints", v1.AnnotationTopologyAwareHints, "hints", hintsAnnotation)
 		}
 		return endpoints
 	}
 
 	zone, ok := nodeLabels[v1.LabelTopologyZone]
 	if !ok || zone == "" {
-		klog.Warningf("Skipping topology aware endpoint filtering since node is missing %s label", v1.LabelTopologyZone)
+		klog.InfoS("Skipping topology aware endpoint filtering since node is missing label", "label", v1.LabelTopologyZone)
 		return endpoints
 	}
 
 	filteredEndpoints := []Endpoint{}
 
 	for _, endpoint := range endpoints {
+		if !endpoint.IsReady() {
+			continue
+		}
 		if endpoint.GetZoneHints().Len() == 0 {
-			klog.Warningf("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
+			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
 			return endpoints
 		}
 		if endpoint.GetZoneHints().Has(zone) {
@@ -78,27 +81,15 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 	}
 
 	if len(filteredEndpoints) == 0 {
-		klog.Warningf("Skipping topology aware endpoint filtering since no hints were provided for zone %s", zone)
+		klog.InfoS("Skipping topology aware endpoint filtering since no hints were provided for zone", "zone", zone)
 		return endpoints
 	}
 
 	return filteredEndpoints
 }
 
-// filterEndpointsInternalTrafficPolicy returns the node local endpoints based
-// on configured InternalTrafficPolicy.
-//
-// If ServiceInternalTrafficPolicy feature gate is off, returns the original
-// EndpointSlice.
-// Otherwise, if InternalTrafficPolicy is Local, only return the node local endpoints.
-func filterEndpointsInternalTrafficPolicy(internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType, endpoints []Endpoint) []Endpoint {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		return endpoints
-	}
-	if internalTrafficPolicy == nil || *internalTrafficPolicy == v1.ServiceInternalTrafficPolicyCluster {
-		return endpoints
-	}
-
+// FilterLocalEndpoint returns the node local endpoints
+func FilterLocalEndpoint(endpoints []Endpoint) []Endpoint {
 	var filteredEndpoints []Endpoint
 
 	// Get all the local endpoints
@@ -108,7 +99,5 @@ func filterEndpointsInternalTrafficPolicy(internalTrafficPolicy *v1.ServiceInter
 		}
 	}
 
-	// When internalTrafficPolicy is Local, only return the node local
-	// endpoints
 	return filteredEndpoints
 }

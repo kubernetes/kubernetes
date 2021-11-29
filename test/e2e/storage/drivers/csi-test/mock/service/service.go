@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -55,6 +55,7 @@ type Config struct {
 	DriverName                 string
 	AttachLimit                int64
 	NodeExpansionRequired      bool
+	VolumeMountGroupRequired   bool
 	DisableControllerExpansion bool
 	DisableOnlineExpansion     bool
 	PermissiveTargetPath       bool
@@ -157,7 +158,6 @@ const (
 	gib    int64 = mib * 1024
 	gib100 int64 = gib * 100
 	tib    int64 = gib * 1024
-	tib100 int64 = tib * 100
 )
 
 func (s *service) newVolume(name string, capcity int64) csi.Volume {
@@ -247,7 +247,7 @@ func (s *service) findVolByID(
 
 func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) cache.Snapshot {
 
-	ptime := ptypes.TimestampNow()
+	ptime := timestamppb.Now()
 	return cache.Snapshot{
 		Name:       name,
 		Parameters: parameters,

@@ -78,7 +78,7 @@ func Test_cellForJSONValue(t *testing.T) {
 func Test_convertor_ConvertToTable(t *testing.T) {
 	type fields struct {
 		headers           []metav1.TableColumnDefinition
-		additionalColumns []*jsonpath.JSONPath
+		additionalColumns []columnPrinter
 	}
 	type args struct {
 		ctx          context.Context
@@ -212,7 +212,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 					{Name: "single2", Type: "string"},
 					{Name: "multi", Type: "string"},
 				},
-				additionalColumns: []*jsonpath.JSONPath{
+				additionalColumns: []columnPrinter{
 					newJSONPath("valueOnly", "{.spec.servers[0].hosts[0]}"),
 					newJSONPath("single1", "{.spec.servers[0].hosts}"),
 					newJSONPath("single2", "{.spec.servers[1].hosts}"),
@@ -285,7 +285,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 					{Name: "single2", Type: "string"},
 					{Name: "multi", Type: "string"},
 				},
-				additionalColumns: []*jsonpath.JSONPath{
+				additionalColumns: []columnPrinter{
 					newJSONPath("valueOnly", "{.spec.foo[0].bar[0]}"),
 					newJSONPath("single1", "{.spec.foo[0].bar}"),
 					newJSONPath("single2", "{.spec.foo[1].bar}"),
@@ -358,7 +358,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 					{Name: "single2", Type: "integer"},
 					{Name: "multi", Type: "integer"},
 				},
-				additionalColumns: []*jsonpath.JSONPath{
+				additionalColumns: []columnPrinter{
 					newJSONPath("valueOnly", "{.spec.foo[0].bar[0]}"),
 					newJSONPath("single1", "{.spec.foo[0].bar}"),
 					newJSONPath("single2", "{.spec.foo[1].bar}"),
@@ -440,7 +440,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 	}
 }
 
-func newJSONPath(name string, jsonPathExpression string) *jsonpath.JSONPath {
+func newJSONPath(name string, jsonPathExpression string) columnPrinter {
 	jp := jsonpath.New(name)
 	_ = jp.Parse(jsonPathExpression)
 	return jp

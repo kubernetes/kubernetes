@@ -106,6 +106,24 @@ func (b *Buffer) Write(bs []byte) (int, error) {
 	return len(bs), nil
 }
 
+// WriteByte writes a single byte to the Buffer.
+//
+// Error returned is always nil, function signature is compatible
+// with bytes.Buffer and bufio.Writer
+func (b *Buffer) WriteByte(v byte) error {
+	b.AppendByte(v)
+	return nil
+}
+
+// WriteString writes a string to the Buffer.
+//
+// Error returned is always nil, function signature is compatible
+// with bytes.Buffer and bufio.Writer
+func (b *Buffer) WriteString(s string) (int, error) {
+	b.AppendString(s)
+	return len(s), nil
+}
+
 // TrimNewline trims any final "\n" byte from the end of the buffer.
 func (b *Buffer) TrimNewline() {
 	if i := len(b.bs) - 1; i >= 0 {

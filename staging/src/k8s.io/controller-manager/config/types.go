@@ -77,5 +77,6 @@ type ControllerLeaderConfiguration struct {
 
 	// Component is the name of the component in which the controller should be running.
 	// E.g. kube-controller-manager, cloud-controller-manager, etc
+	// Or '*' meaning the controller can be run under any component that participates in the migration
 	Component string
 }

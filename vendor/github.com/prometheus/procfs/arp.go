@@ -36,7 +36,7 @@ type ARPEntry struct {
 func (fs FS) GatherARPEntries() ([]ARPEntry, error) {
 	data, err := ioutil.ReadFile(fs.proc.Path("net/arp"))
 	if err != nil {
-		return nil, fmt.Errorf("error reading arp %s: %s", fs.proc.Path("net/arp"), err)
+		return nil, fmt.Errorf("error reading arp %q: %w", fs.proc.Path("net/arp"), err)
 	}
 
 	return parseARPEntries(data)
@@ -59,7 +59,7 @@ func parseARPEntries(data []byte) ([]ARPEntry, error) {
 		} else if width == expectedDataWidth {
 			entry, err := parseARPEntry(columns)
 			if err != nil {
-				return []ARPEntry{}, fmt.Errorf("failed to parse ARP entry: %s", err)
+				return []ARPEntry{}, fmt.Errorf("failed to parse ARP entry: %w", err)
 			}
 			entries = append(entries, entry)
 		} else {

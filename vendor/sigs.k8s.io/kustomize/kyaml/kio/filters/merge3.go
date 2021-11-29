@@ -30,6 +30,36 @@ type ResourceMatcher interface {
 	IsSameResource(node1, node2 *yaml.RNode) bool
 }
 
+// ResourceMergeStrategy is the return type from the Handle function in the
+// ResourceHandler interface. It determines which version of a resource should
+// be included in the output (if any).
+type ResourceMergeStrategy int
+
+const (
+	// Merge means the output to dest should be the 3-way merge of original,
+	// updated and dest.
+	Merge ResourceMergeStrategy = iota
+	// KeepDest means the version of the resource in dest should be the output.
+	KeepDest
+	// KeepUpdated means the version of the resource in updated should be the
+	// output.
+	KeepUpdated
+	// KeepOriginal means the version of the resource in original should be the
+	// output.
+	KeepOriginal
+	// Skip means the resource should not be included in the output.
+	Skip
+)
+
+// ResourceHandler interface is used to determine what should be done for a
+// resource once the versions in original, updated and dest has been
+// identified based on the ResourceMatcher. This allows users to customize
+// what should be the result in dest if a resource has been deleted from
+// upstream.
+type ResourceHandler interface {
+	Handle(original, updated, dest *yaml.RNode) (ResourceMergeStrategy, error)
+}
+
 // Merge3 performs a 3-way merge on the original, updated, and destination packages.
 type Merge3 struct {
 	OriginalPath   string
@@ -37,6 +67,7 @@ type Merge3 struct {
 	DestPath       string
 	MatchFilesGlob []string
 	Matcher        ResourceMatcher
+	Handler        ResourceHandler
 }
 
 func (m Merge3) Merge() error {
@@ -78,6 +109,11 @@ func (m Merge3) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	if matcher == nil {
 		matcher = &DefaultGVKNNMatcher{MergeOnPath: true}
 	}
+	handler := m.Handler
+	if handler == nil {
+		handler = &DefaultResourceHandler{}
+	}
+
 	tl := tuples{matcher: matcher}
 	for i := range nodes {
 		if err := tl.add(nodes[i]); err != nil {
@@ -89,21 +125,12 @@ func (m Merge3) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	var output []*yaml.RNode
 	for i := range tl.list {
 		t := tl.list[i]
-		switch {
-		case t.original == nil && t.updated == nil && t.dest != nil:
-			// added locally -- keep dest
-			output = append(output, t.dest)
-		case t.updated != nil && t.dest == nil:
-			// added in the update -- add update
-			output = append(output, t.updated)
-		case t.original != nil && t.updated == nil:
-			// deleted in the update
-		// don't include the resource in the output
-		case t.original != nil && t.dest == nil:
-			// deleted locally
-			// don't include the resource in the output
-		default:
-			// dest and updated are non-nil -- merge them
+		strategy, err := handler.Handle(t.original, t.updated, t.dest)
+		if err != nil {
+			return nil, err
+		}
+		switch strategy {
+		case Merge:
 			node, err := t.merge()
 			if err != nil {
 				return nil, err
@@ -111,6 +138,14 @@ func (m Merge3) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 			if node != nil {
 				output = append(output, node)
 			}
+		case KeepDest:
+			output = append(output, t.dest)
+		case KeepUpdated:
+			output = append(output, t.updated)
+		case KeepOriginal:
+			output = append(output, t.original)
+		case Skip:
+			// do nothing
 		}
 	}
 	return output, nil
@@ -136,6 +171,12 @@ type DefaultGVKNNMatcher struct {
 // IsSameResource returns true if metadata of node1 and metadata of node2 belongs to same logical resource
 func (dm *DefaultGVKNNMatcher) IsSameResource(node1, node2 *yaml.RNode) bool {
 	if node1 == nil || node2 == nil {
+		return false
+	}
+	if err := kioutil.CopyLegacyAnnotations(node1); err != nil {
+		return false
+	}
+	if err := kioutil.CopyLegacyAnnotations(node2); err != nil {
 		return false
 	}
 
@@ -244,4 +285,33 @@ func (t *tuple) merge() (*yaml.RNode, error) {
 // duplicateError returns duplicate resources error
 func duplicateError(source, filePath string) error {
 	return fmt.Errorf(`found duplicate %q resources in file %q, please refer to "update" documentation for the fix`, source, filePath)
+}
+
+// DefaultResourceHandler is the default implementation of the ResourceHandler
+// interface. It uses the following rules:
+// * Keep dest if resource only exists in dest.
+// * Keep updated if resource added in updated.
+// * Delete dest if updated has been deleted.
+// * Don't add the resource back if removed from dest.
+// * Otherwise merge.
+type DefaultResourceHandler struct{}
+
+func (*DefaultResourceHandler) Handle(original, updated, dest *yaml.RNode) (ResourceMergeStrategy, error) {
+	switch {
+	case original == nil && updated == nil && dest != nil:
+		// added locally -- keep dest
+		return KeepDest, nil
+	case updated != nil && dest == nil:
+		// added in the update -- add update
+		return KeepUpdated, nil
+	case original != nil && updated == nil:
+		// deleted in the update
+		return Skip, nil
+	case original != nil && dest == nil:
+		// deleted locally
+		return Skip, nil
+	default:
+		// dest and updated are non-nil -- merge them
+		return Merge, nil
+	}
 }

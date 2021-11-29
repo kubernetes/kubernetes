@@ -121,7 +121,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := v.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
@@ -246,6 +246,10 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.It("should resize volume when PVC is edited while pod is using it", func() {
 			init()
 			defer cleanup()
+
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")

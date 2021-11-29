@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -35,7 +36,8 @@ import (
 	cadvisorclient "github.com/google/cadvisor/client/v2"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -370,18 +372,21 @@ func getCadvisorPod() *v1.Pod {
 // deletePodsSync deletes a list of pods and block until pods disappear.
 func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	var wg sync.WaitGroup
-	for _, pod := range pods {
+	for i := range pods {
+		pod := pods[i]
 		wg.Add(1)
-		go func(pod *v1.Pod) {
+		go func() {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
-			framework.ExpectNoError(err)
+			if apierrors.IsNotFound(err) {
+				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
+			}
 
 			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
-		}(pod)
+		}()
 	}
 	wg.Wait()
 	return

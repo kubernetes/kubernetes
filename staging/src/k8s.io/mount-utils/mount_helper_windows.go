@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -84,15 +85,9 @@ func NormalizeWindowsPath(path string) string {
 
 // ValidateDiskNumber : disk number should be a number in [0, 99]
 func ValidateDiskNumber(disk string) error {
-	diskNum, err := strconv.Atoi(disk)
-	if err != nil {
-		return fmt.Errorf("wrong disk number format: %q, err:%v", disk, err)
+	if _, err := strconv.Atoi(disk); err != nil {
+		return fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
 	}
-
-	if diskNum < 0 || diskNum > 99 {
-		return fmt.Errorf("disk number out of range: %q", disk)
-	}
-
 	return nil
 }
 

@@ -17,12 +17,11 @@ limitations under the License.
 package topologymanager
 
 import (
-	"fmt"
-
 	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -133,10 +132,10 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			return unexpectedAdmissionError(err)
+			return admission.GetPodAdmitResult(err)
 		}
 	}
-	return admitPod()
+	return admission.GetPodAdmitResult(nil)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
@@ -149,24 +148,4 @@ func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) e
 		}
 	}
 	return nil
-}
-
-func topologyAffinityError() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: "Resources cannot be allocated with Topology locality",
-		Reason:  "TopologyAffinityError",
-		Admit:   false,
-	}
-}
-
-func unexpectedAdmissionError(err error) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-		Reason:  "UnexpectedAdmissionError",
-		Admit:   false,
-	}
-}
-
-func admitPod() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{Admit: true}
 }

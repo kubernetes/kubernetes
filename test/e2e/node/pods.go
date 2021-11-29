@@ -78,10 +78,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pods, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 0)
-			options = metav1.ListOptions{
-				LabelSelector:   selector.String(),
-				ResourceVersion: pods.ListMeta.ResourceVersion,
-			}
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(pod)
@@ -383,10 +379,14 @@ var _ = SIGDescribe("Pods Extended", func() {
 								switch {
 								case t.ExitCode == 1:
 									// expected
+								case t.ExitCode == 137 && (t.Reason == "ContainerStatusUnknown" || t.Reason == "Error"):
+									// expected, pod was force-killed after grace period
 								case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 									// pod volume teardown races with container start in CRI, which reports a failure
 									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
 								default:
+									data, _ := json.MarshalIndent(pod.Status, "", "  ")
+									framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
 									return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
 								}
 								switch {
@@ -427,7 +427,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							if !hasTerminalPhase {
 								var names []string
 								for _, status := range pod.Status.ContainerStatuses {
-									if status.State.Terminated != nil || status.State.Running != nil {
+									if status.State.Running != nil {
 										names = append(names, status.Name)
 									}
 								}

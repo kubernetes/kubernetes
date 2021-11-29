@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	networkingv1 "k8s.io/api/networking/v1"
-	v1 "k8s.io/api/networking/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -192,7 +191,7 @@ func TestCreateIngress(t *testing.T) {
 							},
 						},
 					},
-					TLS: []v1.IngressTLS{},
+					TLS: []networkingv1.IngressTLS{},
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "",
@@ -245,7 +244,7 @@ func TestCreateIngress(t *testing.T) {
 							},
 						},
 					},
-					TLS: []v1.IngressTLS{
+					TLS: []networkingv1.IngressTLS{
 						{
 							SecretName: "secret1",
 						},
@@ -305,7 +304,7 @@ func TestCreateIngress(t *testing.T) {
 							},
 						},
 					},
-					TLS: []v1.IngressTLS{
+					TLS: []networkingv1.IngressTLS{
 						{
 							Hosts: []string{
 								"foo.com",
@@ -456,7 +455,7 @@ func TestCreateIngress(t *testing.T) {
 					},
 				},
 				Spec: networkingv1.IngressSpec{
-					TLS: []v1.IngressTLS{
+					TLS: []networkingv1.IngressTLS{
 						{
 							Hosts: []string{
 								"foo.com",

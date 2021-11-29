@@ -33,7 +33,7 @@ import (
 
 var (
 	explainLong = templates.LongDesc(i18n.T(`
-		List the fields for supported resources
+		List the fields for supported resources.
 
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
@@ -76,7 +76,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	cmd := &cobra.Command{
 		Use:                   "explain RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Documentation of resources"),
+		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {

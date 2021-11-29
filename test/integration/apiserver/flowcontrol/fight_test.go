@@ -25,8 +25,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
-	"k8s.io/apimachinery/pkg/util/clock"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -37,6 +36,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/clock"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 /* fightTest configures a test of how API Priority and Fairness config
@@ -63,7 +64,7 @@ type fightTest struct {
 	teamSize       int
 	stopCh         chan struct{}
 	now            time.Time
-	clk            *clock.FakeClock
+	clk            *testclocks.FakeClock
 	ctlrs          map[bool][]utilfc.Interface
 
 	countsMutex sync.Mutex
@@ -81,7 +82,7 @@ func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *figh
 		teamSize:       teamSize,
 		stopCh:         make(chan struct{}),
 		now:            now,
-		clk:            clock.NewFakeClock(now),
+		clk:            testclocks.NewFakeClock(now),
 		ctlrs: map[bool][]utilfc.Interface{
 			false: make([]utilfc.Interface, teamSize),
 			true:  make([]utilfc.Interface, teamSize)},
@@ -95,7 +96,7 @@ func (ft *fightTest) createMainInformer() {
 	myConfig = rest.AddUserAgent(myConfig, "audience")
 	myClientset := clientset.NewForConfigOrDie(myConfig)
 	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
-	inf := informerFactory.Flowcontrol().V1beta1().FlowSchemas().Informer()
+	inf := informerFactory.Flowcontrol().V1beta2().FlowSchemas().Informer()
 	inf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			fs := obj.(*flowcontrol.FlowSchema)
@@ -123,7 +124,7 @@ func (ft *fightTest) createController(invert bool, i int) {
 	myConfig := rest.CopyConfig(ft.loopbackConfig)
 	myConfig = rest.AddUserAgent(myConfig, fieldMgr)
 	myClientset := clientset.NewForConfigOrDie(myConfig)
-	fcIfc := myClientset.FlowcontrolV1beta1()
+	fcIfc := myClientset.FlowcontrolV1beta2()
 	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
 	foundToDangling := func(found bool) bool { return !found }
 	if invert {
@@ -138,7 +139,8 @@ func (ft *fightTest) createController(invert bool, i int) {
 		FlowcontrolClient:      fcIfc,
 		ServerConcurrencyLimit: 200,             // server concurrency limit
 		RequestWaitLimit:       time.Minute / 4, // request wait limit
-		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
 		QueueSetFactory:        fqtesting.NewNoRestraintFactory(),
 	})
 	ft.ctlrs[invert][i] = ctlr

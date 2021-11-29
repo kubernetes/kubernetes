@@ -91,7 +91,7 @@ func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string
 	return &s
 }
 
-// SetPath sets the path for this schema valdiator
+// SetPath sets the path for this schema validator
 func (s *SchemaValidator) SetPath(path string) {
 	s.Path = path
 }

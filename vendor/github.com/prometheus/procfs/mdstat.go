@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	statusLineRE   = regexp.MustCompile(`(\d+) blocks .*\[(\d+)/(\d+)\] \[[U_]+\]`)
-	recoveryLineRE = regexp.MustCompile(`\((\d+)/\d+\)`)
+	statusLineRE      = regexp.MustCompile(`(\d+) blocks .*\[(\d+)/(\d+)\] \[[U_]+\]`)
+	recoveryLineRE    = regexp.MustCompile(`\((\d+)/\d+\)`)
+	componentDeviceRE = regexp.MustCompile(`(.*)\[\d+\]`)
 )
 
 // MDStat holds info parsed from /proc/mdstat.
@@ -44,6 +45,8 @@ type MDStat struct {
 	BlocksTotal int64
 	// Number of blocks on the device that are in sync.
 	BlocksSynced int64
+	// Name of md component devices
+	Devices []string
 }
 
 // MDStat parses an mdstat-file (/proc/mdstat) and returns a slice of
@@ -56,7 +59,7 @@ func (fs FS) MDStat() ([]MDStat, error) {
 	}
 	mdstat, err := parseMDStat(data)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing mdstat %s: %s", fs.proc.Path("mdstat"), err)
+		return nil, fmt.Errorf("error parsing mdstat %q: %w", fs.proc.Path("mdstat"), err)
 	}
 	return mdstat, nil
 }
@@ -82,10 +85,7 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 		state := deviceFields[2]  // active or inactive
 
 		if len(lines) <= i+3 {
-			return nil, fmt.Errorf(
-				"error parsing %s: too few lines for md device",
-				mdName,
-			)
+			return nil, fmt.Errorf("error parsing %q: too few lines for md device", mdName)
 		}
 
 		// Failed disks have the suffix (F) & Spare disks have the suffix (S).
@@ -94,7 +94,7 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 		active, total, size, err := evalStatusLine(lines[i], lines[i+1])
 
 		if err != nil {
-			return nil, fmt.Errorf("error parsing md device lines: %s", err)
+			return nil, fmt.Errorf("error parsing md device lines: %w", err)
 		}
 
 		syncLineIdx := i + 2
@@ -126,7 +126,7 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 			} else {
 				syncedBlocks, err = evalRecoveryLine(lines[syncLineIdx])
 				if err != nil {
-					return nil, fmt.Errorf("error parsing sync line in md device %s: %s", mdName, err)
+					return nil, fmt.Errorf("error parsing sync line in md device %q: %w", mdName, err)
 				}
 			}
 		}
@@ -140,6 +140,7 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 			DisksTotal:    total,
 			BlocksTotal:   size,
 			BlocksSynced:  syncedBlocks,
+			Devices:       evalComponentDevices(deviceFields),
 		})
 	}
 
@@ -151,7 +152,7 @@ func evalStatusLine(deviceLine, statusLine string) (active, total, size int64, e
 	sizeStr := strings.Fields(statusLine)[0]
 	size, err = strconv.ParseInt(sizeStr, 10, 64)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("unexpected statusLine %s: %s", statusLine, err)
+		return 0, 0, 0, fmt.Errorf("unexpected statusLine %q: %w", statusLine, err)
 	}
 
 	if strings.Contains(deviceLine, "raid0") || strings.Contains(deviceLine, "linear") {
@@ -171,12 +172,12 @@ func evalStatusLine(deviceLine, statusLine string) (active, total, size int64, e
 
 	total, err = strconv.ParseInt(matches[2], 10, 64)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("unexpected statusLine %s: %s", statusLine, err)
+		return 0, 0, 0, fmt.Errorf("unexpected statusLine %q: %w", statusLine, err)
 	}
 
 	active, err = strconv.ParseInt(matches[3], 10, 64)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("unexpected statusLine %s: %s", statusLine, err)
+		return 0, 0, 0, fmt.Errorf("unexpected statusLine %q: %w", statusLine, err)
 	}
 
 	return active, total, size, nil
@@ -190,8 +191,23 @@ func evalRecoveryLine(recoveryLine string) (syncedBlocks int64, err error) {
 
 	syncedBlocks, err = strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("%s in recoveryLine: %s", err, recoveryLine)
+		return 0, fmt.Errorf("error parsing int from recoveryLine %q: %w", recoveryLine, err)
 	}
 
 	return syncedBlocks, nil
+}
+
+func evalComponentDevices(deviceFields []string) []string {
+	mdComponentDevices := make([]string, 0)
+	if len(deviceFields) > 3 {
+		for _, field := range deviceFields[4:] {
+			match := componentDeviceRE.FindStringSubmatch(field)
+			if match == nil {
+				continue
+			}
+			mdComponentDevices = append(mdComponentDevices, match[1])
+		}
+	}
+
+	return mdComponentDevices
 }

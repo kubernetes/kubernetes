@@ -367,13 +367,9 @@ func safeSort(in []string) []string {
 
 // Add adds requirements to the selector. It copies the current selector returning a new one
 func (s internalSelector) Add(reqs ...Requirement) Selector {
-	var ret internalSelector
-	for ix := range s {
-		ret = append(ret, s[ix])
-	}
-	for _, r := range reqs {
-		ret = append(ret, r)
-	}
+	ret := make(internalSelector, 0, len(s)+len(reqs))
+	ret = append(ret, s...)
+	ret = append(ret, reqs...)
 	sort.Sort(ByKey(ret))
 	return ret
 }

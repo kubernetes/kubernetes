@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.19.0 (9 Aug 2021)
+
+Enhancements:
+* [#975][]: Avoid panicking in Sampler core if the level is out of bounds.
+* [#984][]: Reduce the size of BufferedWriteSyncer by aligning the fields
+  better.
+
+[#975]: https://github.com/uber-go/zap/pull/975
+[#984]: https://github.com/uber-go/zap/pull/984
+
+Thanks to @lancoLiu and @thockin for their contributions to this release.
+
+## 1.18.1 (28 Jun 2021)
+
+Bugfixes:
+* [#974][]: Fix nil dereference in logger constructed by `zap.NewNop`.
+
+[#974]: https://github.com/uber-go/zap/pull/974
+
+## 1.18.0 (28 Jun 2021)
+
+Enhancements:
+* [#961][]: Add `zapcore.BufferedWriteSyncer`, a new `WriteSyncer` that buffers
+  messages in-memory and flushes them periodically.
+* [#971][]: Add `zapio.Writer` to use a Zap logger as an `io.Writer`.
+* [#897][]: Add `zap.WithClock` option to control the source of time via the
+  new `zapcore.Clock` interface.
+* [#949][]: Avoid panicking in `zap.SugaredLogger` when arguments of `*w`
+  methods don't match expectations.
+* [#943][]: Add support for filtering by level or arbitrary matcher function to
+  `zaptest/observer`.
+* [#691][]: Comply with `io.StringWriter` and `io.ByteWriter` in Zap's
+  `buffer.Buffer`.
+
+Thanks to @atrn0, @ernado, @heyanfu, @hnlq715, @zchee
+for their contributions to this release.
+
+[#691]: https://github.com/uber-go/zap/pull/691
+[#897]: https://github.com/uber-go/zap/pull/897
+[#943]: https://github.com/uber-go/zap/pull/943
+[#949]: https://github.com/uber-go/zap/pull/949
+[#961]: https://github.com/uber-go/zap/pull/961
+[#971]: https://github.com/uber-go/zap/pull/971
+
+## 1.17.0 (25 May 2021)
+
+Bugfixes:
+* [#867][]: Encode `<nil>` for nil `error` instead of a panic.
+* [#931][], [#936][]: Update minimum version constraints to address
+  vulnerabilities in dependencies.
+
+Enhancements:
+* [#865][]: Improve alignment of fields of the Logger struct, reducing its
+  size from 96 to 80 bytes.
+* [#881][]: Support `grpclog.LoggerV2` in zapgrpc.
+* [#903][]: Support URL-encoded POST requests to the AtomicLevel HTTP handler
+  with the `application/x-www-form-urlencoded` content type.
+* [#912][]: Support multi-field encoding with `zap.Inline`.
+* [#913][]: Speed up SugaredLogger for calls with a single string.
+* [#928][]: Add support for filtering by field name to `zaptest/observer`.
+
+Thanks to @ash2k, @FMLS, @jimmystewpot, @Oncilla, @tsoslow, @tylitianrui, @withshubh, and @wziww for their contributions to this release.
+
 ## 1.16.0 (1 Sep 2020)
 
 Bugfixes:
@@ -430,3 +493,12 @@ upgrade to the upcoming stable release.
 [#854]: https://github.com/uber-go/zap/pull/854
 [#861]: https://github.com/uber-go/zap/pull/861
 [#862]: https://github.com/uber-go/zap/pull/862
+[#865]: https://github.com/uber-go/zap/pull/865
+[#867]: https://github.com/uber-go/zap/pull/867
+[#881]: https://github.com/uber-go/zap/pull/881
+[#903]: https://github.com/uber-go/zap/pull/903
+[#912]: https://github.com/uber-go/zap/pull/912
+[#913]: https://github.com/uber-go/zap/pull/913
+[#928]: https://github.com/uber-go/zap/pull/928
+[#931]: https://github.com/uber-go/zap/pull/931
+[#936]: https://github.com/uber-go/zap/pull/936

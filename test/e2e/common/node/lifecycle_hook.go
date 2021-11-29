@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -41,7 +42,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		preStopWaitTimeout   = 30 * time.Second
 	)
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
-		var targetIP, targetURL string
+		var targetIP, targetURL, targetNode string
 		ports := []v1.ContainerPort{
 			{
 				ContainerPort: 8080,
@@ -50,6 +51,13 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		}
 		podHandleHookRequest := e2epod.NewAgnhostPod("", "pod-handle-http-request", nil, nil, ports, "netexec")
 		ginkgo.BeforeEach(func() {
+			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+			framework.ExpectNoError(err)
+			targetNode = node.Name
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podHandleHookRequest.Spec, nodeSelection)
+
 			podClient = f.PodClient()
 			ginkgo.By("create the container to handle the HTTPGet hook request.")
 			newPod := podClient.CreateSync(podHandleHookRequest)
@@ -86,13 +94,14 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		*/
 		framework.ConformanceIt("should execute poststart exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PostStart: &v1.Handler{
+				PostStart: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=poststart"},
 					},
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+
 			testPodWithHook(podWithHook)
 		})
 		/*
@@ -102,7 +111,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		*/
 		framework.ConformanceIt("should execute prestop exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PreStop: &v1.Handler{
+				PreStop: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=prestop"},
 					},
@@ -114,11 +123,11 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		/*
 			Release: v1.9
 			Testname: Pod Lifecycle, post start http hook
-			Description: When a post start handler is specified in the container lifecycle using a HttpGet action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod to validate that the post start is executed.
+			Description: When a post start handler is specified in the container lifecycle using a HttpGet action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod on the same node with a container lifecycle specifying a post start that invokes the server pod to validate that the post start is executed.
 		*/
 		framework.ConformanceIt("should execute poststart http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PostStart: &v1.Handler{
+				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
 						Host: targetIP,
@@ -127,16 +136,20 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			// make sure we spawn the test pod on the same node as the webserver.
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
 			testPodWithHook(podWithHook)
 		})
 		/*
 			Release: v1.9
 			Testname: Pod Lifecycle, prestop http hook
-			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
 		framework.ConformanceIt("should execute prestop http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PreStop: &v1.Handler{
+				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
 						Host: targetIP,
@@ -145,6 +158,10 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			// make sure we spawn the test pod on the same node as the webserver.
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
 			testPodWithHook(podWithHook)
 		})
 	})

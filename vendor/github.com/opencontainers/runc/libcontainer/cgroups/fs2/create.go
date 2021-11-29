@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
 func supportedControllers() (string, error) {
-	return fscommon.ReadFile(UnifiedMountpoint, "/cgroup.controllers")
+	return cgroups.ReadFile(UnifiedMountpoint, "/cgroup.controllers")
 }
 
 // needAnyControllers returns whether we enable some supported controllers or not,
@@ -92,7 +92,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 	for i, e := range elements {
 		current = filepath.Join(current, e)
 		if i > 0 {
-			if err := os.Mkdir(current, 0755); err != nil {
+			if err := os.Mkdir(current, 0o755); err != nil {
 				if !os.IsExist(err) {
 					return err
 				}
@@ -105,7 +105,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 					}
 				}()
 			}
-			cgType, _ := fscommon.ReadFile(current, cgTypeFile)
+			cgType, _ := cgroups.ReadFile(current, cgTypeFile)
 			cgType = strings.TrimSpace(cgType)
 			switch cgType {
 			// If the cgroup is in an invalid mode (usually this means there's an internal
@@ -122,7 +122,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 					// since that means we're a properly delegated cgroup subtree) but in
 					// this case there's not much we can do and it's better than giving an
 					// error.
-					_ = fscommon.WriteFile(current, cgTypeFile, "threaded")
+					_ = cgroups.WriteFile(current, cgTypeFile, "threaded")
 				}
 			// If the cgroup is in (threaded) or (domain threaded) mode, we can only use thread-aware controllers
 			// (and you cannot usually take a cgroup out of threaded mode).
@@ -136,11 +136,11 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 		}
 		// enable all supported controllers
 		if i < len(elements)-1 {
-			if err := fscommon.WriteFile(current, cgStCtlFile, res); err != nil {
+			if err := cgroups.WriteFile(current, cgStCtlFile, res); err != nil {
 				// try write one by one
 				allCtrs := strings.Split(res, " ")
 				for _, ctr := range allCtrs {
-					_ = fscommon.WriteFile(current, cgStCtlFile, ctr)
+					_ = cgroups.WriteFile(current, cgStCtlFile, ctr)
 				}
 			}
 			// Some controllers might not be enabled when rootless or containerized,

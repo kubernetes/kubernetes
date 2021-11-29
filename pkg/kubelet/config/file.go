@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -164,7 +164,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]*v1.Pod, 0)
+	pods := make([]*v1.Pod, 0, len(dirents))
 	if len(dirents) == 0 {
 		return pods, nil
 	}

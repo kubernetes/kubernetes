@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/sets"
 )
 
@@ -139,16 +139,16 @@ type NameMeta struct {
 type ResourceMeta struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	// ObjectMeta is the metadata field of a Resource
-	ObjectMeta `yaml:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 // ObjectMeta contains metadata about a Resource
 type ObjectMeta struct {
 	NameMeta `json:",inline" yaml:",inline"`
 	// Labels is the metadata.labels field of a Resource
-	Labels map[string]string `yaml:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	// Annotations is the metadata.annotations field of a Resource.
-	Annotations map[string]string `yaml:"annotations,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // GetIdentifier returns a ResourceIdentifier that includes
@@ -213,7 +213,10 @@ func String(node *yaml.Node, opts ...string) (string, error) {
 	b := &bytes.Buffer{}
 	e := NewEncoder(b)
 	err := e.Encode(node)
-	e.Close()
+	errClose := e.Close()
+	if err == nil {
+		err = errClose
+	}
 	val := b.String()
 	if optsSet.Has(Trim) {
 		val = strings.TrimSpace(val)

@@ -17,15 +17,13 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"net"
-
 	clientset "k8s.io/client-go/kubernetes"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
+	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 const (
@@ -76,7 +74,7 @@ func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 }
 
 func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
-	ip := net.ParseIP(localAdvertiseAddress)
+	ip := netutils.ParseIPSloppy(localAdvertiseAddress)
 	if ip.To4() != nil {
 		return kubeadmapiv1.DefaultProxyBindAddressv4
 	}
@@ -105,7 +103,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	if kp.config.BindAddress == "" {
 		kp.config.BindAddress = defaultBindAddress
 	} else if kp.config.BindAddress != defaultBindAddress {
-		warnDefaultComponentConfigValue(kind, "bindAddress", kp.config.BindAddress, defaultBindAddress)
+		warnDefaultComponentConfigValue(kind, "bindAddress", defaultBindAddress, kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
@@ -119,10 +117,9 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	} else if kp.config.ClientConnection.Kubeconfig != kubeproxyKubeConfigFileName {
 		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, kp.config.ClientConnection.Kubeconfig)
 	}
+}
 
-	// TODO: The following code should be removed after dual-stack is GA.
-	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
-		kp.config.FeatureGates[features.IPv6DualStack] = enabled
-	}
+// Mutate is NOP for the kube-proxy config
+func (kp *kubeProxyConfig) Mutate() error {
+	return nil
 }

@@ -430,6 +430,10 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
+			// propagate list source to items source
+			if len(info.Source) != 0 {
+				item.Source = info.Source
+			}
 			if err := fn(item, nil); err != nil {
 				errs = append(errs, err)
 			}
@@ -668,16 +672,6 @@ func RetrieveLazy(info *Info, err error) error {
 	if info.Object == nil {
 		return info.Get()
 	}
-	return nil
-}
-
-// CreateAndRefresh creates an object from input info and refreshes info with that object
-func CreateAndRefresh(info *Info) error {
-	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
-	if err != nil {
-		return err
-	}
-	info.Refresh(obj, true)
 	return nil
 }
 

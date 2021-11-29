@@ -28,6 +28,7 @@ import (
 	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // SelectorSpread is a plugin that calculates selector spread priority.
@@ -44,7 +45,7 @@ var _ framework.ScorePlugin = &SelectorSpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "SelectorSpread"
+	Name = names.SelectorSpread
 	// preScoreStateKey is the key in CycleState to SelectorSpread pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
 
@@ -91,7 +92,7 @@ func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState
 
 	s, ok := c.(*preScoreState)
 	if !ok {
-		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to tainttoleration.preScoreState"))
+		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to selectorspread.preScoreState"))
 	}
 
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)

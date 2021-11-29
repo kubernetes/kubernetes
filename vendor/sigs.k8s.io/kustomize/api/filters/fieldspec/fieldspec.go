@@ -49,7 +49,7 @@ func (fltr Filter) Filter(obj *yaml.RNode) (*yaml.RNode, error) {
 	if match := isMatchGVK(fltr.FieldSpec, obj); !match {
 		return obj, nil
 	}
-	fltr.path = utils.PathSplitter(fltr.FieldSpec.Path)
+	fltr.path = utils.PathSplitter(fltr.FieldSpec.Path, "/")
 	if err := fltr.filter(obj); err != nil {
 		s, _ := obj.String()
 		return nil, errors.WrapPrefixf(err,

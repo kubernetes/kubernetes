@@ -25,13 +25,14 @@ import (
 // CertificateSigningRequestSpecApplyConfiguration represents an declarative configuration of the CertificateSigningRequestSpec type for use
 // with apply.
 type CertificateSigningRequestSpecApplyConfiguration struct {
-	Request    []byte                   `json:"request,omitempty"`
-	SignerName *string                  `json:"signerName,omitempty"`
-	Usages     []v1.KeyUsage            `json:"usages,omitempty"`
-	Username   *string                  `json:"username,omitempty"`
-	UID        *string                  `json:"uid,omitempty"`
-	Groups     []string                 `json:"groups,omitempty"`
-	Extra      map[string]v1.ExtraValue `json:"extra,omitempty"`
+	Request           []byte                   `json:"request,omitempty"`
+	SignerName        *string                  `json:"signerName,omitempty"`
+	ExpirationSeconds *int32                   `json:"expirationSeconds,omitempty"`
+	Usages            []v1.KeyUsage            `json:"usages,omitempty"`
+	Username          *string                  `json:"username,omitempty"`
+	UID               *string                  `json:"uid,omitempty"`
+	Groups            []string                 `json:"groups,omitempty"`
+	Extra             map[string]v1.ExtraValue `json:"extra,omitempty"`
 }
 
 // CertificateSigningRequestSpecApplyConfiguration constructs an declarative configuration of the CertificateSigningRequestSpec type for use with
@@ -55,6 +56,14 @@ func (b *CertificateSigningRequestSpecApplyConfiguration) WithRequest(values ...
 // If called multiple times, the SignerName field is set to the value of the last call.
 func (b *CertificateSigningRequestSpecApplyConfiguration) WithSignerName(value string) *CertificateSigningRequestSpecApplyConfiguration {
 	b.SignerName = &value
+	return b
+}
+
+// WithExpirationSeconds sets the ExpirationSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExpirationSeconds field is set to the value of the last call.
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithExpirationSeconds(value int32) *CertificateSigningRequestSpecApplyConfiguration {
+	b.ExpirationSeconds = &value
 	return b
 }
 

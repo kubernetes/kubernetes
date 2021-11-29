@@ -25,12 +25,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/server/egressselector/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeEgressSelection struct {
@@ -64,7 +64,7 @@ func TestEgressSelector(t *testing.T) {
 						},
 					},
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: apiserver.ProtocolDirect,
 						},
@@ -187,7 +187,7 @@ type fakeProxier struct {
 	err bool
 }
 
-func (f *fakeProxier) proxy(_ string) (net.Conn, error) {
+func (f *fakeProxier) proxy(_ context.Context, _ string) (net.Conn, error) {
 	if f.err {
 		return nil, fmt.Errorf("fake error")
 	}
@@ -244,7 +244,7 @@ func TestMetrics(t *testing.T) {
 
 		t.Run(tn, func(t *testing.T) {
 			metrics.Metrics.Reset()
-			metrics.Metrics.SetClock(clock.NewFakeClock(time.Now()))
+			metrics.Metrics.SetClock(testingclock.NewFakeClock(time.Now()))
 			d := dialerCreator{
 				connector: &fakeProxyServerConnector{
 					connectorErr: tc.connectorErr,

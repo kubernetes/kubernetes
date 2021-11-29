@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// Inject into master an authorizer that uses user info.
+// Inject into control plane an authorizer that uses user info.
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 
@@ -55,10 +55,10 @@ func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -146,14 +146,14 @@ func TestSubjectAccessReview(t *testing.T) {
 
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
 			User: &user.DefaultInfo{Name: username},
 		}, true, nil
 	})
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -229,10 +229,10 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

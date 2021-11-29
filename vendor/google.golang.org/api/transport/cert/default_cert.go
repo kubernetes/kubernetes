@@ -14,6 +14,7 @@ package cert
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 const (
@@ -30,10 +32,18 @@ const (
 	metadataFile = "context_aware_metadata.json"
 )
 
+// defaultCertData holds all the variables pertaining to
+// the default certficate source created by DefaultSource.
+type defaultCertData struct {
+	once            sync.Once
+	source          Source
+	err             error
+	cachedCertMutex sync.Mutex
+	cachedCert      *tls.Certificate
+}
+
 var (
-	defaultSourceOnce sync.Once
-	defaultSource     Source
-	defaultSourceErr  error
+	defaultCert defaultCertData
 )
 
 // Source is a function that can be passed into crypto/tls.Config.GetClientCertificate.
@@ -44,10 +54,10 @@ type Source func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 //
 // If that file does not exist, a nil source is returned.
 func DefaultSource() (Source, error) {
-	defaultSourceOnce.Do(func() {
-		defaultSource, defaultSourceErr = newSecureConnectSource()
+	defaultCert.once.Do(func() {
+		defaultCert.source, defaultCert.err = newSecureConnectSource()
 	})
-	return defaultSource, defaultSourceErr
+	return defaultCert.source, defaultCert.err
 }
 
 type secureConnectSource struct {
@@ -95,7 +105,15 @@ func validateMetadata(metadata secureConnectMetadata) error {
 }
 
 func (s *secureConnectSource) getClientCertificate(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-	// TODO(cbro): consider caching valid certificates rather than exec'ing every time.
+	defaultCert.cachedCertMutex.Lock()
+	defer defaultCert.cachedCertMutex.Unlock()
+	if defaultCert.cachedCert != nil && !isCertificateExpired(defaultCert.cachedCert) {
+		return defaultCert.cachedCert, nil
+	}
+	// Expand OS environment variables in the cert provider command such as "$HOME".
+	for i := 0; i < len(s.metadata.Cmd); i++ {
+		s.metadata.Cmd[i] = os.ExpandEnv(s.metadata.Cmd[i])
+	}
 	command := s.metadata.Cmd
 	data, err := exec.Command(command[0], command[1:]...).Output()
 	if err != nil {
@@ -106,5 +124,18 @@ func (s *secureConnectSource) getClientCertificate(info *tls.CertificateRequestI
 	if err != nil {
 		return nil, err
 	}
+	defaultCert.cachedCert = &cert
 	return &cert, nil
+}
+
+// isCertificateExpired returns true if the given cert is expired or invalid.
+func isCertificateExpired(cert *tls.Certificate) bool {
+	if len(cert.Certificate) == 0 {
+		return true
+	}
+	parsed, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return true
+	}
+	return time.Now().After(parsed.NotAfter)
 }

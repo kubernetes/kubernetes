@@ -19,6 +19,8 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -184,6 +186,25 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}, "status")
 		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
 	})
+
+	// PDB shouldn't error out when there are unmanaged pods
+	ginkgo.It("should observe that the PodDisruptionBudget status is not updated for unmanaged pods",
+		func() {
+			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+
+			createPodsOrDie(cs, ns, 3)
+			waitForPodsOrDie(cs, ns, 3)
+
+			// Since we allow unmanaged pods to be associated with a PDB, we should not see any error
+			gomega.Consistently(func() (bool, error) {
+				pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return isPDBErroring(pdb), nil
+			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod shouldn't error for "+
+				"unmanaged pod")
+		})
 
 	evictionCases := []struct {
 		description        string
@@ -676,4 +697,16 @@ func unstructuredToPDB(obj *unstructured.Unstructured) (*policyv1.PodDisruptionB
 	pdb.Kind = ""
 	pdb.APIVersion = ""
 	return pdb, err
+}
+
+// isPDBErroring checks if the PDB is erroring on when there are unmanaged pods
+func isPDBErroring(pdb *policyv1.PodDisruptionBudget) bool {
+	hasFailed := false
+	for _, condition := range pdb.Status.Conditions {
+		if strings.Contains(condition.Reason, "SyncFailed") &&
+			strings.Contains(condition.Message, "found no controller ref for pod") {
+			hasFailed = true
+		}
+	}
+	return hasFailed
 }

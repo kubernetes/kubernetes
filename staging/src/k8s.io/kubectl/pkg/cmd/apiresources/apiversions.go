@@ -56,7 +56,7 @@ func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:                   "api-versions",
 		Short:                 i18n.T("Print the supported API versions on the server, in the form of \"group/version\""),
-		Long:                  i18n.T("Print the supported API versions on the server, in the form of \"group/version\""),
+		Long:                  i18n.T("Print the supported API versions on the server, in the form of \"group/version\"."),
 		Example:               apiversionsExample,
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {

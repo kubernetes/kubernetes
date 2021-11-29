@@ -35,6 +35,8 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
+  - k8s.io/utils/clock
+  - k8s.io/utils/net
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/api/"
@@ -67,6 +69,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
+  - k8s.io/kube-openapi
   - k8s.io/utils
 
 # prevent core machinery from taking explicit v1 references unless
@@ -77,6 +80,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
+  - k8s.io/utils
 - baseImportPath: "./vendor/k8s.io/client-go/tools/"
   excludeTests: true
   ignoredSubTrees:
@@ -150,6 +154,7 @@
   - k8s.io/component-base
   - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
+  - k8s.io/utils/net
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/apiextensions-apiserver/"
@@ -167,10 +172,10 @@
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
-  - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/gengo
   - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/sample-cli-plugin/"
   allowedImports:
@@ -228,6 +233,7 @@
   - k8s.io/cloud-provider
   - k8s.io/component-base
   - k8s.io/controller-manager
+  - k8s.io/component-helpers
   - k8s.io/klog
   - k8s.io/utils
 
@@ -267,7 +273,10 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/apiserver/pkg/admission
+  - k8s.io/apiserver/pkg/server
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/pod-security-admission
   - k8s.io/utils

@@ -21,12 +21,12 @@ gofmt:
 
 .PHONY: golint
 golint:
-	@go install golang.org/x/lint/golint
+	@cd tools && go install golang.org/x/lint/golint
 	@$(GOBIN)/golint ./...
 
 .PHONY: staticcheck
 staticcheck:
-	@go install honnef.co/go/tools/cmd/staticcheck
+	@cd tools && go install honnef.co/go/tools/cmd/staticcheck
 	@$(GOBIN)/staticcheck ./...
 
 .PHONY: lint
@@ -38,5 +38,5 @@ cover:
 	go tool cover -html=cover.out -o cover.html
 
 update-license:
-	@go install go.uber.org/tools/update-license
+	@cd tools && go install go.uber.org/tools/update-license
 	@$(GOBIN)/update-license $(GO_FILES)

@@ -108,7 +108,7 @@ func (c *FakeSecrets) Update(ctx context.Context, secret *corev1.Secret, opts v1
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
 func (c *FakeSecrets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &corev1.Secret{})
+		Invokes(testing.NewDeleteActionWithOptions(secretsResource, c.ns, name, opts), &corev1.Secret{})
 
 	return err
 }

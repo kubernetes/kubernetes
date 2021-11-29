@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -22,4 +23,8 @@ import "errors"
 
 func watchForLockfileContention(path string, done chan struct{}) error {
 	return errors.New("kubelet unsupported in this build")
+}
+
+func isCgroup2UnifiedMode() bool {
+	return false
 }

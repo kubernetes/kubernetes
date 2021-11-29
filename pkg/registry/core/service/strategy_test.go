@@ -17,28 +17,26 @@ limitations under the License.
 package service
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
-	_, testCIDR, err := net.ParseCIDR(cidr)
+	_, testCIDR, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		panic("invalid CIDR")
 	}
@@ -48,25 +46,30 @@ func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testSta
 }
 
 func TestCheckGeneratedNameError(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		Resource: "foos",
+	})
+
 	testStrategy, _ := newStrategy("10.0.0.0/16", false)
 	expect := errors.NewNotFound(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(testStrategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsAlreadyExists(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
 
 func makeValidService() *api.Service {
 	preferDual := api.IPFamilyPolicyPreferDualStack
+	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
 	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,10 +87,11 @@ func makeValidService() *api.Service {
 				makeValidServicePort("p", "TCP", 8675),
 				makeValidServicePort("q", "TCP", 309),
 			},
-			ClusterIP:      "1.2.3.4",
-			ClusterIPs:     []string{"1.2.3.4", "5:6:7::8"},
-			IPFamilyPolicy: &preferDual,
-			IPFamilies:     []api.IPFamily{"IPv4", "IPv6"},
+			ClusterIP:             "1.2.3.4",
+			ClusterIPs:            []string{"1.2.3.4", "5:6:7::8"},
+			IPFamilyPolicy:        &preferDual,
+			IPFamilies:            []api.IPFamily{"IPv4", "IPv6"},
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
 }
@@ -107,84 +111,6 @@ func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
 		fn(svc)
 	}
 	return svc
-}
-
-func makeServiceWithClusterIp(clusterIP string, clusterIPs []string) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			ClusterIP:  clusterIP,
-			ClusterIPs: clusterIPs,
-		},
-	}
-}
-
-// TODO: This should be done on types that are not part of our API
-func TestBeforeUpdate(t *testing.T) {
-	testCases := []struct {
-		name      string
-		tweakSvc  func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
-		expectErr bool
-	}{
-		{
-			name: "no change",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				// nothing
-			},
-			expectErr: false,
-		},
-		{
-			name: "change port",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Ports[0].Port++
-			},
-			expectErr: false,
-		},
-		{
-			name: "bad namespace",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Namespace = "#$%%invalid"
-			},
-			expectErr: true,
-		},
-		{
-			name: "change name",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Name += "2"
-			},
-			expectErr: true,
-		},
-		{
-			name: "change ClusterIP",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
-				newSvc.Spec.ClusterIPs = []string{"4.3.2.1"}
-			},
-			expectErr: true,
-		},
-		{
-			name: "change selector",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Selector = map[string]string{"newkey": "newvalue"}
-			},
-			expectErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		strategy, _ := newStrategy("172.30.0.0/16", false)
-
-		oldSvc := makeValidService()
-		newSvc := makeValidService()
-		tc.tweakSvc(oldSvc, newSvc)
-		ctx := genericapirequest.NewDefaultContext()
-		err := rest.BeforeUpdate(strategy, ctx, runtime.Object(oldSvc), runtime.Object(newSvc))
-		if tc.expectErr && err == nil {
-			t.Errorf("unexpected non-error for %q", tc.name)
-		}
-		if !tc.expectErr && err != nil {
-			t.Errorf("unexpected error for %q: %v", tc.name, err)
-		}
-	}
 }
 
 func TestServiceStatusStrategy(t *testing.T) {
@@ -215,15 +141,6 @@ func TestServiceStatusStrategy(t *testing.T) {
 	errs := testStatusStrategy.ValidateUpdate(ctx, newService, oldService)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
-	}
-}
-
-func makeServiceWithIPFamilies(ipfamilies []api.IPFamily, ipFamilyPolicy *api.IPFamilyPolicyType) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			IPFamilies:     ipfamilies,
-			IPFamilyPolicy: ipFamilyPolicy,
-		},
 	}
 }
 
@@ -266,15 +183,10 @@ func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPoli
 }
 
 func TestDropDisabledField(t *testing.T) {
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-	singleStack := api.IPFamilyPolicySingleStack
-
 	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
 
 	testCases := []struct {
 		name                        string
-		enableDualStack             bool
 		enableMixedProtocol         bool
 		enableLoadBalancerClass     bool
 		enableInternalTrafficPolicy bool
@@ -282,64 +194,6 @@ func TestDropDisabledField(t *testing.T) {
 		oldSvc                      *api.Service
 		compareSvc                  *api.Service
 	}{
-		{
-			name:            "not dual stack, field not used",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, field used in old and new",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-			oldSvc:          makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-		},
-		{
-			name:            "dualstack, field used",
-			enableDualStack: true,
-			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
-		},
-		/* preferDualStack field */
-		{
-			name:            "not dual stack, fields is not use",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, fields used in new, not in old",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, &preferDualStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, fields used in new, not in old",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, &requireDualStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-
-		{
-			name:            "not dual stack, fields not used in old (single stack)",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          makeServiceWithIPFamilies(nil, &singleStack),
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "dualstack, field used",
-			enableDualStack: true,
-			svc:             makeServiceWithIPFamilies(nil, &singleStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, &singleStack),
-		},
 		/* svc.Status.Conditions */
 		{
 			name:                "mixed protocol not enabled, field not used in old, not used in new",
@@ -537,7 +391,6 @@ func TestDropDisabledField(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
@@ -555,155 +408,6 @@ func TestDropDisabledField(t *testing.T) {
 				t.Errorf("%v: unexpected svc spec: %v", tc.name, diff.ObjectReflectDiff(tc.svc, tc.compareSvc))
 			}
 		}()
-	}
-
-}
-
-func TestNormalizeClusterIPs(t *testing.T) {
-	testCases := []struct {
-		name               string
-		oldService         *api.Service
-		newService         *api.Service
-		expectedClusterIP  string
-		expectedClusterIPs []string
-	}{
-		{
-			name:               "new - only clusterip used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "new - only clusterips used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
-			expectedClusterIP:  "", // this is a validation issue, and validation will catch it
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "new - both used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - no change",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - malformed change",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11"}),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: []string{"10.0.0.11"},
-		},
-		{
-			name:               "update - malformed change on secondary ip",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11", "3000::1"}),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
-		},
-		{
-			name:               "update - upgrade",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
-		},
-		{
-			name:               "update - downgrade",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user cleared cluster IP",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
-			expectedClusterIP:  "",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user cleared both",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", nil),
-			expectedClusterIP:  "",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user cleared ClusterIP but changed clusterIPs",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.11"}),
-			expectedClusterIP:  "", /* validation catches this */
-			expectedClusterIPs: []string{"10.0.0.11"},
-		},
-		{
-			name:               "update - user cleared ClusterIPs but changed ClusterIP",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", nil),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user changed from None to ClusterIP",
-			oldService:         makeServiceWithClusterIp("None", []string{"None"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"None"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user changed from ClusterIP to None",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.10"}),
-			expectedClusterIP:  "None",
-			expectedClusterIPs: []string{"None"},
-		},
-		{
-			name:               "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.11", "2000::1"}),
-			expectedClusterIP:  "None",
-			expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			NormalizeClusterIPs(tc.oldService, tc.newService)
-
-			if tc.newService == nil {
-				t.Fatalf("unexpected new service to be nil")
-			}
-
-			if tc.newService.Spec.ClusterIP != tc.expectedClusterIP {
-				t.Fatalf("expected clusterIP [%v] got [%v]", tc.expectedClusterIP, tc.newService.Spec.ClusterIP)
-			}
-
-			if len(tc.newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
-				t.Fatalf("expected  clusterIPs %v got %v", tc.expectedClusterIPs, tc.newService.Spec.ClusterIPs)
-			}
-
-			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
-				if clusterIP != tc.expectedClusterIPs[idx] {
-					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
-
-				}
-			}
-		})
 	}
 
 }
@@ -989,115 +693,6 @@ func TestDropTypeDependentFields(t *testing.T) {
 			if !reflect.DeepEqual(result.Spec.LoadBalancerClass, tc.expect.Spec.LoadBalancerClass) {
 				t.Errorf("failed %q: expected LoadBalancerClass %v, got %v", tc.name, tc.expect.Spec.LoadBalancerClass, result.Spec.LoadBalancerClass)
 			}
-		})
-	}
-}
-
-func TestTrimFieldsForDualStackDowngrade(t *testing.T) {
-	singleStack := api.IPFamilyPolicySingleStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	testCases := []struct {
-		name          string
-		oldPolicy     *api.IPFamilyPolicyType
-		oldClusterIPs []string
-		oldFamilies   []api.IPFamily
-
-		newPolicy          *api.IPFamilyPolicyType
-		expectedClusterIPs []string
-		expectedIPFamilies []api.IPFamily
-	}{
-
-		{
-			name:               "no change single to single",
-			oldPolicy:          &singleStack,
-			oldClusterIPs:      []string{"10.10.10.10"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"10.10.10.10"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
-		},
-
-		{
-			name:               "dualstack to dualstack (preferred)",
-			oldPolicy:          &preferDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &preferDualStack,
-			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-		},
-
-		{
-			name:               "dualstack to dualstack (required)",
-			oldPolicy:          &requireDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &preferDualStack,
-			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-		},
-
-		{
-			name:               "dualstack (preferred) to single",
-			oldPolicy:          &preferDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"10.10.10.10"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
-		},
-
-		{
-			name:               "dualstack (require) to single",
-			oldPolicy:          &requireDualStack,
-			oldClusterIPs:      []string{"2000::1", "10.10.10.10"},
-			oldFamilies:        []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv6Protocol},
-		},
-	}
-	// only when gate is on
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			oldService := &api.Service{
-				Spec: api.ServiceSpec{
-					IPFamilyPolicy: tc.oldPolicy,
-					ClusterIPs:     tc.oldClusterIPs,
-					IPFamilies:     tc.oldFamilies,
-				},
-			}
-
-			newService := oldService.DeepCopy()
-			newService.Spec.IPFamilyPolicy = tc.newPolicy
-
-			trimFieldsForDualStackDowngrade(newService, oldService)
-
-			if len(newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
-				t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
-			}
-
-			// compare clusterIPS
-			for i, expectedIP := range tc.expectedClusterIPs {
-				if expectedIP != newService.Spec.ClusterIPs[i] {
-					t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
-				}
-			}
-
-			// families
-			if len(newService.Spec.IPFamilies) != len(tc.expectedIPFamilies) {
-				t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
-			}
-
-			// compare clusterIPS
-			for i, expectedIPFamily := range tc.expectedIPFamilies {
-				if expectedIPFamily != newService.Spec.IPFamilies[i] {
-					t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
-				}
-			}
-
 		})
 	}
 }

@@ -56,22 +56,6 @@ type InterPodAffinityArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
-type NodeLabelArgs struct {
-	metav1.TypeMeta
-
-	// PresentLabels should be present for the node to be considered a fit for hosting the pod
-	PresentLabels []string
-	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
-	AbsentLabels []string
-	// Nodes that have labels in the list will get a higher score.
-	PresentLabelsPreference []string
-	// Nodes that don't have labels in the list will get a higher score.
-	AbsentLabelsPreference []string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeResourcesFitArgs holds arguments used to configure the NodeResourcesFit plugin.
 type NodeResourcesFitArgs struct {
 	metav1.TypeMeta
@@ -84,6 +68,9 @@ type NodeResourcesFitArgs struct {
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
 	// A resource group name can't contain '/'.
 	IgnoredResourceGroups []string
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	ScoringStrategy *ScoringStrategy
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -126,39 +113,12 @@ type PodTopologySpreadArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RequestedToCapacityRatioArgs holds arguments used to configure RequestedToCapacityRatio plugin.
-type RequestedToCapacityRatioArgs struct {
-	metav1.TypeMeta
-
-	// Points defining priority function shape
-	Shape []UtilizationShapePoint
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Weights should be larger than 0.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
-type NodeResourcesLeastAllocatedArgs struct {
+// NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
+type NodeResourcesBalancedAllocationArgs struct {
 	metav1.TypeMeta
 
 	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
-type NodeResourcesMostAllocatedArgs struct {
-	metav1.TypeMeta
-
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
+	// The default resource set includes "cpu" and "memory", only valid weight is 1.
 	Resources []ResourceSpec
 }
 
@@ -180,20 +140,6 @@ type ResourceSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ServiceAffinityArgs holds arguments used to configure the ServiceAffinity plugin.
-type ServiceAffinityArgs struct {
-	metav1.TypeMeta
-
-	// AffinityLabels are homogeneous for pods that are scheduled to a node.
-	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
-	// the same service are running on nodes with the exact same values for Labels).
-	AffinityLabels []string
-	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
-	AntiAffinityLabelsPreference []string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // VolumeBindingArgs holds arguments used to configure the VolumeBinding plugin.
 type VolumeBindingArgs struct {
 	metav1.TypeMeta
@@ -202,6 +148,21 @@ type VolumeBindingArgs struct {
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds int64
+
+	// Shape specifies the points defining the score function shape, which is
+	// used to score nodes based on the utilization of statically provisioned
+	// PVs. The utilization is calculated by dividing the total requested
+	// storage of the pod by the total capacity of feasible PVs on each node.
+	// Each point contains utilization (ranges from 0 to 100) and its
+	// associated score (ranges from 0 to 10). You can turn the priority by
+	// specifying different scores for different utilization numbers.
+	// The default shape points are:
+	// 1) 0 for 0 utilization
+	// 2) 10 for 100 utilization
+	// All points must be sorted in increasing order by utilization.
+	// +featureGate=VolumeCapacityPriority
+	// +optional
+	Shape []UtilizationShapePoint
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -217,4 +178,38 @@ type NodeAffinityArgs struct {
 	// When AddedAffinity is used, some Pods with affinity requirements that match
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	AddedAffinity *v1.NodeAffinity
+}
+
+// ScoringStrategyType the type of scoring strategy used in NodeResourcesFit plugin.
+type ScoringStrategyType string
+
+const (
+	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// RequestedToCapacityRatio strategy allows specifying a custom shape function
+	// to score nodes based on the request to capacity ratio.
+	RequestedToCapacityRatio ScoringStrategyType = "RequestedToCapacityRatio"
+)
+
+// ScoringStrategy define ScoringStrategyType for node resource plugin
+type ScoringStrategy struct {
+	// Type selects which strategy to run.
+	Type ScoringStrategyType
+
+	// Resources to consider when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	// Weight defaults to 1 if not specified or explicitly set to 0.
+	Resources []ResourceSpec
+
+	// Arguments specific to RequestedToCapacityRatio strategy.
+	RequestedToCapacityRatio *RequestedToCapacityRatioParam
+}
+
+// RequestedToCapacityRatioParam define RequestedToCapacityRatio parameters
+type RequestedToCapacityRatioParam struct {
+	// Shape is a list of points defining the scoring function shape.
+	Shape []UtilizationShapePoint
 }

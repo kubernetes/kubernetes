@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -55,7 +56,7 @@ var (
 		Mark node as unschedulable.`))
 
 	cordonExample = templates.Examples(i18n.T(`
-		# Mark node "foo" as unschedulable.
+		# Mark node "foo" as unschedulable
 		kubectl cordon foo`))
 )
 
@@ -68,6 +69,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		Short:                 i18n.T("Mark node as unschedulable"),
 		Long:                  cordonLong,
 		Example:               cordonExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
@@ -83,8 +85,8 @@ var (
 		Mark node as schedulable.`))
 
 	uncordonExample = templates.Examples(i18n.T(`
-		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`))
+		# Mark node "foo" as schedulable
+		kubectl uncordon foo`))
 )
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
@@ -96,6 +98,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 		Short:                 i18n.T("Mark node as schedulable"),
 		Long:                  uncordonLong,
 		Example:               uncordonExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
@@ -111,16 +114,16 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		'drain' evicts the pods if the APIServer supports
-		[eviction](http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal
+		'drain' evicts the pods if the API server supports
+		[eviction](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/). Otherwise, it will use normal
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
-		the API server).  If there are DaemonSet-managed pods, drain will not proceed
+		the API server).  If there are daemon set-managed pods, drain will not proceed
 		without --ignore-daemonsets, and regardless it will not delete any
-		DaemonSet-managed pods, because those pods would be immediately replaced by the
-		DaemonSet controller, which ignores unschedulable markings.  If there are any
-		pods that are neither mirror pods nor managed by ReplicationController,
-		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
+		daemon set-managed pods, because those pods would be immediately replaced by the
+		daemon set controller, which ignores unschedulable markings.  If there are any
+		pods that are neither mirror pods nor managed by a replication controller,
+		replica set, daemon set, stateful set, or job, then drain will not delete any pods unless you
 		use --force.  --force will also allow deletion to proceed if the managing resource of one
 		or more pods is missing.
 
@@ -130,14 +133,14 @@ var (
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
 
-		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)`))
+		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
 	drainExample = templates.Examples(i18n.T(`
-		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
-		$ kubectl drain foo --force
+		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set on it
+		kubectl drain foo --force
 
-		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.
-		$ kubectl drain foo --grace-period=900`))
+		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set, and use a grace period of 15 minutes
+		kubectl drain foo --grace-period=900`))
 )
 
 func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
@@ -181,6 +184,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Drain node in preparation for maintenance"),
 		Long:                  drainLong,
 		Example:               drainExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunDrain())
@@ -188,7 +192,6 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	}
 	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
 	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&o.drainer.IgnoreErrors, "ignore-errors", o.drainer.IgnoreErrors, "Ignore errors occurred between drain nodes in group.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-local-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().MarkDeprecated("delete-local-data", "This option is deprecated and will be deleted. Use --delete-emptydir-data.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-emptydir-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
@@ -293,44 +296,40 @@ func (o *DrainCmdOptions) RunDrain() error {
 		return err
 	}
 
-	printObj, err := o.ToPrinter("drained")
-	if err != nil {
-		return err
-	}
-
 	drainedNodes := sets.NewString()
-	var fatal error
+	var fatal []error
 
+	remainingNodes := []string{}
 	for _, info := range o.nodeInfos {
 		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
-			printObj(info.Object, o.Out)
-		} else {
-			if o.drainer.IgnoreErrors && len(o.nodeInfos) > 1 {
-				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
-				continue
-			}
-			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
-			remainingNodes := []string{}
-			fatal = err
-			for _, remainingInfo := range o.nodeInfos {
-				if drainedNodes.Has(remainingInfo.Name) {
-					continue
-				}
-				remainingNodes = append(remainingNodes, remainingInfo.Name)
+
+			printObj, err := o.ToPrinter("drained")
+			if err != nil {
+				return err
 			}
 
-			if len(remainingNodes) > 0 {
-				fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
-				for _, nodeName := range remainingNodes {
-					fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
-				}
+			printObj(info.Object, o.Out)
+		} else {
+			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
+
+			if !drainedNodes.Has(info.Name) {
+				fatal = append(fatal, err)
+				remainingNodes = append(remainingNodes, info.Name)
 			}
-			break
+
+			continue
 		}
 	}
 
-	return fatal
+	if len(remainingNodes) > 0 {
+		fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
+		for _, nodeName := range remainingNodes {
+			fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
+		}
+	}
+
+	return utilerrors.NewAggregate(fatal)
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {

@@ -505,7 +505,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.It("execing into a container with a failing command", func() {
 				_, err := framework.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
@@ -517,7 +519,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.It("running a failing command", func() {
 				_, err := framework.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
@@ -526,7 +530,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
@@ -537,7 +543,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
+				}
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
@@ -644,6 +652,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should handle in-cluster config", func() {
+			// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
+			// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
+			// binaries, the necessary libraries are not also copied. For this reason, the test can not be
+			// guaranteed to work with GKE, which sometimes run tests using a dynamically linked kubectl.
+			e2eskipper.SkipIfProviderIs("gke")
 			// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
 			// for now this only works on amd64
 			e2eskipper.SkipUnlessNodeOSArchIs("amd64")
@@ -1201,7 +1214,7 @@ metadata:
 
 			ginkgo.By("waiting for cronjob to start.")
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				cj, err := c.BatchV1beta1().CronJobs(ns).List(context.TODO(), metav1.ListOptions{})
+				cj, err := c.BatchV1().CronJobs(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
 				}

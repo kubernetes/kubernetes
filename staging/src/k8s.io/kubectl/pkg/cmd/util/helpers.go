@@ -23,19 +23,20 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -465,7 +466,8 @@ type ValidateOptions struct {
 	EnableValidation bool
 }
 
-// Merge requires JSON serialization
+// Merge converts the passed in object to JSON, merges the fragment into it using an RFC7396 JSON Merge Patch,
+// and returns the resulting object
 // TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
 func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
 	// encode dst into versioned json and apply fragment directly too it
@@ -474,6 +476,46 @@ func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Ob
 		return nil, err
 	}
 	patched, err := jsonpatch.MergePatch(target, []byte(fragment))
+	if err != nil {
+		return nil, err
+	}
+	out, err := runtime.Decode(codec, patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StrategicMerge converts the passed in object to JSON, merges the fragment into it using a Strategic Merge Patch,
+// and returns the resulting object
+func StrategicMerge(codec runtime.Codec, dst runtime.Object, fragment string, dataStruct runtime.Object) (runtime.Object, error) {
+	target, err := runtime.Encode(codec, dst)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(target, []byte(fragment), dataStruct)
+	if err != nil {
+		return nil, err
+	}
+	out, err := runtime.Decode(codec, patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// JSONPatch converts the passed in object to JSON, performs an RFC6902 JSON Patch using operations specified in the
+// fragment, and returns the resulting object
+func JSONPatch(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
+	target, err := runtime.Encode(codec, dst)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := jsonpatch.DecodePatch([]byte(fragment))
+	if err != nil {
+		return nil, err
+	}
+	patched, err := patch.Apply(target)
 	if err != nil {
 		return nil, err
 	}
@@ -547,30 +589,18 @@ const (
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
-	b, err := strconv.ParseBool(dryRunFlag)
-	// The flag is not a boolean
-	if err != nil {
-		switch dryRunFlag {
-		case cmd.Flag("dry-run").NoOptDefVal:
-			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
-			return DryRunClient, nil
-		case "client":
-			return DryRunClient, nil
-		case "server":
-			return DryRunServer, nil
-		case "none":
-			return DryRunNone, nil
-		default:
-			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
-		}
-	}
-	// The flag was a boolean
-	if b {
-		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+	switch dryRunFlag {
+	case cmd.Flag("dry-run").NoOptDefVal:
+		return DryRunNone, errors.New(`--dry-run flag without a value was specified. A value must be set: "none", "server", or "client".`)
+	case "client":
 		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
 	}
-	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
-	return DryRunNone, nil
 }
 
 // PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
@@ -695,7 +725,9 @@ func ManualStrip(file []byte) []byte {
 	stripped := []byte{}
 	lines := bytes.Split(file, []byte("\n"))
 	for i, line := range lines {
-		if bytes.HasPrefix(bytes.TrimSpace(line), []byte("#")) {
+		trimline := bytes.TrimSpace(line)
+
+		if bytes.HasPrefix(trimline, []byte("#")) && !bytes.HasPrefix(trimline, []byte("#!")) {
 			continue
 		}
 		stripped = append(stripped, line...)
@@ -745,4 +777,19 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
+}
+
+// Difference removes any elements of subArray from fullArray and returns the result
+func Difference(fullArray []string, subArray []string) []string {
+	exclude := make(map[string]bool, len(subArray))
+	for _, elem := range subArray {
+		exclude[elem] = true
+	}
+	var result []string
+	for _, elem := range fullArray {
+		if _, found := exclude[elem]; !found {
+			result = append(result, elem)
+		}
+	}
+	return result
 }

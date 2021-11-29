@@ -410,21 +410,45 @@ func TestWarnings(t *testing.T) {
 		},
 		{
 			name: "annotations",
-			template: &api.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-				`foo`: `bar`,
-				`scheduler.alpha.kubernetes.io/critical-pod`:         `true`,
-				`seccomp.security.alpha.kubernetes.io/pod`:           `default`,
-				`container.seccomp.security.alpha.kubernetes.io/foo`: `default`,
-				`security.alpha.kubernetes.io/sysctls`:               `a,b,c`,
-				`security.alpha.kubernetes.io/unsafe-sysctls`:        `d,e,f`,
-			}}},
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`foo`: `bar`,
+					`scheduler.alpha.kubernetes.io/critical-pod`:         `true`,
+					`seccomp.security.alpha.kubernetes.io/pod`:           `default`,
+					`container.seccomp.security.alpha.kubernetes.io/foo`: `default`,
+					`security.alpha.kubernetes.io/sysctls`:               `a,b,c`,
+					`security.alpha.kubernetes.io/unsafe-sysctls`:        `d,e,f`,
+				}},
+				Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}}},
+			},
 			expected: []string{
 				`metadata.annotations[scheduler.alpha.kubernetes.io/critical-pod]: non-functional in v1.16+; use the "priorityClassName" field instead`,
-				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19; use the "seccompProfile" field instead`,
-				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19; use the "seccompProfile" field instead`,
+				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
+				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/unsafe-sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 			},
+		},
+		{
+			name: "seccomp fields",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`seccomp.security.alpha.kubernetes.io/pod`:           `default`,
+					`container.seccomp.security.alpha.kubernetes.io/foo`: `default`,
+				}},
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+						SecurityContext: &api.SecurityContext{
+							SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault},
+						},
+					}},
+				},
+			},
+			expected: []string{},
 		},
 	}
 

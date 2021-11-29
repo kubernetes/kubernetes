@@ -52,7 +52,7 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 // ExtractPriorityClass extracts the applied configuration owned by fieldManager from
 // priorityClass. If no managedFields are found in priorityClass for fieldManager, a
 // PriorityClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // priorityClass must be a unmodified PriorityClass API object that was retrieved from the Kubernetes API.

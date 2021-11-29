@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -85,8 +86,8 @@ func TestCreateVolume(t *testing.T) {
 	b.common.cloud.StorageAccountClient = mockSAClient
 
 	diskName, diskURI, requestGB, err := b.CreateVolume("testBlob", "testsa", "type", b.common.location, 10)
-	expectedErr := fmt.Errorf("could not get storage key for storage account testsa: could not get storage key for " +
-		"storage account testsa: Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>")
+	expectedErr := fmt.Errorf("could not get storage key for storage account testsa: could not get storage key for "+
+		"storage account testsa: Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", error(nil))
 	assert.Equal(t, expectedErr, err)
 	assert.Empty(t, diskName)
 	assert.Empty(t, diskURI)
@@ -122,7 +123,7 @@ func TestDeleteVolume(t *testing.T) {
 	fakeDiskURL := "fake"
 	diskURL := "https://foo.blob./vhds/bar.vhd"
 	err := b.DeleteVolume(diskURL)
-	expectedErr := fmt.Errorf("no key for storage account foo, err Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>")
+	expectedErr := fmt.Errorf("no key for storage account foo, err Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", error(nil))
 	assert.Equal(t, expectedErr, err)
 
 	err = b.DeleteVolume(diskURL)

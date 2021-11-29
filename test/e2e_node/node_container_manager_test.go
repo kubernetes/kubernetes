@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -33,7 +34,10 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -166,13 +170,39 @@ func runTest(f *framework.Framework) error {
 		return err
 	}
 
+	// Test needs to be updated to make it run properly on systemd.
+	// In its current state it will result in kubelet error since
+	// kubeReservedCgroup and systemReservedCgroup are not configured
+	// correctly for systemd.
+	// See: https://github.com/kubernetes/kubernetes/issues/102394
+	if oldCfg.CgroupDriver == "systemd" {
+		e2eskipper.Skipf("unable to run test when using systemd as cgroup driver")
+	}
+
 	// Create a cgroup manager object for manipulating cgroups.
 	cgroupManager := cm.NewCgroupManager(subsystems, oldCfg.CgroupDriver)
 
 	defer destroyTemporaryCgroupsForReservation(cgroupManager)
 	defer func() {
 		if oldCfg != nil {
-			framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
+			// Update the Kubelet configuration.
+			ginkgo.By("Stopping the kubelet")
+			startKubelet := stopKubelet()
+
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+
+			ginkgo.By("Starting the kubelet")
+			startKubelet()
+
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 		}
 	}()
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
@@ -182,7 +212,25 @@ func runTest(f *framework.Framework) error {
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.
-	err = setKubeletConfiguration(f, newCfg)
+	// Update the Kubelet configuration.
+	ginkgo.By("Stopping the kubelet")
+	startKubelet := stopKubelet()
+
+	// wait until the kubelet health check will fail
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+
+	ginkgo.By("Starting the kubelet")
+	startKubelet()
+
+	// wait until the kubelet health check will succeed
+	gomega.Eventually(func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+
 	if err != nil {
 		return err
 	}

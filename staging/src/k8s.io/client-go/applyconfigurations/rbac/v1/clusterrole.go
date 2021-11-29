@@ -49,7 +49,7 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 // ExtractClusterRole extracts the applied configuration owned by fieldManager from
 // clusterRole. If no managedFields are found in clusterRole for fieldManager, a
 // ClusterRoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // clusterRole must be a unmodified ClusterRole API object that was retrieved from the Kubernetes API.

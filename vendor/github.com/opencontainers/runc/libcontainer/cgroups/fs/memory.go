@@ -25,8 +25,7 @@ const (
 	cgroupMemoryMaxUsage  = "memory.max_usage_in_bytes"
 )
 
-type MemoryGroup struct {
-}
+type MemoryGroup struct{}
 
 func (s *MemoryGroup) Name() string {
 	return "memory"
@@ -41,7 +40,7 @@ func setMemory(path string, val int64) error {
 		return nil
 	}
 
-	err := fscommon.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(val, 10))
+	err := cgroups.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(val, 10))
 	if !errors.Is(err, unix.EBUSY) {
 		return err
 	}
@@ -65,7 +64,7 @@ func setSwap(path string, val int64) error {
 		return nil
 	}
 
-	return fscommon.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(val, 10))
+	return cgroups.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(val, 10))
 }
 
 func setMemoryAndSwap(path string, r *configs.Resources) error {
@@ -118,20 +117,20 @@ func (s *MemoryGroup) Set(path string, r *configs.Resources) error {
 	// ignore KernelMemory and KernelMemoryTCP
 
 	if r.MemoryReservation != 0 {
-		if err := fscommon.WriteFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(r.MemoryReservation, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(r.MemoryReservation, 10)); err != nil {
 			return err
 		}
 	}
 
 	if r.OomKillDisable {
-		if err := fscommon.WriteFile(path, "memory.oom_control", "1"); err != nil {
+		if err := cgroups.WriteFile(path, "memory.oom_control", "1"); err != nil {
 			return err
 		}
 	}
 	if r.MemorySwappiness == nil || int64(*r.MemorySwappiness) == -1 {
 		return nil
 	} else if *r.MemorySwappiness <= 100 {
-		if err := fscommon.WriteFile(path, "memory.swappiness", strconv.FormatUint(*r.MemorySwappiness, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "memory.swappiness", strconv.FormatUint(*r.MemorySwappiness, 10)); err != nil {
 			return err
 		}
 	} else {
@@ -143,7 +142,7 @@ func (s *MemoryGroup) Set(path string, r *configs.Resources) error {
 
 func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	// Set stats from memory.stat.
-	statsFile, err := fscommon.OpenFile(path, "memory.stat", os.O_RDONLY)
+	statsFile, err := cgroups.OpenFile(path, "memory.stat", os.O_RDONLY)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -200,14 +199,6 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	return nil
 }
 
-func memoryAssigned(cgroup *configs.Cgroup) bool {
-	return cgroup.Resources.Memory != 0 ||
-		cgroup.Resources.MemoryReservation != 0 ||
-		cgroup.Resources.MemorySwap > 0 ||
-		cgroup.Resources.OomKillDisable ||
-		(cgroup.Resources.MemorySwappiness != nil && int64(*cgroup.Resources.MemorySwappiness) != -1)
-}
-
 func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 	memoryData := cgroups.MemoryData{}
 
@@ -258,12 +249,13 @@ func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
 	)
 	stats := cgroups.PageUsageByNUMA{}
 
-	file, err := fscommon.OpenFile(cgroupPath, filename, os.O_RDONLY)
+	file, err := cgroups.OpenFile(cgroupPath, filename, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return stats, nil
 	} else if err != nil {
 		return stats, err
 	}
+	defer file.Close()
 
 	// File format is documented in linux/Documentation/cgroup-v1/memory.txt
 	// and it looks like this:

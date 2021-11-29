@@ -108,7 +108,7 @@ func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision
 // Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
 func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &appsv1.ControllerRevision{})
+		Invokes(testing.NewDeleteActionWithOptions(controllerrevisionsResource, c.ns, name, opts), &appsv1.ControllerRevision{})
 
 	return err
 }

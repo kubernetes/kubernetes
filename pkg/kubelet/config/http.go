@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -129,7 +129,7 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return multiPodErr
 		}
-		pods := make([]*v1.Pod, 0)
+		pods := make([]*v1.Pod, 0, len(podList.Items))
 		for i := range podList.Items {
 			pods = append(pods, &podList.Items[i])
 		}

@@ -64,6 +64,8 @@ var (
 )
 
 type CacheInfo struct {
+	// cache id
+	Id int
 	// size in bytes
 	Size uint64
 	// cache type - instruction, data, unified
@@ -292,14 +294,24 @@ func getCPUCount(cache string) (count int, err error) {
 	return
 }
 
-func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
-	cachePath := fmt.Sprintf("%s%d/cache/%s", cacheDir, id, name)
-	out, err := ioutil.ReadFile(path.Join(cachePath, "/size"))
+func (fs *realSysFs) GetCacheInfo(cpu int, name string) (CacheInfo, error) {
+	cachePath := fmt.Sprintf("%s%d/cache/%s", cacheDir, cpu, name)
+	out, err := ioutil.ReadFile(path.Join(cachePath, "/id"))
+	if err != nil {
+		return CacheInfo{}, err
+	}
+	var id int
+	n, err := fmt.Sscanf(string(out), "%d", &id)
+	if err != nil || n != 1 {
+		return CacheInfo{}, err
+	}
+
+	out, err = ioutil.ReadFile(path.Join(cachePath, "/size"))
 	if err != nil {
 		return CacheInfo{}, err
 	}
 	var size uint64
-	n, err := fmt.Sscanf(string(out), "%dK", &size)
+	n, err = fmt.Sscanf(string(out), "%dK", &size)
 	if err != nil || n != 1 {
 		return CacheInfo{}, err
 	}
@@ -325,6 +337,7 @@ func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 		return CacheInfo{}, err
 	}
 	return CacheInfo{
+		Id:    id,
 		Size:  size,
 		Level: level,
 		Type:  cacheType,

@@ -28,6 +28,10 @@ type Selector struct {
 	LabelSelector string `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty"`
 }
 
+func (s *Selector) Copy() Selector {
+	return *s
+}
+
 func (s *Selector) String() string {
 	return fmt.Sprintf(
 		"%s:a=%s:l=%s", s.ResId, s.AnnotationSelector, s.LabelSelector)

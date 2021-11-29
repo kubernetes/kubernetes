@@ -17,8 +17,10 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -35,7 +37,7 @@ type InitConfiguration struct {
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
 	// +optional
-	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
+	BootstrapTokens []bootstraptokenv1.BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	// +optional
@@ -60,6 +62,11 @@ type InitConfiguration struct {
 	// The flag "--skip-phases" takes precedence over this field.
 	// +optional
 	SkipPhases []string `json:"skipPhases,omitempty"`
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm init".
+	// +optional
+	Patches *Patches `json:"patches,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -115,7 +122,7 @@ type ClusterConfiguration struct {
 	CertificatesDir string `json:"certificatesDir,omitempty"`
 
 	// ImageRepository sets the container registry to pull images from.
-	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
+	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/`)
 	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
 	// will be used for all the other images.
 	// +optional
@@ -133,6 +140,8 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// TODO: This is temporary and ideally we would like to switch all components to
 	// use ComponentConfig + ConfigMaps.
 	// +optional
@@ -209,17 +218,25 @@ type NodeRegistrationOptions struct {
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
 	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
 	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
-	Taints []v1.Taint `json:"taints"`
+	Taints []corev1.Taint `json:"taints"`
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// +optional
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
 	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
+
+	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration
@@ -233,33 +250,6 @@ type Networking struct {
 	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
 	// +optional
 	DNSDomain string `json:"dnsDomain,omitempty"`
-}
-
-// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
-type BootstrapToken struct {
-	// Token is used for establishing bidirectional trust between nodes and control-planes.
-	// Used for joining nodes in the cluster.
-	Token *BootstrapTokenString `json:"token" datapolicy:"token"`
-	// Description sets a human-friendly message why this token exists and what it's used
-	// for, so other administrators can know its purpose.
-	// +optional
-	Description string `json:"description,omitempty"`
-	// TTL defines the time to live for this token. Defaults to 24h.
-	// Expires and TTL are mutually exclusive.
-	// +optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
-	// Expires specifies the timestamp when this token expires. Defaults to being set
-	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
-	// +optional
-	Expires *metav1.Time `json:"expires,omitempty"`
-	// Usages describes the ways in which this token can be used. Can by default be used
-	// for establishing bidirectional trust, but that can be changed here.
-	// +optional
-	Usages []string `json:"usages,omitempty"`
-	// Groups specifies the extra groups that this token will authenticate as when/if
-	// used for authentication
-	// +optional
-	Groups []string `json:"groups,omitempty"`
 }
 
 // Etcd contains elements describing Etcd configuration.
@@ -287,6 +277,8 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// +optional
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
@@ -346,6 +338,11 @@ type JoinConfiguration struct {
 	// The flag "--skip-phases" takes precedence over this field.
 	// +optional
 	SkipPhases []string `json:"skipPhases,omitempty"`
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm join".
+	// +optional
+	Patches *Patches `json:"patches,omitempty"`
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -431,5 +428,18 @@ type HostPathMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
 	// +optional
-	PathType v1.HostPathType `json:"pathType,omitempty"`
+	PathType corev1.HostPathType `json:"pathType,omitempty"`
+}
+
+// Patches contains options related to applying patches to components deployed by kubeadm.
+type Patches struct {
+	// Directory is a path to a directory that contains files named "target[suffix][+patchtype].extension".
+	// For example, "kube-apiserver0+merge.yaml" or just "etcd.json". "target" can be one of
+	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd". "patchtype" can be one
+	// of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
+	// The default "patchtype" is "strategic". "extension" must be either "json" or "yaml".
+	// "suffix" is an optional string that can be used to determine which patches are applied
+	// first alpha-numerically.
+	// +optional
+	Directory string `json:"directory,omitempty"`
 }

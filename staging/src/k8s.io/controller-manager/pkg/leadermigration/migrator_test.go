@@ -55,6 +55,22 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			},
 		},
 	}
+	wildcardConfig := &internal.LeaderMigrationConfiguration{
+		ResourceLock: "leases",
+		LeaderName:   "cloud-provider-extraction-migration",
+		ControllerLeaders: []internal.ControllerLeaderConfiguration{
+			{
+				Name:      "route",
+				Component: "*",
+			}, {
+				Name:      "service",
+				Component: "*",
+			}, {
+				Name:      "cloud-node-lifecycle",
+				Component: "*",
+			},
+		},
+	}
 	for _, tc := range []struct {
 		name         string
 		config       *internal.LeaderMigrationConfiguration
@@ -101,6 +117,28 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			component: "cloud-controller-manager",
 			expectResult: map[string]FilterResult{
 				"cloud-node":           ControllerNonMigrated,
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
+			},
+		},
+		{
+			name:      "wildcard config, kcm",
+			config:    wildcardConfig,
+			component: "kube-controller-manager",
+			expectResult: map[string]FilterResult{
+				"deployment":           ControllerNonMigrated, // KCM only
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
+			},
+		},
+		{
+			name:      "wildcard config, ccm",
+			config:    wildcardConfig,
+			component: "cloud-controller-manager",
+			expectResult: map[string]FilterResult{
+				"cloud-node":           ControllerNonMigrated, // CCM only
 				"route":                ControllerMigrated,
 				"service":              ControllerMigrated,
 				"cloud-node-lifecycle": ControllerMigrated,

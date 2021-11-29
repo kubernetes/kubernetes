@@ -90,6 +90,7 @@ type StorageClassList struct {
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+// +enum
 type VolumeBindingMode string
 
 const (
@@ -341,7 +342,7 @@ type CSIDriverSpec struct {
 	// unset or false and it can be flipped later when storage
 	// capacity information has been published.
 	//
-	// This field is immutable.
+	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
 	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
@@ -353,8 +354,6 @@ type CSIDriverSpec struct {
 	// Defines if the underlying volume supports changing ownership and
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
-	// This field is beta, and is only honored by servers
-	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	//
 	// This field is immutable.
 	//
@@ -381,9 +380,6 @@ type CSIDriverSpec struct {
 	// most one token is empty string. To receive a new token after expiry,
 	// RequiresRepublish can be used to trigger NodePublishVolume periodically.
 	//
-	// This is a beta feature and only available when the
-	// CSIServiceAccountToken feature is enabled.
-	//
 	// +optional
 	// +listType=atomic
 	TokenRequests []TokenRequest `json:"tokenRequests,omitempty" protobuf:"bytes,6,opt,name=tokenRequests"`
@@ -395,9 +391,6 @@ type CSIDriverSpec struct {
 	// Note: After a successful initial NodePublishVolume call, subsequent calls
 	// to NodePublishVolume should only update the contents of the volume. New
 	// mount points will not be seen by a running container.
-	//
-	// This is a beta feature and only available when the
-	// CSIServiceAccountToken feature is enabled.
 	//
 	// +optional
 	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`

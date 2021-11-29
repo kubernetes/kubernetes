@@ -35,8 +35,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -97,7 +95,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
 
 	if err != nil {
-		return errors.Wrap(err, "cannot create Pod event watcher")
+		return fmt.Errorf("cannot create Pod event watcher: %w", err)
 	}
 
 	go func() {

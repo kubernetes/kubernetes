@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
@@ -93,6 +94,43 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 			return strings.Contains(err.Error(), expectedErr), nil
 		}); err != nil {
 			framework.Failf("Expected error to contain %s, got %s", expectedErr, lastErr.Error())
+		}
+	})
+
+	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", func() {
+		ingressClass := &networkingv1.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ingressclass1",
+				Labels: map[string]string{
+					"ingressclass":  f.UniqueName,
+					"special-label": "generic",
+				},
+			},
+			Spec: networkingv1.IngressClassSpec{
+				Controller: "example.com/controller",
+				Parameters: &networkingv1.IngressClassParametersReference{
+					Scope:     utilpointer.StringPtr("Namespace"),
+					Namespace: utilpointer.StringPtr("foo-ns"),
+					Kind:      "fookind",
+					Name:      "fooname",
+					APIGroup:  utilpointer.StringPtr("example.com"),
+				},
+			},
+		}
+		createdIngressClass, err := cs.NetworkingV1().IngressClasses().Create(context.TODO(), ingressClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		defer deleteIngressClass(cs, createdIngressClass.Name)
+
+		if createdIngressClass.Spec.Parameters == nil {
+			framework.Failf("Expected IngressClass.spec.parameters to be set")
+		}
+		scope := ""
+		if createdIngressClass.Spec.Parameters.Scope != nil {
+			scope = *createdIngressClass.Spec.Parameters.Scope
+		}
+
+		if scope != "Namespace" {
+			framework.Failf("Expected IngressClass.spec.parameters.scope to be set to 'Namespace', got %v", scope)
 		}
 	})
 

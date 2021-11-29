@@ -280,6 +280,9 @@ func (p *HelmChartInflationGeneratorPlugin) templateCommand() []string {
 		// I've tried placing the flag before and after the name argument.
 		args = append(args, "--generate-name")
 	}
+	if p.IncludeCRDs {
+		args = append(args, "--include-crds")
+	}
 	return args
 }
 

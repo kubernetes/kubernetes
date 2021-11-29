@@ -40,13 +40,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -143,6 +147,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
 
 		// This is needed for the
@@ -231,11 +236,23 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 			// testsuites/volumelimits.go `should support volume limits`
 			// test.
 			"--maxvolumespernode=10",
+			// Enable volume lifecycle checks, to report failure if
+			// the volume is not unpublished / unstaged correctly.
+			"--check-volume-lifecycle=true",
 		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
+
+	// Disable volume lifecycle checks due to issue #103651 for the one
+	// test that it breaks.
+	// TODO: enable this check once issue is resolved for csi-host-path driver
+	// (https://github.com/kubernetes/kubernetes/pull/104858).
+	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentGinkgoTestDescription().FullTestText) {
+		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
+	}
+
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
@@ -243,10 +260,11 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 
 		// Remove csi-external-health-monitor-agent and
 		// csi-external-health-monitor-controller
-		// containers. They are not needed for any of the
-		// tests and may be causing too much overhead when
+		// containers. The agent is obsolete.
+		// The controller is not needed for any of the
+		// tests and is causing too much overhead when
 		// running in a large cluster (see
-		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-854452816).
+		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-856991009).
 		switch item := item.(type) {
 		case *appsv1.StatefulSet:
 			var containers []v1.Container
@@ -281,21 +299,22 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo          storageframework.DriverInfo
-	manifests           []string
-	podInfo             *bool
-	storageCapacity     *bool
-	attachable          bool
-	attachLimit         int
-	enableTopology      bool
-	enableNodeExpansion bool
-	hooks               Hooks
-	tokenRequests       []storagev1.TokenRequest
-	requiresRepublish   *bool
-	fsGroupPolicy       *storagev1.FSGroupPolicy
-	embedded            bool
-	calls               MockCSICalls
-	embeddedCSIDriver   *mockdriver.CSIDriver
+	driverInfo             storageframework.DriverInfo
+	manifests              []string
+	podInfo                *bool
+	storageCapacity        *bool
+	attachable             bool
+	attachLimit            int
+	enableTopology         bool
+	enableNodeExpansion    bool
+	hooks                  Hooks
+	tokenRequests          []storagev1.TokenRequest
+	requiresRepublish      *bool
+	fsGroupPolicy          *storagev1.FSGroupPolicy
+	enableVolumeMountGroup bool
+	embedded               bool
+	calls                  MockCSICalls
+	embeddedCSIDriver      *mockdriver.CSIDriver
 
 	// Additional values set during PrepareTest
 	clientSet       kubernetes.Interface
@@ -329,18 +348,19 @@ type MockCSITestDriver interface {
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver      bool
-	DisableAttach       bool
-	PodInfo             *bool
-	StorageCapacity     *bool
-	AttachLimit         int
-	EnableTopology      bool
-	EnableResizing      bool
-	EnableNodeExpansion bool
-	EnableSnapshot      bool
-	TokenRequests       []storagev1.TokenRequest
-	RequiresRepublish   *bool
-	FSGroupPolicy       *storagev1.FSGroupPolicy
+	RegisterDriver         bool
+	DisableAttach          bool
+	PodInfo                *bool
+	StorageCapacity        *bool
+	AttachLimit            int
+	EnableTopology         bool
+	EnableResizing         bool
+	EnableNodeExpansion    bool
+	EnableSnapshot         bool
+	EnableVolumeMountGroup bool
+	TokenRequests          []storagev1.TokenRequest
+	RequiresRepublish      *bool
+	FSGroupPolicy          *storagev1.FSGroupPolicy
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -403,16 +423,16 @@ func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err er
 		// "" on no error.
 		Error string
 		// Full error dump, to be able to parse out full gRPC error code and message separately in a test.
-		FullError error
+		FullError *spb.Status
 	}{
-		Method:    method,
-		Request:   request,
-		Response:  reply,
-		FullError: err,
+		Method:   method,
+		Request:  request,
+		Response: reply,
 	}
 
 	if err != nil {
 		logMessage.Error = err.Error()
+		logMessage.FullError = grpcstatus.Convert(err).Proto()
 	}
 
 	msg, _ := json.Marshal(logMessage)
@@ -481,18 +501,19 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				storageframework.CapVolumeLimits: true,
 			},
 		},
-		manifests:           driverManifests,
-		podInfo:             driverOpts.PodInfo,
-		storageCapacity:     driverOpts.StorageCapacity,
-		enableTopology:      driverOpts.EnableTopology,
-		attachable:          !driverOpts.DisableAttach,
-		attachLimit:         driverOpts.AttachLimit,
-		enableNodeExpansion: driverOpts.EnableNodeExpansion,
-		tokenRequests:       driverOpts.TokenRequests,
-		requiresRepublish:   driverOpts.RequiresRepublish,
-		fsGroupPolicy:       driverOpts.FSGroupPolicy,
-		embedded:            driverOpts.Embedded,
-		hooks:               driverOpts.Hooks,
+		manifests:              driverManifests,
+		podInfo:                driverOpts.PodInfo,
+		storageCapacity:        driverOpts.StorageCapacity,
+		enableTopology:         driverOpts.EnableTopology,
+		attachable:             !driverOpts.DisableAttach,
+		attachLimit:            driverOpts.AttachLimit,
+		enableNodeExpansion:    driverOpts.EnableNodeExpansion,
+		tokenRequests:          driverOpts.TokenRequests,
+		requiresRepublish:      driverOpts.RequiresRepublish,
+		fsGroupPolicy:          driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup: driverOpts.EnableVolumeMountGroup,
+		embedded:               driverOpts.Embedded,
+		hooks:                  driverOpts.Hooks,
 	}
 }
 
@@ -555,11 +576,12 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		containername := "mock"
 		ctx, cancel := context.WithCancel(context.Background())
 		serviceConfig := mockservice.Config{
-			DisableAttach:         !m.attachable,
-			DriverName:            "csi-mock-" + f.UniqueName,
-			AttachLimit:           int64(m.attachLimit),
-			NodeExpansionRequired: m.enableNodeExpansion,
-			EnableTopology:        m.enableTopology,
+			DisableAttach:            !m.attachable,
+			DriverName:               "csi-mock-" + f.UniqueName,
+			AttachLimit:              int64(m.attachLimit),
+			NodeExpansionRequired:    m.enableNodeExpansion,
+			VolumeMountGroupRequired: m.enableVolumeMountGroup,
+			EnableTopology:           m.enableTopology,
 			IO: proxy.PodDirIO{
 				F:             f,
 				Namespace:     m.driverNamespace.Name,
@@ -788,6 +810,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
 			},

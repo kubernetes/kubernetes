@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -56,13 +57,13 @@ var (
 	restartLong = templates.LongDesc(i18n.T(`
 		Restart a resource.
 
-	        Resource will be rollout restarted.`))
+	        Resource rollout will be restarted.`))
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
 		kubectl rollout restart deployment/nginx
 
-		# Restart a daemonset
+		# Restart a daemon set
 		kubectl rollout restart daemonset/abc`)
 )
 
@@ -86,12 +87,12 @@ func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Short:                 i18n.T("Restart a resource"),
 		Long:                  restartLong,
 		Example:               restartExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunRestart())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."

@@ -27,7 +27,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfBool(protowire.DecodeBool(v)), n, nil
 	case protoreflect.EnumKind:
@@ -36,7 +36,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfEnum(protoreflect.EnumNumber(v)), n, nil
 	case protoreflect.Int32Kind:
@@ -45,7 +45,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt32(int32(v)), n, nil
 	case protoreflect.Sint32Kind:
@@ -54,7 +54,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt32(int32(protowire.DecodeZigZag(v & math.MaxUint32))), n, nil
 	case protoreflect.Uint32Kind:
@@ -63,7 +63,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfUint32(uint32(v)), n, nil
 	case protoreflect.Int64Kind:
@@ -72,7 +72,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt64(int64(v)), n, nil
 	case protoreflect.Sint64Kind:
@@ -81,7 +81,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt64(protowire.DecodeZigZag(v)), n, nil
 	case protoreflect.Uint64Kind:
@@ -90,7 +90,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfUint64(v), n, nil
 	case protoreflect.Sfixed32Kind:
@@ -99,7 +99,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt32(int32(v)), n, nil
 	case protoreflect.Fixed32Kind:
@@ -108,7 +108,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfUint32(uint32(v)), n, nil
 	case protoreflect.FloatKind:
@@ -117,7 +117,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfFloat32(math.Float32frombits(uint32(v))), n, nil
 	case protoreflect.Sfixed64Kind:
@@ -126,7 +126,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfInt64(int64(v)), n, nil
 	case protoreflect.Fixed64Kind:
@@ -135,7 +135,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfUint64(v), n, nil
 	case protoreflect.DoubleKind:
@@ -144,7 +144,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfFloat64(math.Float64frombits(v)), n, nil
 	case protoreflect.StringKind:
@@ -153,7 +153,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		if strs.EnforceUTF8(fd) && !utf8.Valid(v) {
 			return protoreflect.Value{}, 0, errors.InvalidUTF8(string(fd.FullName()))
@@ -165,7 +165,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfBytes(append(emptyBuf[:], v...)), n, nil
 	case protoreflect.MessageKind:
@@ -174,7 +174,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfBytes(v), n, nil
 	case protoreflect.GroupKind:
@@ -183,7 +183,7 @@ func (o UnmarshalOptions) unmarshalScalar(b []byte, wtyp protowire.Type, fd prot
 		}
 		v, n := protowire.ConsumeGroup(fd.Number(), b)
 		if n < 0 {
-			return val, 0, protowire.ParseError(n)
+			return val, 0, errDecode
 		}
 		return protoreflect.ValueOfBytes(v), n, nil
 	default:
@@ -197,12 +197,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfBool(protowire.DecodeBool(v)))
@@ -214,7 +214,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfBool(protowire.DecodeBool(v)))
 		return n, nil
@@ -222,12 +222,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfEnum(protoreflect.EnumNumber(v)))
@@ -239,7 +239,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfEnum(protoreflect.EnumNumber(v)))
 		return n, nil
@@ -247,12 +247,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt32(int32(v)))
@@ -264,7 +264,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt32(int32(v)))
 		return n, nil
@@ -272,12 +272,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt32(int32(protowire.DecodeZigZag(v & math.MaxUint32))))
@@ -289,7 +289,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt32(int32(protowire.DecodeZigZag(v & math.MaxUint32))))
 		return n, nil
@@ -297,12 +297,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfUint32(uint32(v)))
@@ -314,7 +314,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfUint32(uint32(v)))
 		return n, nil
@@ -322,12 +322,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt64(int64(v)))
@@ -339,7 +339,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt64(int64(v)))
 		return n, nil
@@ -347,12 +347,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt64(protowire.DecodeZigZag(v)))
@@ -364,7 +364,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt64(protowire.DecodeZigZag(v)))
 		return n, nil
@@ -372,12 +372,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeVarint(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfUint64(v))
@@ -389,7 +389,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeVarint(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfUint64(v))
 		return n, nil
@@ -397,12 +397,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed32(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt32(int32(v)))
@@ -414,7 +414,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt32(int32(v)))
 		return n, nil
@@ -422,12 +422,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed32(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfUint32(uint32(v)))
@@ -439,7 +439,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfUint32(uint32(v)))
 		return n, nil
@@ -447,12 +447,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed32(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfFloat32(math.Float32frombits(uint32(v))))
@@ -464,7 +464,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed32(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfFloat32(math.Float32frombits(uint32(v))))
 		return n, nil
@@ -472,12 +472,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed64(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfInt64(int64(v)))
@@ -489,7 +489,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfInt64(int64(v)))
 		return n, nil
@@ -497,12 +497,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed64(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfUint64(v))
@@ -514,7 +514,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfUint64(v))
 		return n, nil
@@ -522,12 +522,12 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		if wtyp == protowire.BytesType {
 			buf, n := protowire.ConsumeBytes(b)
 			if n < 0 {
-				return 0, protowire.ParseError(n)
+				return 0, errDecode
 			}
 			for len(buf) > 0 {
 				v, n := protowire.ConsumeFixed64(buf)
 				if n < 0 {
-					return 0, protowire.ParseError(n)
+					return 0, errDecode
 				}
 				buf = buf[n:]
 				list.Append(protoreflect.ValueOfFloat64(math.Float64frombits(v)))
@@ -539,7 +539,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeFixed64(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfFloat64(math.Float64frombits(v)))
 		return n, nil
@@ -549,7 +549,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		if strs.EnforceUTF8(fd) && !utf8.Valid(v) {
 			return 0, errors.InvalidUTF8(string(fd.FullName()))
@@ -562,7 +562,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		list.Append(protoreflect.ValueOfBytes(append(emptyBuf[:], v...)))
 		return n, nil
@@ -572,7 +572,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeBytes(b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		m := list.NewElement()
 		if err := o.unmarshalMessage(v, m.Message()); err != nil {
@@ -586,7 +586,7 @@ func (o UnmarshalOptions) unmarshalList(b []byte, wtyp protowire.Type, list prot
 		}
 		v, n := protowire.ConsumeGroup(fd.Number(), b)
 		if n < 0 {
-			return 0, protowire.ParseError(n)
+			return 0, errDecode
 		}
 		m := list.NewElement()
 		if err := o.unmarshalMessage(v, m.Message()); err != nil {

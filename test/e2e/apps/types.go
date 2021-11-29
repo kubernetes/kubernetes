@@ -17,7 +17,6 @@ limitations under the License.
 package apps
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -28,9 +27,6 @@ const (
 )
 
 var (
-	// CronJobGroupVersionResourceBeta unambiguously identifies a resource of cronjob with beta status
-	CronJobGroupVersionResourceBeta = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
-
 	// WebserverImage is the fully qualified URI to the Httpd image
 	WebserverImage = imageutils.GetE2EImage(imageutils.Httpd)
 

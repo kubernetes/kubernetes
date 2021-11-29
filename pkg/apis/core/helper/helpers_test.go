@@ -87,24 +87,41 @@ func TestIsStandardContainerResource(t *testing.T) {
 
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
 
 	modes = GetAccessModesFromString("ROX,RWX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, core.ReadWriteMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
 	}
 
 	modes = GetAccessModesFromString("RWO,ROX,RWX")
-	if !containsAccessMode(modes, core.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOnce, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, core.ReadWriteMany) {
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX,RWOP")
+	if !ContainsAccessMode(modes, core.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOnce, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
+	}
+	if !ContainsAccessMode(modes, core.ReadWriteOncePod) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteOncePod, modes)
 	}
 }
 

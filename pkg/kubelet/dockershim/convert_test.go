@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -24,7 +25,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {

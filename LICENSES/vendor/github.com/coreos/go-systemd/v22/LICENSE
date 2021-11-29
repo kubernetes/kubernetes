@@ -192,4 +192,4 @@ third-party archives.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/github.com/coreos/go-systemd/LICENSE 19cbd64715b51267a47bf3750cc6a8a5
+= vendor/github.com/coreos/go-systemd/v22/LICENSE 19cbd64715b51267a47bf3750cc6a8a5

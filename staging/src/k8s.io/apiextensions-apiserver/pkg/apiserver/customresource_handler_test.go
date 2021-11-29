@@ -151,15 +151,25 @@ func TestRouting(t *testing.T) {
 	crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	crdLister := listers.NewCustomResourceDefinitionLister(crdIndexer)
 
+	// note that in production we delegate to the special handler that is attached at the end of the delegation chain that checks if the server has installed all known HTTP paths before replying to the client.
+	// it returns 503 if not all registered signals have been ready (closed) otherwise it simply replies with 404.
+	// the apiextentionserver is considered to be initialized once hasCRDInformerSyncedSignal is closed.
+	//
+	// here, in this test the delegate represent the special handler and hasSync represents the signal.
+	// primarily we just want to make sure that the delegate has been called.
+	// the behaviour of the real delegate is tested elsewhere.
 	delegateCalled := false
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		delegateCalled = true
+		if !hasSynced {
+			http.Error(w, "", 503)
+			return
+		}
 		http.Error(w, "", 418)
 	})
 	customV1 := schema.GroupVersion{Group: "custom", Version: "v1"}
 	handler := &crdHandler{
 		crdLister: crdLister,
-		hasSynced: func() bool { return hasSynced },
 		delegate:  delegate,
 		versionDiscoveryHandler: &versionDiscoveryHandler{
 			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
@@ -209,7 +219,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group discovery",
@@ -231,7 +241,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -255,7 +265,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group version discovery",
@@ -277,7 +287,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v1",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -300,7 +310,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v2",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -325,7 +335,7 @@ func TestRouting(t *testing.T) {
 			Resource:             "foos",
 			HasSynced:            false,
 			IsResourceRequest:    true,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -470,7 +480,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,

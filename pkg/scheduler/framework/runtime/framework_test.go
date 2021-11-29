@@ -119,6 +119,10 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
+func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), "injected status")
+}
+
 func (pl *TestScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return setScoreRes(pl.inj)
 }
@@ -378,23 +382,13 @@ func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerPr
 	if _, ok := r[bindPlugin]; !ok {
 		r[bindPlugin] = newBindPlugin
 	}
-	plugins := &config.Plugins{}
-	plugins.Append(profile.Plugins)
-	if len(plugins.QueueSort.Enabled) == 0 {
-		plugins.Append(&config.Plugins{
-			QueueSort: config.PluginSet{
-				Enabled: []config.Plugin{{Name: queueSortPlugin}},
-			},
-		})
+
+	if len(profile.Plugins.QueueSort.Enabled) == 0 {
+		profile.Plugins.QueueSort.Enabled = append(profile.Plugins.QueueSort.Enabled, config.Plugin{Name: queueSortPlugin})
 	}
-	if len(plugins.Bind.Enabled) == 0 {
-		plugins.Append(&config.Plugins{
-			Bind: config.PluginSet{
-				Enabled: []config.Plugin{{Name: bindPlugin}},
-			},
-		})
+	if len(profile.Plugins.Bind.Enabled) == 0 {
+		profile.Plugins.Bind.Enabled = append(profile.Plugins.Bind.Enabled, config.Plugin{Name: bindPlugin})
 	}
-	profile.Plugins = plugins
 	return NewFramework(r, &profile, opts...)
 }
 
@@ -500,155 +494,276 @@ func TestNewFrameworkErrors(t *testing.T) {
 	}
 }
 
-func recordingPluginFactory(name string, result map[string]runtime.Object) PluginFactory {
-	return func(args runtime.Object, f framework.Handle) (framework.Plugin, error) {
-		result[name] = args
-		return &TestPlugin{
-			name: name,
-		}, nil
-	}
-}
-
-func TestNewFrameworkPluginDefaults(t *testing.T) {
-	// In-tree plugins that use args.
-	pluginsWithArgs := []string{
-		"InterPodAffinity",
-		"NodeLabel",
-		"NodeResourcesFit",
-		"NodeResourcesLeastAllocated",
-		"NodeResourcesMostAllocated",
-		"PodTopologySpread",
-		"RequestedToCapacityRatio",
-		"VolumeBinding",
-	}
-	plugins := config.Plugins{}
-	// Use all plugins in Filter.
-	// NOTE: This does not mean those plugins implemented `Filter` interfaces.
-	// `TestPlugin` is created in this test to fake the behavior for test purpose.
-	for _, name := range pluginsWithArgs {
-		plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: name})
-	}
-	// Set required extension points.
-	onePlugin := config.PluginSet{
-		Enabled: []config.Plugin{{Name: pluginsWithArgs[0]}},
-	}
-	plugins.QueueSort = onePlugin
-	plugins.Bind = onePlugin
-
+func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 	tests := []struct {
-		name      string
-		pluginCfg []config.PluginConfig
-		wantCfg   map[string]runtime.Object
+		name        string
+		plugins     *config.Plugins
+		wantPlugins *config.Plugins
+		wantErr     string
 	}{
 		{
-			name: "empty plugin config",
-			wantCfg: map[string]runtime.Object{
-				"InterPodAffinity": &config.InterPodAffinityArgs{
-					HardPodAffinityWeight: 1,
+			name: "plugin expansion",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin, Weight: 5},
+					},
 				},
-				"NodeLabel":        &config.NodeLabelArgs{},
-				"NodeResourcesFit": &config.NodeResourcesFitArgs{},
-				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"NodeResourcesMostAllocated": &config.NodeResourcesMostAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.SystemDefaulting,
-				},
-				"VolumeBinding": &config.VolumeBindingArgs{
-					BindTimeoutSeconds: 600,
-				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Score:      config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 5}}},
+				Reserve:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
 			},
 		},
 		{
-			name: "some overridden plugin config",
-			pluginCfg: []config.PluginConfig{
-				{
-					Name: "InterPodAffinity",
-					Args: &config.InterPodAffinityArgs{
-						HardPodAffinityWeight: 3,
+			name: "disable MultiPoint plugin at some extension points",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
 					},
 				},
-				{
-					Name: "NodeResourcesFit",
-					Args: &config.NodeResourcesFitArgs{
-						IgnoredResources: []string{"example.com/foo"},
+				PreScore: config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: testPlugin},
 					},
 				},
-				{
-					Name: "NodeResourcesLeastAllocated",
-					Args: &config.NodeResourcesLeastAllocatedArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 4}},
-					},
-				},
-				{
-					Name: "NodeResourcesMostAllocated",
-					Args: &config.NodeResourcesMostAllocatedArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 3}},
-					},
-				},
-				{
-					Name: "RequestedToCapacityRatio",
-					Args: &config.RequestedToCapacityRatioArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
-					},
-				},
-				{
-					Name: "VolumeBinding",
-					Args: &config.VolumeBindingArgs{
-						BindTimeoutSeconds: 300,
+				Score: config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: testPlugin},
 					},
 				},
 			},
-			wantCfg: map[string]runtime.Object{
-				"InterPodAffinity": &config.InterPodAffinityArgs{
-					HardPodAffinityWeight: 3,
-				},
-				"NodeLabel": &config.NodeLabelArgs{},
-				"NodeResourcesFit": &config.NodeResourcesFitArgs{
-					IgnoredResources: []string{"example.com/foo"},
-				},
-				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 4}},
-				},
-				"NodeResourcesMostAllocated": &config.NodeResourcesMostAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 3}},
-				},
-				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.SystemDefaulting,
-				},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
-				},
-				"VolumeBinding": &config.VolumeBindingArgs{
-					BindTimeoutSeconds: 300,
-				},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Reserve:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
 			},
 		},
+		{
+			name: "Multiple MultiPoint plugins",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin},
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin, Weight: 1},
+					{Name: scorePlugin1, Weight: 1},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+		},
+		{
+			name: "disable MultiPoint extension",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+				PreScore: config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin, Weight: 1},
+					{Name: scorePlugin1, Weight: 1},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+		},
+		{
+			name: "Reorder MultiPoint plugins (specified extension takes precedence)",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: scoreWithNormalizePlugin1},
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+				Score: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: scorePlugin1},
+						{Name: testPlugin},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin},
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 1},
+					{Name: testPlugin, Weight: 1},
+					{Name: scoreWithNormalizePlugin1, Weight: 1},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+		},
+		{
+			name: "Override MultiPoint plugins weights",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+				Score: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: scorePlugin1, Weight: 5},
+						{Name: testPlugin, Weight: 3},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin},
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 5},
+					{Name: testPlugin, Weight: 3},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+		},
+		{
+			name: "disable and enable MultiPoint plugins with '*'",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+						{Name: bindPlugin},
+						{Name: scorePlugin1},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 1},
+				}},
+				Bind: config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+			},
+		},
+		{
+			name: "disable and enable MultiPoint plugin by name",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+						{Name: queueSortPlugin},
+						{Name: scorePlugin1},
+					},
+					Disabled: []config.Plugin{
+						{Name: scorePlugin1},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 1},
+				}},
+				Bind: config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+			},
+		},
+		{
+			name: "Expect 'already registered' error",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: testPlugin},
+					},
+				},
+			},
+			wantErr: "already registered",
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// result will hold plugin args passed to factories.
-			result := make(map[string]runtime.Object)
-			registry := make(Registry, len(pluginsWithArgs))
-			for _, name := range pluginsWithArgs {
-				registry[name] = recordingPluginFactory(name, result)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			if (err != nil && tc.wantErr == "") || (err == nil && tc.wantErr != "") || (err != nil && !strings.Contains(err.Error(), tc.wantErr)) {
+				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 			}
-			profile := &config.KubeSchedulerProfile{
-				Plugins:      &plugins,
-				PluginConfig: tt.pluginCfg,
-			}
-			_, err := NewFramework(registry, profile)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(tt.wantCfg, result); diff != "" {
-				t.Errorf("unexpected plugin args (-want,+got):\n%s", diff)
+			if tc.wantErr == "" {
+				if diff := cmp.Diff(tc.wantPlugins, fw.ListPlugins()); diff != "" {
+					t.Errorf("Unexpected eventToPlugin map (-want,+got):%s", diff)
+				}
 			}
 		})
 	}
@@ -1479,7 +1594,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 
-			podNominator := internalqueue.NewPodNominator()
+			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(framework.NewPodInfo(tt.nominatedPod), nodeName)
 			}
@@ -2335,54 +2450,25 @@ func TestListPlugins(t *testing.T) {
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
-		// pluginSetCount include queue sort plugin and bind plugin.
-		pluginSetCount int
+		want    *config.Plugins
 	}{
 		{
-			name:           "Add empty plugin",
-			plugins:        &config.Plugins{},
-			pluginSetCount: 2,
+			name:    "Add empty plugin",
+			plugins: &config.Plugins{},
+			want: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+			},
 		},
 		{
 			name: "Add multiple plugins",
 			plugins: &config.Plugins{
-				Score: config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
+				Score: config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1, Weight: 3}, {Name: scoreWithNormalizePlugin1}}},
 			},
-			pluginSetCount: 3,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
-			if err != nil {
-				t.Fatalf("Failed to create framework for testing: %v", err)
-			}
-			plugins := f.ListPlugins()
-			if len(plugins) != tt.pluginSetCount {
-				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
-			}
-		})
-	}
-}
-
-func TestNewFrameworkPluginWeights(t *testing.T) {
-	tests := []struct {
-		name    string
-		plugins *config.Plugins
-	}{
-		{
-			name: "Extend multiple extension points by same plugin",
-			plugins: &config.Plugins{
-				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
-				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
-			},
-		},
-		{
-			name: "Add multiple score plugins",
-			plugins: &config.Plugins{
-				Score: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}, {Name: scorePlugin1, Weight: 6}}},
+			want: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+				Score:     config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1, Weight: 3}, {Name: scoreWithNormalizePlugin1, Weight: 1}}},
 			},
 		},
 	}
@@ -2394,14 +2480,9 @@ func TestNewFrameworkPluginWeights(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-
-			plugins := f.ListPlugins()
-			if len(plugins["ScorePlugin"]) != len(tt.plugins.Score.Enabled) {
-				t.Fatalf("Expect %d ScorePlugin, got %d from: %v", len(tt.plugins.Score.Enabled), len(plugins["ScorePlugin"]), plugins["ScorePlugin"])
-			}
-
-			if diff := cmp.Diff(tt.plugins.Score.Enabled, plugins["ScorePlugin"]); diff != "" {
-				t.Errorf("unexpected plugin weights (-want,+got):\n%s", diff)
+			got := f.ListPlugins()
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected plugins (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -27,15 +27,16 @@ import (
 // StatefulSetSpecApplyConfiguration represents an declarative configuration of the StatefulSetSpec type for use
 // with apply.
 type StatefulSetSpecApplyConfiguration struct {
-	Replicas             *int32                                           `json:"replicas,omitempty"`
-	Selector             *v1.LabelSelectorApplyConfiguration              `json:"selector,omitempty"`
-	Template             *corev1.PodTemplateSpecApplyConfiguration        `json:"template,omitempty"`
-	VolumeClaimTemplates []corev1.PersistentVolumeClaimApplyConfiguration `json:"volumeClaimTemplates,omitempty"`
-	ServiceName          *string                                          `json:"serviceName,omitempty"`
-	PodManagementPolicy  *v1beta1.PodManagementPolicyType                 `json:"podManagementPolicy,omitempty"`
-	UpdateStrategy       *StatefulSetUpdateStrategyApplyConfiguration     `json:"updateStrategy,omitempty"`
-	RevisionHistoryLimit *int32                                           `json:"revisionHistoryLimit,omitempty"`
-	MinReadySeconds      *int32                                           `json:"minReadySeconds,omitempty"`
+	Replicas                             *int32                                                             `json:"replicas,omitempty"`
+	Selector                             *v1.LabelSelectorApplyConfiguration                                `json:"selector,omitempty"`
+	Template                             *corev1.PodTemplateSpecApplyConfiguration                          `json:"template,omitempty"`
+	VolumeClaimTemplates                 []corev1.PersistentVolumeClaimApplyConfiguration                   `json:"volumeClaimTemplates,omitempty"`
+	ServiceName                          *string                                                            `json:"serviceName,omitempty"`
+	PodManagementPolicy                  *v1beta1.PodManagementPolicyType                                   `json:"podManagementPolicy,omitempty"`
+	UpdateStrategy                       *StatefulSetUpdateStrategyApplyConfiguration                       `json:"updateStrategy,omitempty"`
+	RevisionHistoryLimit                 *int32                                                             `json:"revisionHistoryLimit,omitempty"`
+	MinReadySeconds                      *int32                                                             `json:"minReadySeconds,omitempty"`
+	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
 }
 
 // StatefulSetSpecApplyConfiguration constructs an declarative configuration of the StatefulSetSpec type for use with
@@ -118,5 +119,13 @@ func (b *StatefulSetSpecApplyConfiguration) WithRevisionHistoryLimit(value int32
 // If called multiple times, the MinReadySeconds field is set to the value of the last call.
 func (b *StatefulSetSpecApplyConfiguration) WithMinReadySeconds(value int32) *StatefulSetSpecApplyConfiguration {
 	b.MinReadySeconds = &value
+	return b
+}
+
+// WithPersistentVolumeClaimRetentionPolicy sets the PersistentVolumeClaimRetentionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PersistentVolumeClaimRetentionPolicy field is set to the value of the last call.
+func (b *StatefulSetSpecApplyConfiguration) WithPersistentVolumeClaimRetentionPolicy(value *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) *StatefulSetSpecApplyConfiguration {
+	b.PersistentVolumeClaimRetentionPolicy = value
 	return b
 }

@@ -16,10 +16,10 @@ const DefaultReplacementFieldPath = "metadata.name"
 // where it is from and where it is to.
 type Replacement struct {
 	// The source of the value.
-	Source *SourceSelector `json:"source" yaml:"source"`
+	Source *SourceSelector `json:"source,omitempty" yaml:"source,omitempty"`
 
 	// The N fields to write the value to.
-	Targets []*TargetSelector `json:"targets" yaml:"targets"`
+	Targets []*TargetSelector `json:"targets,omitempty" yaml:"targets,omitempty"`
 }
 
 // SourceSelector is the source of the replacement transformer.
@@ -28,10 +28,10 @@ type SourceSelector struct {
 	resid.ResId `json:",inline,omitempty" yaml:",inline,omitempty"`
 
 	// Structured field path expected in the allowed object.
-	FieldPath string `json:"fieldPath" yaml:"fieldPath"`
+	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
 
 	// Used to refine the interpretation of the field.
-	Options *FieldOptions `json:"options" yaml:"options"`
+	Options *FieldOptions `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 func (s *SourceSelector) String() string {
@@ -54,34 +54,34 @@ type TargetSelector struct {
 	Select *Selector `json:"select" yaml:"select"`
 
 	// From the allowed set, remove objects that match this.
-	Reject []*Selector `json:"reject" yaml:"reject"`
+	Reject []*Selector `json:"reject,omitempty" yaml:"reject,omitempty"`
 
 	// Structured field paths expected in each allowed object.
-	FieldPaths []string `json:"fieldPaths" yaml:"fieldPaths"`
+	FieldPaths []string `json:"fieldPaths,omitempty" yaml:"fieldPaths,omitempty"`
 
 	// Used to refine the interpretation of the field.
-	Options *FieldOptions `json:"options" yaml:"options"`
+	Options *FieldOptions `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 // FieldOptions refine the interpretation of FieldPaths.
 type FieldOptions struct {
 	// Used to split/join the field.
-	Delimiter string `json:"delimiter" yaml:"delimiter"`
+	Delimiter string `json:"delimiter,omitempty" yaml:"delimiter,omitempty"`
 
 	// Which position in the split to consider.
-	Index int `json:"index" yaml:"index"`
+	Index int `json:"index,omitempty" yaml:"index,omitempty"`
 
 	// TODO (#3492): Implement use of this option
 	// None, Base64, URL, Hex, etc
-	Encoding string `json:"encoding" yaml:"encoding"`
+	Encoding string `json:"encoding,omitempty" yaml:"encoding,omitempty"`
 
 	// If field missing, add it.
-	Create bool `json:"create" yaml:"create"`
+	Create bool `json:"create,omitempty" yaml:"create,omitempty"`
 }
 
 func (fo *FieldOptions) String() string {
-	if fo == nil || fo.Delimiter == "" {
+	if fo == nil || (fo.Delimiter == "" && !fo.Create) {
 		return ""
 	}
-	return fmt.Sprintf("%s(%d)", fo.Delimiter, fo.Index)
+	return fmt.Sprintf("%s(%d), create=%t", fo.Delimiter, fo.Index, fo.Create)
 }

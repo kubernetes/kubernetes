@@ -84,8 +84,8 @@ var (
 	  # Create a new secret named my-secret using a combination of a file and a literal
 	  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/to/id_rsa --from-literal=passphrase=topsecret
 
-	  # Create a new secret named my-secret from an env file
-	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
+	  # Create a new secret named my-secret from env files
+	  kubectl create secret generic my-secret --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`))
 )
 
 // CreateSecretOptions holds the options for 'create secret' sub command
@@ -102,8 +102,8 @@ type CreateSecretOptions struct {
 	FileSources []string
 	// LiteralSources to derive the secret from (optional)
 	LiteralSources []string
-	// EnvFileSource to derive the secret from (optional)
-	EnvFileSource string
+	// EnvFileSources to derive the secret from (optional)
+	EnvFileSources []string
 	// AppendHash; if true, derive a hash from the Secret data and type and append it to the name
 	AppendHash bool
 
@@ -134,7 +134,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd := &cobra.Command{
 		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a secret from a local file, directory or literal value"),
+		Short:                 i18n.T("Create a secret from a local file, directory, or literal value"),
 		Long:                  secretLong,
 		Example:               secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -151,7 +151,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
-	cmd.Flags().StringVar(&o.EnvFileSource, "from-env-file", o.EnvFileSource, "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
+	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("The type of secret to create"))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
@@ -220,7 +220,7 @@ func (o *CreateSecretOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if len(o.EnvFileSource) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
+	if len(o.EnvFileSources) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
 		return fmt.Errorf("from-env-file cannot be combined with from-file or from-literal")
 	}
 	return nil
@@ -276,8 +276,8 @@ func (o *CreateSecretOptions) createSecret() (*corev1.Secret, error) {
 			return nil, err
 		}
 	}
-	if len(o.EnvFileSource) > 0 {
-		if err := handleSecretFromEnvFileSource(secret, o.EnvFileSource); err != nil {
+	if len(o.EnvFileSources) > 0 {
+		if err := handleSecretFromEnvFileSources(secret, o.EnvFileSources); err != nil {
 			return nil, err
 		}
 	}
@@ -370,25 +370,31 @@ func handleSecretFromFileSources(secret *corev1.Secret, fileSources []string) er
 	return nil
 }
 
-// handleSecretFromEnvFileSource adds the specified env file source information
+// handleSecretFromEnvFileSources adds the specified env files source information
 // into the provided secret
-func handleSecretFromEnvFileSource(secret *corev1.Secret, envFileSource string) error {
-	fileInfo, err := os.Stat(envFileSource)
-	if err != nil {
-		switch err := err.(type) {
-		case *os.PathError:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
-		default:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err)
+func handleSecretFromEnvFileSources(secret *corev1.Secret, envFileSources []string) error {
+	for _, envFileSource := range envFileSources {
+		info, err := os.Stat(envFileSource)
+		if err != nil {
+			switch err := err.(type) {
+			case *os.PathError:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
+			default:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err)
+			}
+		}
+		if info.IsDir() {
+			return fmt.Errorf("env secret file cannot be a directory")
+		}
+		err = cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
+			return addKeyFromLiteralToSecret(secret, key, []byte(value))
+		})
+		if err != nil {
+			return err
 		}
 	}
-	if fileInfo.IsDir() {
-		return fmt.Errorf("env secret file cannot be a directory")
-	}
 
-	return cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
-		return addKeyFromLiteralToSecret(secret, key, []byte(value))
-	})
+	return nil
 }
 
 // addKeyFromFileToSecret adds a key with the given name to a Secret, populating

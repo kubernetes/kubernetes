@@ -1,3 +1,4 @@
+//go:build !nolegacyroviders
 // +build !nolegacyroviders
 
 /*

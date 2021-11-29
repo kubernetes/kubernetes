@@ -69,7 +69,7 @@ func testPod(podnamebase string) *v1.Pod {
 	return pod
 }
 
-var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:SetHostnameAsFQDN]", func() {
+var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	/*
 	   Release: v1.19
@@ -88,7 +88,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:Set
 	   Release: v1.19
 	   Testname: Create Pod without FQDN, setHostnameAsFQDN field set to true
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
-	                Hence, SetHostnameAsFQDN feature has no effect.
+	                Hence, setHostnameAsFQDN field has no effect.
 	*/
 	ginkgo.It("a pod without FQDN is not affected by SetHostnameAsFQDN field", func() {
 		pod := testPod("hostfqdn")
@@ -201,7 +201,7 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 
 func checkPodIsPending(f *framework.Framework, podName, namespace string) error {
 	c := f.ClientSet
-	// we call this functoin after we saw event failing to create Pod, hence
+	// we call this function after we saw event failing to create Pod, hence
 	// pod has already been created and it should be in Pending status. Giving
 	// 30 seconds to fetch the pod to avoid failing for transient issues getting
 	// pods.
@@ -215,8 +215,7 @@ func checkPodIsPending(f *framework.Framework, podName, namespace string) error 
 				}
 			}
 		}
-		// If pod gets to this status, either FQDN is shorter than 64bytes
-		// or setHostnameAsFQDN feature is not enable/in use.
+		// If pod gets to this status, it is likely that FQDN is shorter than 64bytes.
 		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v", podName, namespace, pod.Status.Phase)
 		}

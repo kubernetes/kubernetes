@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -39,8 +40,9 @@ import (
 const (
 	// use this timeout for larger clusters
 	largeClusterTimeout = 400 * time.Second
-	// iperf2BaselineBandwidthMegabytesPerSecond sets a baseline for iperf2 bandwidth of 90 MB/s
-	iperf2BaselineBandwidthMegabytesPerSecond = 90
+	// iperf2BaselineBandwidthMegabytesPerSecond sets a baseline for iperf2 bandwidth of 10 MBps = 80 Mbps
+	// this limits is chosen in order to support small devices with 100 mbps cards.
+	iperf2BaselineBandwidthMegabytesPerSecond = 10
 	// iperf2Port selects an arbitrary, unique port to run iperf2's client and server on
 	iperf2Port = 6789
 	// labelKey is used as a key for selectors
@@ -66,38 +68,16 @@ func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6
 	if isIPV6 {
 		args = append(args, "-V")
 	}
-	deploymentSpec := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "iperf2-server-deployment",
-			Labels: labels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &one,
-					Containers: []v1.Container{
-						{
-							Name:    "iperf2-server",
-							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-							Command: []string{"iperf"},
-							Args:    args,
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: iperf2Port,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
-				},
-			},
+	deploymentSpec := e2edeployment.NewDeployment(
+		"iperf2-server-deployment", replicas, labels, "iperf2-server",
+		imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
+	deploymentSpec.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	deploymentSpec.Spec.Template.Spec.Containers[0].Command = []string{"iperf"}
+	deploymentSpec.Spec.Template.Spec.Containers[0].Args = args
+	deploymentSpec.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{
+		{
+			ContainerPort: iperf2Port,
+			Protocol:      v1.ProtocolTCP,
 		},
 	}
 
@@ -132,34 +112,8 @@ func iperf2ServerService(client clientset.Interface, namespace string) (*v1.Serv
 func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv1.DaemonSet, error) {
 	one := int64(1)
 	labels := map[string]string{labelKey: clientLabelValue}
-	spec := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "iperf2-clients",
-			Labels: labels,
-		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    "iperf2-client",
-							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-							Command: []string{"/agnhost"},
-							Args:    []string{"pause"},
-						},
-					},
-					TerminationGracePeriodSeconds: &one,
-				},
-			},
-		},
-		Status: appsv1.DaemonSetStatus{},
-	}
+	spec := e2edaemonset.NewDaemonSet("iperf2-clients", imageutils.GetE2EImage(imageutils.Agnhost), labels, nil, nil, nil)
+	spec.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
 	ds, err := client.AppsV1().DaemonSets(namespace).Create(context.TODO(), spec, metav1.CreateOptions{})
 	if err != nil {

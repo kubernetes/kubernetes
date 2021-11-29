@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -31,35 +32,38 @@ type OSInfo struct {
 
 // GetOSInfo reads Windows version information from the registry
 func GetOSInfo() (*OSInfo, error) {
+	// for log detail
+	var keyPrefix string = `regedit:LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion`
+
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getOSInfo, open Windows %s failed: %w", keyPrefix, err)
 	}
 	defer k.Close()
 
 	buildNumber, _, err := k.GetStringValue("CurrentBuildNumber")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getOSInfo, get %s\\CurrentBuildNumber failed: %w", keyPrefix, err)
 	}
 
 	majorVersionNumber, _, err := k.GetIntegerValue("CurrentMajorVersionNumber")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getOSInfo, get %s\\CurrentMajorVersionNumber failed: %w", keyPrefix, err)
 	}
 
 	minorVersionNumber, _, err := k.GetIntegerValue("CurrentMinorVersionNumber")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getOSInfo, get %s\\CurrentMinorVersionNumber failed: %w", keyPrefix, err)
 	}
 
 	revision, _, err := k.GetIntegerValue("UBR")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getOSInfo, get %s\\UBR failed: %w", keyPrefix, err)
 	}
 
 	productName, _, err := k.GetStringValue("ProductName")
 	if err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("getOSInfo, get %s\\ProductName failed: %w", keyPrefix, err)
 	}
 
 	return &OSInfo{

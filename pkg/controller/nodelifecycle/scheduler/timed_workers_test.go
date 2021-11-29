@@ -17,35 +17,36 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestExecute(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(5)
-	queue := CreateWorkerQueue(func(args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
 	})
 	now := time.Now()
-	queue.AddWork(NewWorkArgs("1", "1"), now, now)
-	queue.AddWork(NewWorkArgs("2", "2"), now, now)
-	queue.AddWork(NewWorkArgs("3", "3"), now, now)
-	queue.AddWork(NewWorkArgs("4", "4"), now, now)
-	queue.AddWork(NewWorkArgs("5", "5"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, now)
 	// Adding the same thing second time should be no-op
-	queue.AddWork(NewWorkArgs("1", "1"), now, now)
-	queue.AddWork(NewWorkArgs("2", "2"), now, now)
-	queue.AddWork(NewWorkArgs("3", "3"), now, now)
-	queue.AddWork(NewWorkArgs("4", "4"), now, now)
-	queue.AddWork(NewWorkArgs("5", "5"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, now)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, now)
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
 	if lastVal != 5 {
@@ -57,25 +58,25 @@ func TestExecuteDelayed(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(5)
-	queue := CreateWorkerQueue(func(args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
@@ -88,25 +89,25 @@ func TestCancel(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(3)
-	queue := CreateWorkerQueue(func(args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
 	queue.CancelWork(NewWorkArgs("2", "2").KeyFromWorkArgs())
 	queue.CancelWork(NewWorkArgs("4", "4").KeyFromWorkArgs())
 	fakeClock.Step(11 * time.Second)
@@ -121,28 +122,28 @@ func TestCancelAndReadd(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(4)
-	queue := CreateWorkerQueue(func(args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
-	queue.AddWork(NewWorkArgs("1", "1"), now, then)
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
-	queue.AddWork(NewWorkArgs("3", "3"), now, then)
-	queue.AddWork(NewWorkArgs("4", "4"), now, then)
-	queue.AddWork(NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
 	queue.CancelWork(NewWorkArgs("2", "2").KeyFromWorkArgs())
 	queue.CancelWork(NewWorkArgs("4", "4").KeyFromWorkArgs())
-	queue.AddWork(NewWorkArgs("2", "2"), now, then)
+	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)

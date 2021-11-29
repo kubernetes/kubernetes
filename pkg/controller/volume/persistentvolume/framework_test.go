@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -369,6 +370,15 @@ func withVolumeDeletionTimestamp(pvs []*v1.PersistentVolume) []*v1.PersistentVol
 	return result
 }
 
+func volumesWithFinalizers(pvs []*v1.PersistentVolume, finalizers []string) []*v1.PersistentVolume {
+	result := []*v1.PersistentVolume{}
+	for _, pv := range pvs {
+		pv.SetFinalizers(finalizers)
+		result = append(result, pv)
+	}
+	return result
+}
+
 // newClaim returns a new claim with given attributes
 func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, class *string, annotations ...string) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
@@ -401,7 +411,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case pvutil.AnnStorageProvisioner:
+			case pvutil.AnnBetaStorageProvisioner, pvutil.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -490,11 +500,11 @@ func claimWithAccessMode(modes []v1.PersistentVolumeAccessMode, claims []*v1.Per
 }
 
 func testSyncClaim(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	return ctrl.syncClaim(test.initialClaims[0])
+	return ctrl.syncClaim(context.TODO(), test.initialClaims[0])
 }
 
 func testSyncClaimError(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	err := ctrl.syncClaim(test.initialClaims[0])
+	err := ctrl.syncClaim(context.TODO(), test.initialClaims[0])
 
 	if err != nil {
 		return nil
@@ -503,7 +513,7 @@ func testSyncClaimError(ctrl *PersistentVolumeController, reactor *pvtesting.Vol
 }
 
 func testSyncVolume(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-	return ctrl.syncVolume(test.initialVolumes[0])
+	return ctrl.syncVolume(context.TODO(), test.initialVolumes[0])
 }
 
 type operationType string
@@ -797,7 +807,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				claim := obj.(*v1.PersistentVolumeClaim)
 				// Simulate "claim updated" event
 				ctrl.claims.Update(claim)
-				err = ctrl.syncClaim(claim)
+				err = ctrl.syncClaim(context.TODO(), claim)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
@@ -814,7 +824,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				volume := obj.(*v1.PersistentVolume)
 				// Simulate "volume updated" event
 				ctrl.volumes.store.Update(volume)
-				err = ctrl.syncVolume(volume)
+				err = ctrl.syncVolume(context.TODO(), volume)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors

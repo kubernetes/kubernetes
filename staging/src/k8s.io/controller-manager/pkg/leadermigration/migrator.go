@@ -36,7 +36,7 @@ type LeaderMigrator struct {
 func NewLeaderMigrator(config *internal.LeaderMigrationConfiguration, component string) *LeaderMigrator {
 	migratedControllers := make(map[string]bool)
 	for _, leader := range config.ControllerLeaders {
-		migratedControllers[leader.Name] = leader.Component == component
+		migratedControllers[leader.Name] = leader.Component == component || leader.Component == "*"
 	}
 	return &LeaderMigrator{
 		MigrationReady: make(chan struct{}),

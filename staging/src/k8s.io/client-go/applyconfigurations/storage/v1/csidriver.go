@@ -48,7 +48,7 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // ExtractCSIDriver extracts the applied configuration owned by fieldManager from
 // cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
 // CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.

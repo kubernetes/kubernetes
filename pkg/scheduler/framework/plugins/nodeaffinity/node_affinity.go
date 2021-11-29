@@ -26,7 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
@@ -44,7 +45,7 @@ var _ framework.EnqueueExtensions = &NodeAffinity{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeAffinity"
+	Name = names.NodeAffinity
 
 	// preScoreStateKey is the key in CycleState to NodeAffinity pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
@@ -157,9 +158,6 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
 
 	var count int64
 	if pl.addedPrefSchedTerms != nil {
@@ -187,7 +185,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	return pluginhelper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
+	return helper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
 }
 
 // ScoreExtensions of the Score plugin.

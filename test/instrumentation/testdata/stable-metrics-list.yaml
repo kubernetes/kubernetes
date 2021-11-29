@@ -1,3 +1,199 @@
+- name: framework_extension_point_duration_seconds
+  subsystem: scheduler
+  help: Latency for running all plugins of a specific extension point.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - extension_point
+  - profile
+  - status
+  buckets:
+  - 0.0001
+  - 0.0002
+  - 0.0004
+  - 0.0008
+  - 0.0016
+  - 0.0032
+  - 0.0064
+  - 0.0128
+  - 0.0256
+  - 0.0512
+  - 0.1024
+  - 0.2048
+- name: pending_pods
+  subsystem: scheduler
+  help: Number of pending pods, by the queue type. 'active' means number of pods in
+    activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
+    of pods in unschedulableQ.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - queue
+- name: pod_scheduling_attempts
+  subsystem: scheduler
+  help: Number of attempts to successfully schedule a pod.
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+- name: pod_scheduling_duration_seconds
+  subsystem: scheduler
+  help: E2e latency for a pod being scheduled which may include multiple scheduling
+    attempts.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - attempts
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
+- name: preemption_attempts_total
+  subsystem: scheduler
+  help: Total preemption attempts in the cluster till now
+  type: Counter
+  stabilityLevel: STABLE
+- name: preemption_victims
+  subsystem: scheduler
+  help: Number of selected preemption victims
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 5
+  - 10
+  - 15
+  - 20
+  - 25
+  - 30
+  - 35
+  - 40
+  - 45
+  - 50
+- name: queue_incoming_pods_total
+  subsystem: scheduler
+  help: Number of pods added to scheduling queues by event and queue type.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - event
+  - queue
+- name: schedule_attempts_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
+    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+- name: scheduling_attempt_duration_seconds
+  subsystem: scheduler
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: controller_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission controller latency histogram in seconds, identified by name and
+    broken out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: step_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission sub-step latency histogram in seconds, broken out for each operation
+    and API resource and step type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: webhook_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook latency histogram in seconds, identified by name and broken
+    out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: apiserver_current_inflight_requests
+  help: Maximal number of currently used inflight request limit of this apiserver
+    per request kind in last second.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - request_kind
 - name: apiserver_request_duration_seconds
   help: Response latency distribution in seconds for each verb, dry run value, group,
     version, resource, subresource, scope and component.
@@ -15,40 +211,24 @@
   buckets:
   - 0.05
   - 0.1
-  - 0.15
   - 0.2
-  - 0.25
-  - 0.3
-  - 0.35
   - 0.4
-  - 0.45
-  - 0.5
   - 0.6
-  - 0.7
   - 0.8
-  - 0.9
   - 1
   - 1.25
   - 1.5
-  - 1.75
   - 2
-  - 2.5
   - 3
-  - 3.5
   - 4
-  - 4.5
   - 5
   - 6
-  - 7
   - 8
-  - 9
   - 10
   - 15
   - 20
-  - 25
   - 30
-  - 40
-  - 50
+  - 45
   - 60
 - name: apiserver_request_total
   help: Counter of apiserver requests broken out for each verb, dry run value, group,
@@ -76,6 +256,27 @@
   - resource
   - subresource
   - version
+- name: apiserver_response_sizes
+  help: Response size distribution in bytes for each group, version, verb, resource,
+    subresource, scope and component.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 1000
+  - 10000
+  - 100000
+  - 1e+06
+  - 1e+07
+  - 1e+08
+  - 1e+09
 - name: apiserver_storage_objects
   help: Number of stored objects at the time of last check split by kind.
   type: Gauge

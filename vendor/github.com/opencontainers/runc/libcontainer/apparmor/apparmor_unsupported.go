@@ -2,17 +2,11 @@
 
 package apparmor
 
-import (
-	"errors"
-)
-
-var ErrApparmorNotEnabled = errors.New("apparmor: config provided but apparmor not supported")
-
-func IsEnabled() bool {
+func isEnabled() bool {
 	return false
 }
 
-func ApplyProfile(name string) error {
+func applyProfile(name string) error {
 	if name != "" {
 		return ErrApparmorNotEnabled
 	}

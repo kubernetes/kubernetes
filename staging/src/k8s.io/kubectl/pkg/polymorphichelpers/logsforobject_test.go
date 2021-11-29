@@ -56,7 +56,7 @@ func TestLogsForObject(t *testing.T) {
 			name: "pod logs",
 			obj:  testPodWithOneContainers(),
 			actions: []testclient.Action{
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -129,7 +129,7 @@ func TestLogsForObject(t *testing.T) {
 				Items: []corev1.Pod{*testPodWithOneContainers()},
 			},
 			actions: []testclient.Action{
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -137,6 +137,70 @@ func TestLogsForObject(t *testing.T) {
 				Name:       testPodWithOneContainers().Name,
 				Namespace:  testPodWithOneContainers().Namespace,
 				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
+		},
+		{
+			name: "pods list logs: default container should not leak across pods",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "pod",
+							APIVersion: "v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "foo",
+							Namespace: "test",
+							Labels:    map[string]string{"test": "logs"},
+							Annotations: map[string]string{
+								"kubectl.kubernetes.io/default-container": "c1",
+							},
+						},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyAlways,
+							DNSPolicy:     corev1.DNSClusterFirst,
+							Containers: []corev1.Container{
+								{Name: "c1"},
+								{Name: "c2"},
+							},
+						},
+					},
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "pod",
+							APIVersion: "v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "test",
+							Labels:    map[string]string{"test": "logs"},
+						},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyAlways,
+							DNSPolicy:     corev1.DNSClusterFirst,
+							Containers: []corev1.Container{
+								{Name: "c2"},
+							},
+						},
+					},
+				},
+			},
+			actions: []testclient.Action{
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       "pod",
+				APIVersion: "v1",
+				Name:       "foo",
+				Namespace:  "test",
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", "c1"),
+			}, {
+				Kind:       "pod",
+				APIVersion: "v1",
+				Name:       "bar",
+				Namespace:  "test",
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", "c2"),
 			}},
 		},
 		{
@@ -201,7 +265,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -222,7 +286,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -243,7 +307,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -264,7 +328,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -285,7 +349,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,

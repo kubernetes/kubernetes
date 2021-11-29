@@ -4,10 +4,19 @@ Cobra can generate shell completions for multiple shells.
 The currently supported shells are:
 - Bash
 - Zsh
-- Fish
+- fish
 - PowerShell
 
-If you are using the generator you can create a completion command by running
+Cobra will automatically provide your program with a fully functional `completion` command,
+similarly to how it provides the `help` command.
+
+## Creating your own completion command
+
+If you do not wish to use the default `completion` command, you can choose to
+provide your own, which will take precedence over the default one. (This also provides
+backwards-compatibility with programs that already have their own `completion` command.)
+
+If you are using the generator, you can create a completion command by running
 
 ```bash
 cobra add completion
@@ -17,38 +26,46 @@ and then modifying the generated `cmd/completion.go` file to look something like
 
 ```go
 var completionCmd = &cobra.Command{
-	Use:                   "completion [bash|zsh|fish|powershell]",
-	Short:                 "Generate completion script",
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate completion script",
 	Long: `To load completions:
 
 Bash:
 
-$ source <(yourprogram completion bash)
+  $ source <(yourprogram completion bash)
 
-# To load completions for each session, execute once:
-Linux:
+  # To load completions for each session, execute once:
+  # Linux:
   $ yourprogram completion bash > /etc/bash_completion.d/yourprogram
-MacOS:
+  # macOS:
   $ yourprogram completion bash > /usr/local/etc/bash_completion.d/yourprogram
 
 Zsh:
 
-# If shell completion is not already enabled in your environment you will need
-# to enable it.  You can execute the following once:
+  # If shell completion is not already enabled in your environment,
+  # you will need to enable it.  You can execute the following once:
 
-$ echo "autoload -U compinit; compinit" >> ~/.zshrc
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
-# To load completions for each session, execute once:
-$ yourprogram completion zsh > "${fpath[1]}/_yourprogram"
+  # To load completions for each session, execute once:
+  $ yourprogram completion zsh > "${fpath[1]}/_yourprogram"
 
-# You will need to start a new shell for this setup to take effect.
+  # You will need to start a new shell for this setup to take effect.
 
-Fish:
+fish:
 
-$ yourprogram completion fish | source
+  $ yourprogram completion fish | source
 
-# To load completions for each session, execute once:
-$ yourprogram completion fish > ~/.config/fish/completions/yourprogram.fish
+  # To load completions for each session, execute once:
+  $ yourprogram completion fish > ~/.config/fish/completions/yourprogram.fish
+
+PowerShell:
+
+  PS> yourprogram completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for every new session, run:
+  PS> yourprogram completion powershell > yourprogram.ps1
+  # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
@@ -62,13 +79,33 @@ $ yourprogram completion fish > ~/.config/fish/completions/yourprogram.fish
 		case "fish":
 			cmd.Root().GenFishCompletion(os.Stdout, true)
 		case "powershell":
-			cmd.Root().GenPowerShellCompletion(os.Stdout)
+			cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
 		}
 	},
 }
 ```
 
-**Note:** The cobra generator may include messages printed to stdout for example if the config file is loaded, this will break the auto complete script so must be removed.
+**Note:** The cobra generator may include messages printed to stdout, for example, if the config file is loaded; this will break the auto-completion script so must be removed.
+
+## Adapting the default completion command
+
+Cobra provides a few options for the default `completion` command.  To configure such options you must set
+the `CompletionOptions` field on the *root* command.
+
+To tell Cobra *not* to provide the default `completion` command:
+```
+rootCmd.CompletionOptions.DisableDefaultCmd = true
+```
+
+To tell Cobra *not* to provide the user with the `--no-descriptions` flag to the completion sub-commands:
+```
+rootCmd.CompletionOptions.DisableNoDescFlag = true
+```
+
+To tell Cobra to completely disable descriptions for completions:
+```
+rootCmd.CompletionOptions.DisableDescriptions = true
+```
 
 # Customizing completions
 
@@ -91,8 +128,7 @@ cmd := &cobra.Command{
 	Long:    get_long,
 	Example: get_example,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := RunGet(f, out, cmd, args)
-		util.CheckErr(err)
+		cobra.CheckErr(RunGet(f, out, cmd, args))
 	},
 	ValidArgs: validArgs,
 }
@@ -124,7 +160,7 @@ the completion algorithm if entered manually, e.g. in:
 
 ```bash
 $ kubectl get rc [tab][tab]
-backend        frontend       database 
+backend        frontend       database
 ```
 
 Note that without declaring `rc` as an alias, the completion algorithm would not know to show the list of
@@ -246,7 +282,7 @@ and you'll get something like
 
 ```bash
 $ kubectl exec [tab][tab]
--c            --container=  -p            --pod=  
+-c            --container=  -p            --pod=
 ```
 
 ### Specify dynamic flag completion
@@ -316,7 +352,10 @@ cmd.RegisterFlagCompletionFunc(flagName, func(cmd *cobra.Command, args []string,
 ```
 ### Descriptions for completions
 
-Both `zsh` and `fish` allow for descriptions to annotate completion choices.  For commands and flags, Cobra will provide the descriptions automatically, based on usage information.  For example, using zsh:
+Cobra provides support for completion descriptions.  Such descriptions are supported for each shell
+(however, for bash, it is only available in the [completion V2 version](#bash-completion-v2)).
+For commands and flags, Cobra will provide the descriptions automatically, based on usage information.
+For example, using zsh:
 ```
 $ helm s[tab]
 search  -- search for a keyword in charts
@@ -329,7 +368,7 @@ $ helm s[tab]
 search  (search for a keyword in charts)  show  (show information of a chart)  status  (displays the status of the named release)
 ```
 
-Cobra allows you to add annotations to your own completions.  Simply add the annotation text after each completion, following a `\t` separator.  This technique applies to completions returned by `ValidArgs`, `ValidArgsFunction` and `RegisterFlagCompletionFunc()`.  For example:
+Cobra allows you to add descriptions to your own completions.  Simply add the description text after each completion, following a `\t` separator.  This technique applies to completions returned by `ValidArgs`, `ValidArgsFunction` and `RegisterFlagCompletionFunc()`.  For example:
 ```go
 ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return []string{"harbor\tAn image registry", "thanos\tLong-term metrics"}, cobra.ShellCompDirectiveNoFileComp
@@ -361,12 +400,43 @@ completion     firstcommand   secondcommand
 ```
 ### Bash legacy dynamic completions
 
-For backwards-compatibility, Cobra still supports its bash legacy dynamic completion solution.
+For backward compatibility, Cobra still supports its bash legacy dynamic completion solution.
 Please refer to [Bash Completions](bash_completions.md) for details.
 
+### Bash completion V2
+
+Cobra provides two versions for bash completion.  The original bash completion (which started it all!) can be used by calling
+`GenBashCompletion()` or `GenBashCompletionFile()`.
+
+A new V2 bash completion version is also available.  This version can be used by calling `GenBashCompletionV2()` or
+`GenBashCompletionFileV2()`.  The V2 version does **not** support the legacy dynamic completion
+(see [Bash Completions](bash_completions.md)) but instead works only with the Go dynamic completion
+solution described in this document.
+Unless your program already uses the legacy dynamic completion solution, it is recommended that you use the bash
+completion V2 solution which provides the following extra features:
+- Supports completion descriptions (like the other shells)
+- Small completion script of less than 300 lines (v1 generates scripts of thousands of lines; `kubectl` for example has a bash v1 completion script of over 13K lines)
+- Streamlined user experience thanks to a completion behavior aligned with the other shells 
+
+`Bash` completion V2 supports descriptions for completions. When calling `GenBashCompletionV2()` or `GenBashCompletionFileV2()`
+you must provide these functions with a parameter indicating if the completions should be annotated with a description; Cobra
+will provide the description automatically based on usage information.  You can choose to make this option configurable by
+your users.
+
+```
+# With descriptions
+$ helm s[tab][tab]
+search  (search for a keyword in charts)           status  (display the status of the named release)
+show    (show information of a chart)
+
+# Without descriptions
+$ helm s[tab][tab]
+search  show  status
+```
+**Note**: Cobra's default `completion` command uses bash completion V2.  If for some reason you need to use bash completion V1, you will need to implement your own `completion` command. 
 ## Zsh completions
 
-Cobra supports native Zsh completion generated from the root `cobra.Command`.
+Cobra supports native zsh completion generated from the root `cobra.Command`.
 The generated completion script should be put somewhere in your `$fpath` and be named
 `_<yourProgram>`.  You will need to start a new shell for the completions to become available.
 
@@ -385,23 +455,23 @@ status  -- displays the status of the named release
 $ helm s[tab]
 search  show  status
 ```
-*Note*: Because of backwards-compatibility requirements, we were forced to have a different API to disable completion descriptions between `Zsh` and `Fish`.
+*Note*: Because of backward-compatibility requirements, we were forced to have a different API to disable completion descriptions between `zsh` and `fish`.
 
 ### Limitations
 
 * Custom completions implemented in Bash scripting (legacy) are not supported and will be ignored for `zsh` (including the use of the `BashCompCustom` flag annotation).
-  * You should instead use `ValidArgsFunction` and `RegisterFlagCompletionFunc()` which are portable to the different shells (`bash`, `zsh`, `fish`).
+  * You should instead use `ValidArgsFunction` and `RegisterFlagCompletionFunc()` which are portable to the different shells (`bash`, `zsh`, `fish`, `powershell`).
 * The function `MarkFlagCustom()` is not supported and will be ignored for `zsh`.
   * You should instead use `RegisterFlagCompletionFunc()`.
 
 ### Zsh completions standardization
 
-Cobra 1.1 standardized its zsh completion support to align it with its other shell completions.  Although the API was kept backwards-compatible, some small changes in behavior were introduced.
+Cobra 1.1 standardized its zsh completion support to align it with its other shell completions.  Although the API was kept backward-compatible, some small changes in behavior were introduced.
 Please refer to [Zsh Completions](zsh_completions.md) for details.
 
-## Fish completions
+## fish completions
 
-Cobra supports native Fish completions generated from the root `cobra.Command`.  You can use the `command.GenFishCompletion()` or `command.GenFishCompletionFile()` functions. You must provide these functions with a parameter indicating if the completions should be annotated with a description; Cobra will provide the description automatically based on usage information.  You can choose to make this option configurable by your users.
+Cobra supports native fish completions generated from the root `cobra.Command`.  You can use the `command.GenFishCompletion()` or `command.GenFishCompletionFile()` functions. You must provide these functions with a parameter indicating if the completions should be annotated with a description; Cobra will provide the description automatically based on usage information.  You can choose to make this option configurable by your users.
 ```
 # With descriptions
 $ helm s[tab]
@@ -411,12 +481,12 @@ search  (search for a keyword in charts)  show  (show information of a chart)  s
 $ helm s[tab]
 search  show  status
 ```
-*Note*: Because of backwards-compatibility requirements, we were forced to have a different API to disable completion descriptions between `Zsh` and `Fish`.
+*Note*: Because of backward-compatibility requirements, we were forced to have a different API to disable completion descriptions between `zsh` and `fish`.
 
 ### Limitations
 
-* Custom completions implemented in Bash scripting (legacy) are not supported and will be ignored for `fish` (including the use of the `BashCompCustom` flag annotation).
-  * You should instead use `ValidArgsFunction` and `RegisterFlagCompletionFunc()` which are portable to the different shells (`bash`, `zsh`, `fish`).
+* Custom completions implemented in bash scripting (legacy) are not supported and will be ignored for `fish` (including the use of the `BashCompCustom` flag annotation).
+  * You should instead use `ValidArgsFunction` and `RegisterFlagCompletionFunc()` which are portable to the different shells (`bash`, `zsh`, `fish`, `powershell`).
 * The function `MarkFlagCustom()` is not supported and will be ignored for `fish`.
   * You should instead use `RegisterFlagCompletionFunc()`.
 * The following flag completion annotations are not supported and will be ignored for `fish`:
@@ -431,4 +501,46 @@ search  show  status
 
 ## PowerShell completions
 
-Please refer to [PowerShell Completions](powershell_completions.md) for details.
+Cobra supports native PowerShell completions generated from the root `cobra.Command`. You can use the `command.GenPowerShellCompletion()` or `command.GenPowerShellCompletionFile()` functions. To include descriptions use `command.GenPowerShellCompletionWithDesc()` and `command.GenPowerShellCompletionFileWithDesc()`. Cobra will provide the description automatically based on usage information. You can choose to make this option configurable by your users.
+
+The script is designed to support all three PowerShell completion modes:
+
+* TabCompleteNext (default windows style - on each key press the next option is displayed)
+* Complete (works like bash)
+* MenuComplete (works like zsh)
+
+You set the mode with `Set-PSReadLineKeyHandler -Key Tab -Function <mode>`. Descriptions are only displayed when using the `Complete` or `MenuComplete` mode.
+
+Users need PowerShell version 5.0 or above, which comes with Windows 10 and can be downloaded separately for Windows 7 or 8.1. They can then write the completions to a file and source this file from their PowerShell profile, which is referenced by the `$Profile` environment variable. See `Get-Help about_Profiles` for more info about PowerShell profiles.
+
+```
+# With descriptions and Mode 'Complete'
+$ helm s[tab]
+search  (search for a keyword in charts)  show  (show information of a chart)  status  (displays the status of the named release)
+
+# With descriptions and Mode 'MenuComplete' The description of the current selected value will be displayed below the suggestions.
+$ helm s[tab]
+search    show     status  
+
+search for a keyword in charts
+
+# Without descriptions
+$ helm s[tab]
+search  show  status
+```
+
+### Limitations
+
+* Custom completions implemented in bash scripting (legacy) are not supported and will be ignored for `powershell` (including the use of the `BashCompCustom` flag annotation).
+  * You should instead use `ValidArgsFunction` and `RegisterFlagCompletionFunc()` which are portable to the different shells (`bash`, `zsh`, `fish`, `powershell`).
+* The function `MarkFlagCustom()` is not supported and will be ignored for `powershell`.
+  * You should instead use `RegisterFlagCompletionFunc()`.
+* The following flag completion annotations are not supported and will be ignored for `powershell`:
+  * `BashCompFilenameExt` (filtering by file extension)
+  * `BashCompSubdirsInDir` (filtering by directory)
+* The functions corresponding to the above annotations are consequently not supported and will be ignored for `powershell`:
+  * `MarkFlagFilename()` and `MarkPersistentFlagFilename()` (filtering by file extension)
+  * `MarkFlagDirname()` and `MarkPersistentFlagDirname()` (filtering by directory)
+* Similarly, the following completion directives are not supported and will be ignored for `powershell`:
+  * `ShellCompDirectiveFilterFileExt` (filtering by file extension)
+  * `ShellCompDirectiveFilterDirs` (filtering by directory)

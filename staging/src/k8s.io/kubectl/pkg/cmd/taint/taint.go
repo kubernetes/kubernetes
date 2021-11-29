@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/explain"
+	"k8s.io/kubectl/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -71,17 +72,17 @@ var (
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
+		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app.
 		* The value is optional. If given, it must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
 		* Currently taint can only apply to node.`))
 
 	taintExample = templates.Examples(i18n.T(`
-		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
-		# If a taint with that key and effect already exists, its value is replaced as specified.
+		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'
+		# If a taint with that key and effect already exists, its value is replaced as specified
 		kubectl taint nodes foo dedicated=special-user:NoSchedule
 
-		# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.
+		# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists
 		kubectl taint nodes foo dedicated:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
@@ -108,12 +109,12 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short:                 i18n.T("Update the taints on one or more nodes"),
 		Long:                  fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
 		Example:               taintExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Validate())
 			cmdutil.CheckErr(options.RunTaint())
 		},
-		ValidArgs: validArgs,
 	}
 
 	options.PrintFlags.AddFlags(cmd)
@@ -247,7 +248,7 @@ func (o TaintOptions) Validate() error {
 				continue
 			}
 			if len(taintRemove.Effect) == 0 || taintAdd.Effect == taintRemove.Effect {
-				conflictTaint := fmt.Sprintf("{\"%s\":\"%s\"}", taintRemove.Key, taintRemove.Effect)
+				conflictTaint := fmt.Sprintf("%s=%s", taintRemove.Key, taintRemove.Effect)
 				conflictTaints = append(conflictTaints, conflictTaint)
 			}
 		}

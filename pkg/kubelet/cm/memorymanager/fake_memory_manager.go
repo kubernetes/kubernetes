@@ -61,17 +61,29 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Topology Hints")
+	klog.InfoS("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Pod Topology Hints")
+	klog.InfoS("Get Pod Topology Hints", "pod", klog.KObj(pod))
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) State() state.Reader {
 	return m.state
+}
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (m *fakeManager) GetAllocatableMemory() []state.Block {
+	klog.InfoS("Get Allocatable Memory")
+	return []state.Block{}
+}
+
+// GetMemory returns the memory allocated by a container from NUMA nodes
+func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
+	klog.InfoS("Get Memory", "podUID", podUID, "containerName", containerName)
+	return []state.Block{}
 }
 
 // NewFakeManager creates empty/fake memory manager

@@ -48,7 +48,7 @@ func PodSecurityPolicy(name string) *PodSecurityPolicyApplyConfiguration {
 // ExtractPodSecurityPolicy extracts the applied configuration owned by fieldManager from
 // podSecurityPolicy. If no managedFields are found in podSecurityPolicy for fieldManager, a
 // PodSecurityPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // podSecurityPolicy must be a unmodified PodSecurityPolicy API object that was retrieved from the Kubernetes API.

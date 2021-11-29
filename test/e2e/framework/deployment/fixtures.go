@@ -38,7 +38,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
-func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
+func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, containerName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
 	zero := int64(0)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +59,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:            imageName,
+							Name:            containerName,
 							Image:           image,
 							SecurityContext: &v1.SecurityContext{},
 						},
@@ -99,12 +99,12 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 	}
 
 	ownedReplicaSets := make([]*appsv1.ReplicaSet, 0, len(allReplicaSets.Items))
-	for _, rs := range allReplicaSets.Items {
-		if !metav1.IsControlledBy(&rs, deployment) {
+	for i := range allReplicaSets.Items {
+		if !metav1.IsControlledBy(&allReplicaSets.Items[i], deployment) {
 			continue
 		}
 
-		ownedReplicaSets = append(ownedReplicaSets, &rs)
+		ownedReplicaSets = append(ownedReplicaSets, &allReplicaSets.Items[i])
 	}
 
 	// We ignore pod-template-hash because:
@@ -126,8 +126,8 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 	// see https://github.com/kubernetes/kubernetes/issues/40415
 	// We deterministically choose the oldest new ReplicaSet.
 	sort.Sort(replicaSetsByCreationTimestamp(ownedReplicaSets))
-	for _, rs := range ownedReplicaSets {
-		if !podTemplatesEqualsIgnoringHash(&rs.Spec.Template, &deployment.Spec.Template) {
+	for i, rs := range ownedReplicaSets {
+		if !podTemplatesEqualsIgnoringHash(&ownedReplicaSets[i].Spec.Template, &deployment.Spec.Template) {
 			continue
 		}
 
@@ -151,8 +151,8 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 
 	replicaSetUID := replicaSet.UID
 	ownedPods := &v1.PodList{Items: make([]v1.Pod, 0, len(allPods.Items))}
-	for _, pod := range allPods.Items {
-		controllerRef := metav1.GetControllerOf(&pod)
+	for i, pod := range allPods.Items {
+		controllerRef := metav1.GetControllerOf(&allPods.Items[i])
 		if controllerRef != nil && controllerRef.UID == replicaSetUID {
 			ownedPods.Items = append(ownedPods.Items, pod)
 		}

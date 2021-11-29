@@ -31,6 +31,7 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/zfs"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
@@ -121,9 +122,9 @@ func newDockerContainerHandler(
 	fsInfo fs.FsInfo,
 	storageDriver storageDriver,
 	storageDir string,
-	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
+	cgroupSubsystems map[string]string,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	dockerVersion []int,
 	includedMetrics container.MetricSet,
 	thinPoolName string,
@@ -131,7 +132,7 @@ func newDockerContainerHandler(
 	zfsWatcher *zfs.ZfsWatcher,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager, err := containerlibcontainer.NewCgroupManager(name, cgroupPaths)
@@ -249,9 +250,9 @@ func newDockerContainerHandler(
 	}
 
 	// split env vars to get metadata map.
-	for _, exposedEnv := range metadataEnvs {
+	for _, exposedEnv := range metadataEnvAllowList {
 		if exposedEnv == "" {
-			// if no dockerEnvWhitelist provided, len(metadataEnvs) == 1, metadataEnvs[0] == ""
+			// if no dockerEnvWhitelist provided, len(metadataEnvAllowList) == 1, metadataEnvAllowList[0] == ""
 			continue
 		}
 
@@ -484,7 +485,11 @@ func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]
 }
 
 func (h *dockerContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := h.cgroupPaths[resource]
+	var res string
+	if !cgroups.IsCgroup2UnifiedMode() {
+		res = resource
+	}
+	path, ok := h.cgroupPaths[res]
 	if !ok {
 		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.reference.Name)
 	}

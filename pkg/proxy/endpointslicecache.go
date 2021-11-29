@@ -24,11 +24,11 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -51,7 +51,7 @@ type EndpointSliceCache struct {
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
 	ipFamily         v1.IPFamily
-	recorder         record.EventRecorder
+	recorder         events.EventRecorder
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -76,11 +76,11 @@ type endpointSliceInfo struct {
 
 // endpointInfo contains just the attributes kube-proxy cares about.
 // Used for caching. Intentionally small to limit memory util.
-// Addresses and Topology are copied from EndpointSlice Endpoints.
+// Addresses, NodeName, and Zone are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
-	Topology  map[string]string
+	Zone      *string
 	ZoneHints sets.String
 
 	Ready       bool
@@ -93,7 +93,7 @@ type endpointInfo struct {
 type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
@@ -130,15 +130,14 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 		for _, endpoint := range endpointSlice.Endpoints {
 			epInfo := &endpointInfo{
 				Addresses: endpoint.Addresses,
-				Topology:  endpoint.Topology,
+				Zone:      endpoint.Zone,
+				NodeName:  endpoint.NodeName,
 
 				// conditions
 				Ready:       endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready,
 				Serving:     endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving,
 				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
-
-			epInfo.NodeName = endpoint.NodeName
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
@@ -167,7 +166,7 @@ func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
 func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
 	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
-		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		klog.ErrorS(err, "Error getting endpoint slice cache keys")
 		return false
 	}
 
@@ -236,12 +235,12 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
-				klog.Warningf("ignoring port with nil name %v", port)
+				klog.ErrorS(nil, "Ignoring port with nil name", "portName", port.Name)
 				continue
 			}
 			// TODO: handle nil ports to mean "all"
 			if port.Port == nil || *port.Port == int32(0) {
-				klog.Warningf("ignoring invalid endpoint port %s", *port.Name)
+				klog.ErrorS(nil, "Ignoring invalid endpoint port", "portName", *port.Name)
 				continue
 			}
 
@@ -267,7 +266,7 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 	// iterate through endpoints to add them to endpointSet.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.Warningf("ignoring invalid endpoint port %s with empty addresses", endpoint)
+			klog.ErrorS(nil, "Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
 			continue
 		}
 
@@ -281,13 +280,18 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 		}
 
 		isLocal := false
+		nodeName := ""
 		if endpoint.NodeName != nil {
 			isLocal = cache.isLocal(*endpoint.NodeName)
-		} else {
-			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
+			nodeName = *endpoint.NodeName
 		}
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology,
+		zone := ""
+		if endpoint.Zone != nil {
+			zone = *endpoint.Zone
+		}
+
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], nodeName, zone, portNum, isLocal,
 			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
@@ -351,7 +355,7 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
 
-			klog.V(3).Infof("Setting endpoints for %q to %+v", svcPortName, formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 
@@ -372,9 +376,9 @@ func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.Names
 	var err error
 	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
 	if !ok || serviceName == "" {
-		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
+		err = fmt.Errorf("no %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
 	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
-		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+		err = fmt.Errorf("expected EndpointSlice name and namespace to be set: %v", endpointSlice)
 	}
 	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }

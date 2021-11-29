@@ -116,7 +116,7 @@ func (c *Controller) handleErr(err error, key interface{}) {
 }
 
 // Run begins watching and syncing.
-func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
+func (c *Controller) Run(workers int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 
 	// Let the workers stop when we are done
@@ -131,7 +131,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 

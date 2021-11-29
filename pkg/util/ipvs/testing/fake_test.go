@@ -17,10 +17,10 @@ limitations under the License.
 package testing
 
 import (
-	"net"
 	"testing"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	netutils "k8s.io/utils/net"
 )
 
 func TestVirtualServer(t *testing.T) {
@@ -28,7 +28,7 @@ func TestVirtualServer(t *testing.T) {
 	fake := NewFake()
 	// Add a virtual server
 	vs1 := &utilipvs.VirtualServer{
-		Address:  net.ParseIP("1.2.3.4"),
+		Address:  netutils.ParseIPSloppy("1.2.3.4"),
 		Port:     uint16(80),
 		Protocol: string("TCP"),
 		Flags:    utilipvs.FlagHashed,
@@ -47,7 +47,7 @@ func TestVirtualServer(t *testing.T) {
 	}
 	// Update virtual server
 	vs12 := &utilipvs.VirtualServer{
-		Address:  net.ParseIP("1.2.3.4"),
+		Address:  netutils.ParseIPSloppy("1.2.3.4"),
 		Port:     uint16(80),
 		Protocol: string("TCP"),
 		Flags:    utilipvs.FlagPersistent,
@@ -66,7 +66,7 @@ func TestVirtualServer(t *testing.T) {
 	}
 	// Add another virtual server
 	vs2 := &utilipvs.VirtualServer{
-		Address:  net.ParseIP("10::40"),
+		Address:  netutils.ParseIPSloppy("10::40"),
 		Port:     uint16(8080),
 		Protocol: string("UDP"),
 	}
@@ -76,7 +76,7 @@ func TestVirtualServer(t *testing.T) {
 	}
 	// Add another virtual server
 	vs3 := &utilipvs.VirtualServer{
-		Address:  net.ParseIP("10::40"),
+		Address:  netutils.ParseIPSloppy("10::40"),
 		Port:     uint16(7777),
 		Protocol: string("SCTP"),
 	}
@@ -122,14 +122,14 @@ func TestRealServer(t *testing.T) {
 	fake := NewFake()
 	// Add a virtual server
 	vs := &utilipvs.VirtualServer{
-		Address:  net.ParseIP("10.20.30.40"),
+		Address:  netutils.ParseIPSloppy("10.20.30.40"),
 		Port:     uint16(80),
 		Protocol: string("TCP"),
 	}
 	rss := []*utilipvs.RealServer{
-		{Address: net.ParseIP("172.16.2.1"), Port: 8080, Weight: 1},
-		{Address: net.ParseIP("172.16.2.2"), Port: 8080, Weight: 2},
-		{Address: net.ParseIP("172.16.2.3"), Port: 8080, Weight: 3},
+		{Address: netutils.ParseIPSloppy("172.16.2.1"), Port: 8080, Weight: 1},
+		{Address: netutils.ParseIPSloppy("172.16.2.2"), Port: 8080, Weight: 2},
+		{Address: netutils.ParseIPSloppy("172.16.2.3"), Port: 8080, Weight: 3},
 	}
 	err := fake.AddVirtualServer(vs)
 	if err != nil {
@@ -173,7 +173,7 @@ func TestRealServer(t *testing.T) {
 	}
 	// Test delete real server that not exist
 	rs := &utilipvs.RealServer{
-		Address: net.ParseIP("172.16.2.4"),
+		Address: netutils.ParseIPSloppy("172.16.2.4"),
 		Port:    uint16(8080),
 		Weight:  1,
 	}

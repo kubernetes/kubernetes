@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -92,10 +93,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		job.Spec.TTLSecondsAfterFinished = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
 		job.Spec.CompletionMode = nil
 	}
@@ -104,7 +101,34 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.Suspend = nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) {
+		// Until this feature graduates to GA and soaks in clusters, we use an
+		// annotation to mark whether jobs are tracked with it.
+		addJobTrackingAnnotation(job)
+	} else {
+		dropJobTrackingAnnotation(job)
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
+}
+
+func addJobTrackingAnnotation(job *batch.Job) {
+	if job.Annotations == nil {
+		job.Annotations = map[string]string{}
+	}
+	job.Annotations[batchv1.JobTrackingFinalizer] = ""
+}
+
+func hasJobTrackingAnnotation(job *batch.Job) bool {
+	if job.Annotations == nil {
+		return false
+	}
+	_, ok := job.Annotations[batchv1.JobTrackingFinalizer]
+	return ok
+}
+
+func dropJobTrackingAnnotation(job *batch.Job) {
+	delete(job.Annotations, batchv1.JobTrackingFinalizer)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -112,10 +136,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
-		newJob.Spec.TTLSecondsAfterFinished = nil
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == nil {
 		newJob.Spec.CompletionMode = nil
@@ -129,6 +149,9 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		if oldJob.Spec.Suspend == nil || !*oldJob.Spec.Suspend {
 			newJob.Spec.Suspend = oldJob.Spec.Suspend
 		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && !hasJobTrackingAnnotation(oldJob) {
+		dropJobTrackingAnnotation(newJob)
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
@@ -147,8 +170,38 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, nil)
+	opts := validationOptionsForJob(job, nil)
 	return validation.ValidateJob(job, opts)
+}
+
+func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidationOptions {
+	var newPodTemplate, oldPodTemplate *core.PodTemplateSpec
+	if newJob != nil {
+		newPodTemplate = &newJob.Spec.Template
+	}
+	if oldJob != nil {
+		oldPodTemplate = &oldJob.Spec.Template
+	}
+	opts := validation.JobValidationOptions{
+		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
+		AllowTrackingAnnotation: utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers),
+	}
+	if oldJob != nil {
+		// Because we don't support the tracking with finalizers for already
+		// existing jobs, we allow the annotation only if the Job already had it,
+		// regardless of the feature gate.
+		opts.AllowTrackingAnnotation = hasJobTrackingAnnotation(oldJob)
+
+		// Updating node affinity, node selector and tolerations is allowed
+		// only for suspended jobs that never started before.
+		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
+		notStarted := oldJob.Status.StartTime == nil
+		opts.AllowMutableSchedulingDirectives = utilfeature.DefaultFeatureGate.Enabled(features.JobMutableNodeSchedulingDirectives) &&
+			suspended && notStarted
+
+	}
+
+	return opts
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -225,7 +278,7 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	job := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, &oldJob.Spec.Template)
+	opts := validationOptionsForJob(job, oldJob)
 	validationErrorList := validation.ValidateJob(job, opts)
 	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
 	return append(validationErrorList, updateErrorList...)

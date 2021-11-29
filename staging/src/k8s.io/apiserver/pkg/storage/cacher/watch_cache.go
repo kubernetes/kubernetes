@@ -27,11 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -420,17 +420,27 @@ func (w *watchCache) List() []interface{} {
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
 	startTime := w.clock.Now()
-	go func() {
-		// Wake us up when the time limit has expired.  The docs
-		// promise that time.After (well, NewTimer, which it calls)
-		// will wait *at least* the duration given. Since this go
-		// routine starts sometime after we record the start time, and
-		// it will wake up the loop below sometime after the broadcast,
-		// we don't need to worry about waking it up before the time
-		// has expired accidentally.
-		<-w.clock.After(blockTimeout)
-		w.cond.Broadcast()
-	}()
+
+	// In case resourceVersion is 0, we accept arbitrarily stale result.
+	// As a result, the condition in the below for loop will never be
+	// satisfied (w.resourceVersion is never negative), this call will
+	// never hit the w.cond.Wait().
+	// As a result - we can optimize the code by not firing the wakeup
+	// function (and avoid starting a gorotuine), especially given that
+	// resourceVersion=0 is the most common case.
+	if resourceVersion > 0 {
+		go func() {
+			// Wake us up when the time limit has expired.  The docs
+			// promise that time.After (well, NewTimer, which it calls)
+			// will wait *at least* the duration given. Since this go
+			// routine starts sometime after we record the start time, and
+			// it will wake up the loop below sometime after the broadcast,
+			// we don't need to worry about waking it up before the time
+			// has expired accidentally.
+			<-w.clock.After(blockTimeout)
+			w.cond.Broadcast()
+		}()
+	}
 
 	w.RLock()
 	if trace != nil {
@@ -449,12 +459,13 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	return nil
 }
 
-// WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, error) {
+// WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
+// with their ResourceVersion and the name of the index, if any, that was used.
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
@@ -463,10 +474,10 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
 		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, nil
+			return result, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	return w.store.List(), w.resourceVersion, nil
+	return w.store.List(), w.resourceVersion, "", nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
@@ -619,12 +630,6 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 		result[i] = w.cache[(w.startIndex+first+i)%w.capacity]
 	}
 	return result, nil
-}
-
-func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	w.RLock()
-	defer w.RUnlock()
-	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
 }
 
 func (w *watchCache) Resync() error {

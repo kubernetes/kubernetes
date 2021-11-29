@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: selinuxoptions1
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+      seLinuxOptions:
+        type: somevalue
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+      seLinuxOptions: {}
+  securityContext:
+    runAsNonRoot: true
+    seLinuxOptions: {}
+    seccompProfile:
+      type: RuntimeDefault

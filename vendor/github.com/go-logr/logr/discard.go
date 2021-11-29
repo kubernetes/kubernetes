@@ -16,36 +16,39 @@ limitations under the License.
 
 package logr
 
-// Discard returns a valid Logger that discards all messages logged to it.
-// It can be used whenever the caller is not interested in the logs.
+// Discard returns a Logger that discards all messages logged to it.  It can be
+// used whenever the caller is not interested in the logs.  Logger instances
+// produced by this function always compare as equal.
 func Discard() Logger {
-	return DiscardLogger{}
+	return Logger{
+		level: 0,
+		sink:  discardLogSink{},
+	}
 }
 
-// DiscardLogger is a Logger that discards all messages.
-type DiscardLogger struct{}
+// discardLogSink is a LogSink that discards all messages.
+type discardLogSink struct{}
 
-func (l DiscardLogger) Enabled() bool {
+// Verify that it actually implements the interface
+var _ LogSink = discardLogSink{}
+
+func (l discardLogSink) Init(RuntimeInfo) {
+}
+
+func (l discardLogSink) Enabled(int) bool {
 	return false
 }
 
-func (l DiscardLogger) Info(msg string, keysAndValues ...interface{}) {
+func (l discardLogSink) Info(int, string, ...interface{}) {
 }
 
-func (l DiscardLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+func (l discardLogSink) Error(error, string, ...interface{}) {
 }
 
-func (l DiscardLogger) V(level int) Logger {
+func (l discardLogSink) WithValues(...interface{}) LogSink {
 	return l
 }
 
-func (l DiscardLogger) WithValues(keysAndValues ...interface{}) Logger {
+func (l discardLogSink) WithName(string) LogSink {
 	return l
 }
-
-func (l DiscardLogger) WithName(name string) Logger {
-	return l
-}
-
-// Verify that it actually implements the interface
-var _ Logger = DiscardLogger{}

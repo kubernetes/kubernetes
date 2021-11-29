@@ -1,7 +1,7 @@
 # The development version of clang is distributed as the 'clang' binary,
 # while stable/released versions have a version number attached.
 # Pin the default clang to a stable version.
-CLANG ?= clang-11
+CLANG ?= clang-12
 CFLAGS := -target bpf -O2 -g -Wall -Werror $(CFLAGS)
 
 # Obtain an absolute path to the directory of the Makefile.
@@ -17,7 +17,7 @@ VERSION := $(shell cat ${REPODIR}/testdata/docker/VERSION)
 TARGETS := \
 	testdata/loader-clang-7 \
 	testdata/loader-clang-9 \
-	testdata/loader-clang-11 \
+	testdata/loader-$(CLANG) \
 	testdata/invalid_map \
 	testdata/raw_tracepoint \
 	testdata/invalid_map_static \
@@ -33,6 +33,7 @@ TARGETS := \
 docker-all:
 	docker run --rm --user "${UIDGID}" \
 		-v "${REPODIR}":/ebpf -w /ebpf --env MAKEFLAGS \
+		--env CFLAGS="-fdebug-prefix-map=/ebpf=." \
 		"${IMAGE}:${VERSION}" \
 		make all
 
@@ -47,6 +48,8 @@ clean:
 	-$(RM) internal/btf/testdata/*.elf
 
 all: $(addsuffix -el.elf,$(TARGETS)) $(addsuffix -eb.elf,$(TARGETS))
+	ln -srf testdata/loader-$(CLANG)-el.elf testdata/loader-el.elf
+	ln -srf testdata/loader-$(CLANG)-eb.elf testdata/loader-eb.elf
 
 testdata/loader-%-el.elf: testdata/loader.c
 	$* $(CFLAGS) -mlittle-endian -c $< -o $@

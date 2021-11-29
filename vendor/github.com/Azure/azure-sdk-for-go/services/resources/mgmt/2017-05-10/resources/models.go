@@ -80,6 +80,7 @@ func (future *CreateOrUpdateByIDFuture) result(client Client) (gr GenericResourc
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.CreateOrUpdateByIDFuture")
 		return
 	}
@@ -122,6 +123,7 @@ func (future *CreateOrUpdateFuture) result(client Client) (gr GenericResource, e
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.CreateOrUpdateFuture")
 		return
 	}
@@ -169,6 +171,7 @@ func (future *DeleteByIDFuture) result(client Client) (ar autorest.Response, err
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeleteByIDFuture")
 		return
 	}
@@ -204,6 +207,7 @@ func (future *DeleteFuture) result(client Client) (ar autorest.Response, err err
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeleteFuture")
 		return
 	}
@@ -471,6 +475,12 @@ type DeploymentOperationProperties struct {
 	Request *HTTPMessage `json:"request,omitempty"`
 	// Response - READ-ONLY; The HTTP response message.
 	Response *HTTPMessage `json:"response,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for DeploymentOperationProperties.
+func (dop DeploymentOperationProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	return json.Marshal(objectMap)
 }
 
 // DeploymentOperationsListResult list of deployment operations.
@@ -748,6 +758,7 @@ func (future *DeploymentsCreateOrUpdateFuture) result(client DeploymentsClient) 
 		return
 	}
 	if !done {
+		de.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeploymentsCreateOrUpdateFuture")
 		return
 	}
@@ -790,6 +801,7 @@ func (future *DeploymentsDeleteFuture) result(client DeploymentsClient) (ar auto
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeploymentsDeleteFuture")
 		return
 	}
@@ -814,6 +826,12 @@ type ErrorAdditionalInfo struct {
 	Info interface{} `json:"info,omitempty"`
 }
 
+// MarshalJSON is the custom marshaler for ErrorAdditionalInfo.
+func (eai ErrorAdditionalInfo) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	return json.Marshal(objectMap)
+}
+
 // ErrorResponse common error response for all Azure Resource Manager APIs to return error details for
 // failed operations. (This also follows the OData error response format.)
 type ErrorResponse struct {
@@ -827,6 +845,12 @@ type ErrorResponse struct {
 	Details *[]ErrorResponse `json:"details,omitempty"`
 	// AdditionalInfo - READ-ONLY; The error additional info.
 	AdditionalInfo *[]ErrorAdditionalInfo `json:"additionalInfo,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ErrorResponse.
+func (er ErrorResponse) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	return json.Marshal(objectMap)
 }
 
 // ExportTemplateRequest export resource group template request parameters.
@@ -1223,6 +1247,12 @@ type GroupProperties struct {
 	ProvisioningState *string `json:"provisioningState,omitempty"`
 }
 
+// MarshalJSON is the custom marshaler for GroupProperties.
+func (gp GroupProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	return json.Marshal(objectMap)
+}
+
 // GroupsDeleteFuture an abstraction for monitoring and retrieving the results of a long-running operation.
 type GroupsDeleteFuture struct {
 	azure.FutureAPI
@@ -1251,6 +1281,7 @@ func (future *GroupsDeleteFuture) result(client GroupsClient) (ar autorest.Respo
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.GroupsDeleteFuture")
 		return
 	}
@@ -1463,6 +1494,12 @@ type ManagementErrorWithDetails struct {
 	Details *[]ManagementErrorWithDetails `json:"details,omitempty"`
 }
 
+// MarshalJSON is the custom marshaler for ManagementErrorWithDetails.
+func (mewd ManagementErrorWithDetails) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	return json.Marshal(objectMap)
+}
+
 // MoveInfo parameters of move resources.
 type MoveInfo struct {
 	// ResourcesProperty - The IDs of the resources.
@@ -1500,6 +1537,7 @@ func (future *MoveResourcesFuture) result(client Client) (ar autorest.Response, 
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.MoveResourcesFuture")
 		return
 	}
@@ -2099,6 +2137,7 @@ func (future *UpdateByIDFuture) result(client Client) (gr GenericResource, err e
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.UpdateByIDFuture")
 		return
 	}
@@ -2140,6 +2179,7 @@ func (future *UpdateFuture) result(client Client) (gr GenericResource, err error
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.UpdateFuture")
 		return
 	}
@@ -2182,6 +2222,7 @@ func (future *ValidateMoveResourcesFuture) result(client Client) (ar autorest.Re
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.ValidateMoveResourcesFuture")
 		return
 	}

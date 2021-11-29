@@ -96,6 +96,12 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 		}
 		delegateSpec, etag, _, err := downloader.Download(handler, "")
 		if err != nil {
+			// ignore errors for the empty delegate we attach at the end the chain
+			// atm the empty delegate returns 503 when the server hasn't been fully initialized
+			// and the spec downloader only silences 404s
+			if len(delegate.ListedPaths()) == 0 && delegate.NextDelegate() == nil {
+				continue
+			}
 			return nil, err
 		}
 		if delegateSpec == nil {

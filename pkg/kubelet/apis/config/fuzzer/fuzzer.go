@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/google/gofuzz"
@@ -29,6 +30,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.
@@ -68,6 +70,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"
+			obj.CPUManagerPolicyOptions = make(map[string]string)
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
 			obj.NodeStatusMaxImages = 50
 			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
@@ -106,6 +109,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Logging.Format = "text"
 			}
 			obj.EnableSystemLogHandler = true
+			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
 		},
 	}
 }

@@ -70,10 +70,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
 	})
 
-	// Requires the alpha level feature gate SuspendJob. This e2e test will not
-	// pass without the following flag being passed to kubetest:
-	//   --test_args="--feature-gates=SuspendJob=true"
-	ginkgo.It("[Feature:SuspendJob] should not create pods when created in suspend state", func() {
+	ginkgo.It("should not create pods when created in suspend state", func() {
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(true)
@@ -111,10 +108,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	// Requires the alpha level feature gate SuspendJob. This e2e test will not
-	// pass without the following flag being passed to kubetest:
-	//   --test_args="--feature-gates=SuspendJob=true"
-	ginkgo.It("[Feature:SuspendJob] should delete pods when suspended", func() {
+	ginkgo.It("should delete pods when suspended", func() {
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(false)

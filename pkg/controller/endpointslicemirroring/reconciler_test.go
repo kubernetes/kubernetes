@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -44,6 +45,7 @@ func TestReconcile(t *testing.T) {
 		testName                 string
 		subsets                  []corev1.EndpointSubset
 		epLabels                 map[string]string
+		epAnnotations            map[string]string
 		endpointsDeletionPending bool
 		maxEndpointsPerSubset    int32
 		existingEndpointSlices   []*discovery.EndpointSlice
@@ -228,6 +230,67 @@ func TestReconcile(t *testing.T) {
 		expectedNumSlices:      1,
 		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
+	}, {
+		testName: "Endpoints with 1 subset, 2 ports, and 2 not ready addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			NotReadyAddresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
+	}, {
+		testName: "Endpoints with 1 subset, 2 ports, and 2 ready and 2 not ready addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.1.1.1",
+				Hostname: "pod-11",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.1.1.2",
+				Hostname: "pod-12",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+			NotReadyAddresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 4, addedPerSync: 4, numCreated: 1},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses",
 		subsets: []corev1.EndpointSubset{{
@@ -730,6 +793,118 @@ func TestReconcile(t *testing.T) {
 		expectedClientActions:  2,
 		maxEndpointsPerSubset:  2,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 4, addedPerSync: 4, updatedPerSync: 0, removedPerSync: 0, skippedPerSync: 1, numCreated: 2, numUpdated: 0},
+	}, {
+		testName: "The last-applied-configuration annotation should not get mirrored to created or updated endpoint slices",
+		epAnnotations: map[string]string{
+			corev1.LastAppliedConfigAnnotation: "{\"apiVersion\":\"v1\",\"kind\":\"Endpoints\",\"subsets\":[]}",
+		},
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{addedPerSync: 1, numCreated: 1, desiredEndpoints: 1, desiredSlices: 1, actualSlices: 1},
+	}, {
+		testName: "The last-applied-configuration annotation shouldn't get added to created endpoint slices",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{addedPerSync: 1, numCreated: 1, desiredEndpoints: 1, desiredSlices: 1, actualSlices: 1},
+	}, {
+		testName: "The last-applied-configuration shouldn't get mirrored to endpoint slices when it's value is empty",
+		epAnnotations: map[string]string{
+			corev1.LastAppliedConfigAnnotation: "",
+		},
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{addedPerSync: 1, numCreated: 1, desiredEndpoints: 1, desiredSlices: 1, actualSlices: 1},
+	}, {
+		testName: "Annotations other than last-applied-configuration should get correctly mirrored",
+		epAnnotations: map[string]string{
+			corev1.LastAppliedConfigAnnotation: "{\"apiVersion\":\"v1\",\"kind\":\"Endpoints\",\"subsets\":[]}",
+			"foo":                              "bar",
+		},
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{addedPerSync: 1, numCreated: 1, desiredEndpoints: 1, desiredSlices: 1, actualSlices: 1},
+	}, {
+		testName: "Annotation mirroring should remove the last-applied-configuration annotation from existing endpoint slices",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ep-1",
+				Annotations: map[string]string{
+					corev1.LastAppliedConfigAnnotation: "{\"apiVersion\":\"v1\",\"kind\":\"Endpoints\",\"subsets\":[]}",
+				},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
 	}}
 
 	for _, tc := range testCases {
@@ -738,7 +913,7 @@ func TestReconcile(t *testing.T) {
 			setupMetrics()
 			namespace := "test"
 			endpoints := corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels, Annotations: tc.epAnnotations},
 				Subsets:    tc.subsets,
 			}
 
@@ -791,7 +966,7 @@ func newReconciler(client *fake.Clientset, maxEndpointsPerSubset int32) *reconci
 	return &reconciler{
 		client:                client,
 		maxEndpointsPerSubset: maxEndpointsPerSubset,
-		endpointSliceTracker:  newEndpointSliceTracker(),
+		endpointSliceTracker:  endpointsliceutil.NewEndpointSliceTracker(),
 		metricsCache:          metrics.NewCache(maxEndpointsPerSubset),
 		eventRecorder:         recorder,
 	}
@@ -818,6 +993,25 @@ func expectEndpointSlices(t *testing.T, num, maxEndpointsPerSubset int, endpoint
 		}
 		if serviceNameVal != endpoints.Name {
 			t.Errorf("Expected EndpointSlice to have %s label set to %s, got %s", discovery.LabelServiceName, endpoints.Name, serviceNameVal)
+		}
+
+		_, ok = epSlice.Annotations[corev1.LastAppliedConfigAnnotation]
+		if ok {
+			t.Errorf("Expected LastAppliedConfigAnnotation to be unset, got %s", epSlice.Annotations[corev1.LastAppliedConfigAnnotation])
+		}
+
+		_, ok = epSlice.Annotations[corev1.EndpointsLastChangeTriggerTime]
+		if ok {
+			t.Errorf("Expected EndpointsLastChangeTriggerTime to be unset, got %s", epSlice.Annotations[corev1.EndpointsLastChangeTriggerTime])
+		}
+
+		for annotation, val := range endpoints.Annotations {
+			if annotation == corev1.EndpointsLastChangeTriggerTime || annotation == corev1.LastAppliedConfigAnnotation {
+				continue
+			}
+			if epSlice.Annotations[annotation] != val {
+				t.Errorf("Expected endpoint annotation %s to be mirrored correctly, got %s", annotation, epSlice.Annotations[annotation])
+			}
 		}
 	}
 

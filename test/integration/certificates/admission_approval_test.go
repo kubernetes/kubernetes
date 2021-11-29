@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -102,8 +102,8 @@ func grantUserPermissionToApproveFor(t *testing.T, client clientset.Interface, u
 	}
 	approveRule := cr.Rules[0]
 	updateRule := cr.Rules[1]
-	waitForNamedAuthorizationUpdate(t, client.AuthorizationV1(), username, "", approveRule.Verbs[0], approveRule.ResourceNames[0], schema.GroupResource{Group: approveRule.APIGroups[0], Resource: approveRule.Resources[0]}, true)
-	waitForNamedAuthorizationUpdate(t, client.AuthorizationV1(), username, "", updateRule.Verbs[0], "", schema.GroupResource{Group: updateRule.APIGroups[0], Resource: updateRule.Resources[0]}, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(), username, "", approveRule.Verbs[0], approveRule.ResourceNames[0], schema.GroupResource{Group: approveRule.APIGroups[0], Resource: approveRule.Resources[0]}, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(), username, "", updateRule.Verbs[0], "", schema.GroupResource{Group: updateRule.APIGroups[0], Resource: updateRule.Resources[0]}, true)
 }
 
 func buildApprovalClusterRoleForSigners(name string, signerNames ...string) *rbacv1.ClusterRole {

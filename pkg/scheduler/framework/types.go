@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -70,6 +69,8 @@ const (
 	Service               GVK = "Service"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
+	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
 	WildCard              GVK = "*"
 )
 
@@ -272,8 +273,8 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm
 	}
 
 	var terms []AffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i])
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
@@ -290,13 +291,13 @@ func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm)
 	}
 
 	var terms []WeightedAffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term.PodAffinityTerm)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
 		}
-		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
 	}
 	return terms, nil
 }
@@ -388,19 +389,13 @@ type NodeInfo struct {
 	// state information.
 	ImageStates map[string]*ImageStateSummary
 
-	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
-	// scheduling cycle.
-	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
-	TransientInfo *TransientSchedulerInfo
+	// PVCRefCounts contains a mapping of PVC names to the number of pods on the node using it.
+	// Keys are in the format "namespace/name".
+	PVCRefCounts map[string]int
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
-}
-
-//initializeNodeTransientInfo initializes transient information pertaining to node.
-func initializeNodeTransientInfo() nodeTransientInfo {
-	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
 }
 
 // nextGeneration: Let's make sure history never forgets the name...
@@ -409,43 +404,6 @@ func initializeNodeTransientInfo() nodeTransientInfo {
 // added back with the same name. See issue#63262.
 func nextGeneration() int64 {
 	return atomic.AddInt64(&generation, 1)
-}
-
-// nodeTransientInfo contains transient node information while scheduling.
-type nodeTransientInfo struct {
-	// AllocatableVolumesCount contains number of volumes that could be attached to node.
-	AllocatableVolumesCount int
-	// Requested number of volumes on a particular node.
-	RequestedVolumes int
-}
-
-// TransientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
-// It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
-// priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
-// on node etc.
-// IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
-// only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
-type TransientSchedulerInfo struct {
-	TransientLock sync.Mutex
-	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
-	TransNodeInfo nodeTransientInfo
-}
-
-// NewTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
-func NewTransientSchedulerInfo() *TransientSchedulerInfo {
-	tsi := &TransientSchedulerInfo{
-		TransNodeInfo: initializeNodeTransientInfo(),
-	}
-	return tsi
-}
-
-// ResetTransientSchedulerInfo resets the TransientSchedulerInfo.
-func (transientSchedInfo *TransientSchedulerInfo) ResetTransientSchedulerInfo() {
-	transientSchedInfo.TransientLock.Lock()
-	defer transientSchedInfo.TransientLock.Unlock()
-	// Reset TransientNodeInfo.
-	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
-	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
 }
 
 // Resource is a collection of compute resource.
@@ -557,10 +515,10 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		Requested:        &Resource{},
 		NonZeroRequested: &Resource{},
 		Allocatable:      &Resource{},
-		TransientInfo:    NewTransientSchedulerInfo(),
 		Generation:       nextGeneration(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -583,9 +541,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Requested:        n.Requested.Clone(),
 		NonZeroRequested: n.NonZeroRequested.Clone(),
 		Allocatable:      n.Allocatable.Clone(),
-		TransientInfo:    n.TransientInfo,
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
+		PVCRefCounts:     n.PVCRefCounts,
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -645,6 +603,7 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 
 	// Consume ports when pods added.
 	n.updateUsedPorts(podInfo.Pod, true)
+	n.updatePVCRefCounts(podInfo.Pod, true)
 
 	n.Generation = nextGeneration()
 }
@@ -722,6 +681,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
+			n.updatePVCRefCounts(pod, false)
 
 			n.Generation = nextGeneration()
 			n.resetSlicesIfEmpty()
@@ -786,10 +746,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for j := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[j]
-		for k := range container.Ports {
-			podPort := &container.Ports[k]
+	for _, container := range pod.Spec.Containers {
+		for _, podPort := range container.Ports {
 			if add {
 				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {
@@ -799,11 +757,29 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
+// updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
+func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		if add {
+			n.PVCRefCounts[key] += 1
+		} else {
+			n.PVCRefCounts[key] -= 1
+			if n.PVCRefCounts[key] <= 0 {
+				delete(n.PVCRefCounts, key)
+			}
+		}
+	}
+}
+
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
-	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
 }
 

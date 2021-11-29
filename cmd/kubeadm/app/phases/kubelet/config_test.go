@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -68,7 +69,7 @@ func TestCreateConfigMapRBACRules(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := createConfigMapRBACRules(client, version.MustParseSemantic("v1.11.0")); err != nil {
+	if err := createConfigMapRBACRules(client, version.MustParseSemantic("v1.11.0"), false); err != nil {
 		t.Errorf("createConfigMapRBACRules: unexpected error %v", err)
 	}
 }

@@ -41,7 +41,7 @@ import (
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
 // store into it's kind.  We've used this downstream for mappings before.
-var kindWhiteList = sets.NewString()
+var kindAllowList = sets.NewString()
 
 // namespace used for all tests, do not change this
 const testNamespace = "dryrunnamespace"
@@ -264,8 +264,8 @@ func TestDryRun(t *testing.T) {
 			gvResource := resourceToTest.Mapping.Resource
 			kind := gvk.Kind
 
-			if kindWhiteList.Has(kind) {
-				t.Skip("whitelisted")
+			if kindAllowList.Has(kind) {
+				t.Skip("allowlisted")
 			}
 
 			testData, hasTest := dryrunData[gvResource]

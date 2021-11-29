@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -21,12 +22,12 @@ package hostport
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeChain struct {
@@ -192,7 +193,7 @@ func normalizeRule(rule string) (string, error) {
 		arg := remaining[:end]
 
 		// Normalize un-prefixed IP addresses like iptables does
-		if net.ParseIP(arg) != nil {
+		if netutils.ParseIPSloppy(arg) != nil {
 			arg += "/32"
 		}
 
@@ -367,4 +368,8 @@ func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName ut
 
 func (f *fakeIPTables) HasRandomFully() bool {
 	return false
+}
+
+func (f *fakeIPTables) Present() bool {
+	return true
 }

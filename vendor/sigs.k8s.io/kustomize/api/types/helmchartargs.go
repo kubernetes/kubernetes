@@ -68,6 +68,10 @@ type HelmChart struct {
 	// Legal values: 'merge', 'override', 'replace'.
 	// Defaults to 'override'.
 	ValuesMerge string `json:"valuesMerge,omitempty" yaml:"valuesMerge,omitempty"`
+
+	// IncludeCRDs specifies if Helm should also generate CustomResourceDefinitions.
+	// Defaults to 'false'.
+	IncludeCRDs bool `json:"includeCRDs,omitempty" yaml:"includeCRDs,omitempty"`
 }
 
 // HelmChartArgs contains arguments to helm.

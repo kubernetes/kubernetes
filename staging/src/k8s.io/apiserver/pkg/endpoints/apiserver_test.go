@@ -286,9 +286,9 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	}
-	fakeChecker := auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	handler := genericapifilters.WithAudit(mux, auditSink, fakeChecker, longRunningCheck)
-	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeChecker, longRunningCheck, codecs, 60*time.Second)
+	fakeRuleEvaluator := auditpolicy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
+	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}

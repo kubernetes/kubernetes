@@ -30,6 +30,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -46,6 +47,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -84,6 +86,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	authorizationv1.AddToScheme,
 	authorizationv1beta1.AddToScheme,
 	autoscalingv1.AddToScheme,
+	autoscalingv2.AddToScheme,
 	autoscalingv2beta1.AddToScheme,
 	autoscalingv2beta2.AddToScheme,
 	batchv1.AddToScheme,
@@ -100,6 +103,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	extensionsv1beta1.AddToScheme,
 	flowcontrolv1alpha1.AddToScheme,
 	flowcontrolv1beta1.AddToScheme,
+	flowcontrolv1beta2.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1beta1.AddToScheme,
 	nodev1.AddToScheme,

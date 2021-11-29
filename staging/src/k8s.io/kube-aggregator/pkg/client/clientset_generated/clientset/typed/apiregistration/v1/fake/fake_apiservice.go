@@ -110,7 +110,7 @@ func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *apiregis
 // Delete takes name of the aPIService and deletes it. Returns an error if one occurs.
 func (c *FakeAPIServices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(apiservicesResource, name), &apiregistrationv1.APIService{})
+		Invokes(testing.NewRootDeleteActionWithOptions(apiservicesResource, name, opts), &apiregistrationv1.APIService{})
 	return err
 }
 

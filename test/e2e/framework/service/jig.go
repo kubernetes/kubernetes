@@ -48,7 +48,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -304,6 +304,10 @@ func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
 func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
+	if err != nil {
+		return nil, err
+	}
 	endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -599,7 +603,8 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			framework.Logf("Retrying .... error trying to get Service %s: %v", j.Name, err)
+			return false, nil
 		}
 		if conditionFn(svc) {
 			service = svc
@@ -608,7 +613,7 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		return nil, fmt.Errorf("timed out waiting for service %q to %s", j.Name, message)
+		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
 }
@@ -641,7 +646,7 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 							Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &v1.Probe{
 								PeriodSeconds: 3,
-								Handler: v1.Handler{
+								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
 										Port: intstr.FromInt(80),
 										Path: "/hostName",
@@ -816,7 +821,7 @@ func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, exec
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	if net.ParseIP(clusterIP) == nil {
+	if netutils.ParseIPSloppy(clusterIP) == nil {
 		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
 	return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
@@ -828,7 +833,7 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string, externalIPs bool) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
+	isClusterIPV4 := netutils.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
@@ -838,7 +843,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			continue
 		}
 		// Check service reachability on the node internalIP which is same family as clusterIP
-		if isClusterIPV4 != utilsnet.IsIPv4String(internalAddr) {
+		if isClusterIPV4 != netutils.IsIPv4String(internalAddr) {
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
@@ -851,7 +856,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 	if externalIPs {
 		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 		for _, externalAddr := range externalAddrs {
-			if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
+			if isClusterIPV4 != netutils.IsIPv4String(externalAddr) {
 				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 				continue
 			}
@@ -867,7 +872,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 // isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
 // parsable or the loopback address. Otherwise it will return `false`.
 func isInvalidOrLocalhostAddress(ip string) bool {
-	parsedIP := net.ParseIP(ip)
+	parsedIP := netutils.ParseIPSloppy(ip)
 	if parsedIP == nil || parsedIP.IsLoopback() {
 		return true
 	}

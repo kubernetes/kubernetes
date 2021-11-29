@@ -90,7 +90,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommo
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Env
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,EnvFrom
-API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Ports
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/core/v1,ExecAction,Command
@@ -367,17 +366,12 @@ API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1al
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostCIDRDenylist
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NodePortAddresses
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyIPVSConfiguration,ExcludeCIDRs
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,CAData
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,CertData
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,KeyData
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,LabelsPresence,Labels
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,LegacyExtender,ManagedResources
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Extenders
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Predicates
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Priorities
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Resources
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Shape
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ServiceAffinity,Labels
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta2,ExtenderTLSConfig,CAData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta2,ExtenderTLSConfig,CertData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta2,ExtenderTLSConfig,KeyData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,CAData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,CertData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,KeyData
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Args
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Env
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,MatchImages
@@ -385,7 +379,9 @@ API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialP
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,AllowedUnsafeSysctls
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ClusterDNS
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,EnforceNodeAllocatable
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,RegisterWithTaints
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ReservedMemory
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ShutdownGracePeriodByPodPriority
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,TLSCipherSuites
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1alpha1,PodMetrics,Containers
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1beta1,PodMetrics,Containers
@@ -425,6 +421,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XPreserveUnknownFields
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XValidations
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrBool,Allows
@@ -441,6 +438,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XPreserveUnknownFields
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XValidations
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrBool,Allows
@@ -466,6 +464,10 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,CertificateAuthorityData
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,InsecureSkipTLSVerify
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,ProxyURL
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,CertificateAuthorityData
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,InsecureSkipTLSVerify
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,ProxyURL
@@ -524,6 +526,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,E
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceMirroringControllerConfiguration,MirroringConcurrentServiceEndpointSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceMirroringControllerConfiguration,MirroringEndpointUpdatesBatchPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceMirroringControllerConfiguration,MirroringMaxEndpointsPerSubset
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EphemeralVolumeControllerConfiguration,ConcurrentEphemeralVolumeSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,ConcurrentGCSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,EnableGarbageCollector
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,GCIgnoredResources
@@ -536,7 +539,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,H
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUpscaleForbiddenWindow
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUseRESTClients
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
@@ -547,6 +549,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,EndpointController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,EndpointSliceController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,EndpointSliceMirroringController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,EphemeralVolumeController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,GarbageCollectorController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,Generic
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,HPAController
@@ -605,7 +608,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,V
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,FlexVolumePluginDir
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,IPTables
-API rule violation: names_match,k8s.io/kube-scheduler/config/v1,LegacyExtender,EnableHTTPS
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig

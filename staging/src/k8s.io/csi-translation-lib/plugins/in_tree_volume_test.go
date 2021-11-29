@@ -582,7 +582,6 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 		name            string
 		topology        []v1.TopologySelectorTerm
 		expectedToplogy []v1.TopologySelectorTerm
-		expErr          bool
 	}{
 		{
 			name:     "no translation",
@@ -664,18 +663,24 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			expectedToplogy: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "test",
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Logf("Running test: %v", tc.name)
 		gotTop, err := translateAllowedTopologies(tc.topology, GCEPDTopologyKey)
-		if err != nil && !tc.expErr {
-			t.Errorf("Did not expect an error, got: %v", err)
-		}
-		if err == nil && tc.expErr {
-			t.Errorf("Expected an error but did not get one")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
 		}
 
 		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {

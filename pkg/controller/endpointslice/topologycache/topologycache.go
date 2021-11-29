@@ -20,10 +20,11 @@ import (
 	"math"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 const (
@@ -84,11 +85,11 @@ func (t *TopologyCache) GetOverloadedServices() []string {
 // AddHints adds or updates topology hints on EndpointSlices and returns updated
 // lists of EndpointSlices to create and update.
 func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice) {
-	totalEndpoints := si.getTotalEndpoints()
+	totalEndpoints := si.getTotalReadyEndpoints()
 	allocations := t.getAllocations(totalEndpoints)
 
 	if allocations == nil {
-		klog.V(2).Infof("Insufficient endpoints, removing hints from %s Service", si.ServiceKey)
+		klog.V(2).InfoS("Insufficient endpoints, removing hints from service", "serviceKey", si.ServiceKey)
 		t.RemoveHints(si.ServiceKey, si.AddressType)
 		return RemoveHintsFromSlices(si)
 	}
@@ -103,8 +104,12 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	// step 1: assign same-zone hints for all endpoints as a starting point.
 	for _, slice := range allocatableSlices {
 		for i, endpoint := range slice.Endpoints {
+			if !endpointsliceutil.EndpointReady(endpoint) {
+				endpoint.Hints = nil
+				continue
+			}
 			if endpoint.Zone == nil || *endpoint.Zone == "" {
-				klog.Warningf("Endpoint found without zone specified, removing hints from %s Service", si.ServiceKey)
+				klog.InfoS("Endpoint found without zone specified, removing hints from service", "serviceKey", si.ServiceKey)
 				t.RemoveHints(si.ServiceKey, si.AddressType)
 				return RemoveHintsFromSlices(si)
 			}
@@ -132,6 +137,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 // cache.
 func (t *TopologyCache) SetHints(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
 	if len(allocatedHintsByZone) == 0 {
+		klog.V(2).Infof("No hints allocated for zones, removing them from %s EndpointSlices for %s Service", addrType, serviceKey)
 		t.RemoveHints(serviceKey, addrType)
 		return
 	}
@@ -169,9 +175,15 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	totalCPU := resource.Quantity{}
 
 	for _, node := range nodes {
-		if !NodeReady(node.Status) {
+		if hasExcludedLabels(node.Labels) {
+			klog.V(2).Infof("Ignoring node %s because it has an excluded label", node.Name)
 			continue
 		}
+		if !NodeReady(node.Status) {
+			klog.V(2).Infof("Ignoring node %s because it is not ready: %v", node.Name, node.Status.Conditions)
+			continue
+		}
+
 		nodeCPU := node.Status.Allocatable.Cpu()
 		zone, ok := node.Labels[v1.LabelTopologyZone]
 
@@ -184,6 +196,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 		if !ok || zone == "" || nodeCPU.IsZero() {
 			cpuByZone = map[string]*resource.Quantity{}
 			sufficientNodeInfo = false
+			klog.Warningf("Can't get CPU or zone information for %s node", node.Name)
 			break
 		}
 
@@ -199,6 +212,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	defer t.lock.Unlock()
 
 	if totalCPU.IsZero() || !sufficientNodeInfo || len(cpuByZone) < 2 {
+		klog.V(2).Infof("Insufficient node info for topology hints (%d zones, %s CPU, %t)", len(cpuByZone), totalCPU.MilliValue(), sufficientNodeInfo)
 		t.sufficientNodeInfo = false
 		t.cpuByZone = nil
 		t.cpuRatiosByZone = nil
@@ -219,6 +233,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 // threshold, a nil value will be returned.
 func (t *TopologyCache) getAllocations(numEndpoints int) map[string]Allocation {
 	if t.cpuRatiosByZone == nil || len(t.cpuRatiosByZone) < 2 || len(t.cpuRatiosByZone) > numEndpoints {
+		klog.V(2).Infof("Insufficient info to allocate endpoints (%d endpoints, %d zones)", numEndpoints, len(t.cpuRatiosByZone))
 		return nil
 	}
 
@@ -249,4 +264,19 @@ func (t *TopologyCache) getAllocations(numEndpoints int) map[string]Allocation {
 	}
 
 	return allocations
+}
+
+// Nodes with any of these labels set to any value will be excluded from
+// topology capacity calculations.
+func hasExcludedLabels(labels map[string]string) bool {
+	if len(labels) == 0 {
+		return false
+	}
+	if _, ok := labels["node-role.kubernetes.io/control-plane"]; ok {
+		return true
+	}
+	if _, ok := labels["node-role.kubernetes.io/master"]; ok {
+		return true
+	}
+	return false
 }

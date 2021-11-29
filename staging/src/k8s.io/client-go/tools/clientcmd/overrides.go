@@ -53,6 +53,7 @@ type AuthOverrideFlags struct {
 	ClientKey         FlagInfo
 	Token             FlagInfo
 	Impersonate       FlagInfo
+	ImpersonateUID    FlagInfo
 	ImpersonateGroups FlagInfo
 	Username          FlagInfo
 	Password          FlagInfo
@@ -154,6 +155,7 @@ const (
 	FlagEmbedCerts       = "embed-certs"
 	FlagBearerToken      = "token"
 	FlagImpersonate      = "as"
+	FlagImpersonateUID   = "as-uid"
 	FlagImpersonateGroup = "as-group"
 	FlagUsername         = "username"
 	FlagPassword         = "password"
@@ -179,6 +181,7 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
 		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
+		ImpersonateUID:    FlagInfo{prefix + FlagImpersonateUID, "", "", "UID to impersonate for the operation"},
 		ImpersonateGroups: FlagInfo{prefix + FlagImpersonateGroup, "", "", "Group to impersonate for the operation, this flag can be repeated to specify multiple groups."},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
 		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
@@ -219,6 +222,7 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flagNames.ClientKey.BindStringFlag(flags, &authInfo.ClientKey).AddSecretAnnotation(flags)
 	flagNames.Token.BindStringFlag(flags, &authInfo.Token).AddSecretAnnotation(flags)
 	flagNames.Impersonate.BindStringFlag(flags, &authInfo.Impersonate).AddSecretAnnotation(flags)
+	flagNames.ImpersonateUID.BindStringFlag(flags, &authInfo.ImpersonateUID).AddSecretAnnotation(flags)
 	flagNames.ImpersonateGroups.BindStringArrayFlag(flags, &authInfo.ImpersonateGroups).AddSecretAnnotation(flags)
 	flagNames.Username.BindStringFlag(flags, &authInfo.Username).AddSecretAnnotation(flags)
 	flagNames.Password.BindStringFlag(flags, &authInfo.Password).AddSecretAnnotation(flags)

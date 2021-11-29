@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
@@ -30,6 +31,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 var (
@@ -125,6 +127,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
+
+	for _, nodeTaint := range kc.RegisterWithTaints {
+		if err := utiltaints.CheckTaintValidation(nodeTaint); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid taint: %v", nodeTaint))
+		}
+		if nodeTaint.TimeAdded != nil {
+			allErrors = append(allErrors, fmt.Errorf("taint TimeAdded is not nil"))
+		}
+	}
+
 	switch kc.TopologyManagerPolicy {
 	case kubeletconfig.NoneTopologyManagerPolicy:
 	case kubeletconfig.BestEffortTopologyManagerPolicy:
@@ -153,6 +165,24 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
+	}
+	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Cannot specify both shutdownGracePeriodByPodPriority and shutdownGracePeriod at the same time"))
+		}
+	}
+	if !localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if len(kc.ShutdownGracePeriodByPodPriority) != 0 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority"))
+		}
+	}
+	if localFeatureGate.Enabled(features.NodeSwap) {
+		if kc.MemorySwap.SwapBehavior != "" && kc.MemorySwap.SwapBehavior != kubetypes.LimitedSwap && kc.MemorySwap.SwapBehavior != kubetypes.UnlimitedSwap {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
+		}
+	}
+	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
@@ -200,11 +230,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
 
-	logOption := logs.NewOptions()
-	if kc.Logging.Format != "" {
-		logOption.LogFormat = kc.Logging.Format
+	if errs := logs.ValidateLoggingConfiguration(&kc.Logging, field.NewPath("logging")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
-	allErrors = append(allErrors, logOption.Validate()...)
+
+	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor is required when MemoryQoS feature flag is enabled"))
+	}
+	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", kc.MemoryThrottlingFactor))
+	}
 
 	return utilerrors.NewAggregate(allErrors)
 }

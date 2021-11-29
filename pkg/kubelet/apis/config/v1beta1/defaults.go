@@ -36,6 +36,9 @@ const (
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
+	DefaultMemoryThrottlingFactor = 0.8
 )
 
 var (
@@ -175,11 +178,11 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	// default nil or negative value to -1 (implies node allocatable pid limit)
 	if obj.PodPidsLimit == nil || *obj.PodPidsLimit < int64(0) {
-		temp := int64(-1)
-		obj.PodPidsLimit = &temp
+		obj.PodPidsLimit = utilpointer.Int64(-1)
 	}
-	if obj.ResolverConfig == "" {
-		obj.ResolverConfig = kubetypes.ResolvConfDefault
+
+	if obj.ResolverConfig == nil {
+		obj.ResolverConfig = utilpointer.String(kubetypes.ResolvConfDefault)
 	}
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
@@ -251,5 +254,14 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.EnableDebugFlagsHandler == nil {
 		obj.EnableDebugFlagsHandler = utilpointer.BoolPtr(true)
+	}
+	if obj.SeccompDefault == nil {
+		obj.SeccompDefault = utilpointer.BoolPtr(false)
+	}
+	if obj.MemoryThrottlingFactor == nil {
+		obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor)
+	}
+	if obj.RegisterNode == nil {
+		obj.RegisterNode = utilpointer.BoolPtr(true)
 	}
 }

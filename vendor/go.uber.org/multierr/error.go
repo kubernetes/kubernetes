@@ -54,7 +54,7 @@
 //
 // 	errors := multierr.Errors(err)
 // 	if len(errors) > 0 {
-// 		fmt.Println("The following errors occurred:")
+// 		fmt.Println("The following errors occurred:", errors)
 // 	}
 //
 // Advanced Usage

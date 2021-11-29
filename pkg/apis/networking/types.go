@@ -149,8 +149,8 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Alpha state and should be enabled using the Feature Gate
-	// "NetworkPolicyEndPort".
+	// This feature is in Beta state and is enabled by default.
+	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32
 }
@@ -339,15 +339,12 @@ type IngressClassParametersReference struct {
 	Name string
 	// Scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
-	// Field can be enabled with IngressClassNamespacedParams feature gate.
 	// +optional
-	// +featureGate=IngressClassNamespacedParams
 	Scope *string
 	// Namespace is the namespace of the resource being referenced. This field is
 	// required when scope is set to "Namespace" and must be unset when scope is set to
 	// "Cluster".
 	// +optional
-	// +featureGate=IngressClassNamespacedParams
 	Namespace *string
 }
 

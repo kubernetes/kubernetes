@@ -23,11 +23,14 @@ import (
 	"path"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -71,13 +74,21 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
+		enforceMemoryQoS := false
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+			libcontainercgroups.IsCgroup2UnifiedMode() {
+			enforceMemoryQoS = true
+		}
 		// Create the pod container
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+		}
+		if enforceMemoryQoS {
+			klog.V(4).InfoS("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)

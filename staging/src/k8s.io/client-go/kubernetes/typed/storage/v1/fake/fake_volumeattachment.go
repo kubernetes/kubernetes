@@ -113,7 +113,7 @@ func (c *FakeVolumeAttachments) UpdateStatus(ctx context.Context, volumeAttachme
 // Delete takes name of the volumeAttachment and deletes it. Returns an error if one occurs.
 func (c *FakeVolumeAttachments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(volumeattachmentsResource, name), &storagev1.VolumeAttachment{})
+		Invokes(testing.NewRootDeleteActionWithOptions(volumeattachmentsResource, name, opts), &storagev1.VolumeAttachment{})
 	return err
 }
 

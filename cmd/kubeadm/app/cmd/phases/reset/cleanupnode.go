@@ -23,13 +23,16 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	utilsexec "k8s.io/utils/exec"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 // NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
@@ -89,6 +92,13 @@ func runCleanupNode(c workflow.RunData) error {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
+
+	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
+		klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+		if err := users.RemoveUsersAndGroups(); err != nil {
+			klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
+		}
+	}
 
 	return nil
 }

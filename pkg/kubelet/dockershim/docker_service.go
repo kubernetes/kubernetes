@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -34,7 +35,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -256,16 +257,17 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	ds.network = network.NewPluginManager(plug)
 	klog.InfoS("Docker cri networking managed by the network plugin", "networkPluginName", plug.Name())
 
+	dockerInfo, err := ds.client.Info()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to execute Info() call to the Docker client")
+	}
+	klog.InfoS("Docker Info", "dockerInfo", dockerInfo)
+	ds.dockerRootDir = dockerInfo.DockerRootDir
+
 	// skipping cgroup driver checks for Windows
 	if runtime.GOOS == "linux" {
-		// NOTE: cgroup driver is only detectable in docker 1.11+
 		cgroupDriver := defaultCgroupDriver
-		dockerInfo, err := ds.client.Info()
-		klog.InfoS("Docker Info", "dockerInfo", dockerInfo)
-		if err != nil {
-			klog.ErrorS(err, "Failed to execute Info() call to the Docker client")
-			klog.InfoS("Falling back to use the default driver", "cgroupDriver", cgroupDriver)
-		} else if len(dockerInfo.CgroupDriver) == 0 {
+		if len(dockerInfo.CgroupDriver) == 0 {
 			klog.InfoS("No cgroup driver is set in Docker")
 			klog.InfoS("Falling back to use the default driver", "cgroupDriver", cgroupDriver)
 		} else {
@@ -312,6 +314,9 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
+
+	// docker root directory
+	dockerRootDir string
 
 	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
 	// needed to clean up after containers have been removed.

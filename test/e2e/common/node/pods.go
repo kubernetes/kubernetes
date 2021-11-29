@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/util/retry"
+
 	"golang.org/x/net/websocket"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -243,10 +246,6 @@ var _ = SIGDescribe("Pods", func() {
 		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pods")
 		framework.ExpectEqual(len(pods.Items), 0)
-		options = metav1.ListOptions{
-			LabelSelector:   selector.String(),
-			ResourceVersion: pods.ListMeta.ResourceVersion,
-		}
 
 		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
@@ -773,8 +772,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 	})
 
-	// TODO(freehan): label the test to be [NodeConformance] after tests are proven to be stable.
-	ginkgo.It("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
+	ginkgo.It("should support pod readiness gates [NodeConformance]", func() {
 		podName := "pod-ready"
 		readinessGate1 := "k8s.io/test-condition1"
 		readinessGate2 := "k8s.io/test-condition2"
@@ -800,11 +798,13 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				podReady := podClient.PodIsReady(podName)
+			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				podReady := podutils.IsPodReady(pod)
 				res := expectReady == podReady
 				if !res {
-					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v (pod status %#v)", podName, expectReady, podReady, pod.Status)
 				}
 				return res, nil
 			})
@@ -866,6 +866,8 @@ var _ = SIGDescribe("Pods", func() {
 				}}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
+			framework.Logf("running and ready %v", podTestName)
 		}
 
 		// wait as required for all 3 pods to be found
@@ -948,6 +950,10 @@ var _ = SIGDescribe("Pods", func() {
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
+		if err != nil {
+			p, _ := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
+			framework.Logf("Pod: %+v", p)
+		}
 		framework.ExpectNoError(err, "failed to see Pod %v in namespace %v running", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
@@ -989,32 +995,35 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
 		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
 
-		ginkgo.By("getting the PodStatus")
-		podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
-		podStatusBytes, err := json.Marshal(podStatusUnstructured)
-		framework.ExpectNoError(err, "failed to marshal unstructured response")
-		var podStatus v1.Pod
-		err = json.Unmarshal(podStatusBytes, &podStatus)
-		framework.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
-
 		ginkgo.By("replacing the Pod's status Ready condition to False")
-		podStatusUpdated := podStatus
-		podStatusFieldPatchCount := 0
-		podStatusFieldPatchCountTotal := 2
-		for pos, cond := range podStatusUpdated.Status.Conditions {
-			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionTrue) {
-				podStatusUpdated.Status.Conditions[pos].Status = v1.ConditionFalse
-				podStatusFieldPatchCount++
+		var podStatusUpdate *v1.Pod
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
+			podStatusBytes, err := json.Marshal(podStatusUnstructured)
+			framework.ExpectNoError(err, "failed to marshal unstructured response")
+			var podStatus v1.Pod
+			err = json.Unmarshal(podStatusBytes, &podStatus)
+			framework.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
+			podStatusUpdated := podStatus
+			podStatusFieldPatchCount := 0
+			podStatusFieldPatchCountTotal := 2
+			for pos, cond := range podStatusUpdated.Status.Conditions {
+				if (cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionTrue) {
+					podStatusUpdated.Status.Conditions[pos].Status = v1.ConditionFalse
+					podStatusFieldPatchCount++
+				}
 			}
-		}
-		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
-		podStatusUpdate, err := f.ClientSet.CoreV1().Pods(testNamespaceName).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
+			framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
+			podStatusUpdate, err = f.ClientSet.CoreV1().Pods(testNamespaceName).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
+			return err
+		})
 		framework.ExpectNoError(err, "failed to update PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
 
 		ginkgo.By("check the Pod again to ensure its Ready conditions are False")
-		podStatusFieldPatchCount = 0
-		podStatusFieldPatchCountTotal = 2
+		podStatusFieldPatchCount := 0
+		podStatusFieldPatchCountTotal := 2
 		for _, cond := range podStatusUpdate.Status.Conditions {
 			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionFalse) {
 				podStatusFieldPatchCount++

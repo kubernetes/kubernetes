@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	gomock "github.com/golang/mock/gomock"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -35,6 +35,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -46,14 +47,16 @@ const (
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
 	pod                 *v1.Pod
-	status              v1.PodStatus
+	evict               bool
+	statusFn            func(*v1.PodStatus)
 	gracePeriodOverride *int64
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
 	m.pod = pod
-	m.status = status
+	m.statusFn = statusFn
+	m.evict = evict
 	m.gracePeriodOverride = gracePeriodOverride
 	return nil
 }
@@ -204,7 +207,7 @@ func TestMemoryPressure(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -469,7 +472,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -666,7 +669,7 @@ func TestMinReclaim(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -806,7 +809,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
@@ -1050,7 +1053,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -1257,7 +1260,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		return mirrorPod, true
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -1383,7 +1386,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -1527,7 +1530,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		return []*v1.Pod{}
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	diskGC := &mockDiskGC{err: nil}
@@ -1549,8 +1552,11 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", map[*v1.Pod]statsapi.PodStats{})}
 
-	thresholdNotifier := &MockThresholdNotifier{}
-	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(nil).Twice()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	thresholdNotifier := NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(nil).Times(2)
 
 	manager := &managerImpl{
 		clock:                        fakeClock,
@@ -1566,29 +1572,24 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
 	}
 
-	manager.synchronize(diskInfoProvider, activePodsFunc)
 	// The UpdateThreshold method should have been called once, since this is the first run.
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
-
 	manager.synchronize(diskInfoProvider, activePodsFunc)
-	// The UpdateThreshold method should not have been called again, since not enough time has passed
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
 
+	// The UpdateThreshold method should not have been called again, since not enough time has passed
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// The UpdateThreshold method should be called again since enough time has passed
 	fakeClock.Step(2 * notifierRefreshInterval)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
-	// The UpdateThreshold method should be called again since enough time has passed
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 2)
 
 	// new memory threshold notifier that returns an error
-	thresholdNotifier = &MockThresholdNotifier{}
-	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(fmt.Errorf("error updating threshold"))
-	thresholdNotifier.On("Description").Return("mock thresholdNotifier").Once()
+	thresholdNotifier = NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(fmt.Errorf("error updating threshold")).Times(1)
+	thresholdNotifier.EXPECT().Description().Return("mock thresholdNotifier").Times(1)
 	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}
 
-	fakeClock.Step(2 * notifierRefreshInterval)
-	manager.synchronize(diskInfoProvider, activePodsFunc)
 	// The UpdateThreshold method should be called because at least notifierRefreshInterval time has passed.
 	// The Description method should be called because UpdateThreshold returned an error
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
-	thresholdNotifier.AssertNumberOfCalls(t, "Description", 1)
+	fakeClock.Step(2 * notifierRefreshInterval)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
 }

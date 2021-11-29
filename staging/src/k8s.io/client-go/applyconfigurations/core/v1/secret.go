@@ -52,7 +52,7 @@ func Secret(name, namespace string) *SecretApplyConfiguration {
 // ExtractSecret extracts the applied configuration owned by fieldManager from
 // secret. If no managedFields are found in secret for fieldManager, a
 // SecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // secret must be a unmodified Secret API object that was retrieved from the Kubernetes API.

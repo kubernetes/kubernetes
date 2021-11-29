@@ -43,10 +43,8 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/defaulter-gen/generators"
 	"k8s.io/klog/v2"
 
@@ -60,7 +58,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of defaulter-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

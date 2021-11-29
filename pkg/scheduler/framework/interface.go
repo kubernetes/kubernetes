@@ -23,6 +23,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,7 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -105,9 +106,34 @@ const (
 	MaxTotalScore int64 = math.MaxInt64
 )
 
+// PodsToActivateKey is a reserved state key for stashing pods.
+// If the stashed pods are present in unschedulableQ or backoffQ，they will be
+// activated (i.e., moved to activeQ) in two phases:
+// - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
+// - end of a binding cycle if it succeeds
+var PodsToActivateKey StateKey = "kubernetes.io/pods-to-activate"
+
+// PodsToActivate stores pods to be activated.
+type PodsToActivate struct {
+	sync.Mutex
+	// Map is keyed with namespaced pod name, and valued with the pod.
+	Map map[string]*v1.Pod
+}
+
+// Clone just returns the same state.
+func (s *PodsToActivate) Clone() StateData {
+	return s
+}
+
+// NewPodsToActivate instantiates a PodsToActivate object.
+func NewPodsToActivate() *PodsToActivate {
+	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
+
 // Status indicates the result of running a plugin. It consists of a code, a
-// message, (optionally) an error and an plugin name it fails by. When the status
-// code is not `Success`, the reasons should explain why.
+// message, (optionally) an error, and a plugin name it fails by.
+// When the status code is not Success, the reasons should explain why.
+// And, when code is Success, all the other fields should be empty.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code    Code
@@ -282,10 +308,13 @@ type QueueSortPlugin interface {
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
-// move unschedulable Pods in internal scheduling queues.
+// move unschedulable Pods in internal scheduling queues. Plugins
+// that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface.
 type EnqueueExtensions interface {
-	// EventsToRegister returns a series of interested events that
-	// will be registered when instantiating the internal scheduling queue.
+	// EventsToRegister returns a series of possible events that may cause a Pod
+	// failed by this plugin schedulable.
+	// The events will be registered when instantiating the internal scheduling queue,
+	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
 	EventsToRegister() []ClusterEvent
@@ -525,7 +554,7 @@ type Framework interface {
 	HasScorePlugins() bool
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
-	ListPlugins() map[string][]config.Plugin
+	ListPlugins() *config.Plugins
 
 	// ProfileName returns the profile name associated to this framework.
 	ProfileName() string
@@ -555,7 +584,8 @@ type Handle interface {
 	GetWaitingPod(uid types.UID) WaitingPod
 
 	// RejectWaitingPod rejects a waiting pod given its UID.
-	RejectWaitingPod(uid types.UID)
+	// The return value indicates if the pod is waiting or not.
+	RejectWaitingPod(uid types.UID) bool
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
@@ -585,7 +615,7 @@ type PostFilterResult struct {
 
 // PodNominator abstracts operations to maintain nominated Pods.
 type PodNominator interface {
-	// AddNominatedPod adds the given pod to the nominated pod map or
+	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
 	AddNominatedPod(pod *PodInfo, nodeName string)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.

@@ -451,7 +451,7 @@ func (fd *Field) unmarshalFull(b []byte, sb *strs.Builder, pf *File, pd pref.Des
 			case genid.FieldDescriptorProto_Name_field_number:
 				fd.L0.FullName = appendFullName(sb, pd.FullName(), v)
 			case genid.FieldDescriptorProto_JsonName_field_number:
-				fd.L1.JSONName.Init(sb.MakeString(v))
+				fd.L1.StringName.InitJSON(sb.MakeString(v))
 			case genid.FieldDescriptorProto_DefaultValue_field_number:
 				fd.L1.Default.val = pref.ValueOfBytes(v) // temporarily store as bytes; later resolved in resolveMessages
 			case genid.FieldDescriptorProto_TypeName_field_number:
@@ -551,7 +551,7 @@ func (xd *Extension) unmarshalFull(b []byte, sb *strs.Builder) {
 			b = b[m:]
 			switch num {
 			case genid.FieldDescriptorProto_JsonName_field_number:
-				xd.L2.JSONName.Init(sb.MakeString(v))
+				xd.L2.StringName.InitJSON(sb.MakeString(v))
 			case genid.FieldDescriptorProto_DefaultValue_field_number:
 				xd.L2.Default.val = pref.ValueOfBytes(v) // temporarily store as bytes; later resolved in resolveExtensions
 			case genid.FieldDescriptorProto_TypeName_field_number:

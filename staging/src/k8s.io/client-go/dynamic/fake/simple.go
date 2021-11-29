@@ -35,7 +35,35 @@ import (
 )
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
-	return NewSimpleDynamicClientWithCustomListKinds(scheme, nil, objects...)
+	unstructuredScheme := runtime.NewScheme()
+	for gvk := range scheme.AllKnownTypes() {
+		if unstructuredScheme.Recognizes(gvk) {
+			continue
+		}
+		if strings.HasSuffix(gvk.Kind, "List") {
+			unstructuredScheme.AddKnownTypeWithName(gvk, &unstructured.UnstructuredList{})
+			continue
+		}
+		unstructuredScheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+	}
+
+	objects, err := convertObjectsToUnstructured(scheme, objects)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, obj := range objects {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if !unstructuredScheme.Recognizes(gvk) {
+			unstructuredScheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+		}
+		gvk.Kind += "List"
+		if !unstructuredScheme.Recognizes(gvk) {
+			unstructuredScheme.AddKnownTypeWithName(gvk, &unstructured.UnstructuredList{})
+		}
+	}
+
+	return NewSimpleDynamicClientWithCustomListKinds(unstructuredScheme, nil, objects...)
 }
 
 // NewSimpleDynamicClientWithCustomListKinds try not to use this.  In general you want to have the scheme have the List types registered
@@ -424,4 +452,42 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 		return nil, err
 	}
 	return ret, err
+}
+
+func convertObjectsToUnstructured(s *runtime.Scheme, objs []runtime.Object) ([]runtime.Object, error) {
+	ul := make([]runtime.Object, 0, len(objs))
+
+	for _, obj := range objs {
+		u, err := convertToUnstructured(s, obj)
+		if err != nil {
+			return nil, err
+		}
+
+		ul = append(ul, u)
+	}
+	return ul, nil
+}
+
+func convertToUnstructured(s *runtime.Scheme, obj runtime.Object) (runtime.Object, error) {
+	var (
+		err error
+		u   unstructured.Unstructured
+	)
+
+	u.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
+	}
+
+	gvk := u.GroupVersionKind()
+	if gvk.Group == "" || gvk.Kind == "" {
+		gvks, _, err := s.ObjectKinds(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert to unstructured - unable to get GVK %w", err)
+		}
+		apiv, k := gvks[0].ToAPIVersionAndKind()
+		u.SetAPIVersion(apiv)
+		u.SetKind(k)
+	}
+	return &u, nil
 }

@@ -71,25 +71,34 @@
       "apiGroup": "28",
       "kind": "29",
       "name": "30"
+    },
+    "dataSourceRef": {
+      "apiGroup": "31",
+      "kind": "32",
+      "name": "33"
     }
   },
   "status": {
-    "phase": "燴壩卄蓨MĮ?",
+    "phase": "gɸ=ǤÆ碛,1ZƜ/C龷Ȫ",
     "accessModes": [
-      "ĭÐl恕ɍȇ廄裭4懙"
+      "l殛瓷雼浢Ü礽"
     ],
     "capacity": {
-      "嵒ƫS捕ɷD¡轫n": "583"
+      "{囥": "721"
     },
     "conditions": [
       {
-        "type": "Ü郀",
-        "status": "ƣKʘńw:5塋",
-        "lastProbeTime": "2588-10-04T08:20:38Z",
-        "lastTransitionTime": "2095-10-31T02:52:44Z",
-        "reason": "31",
-        "message": "32"
+        "type": "n(鲼ƳÐƣKʘńw:5塋訩塶\"=",
+        "status": "Ka縳讋ɮ衺勽Ƙq",
+        "lastProbeTime": "2343-07-10T15:32:16Z",
+        "lastTransitionTime": "2944-07-13T11:02:13Z",
+        "reason": "34",
+        "message": "35"
       }
-    ]
+    ],
+    "allocatedResources": {
+      " u衲\u003c¿燥": "98"
+    },
+    "resizeStatus": "{舁吉蓨O澘"
   }
 }

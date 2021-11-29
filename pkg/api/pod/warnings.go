@@ -78,11 +78,6 @@ var deprecatedAnnotations = []struct {
 		message: `non-functional in v1.16+; use the "priorityClassName" field instead`,
 	},
 	{
-		key:     `seccomp.security.alpha.kubernetes.io/pod`,
-		prefix:  `container.seccomp.security.alpha.kubernetes.io/`,
-		message: `deprecated since v1.19; use the "seccompProfile" field instead`,
-	},
-	{
 		key:     `security.alpha.kubernetes.io/sysctls`,
 		message: `non-functional in v1.11+; use the "sysctls" field instead`,
 	},
@@ -239,7 +234,21 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.Child("spec", "overhead").Key(string(api.ResourceEphemeralStorage)), value.String()))
 	}
 
+	// use of pod seccomp annotation without accompanying field
+	if podSpec.SecurityContext == nil || podSpec.SecurityContext.SeccompProfile == nil {
+		if _, exists := meta.Annotations[api.SeccompPodAnnotationKey]; exists {
+			warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
+		}
+	}
+
 	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, p *field.Path) bool {
+		// use of container seccomp annotation without accompanying field
+		if c.SecurityContext == nil || c.SecurityContext.SeccompProfile == nil {
+			if _, exists := meta.Annotations[api.SeccompContainerAnnotationKeyPrefix+c.Name]; exists {
+				warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix+c.Name)))
+			}
+		}
+
 		// fractional memory/ephemeral-storage requests/limits (#79950, #49442, #18538)
 		if value, ok := c.Resources.Limits[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "limits").Key(string(api.ResourceMemory)), value.String()))

@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -58,6 +59,7 @@ var (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -294,6 +296,23 @@ func TestControllerSync(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			// Test that the finalizer gets removed if CSI migration is disabled.
+			"5-9 - volume has its PV deletion protection finalizer removed as CSI migration is disabled",
+			volumesWithFinalizers(
+				volumesWithAnnotation(pvutil.AnnMigratedTo, "pd.csi.storage.gke.io",
+					newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned)),
+				[]string{pvutil.PVDeletionProtectionFinalizer},
+			),
+			newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+			noclaims,
+			noclaims,
+			noevents,
+			noerrors,
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				return nil
+			},
+		},
 	}
 
 	doit := func(test controllerTest) {
@@ -341,10 +360,10 @@ func TestControllerSync(t *testing.T) {
 		}
 
 		// Start the controller
-		stopCh := make(chan struct{})
-		informers.Start(stopCh)
-		informers.WaitForCacheSync(stopCh)
-		go ctrl.Run(stopCh)
+		ctx, cancel := context.WithCancel(context.TODO())
+		informers.Start(ctx.Done())
+		informers.WaitForCacheSync(ctx.Done())
+		go ctrl.Run(ctx)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -369,7 +388,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to run test %s: %v", test.name, err)
 		}
-		close(stopCh)
+		cancel()
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 	}
@@ -548,6 +567,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 		claimAnnotations     map[string]string
 		expClaimAnnotations  map[string]string
 		migratedDriverGates  []featuregate.Feature
+		disabledDriverGates  []featuregate.Feature
 	}{
 		{
 			name:                 "migration on for GCE",
@@ -556,6 +576,16 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "migration on for GCE with Beta storage provisioner annontation",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
+			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "migration off for GCE",
@@ -564,6 +594,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration off for GCE removes migrated to (rollback)",
@@ -572,6 +603,16 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+		{
+			name:                 "migration off for GCE removes migrated to (rollback) with Beta storage provisioner annontation",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
+			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration on for GCE other plugin not affected",
@@ -580,6 +621,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "not dynamically provisioned migration off for GCE",
@@ -588,6 +630,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{},
 			expClaimAnnotations:  map[string]string{},
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "not dynamically provisioned migration on for GCE",
@@ -596,6 +639,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     map[string]string{},
 			expClaimAnnotations:  map[string]string{},
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
 		},
 		{
 			name:                 "nil annotations migration off for GCE",
@@ -604,6 +648,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     nil,
 			expClaimAnnotations:  nil,
 			migratedDriverGates:  []featuregate.Feature{},
+			disabledDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			name:                 "nil annotations migration on for GCE",
@@ -612,6 +657,170 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			claimAnnotations:     nil,
 			expClaimAnnotations:  nil,
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			disabledDriverGates:  []featuregate.Feature{},
+		},
+	}
+
+	translator := csitrans.New()
+	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, f := range tc.migratedDriverGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+			}
+			for _, f := range tc.disabledDriverGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, false)()
+			}
+			if tc.volumeAnnotations != nil {
+				ann := tc.volumeAnnotations
+				updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, nil, false)
+				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
+					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				}
+			}
+			if tc.claimAnnotations != nil {
+				ann := tc.claimAnnotations
+				updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, nil, true)
+				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
+					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				}
+			}
+
+		})
+	}
+}
+
+func TestUpdateFinalizer(t *testing.T) {
+	// This set of tests ensures that protection finalizer is removed when CSI migration is disabled
+	// and PV controller needs to remove finalizers added by the external-provisioner.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	const gcePlugin = "kubernetes.io/gce-pd"
+	const gceDriver = "pd.csi.storage.gke.io"
+	const customFinalizer = "test.volume.kubernetes.io/finalizer"
+	tests := []struct {
+		name                string
+		volumeAnnotations   map[string]string
+		volumeFinalizers    []string
+		expVolumeFinalizers []string
+		expModified         bool
+		migratedDriverGates []featuregate.Feature
+	}{
+		{
+			// Represents a volume provisioned through external-provisioner
+			name:                "13-1 migration was never enabled, volume has the finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// Represents a volume provisioned through external-provisioner but the external-provisioner has
+			// yet to sync the volume to add the new finalizer
+			name:                "13-2 migration was never enabled, volume does not have the finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gceDriver},
+			volumeFinalizers:    nil,
+			expVolumeFinalizers: nil,
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// Represents an in-tree volume that has the migrated-to annotation but the external-provisioner is
+			// yet to sync the volume and add the pv deletion protection finalizer. The custom finalizer is some
+			// pre-existing finalizer, for example the pv-protection finalizer. The csi-migration is disabled,
+			// the migrated-to annotation will be removed shortly when updateVolumeMigrationAnnotationsAndFinalizers is called.
+			name:                "13-3 migration was disabled but still has migrated-to annotation, volume does not have pv deletion protection finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer},
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			name:                "13-4 migration was disabled but still has migrated-to annotation, volume has no finalizers",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    nil,
+			expVolumeFinalizers: nil,
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// Represents roll back scenario where the external-provisioner has added the pv deletion protection
+			// finalizer and later the csi migration was disabled. The pv deletion protection finalizer added through
+			// external-provisioner will be removed.
+			name:                "13-5 migration was disabled as it has the migrated-to annotation, volume has the finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: nil,
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// Represents roll-back of csi-migration as 13-5, here there are multiple finalizers, only the pv deletion
+			// protection finalizer added by external-provisioner needs to be removed.
+			name:                "13-6 migration was disabled as it has the migrated-to annotation, volume has multiple finalizers",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer, customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer},
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// csi migration is enabled, the pv controller should not delete the finalizer added by the
+			// external-provisioner.
+			name:                "13-7 migration is enabled, has the migrated-to annotation, volume has the finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
+		},
+		{
+			// csi-migration is not completely enabled as the specific plugin feature is not present. This is equivalent
+			// of disabled csi-migration.
+			name:                "13-8 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has the finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: nil,
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
+		},
+		{
+			// same as 13-8 but multiple finalizers exists, only the pv deletion protection finalizer needs to be removed.
+			name:                "13-9 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has multiple finalizers",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer, customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer},
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
+		},
+		{
+			// corner error case.
+			name:                "13-10 missing annotations but finalizers exist",
+			volumeAnnotations:   nil,
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			name:                "13-11 missing annotations and finalizers",
+			volumeAnnotations:   nil,
+			volumeFinalizers:    nil,
+			expVolumeFinalizers: nil,
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// corner error case
+			name:                "13-12 missing provisioned-by annotation, existing finalizers",
+			volumeAnnotations:   map[string]string{"fake": gcePlugin},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
 		},
 	}
 
@@ -625,16 +834,13 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			}
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnDynamicallyProvisioned)
-				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
-					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				finalizers := tc.volumeFinalizers
+				modified := updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, &finalizers, false)
+				if modified != tc.expModified {
+					t.Errorf("got modified: %v, but expected: %v", modified, tc.expModified)
 				}
-			}
-			if tc.claimAnnotations != nil {
-				ann := tc.claimAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnStorageProvisioner)
-				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
-					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				if !reflect.DeepEqual(tc.expVolumeFinalizers, finalizers) {
+					t.Errorf("got volume finaliers: %v, but expected: %v", finalizers, tc.expVolumeFinalizers)
 				}
 			}
 

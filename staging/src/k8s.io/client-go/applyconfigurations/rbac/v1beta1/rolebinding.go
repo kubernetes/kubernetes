@@ -50,7 +50,7 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // ExtractRoleBinding extracts the applied configuration owned by fieldManager from
 // roleBinding. If no managedFields are found in roleBinding for fieldManager, a
 // RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.

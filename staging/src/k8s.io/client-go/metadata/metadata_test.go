@@ -19,6 +19,7 @@ package metadata
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -35,6 +36,10 @@ import (
 
 func TestClient(t *testing.T) {
 	gvr := schema.GroupVersionResource{Group: "group", Version: "v1", Resource: "resource"}
+	statusOK := &metav1.Status{
+		Status: metav1.StatusSuccess,
+		Code:   http.StatusOK,
+	}
 
 	writeJSON := func(t *testing.T, w http.ResponseWriter, obj runtime.Object) {
 		data, err := json.Marshal(obj)
@@ -226,6 +231,61 @@ func TestClient(t *testing.T) {
 				}
 				if obj != nil {
 					t.Fatal(obj)
+				}
+			},
+		},
+
+		{
+			name: "Delete fails if DeleteOptions cannot be serialized to JSON",
+			handler: func(t *testing.T, w http.ResponseWriter, req *http.Request) {
+				if req.Header.Get("Content-Type") != runtime.ContentTypeJSON {
+					t.Fatal(req.Header.Get("Content-Type"))
+				}
+				if req.Method != "DELETE" && req.URL.String() != "/apis/group/v1/namespaces/ns/resource/name" {
+					t.Fatal(req.URL.String())
+				}
+				defer req.Body.Close()
+				buf, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !json.Valid(buf) {
+					t.Fatalf("request body is not a valid JSON: %s", buf)
+				}
+				writeJSON(t, w, statusOK)
+			},
+			want: func(t *testing.T, client *Client) {
+				err := client.Resource(gvr).Namespace("ns").Delete(context.TODO(), "name", metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+
+		{
+			name: "DeleteCollection fails if DeleteOptions cannot be serialized to JSON",
+			handler: func(t *testing.T, w http.ResponseWriter, req *http.Request) {
+				if req.Header.Get("Content-Type") != runtime.ContentTypeJSON {
+					t.Fatal(req.Header.Get("Content-Type"))
+				}
+				if req.Method != "DELETE" && req.URL.String() != "/apis/group/v1/namespaces/ns/resource/name" {
+					t.Fatal(req.URL.String())
+				}
+				defer req.Body.Close()
+				buf, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !json.Valid(buf) {
+					t.Fatalf("request body is not a valid JSON: %s", buf)
+				}
+
+				writeJSON(t, w, statusOK)
+			},
+			want: func(t *testing.T, client *Client) {
+				err := client.Resource(gvr).Namespace("ns").DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+				if err != nil {
+					t.Fatal(err)
 				}
 			},
 		},

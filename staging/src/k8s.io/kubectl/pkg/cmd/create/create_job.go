@@ -44,10 +44,10 @@ var (
 		# Create a job
 		kubectl create job my-job --image=busybox
 
-		# Create a job with command
+		# Create a job with a command
 		kubectl create job my-job --image=busybox -- date
 
-		# Create a job from a CronJob named "a-cronjob"
+		# Create a job from a cron job named "a-cronjob"
 		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
@@ -88,7 +88,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 jobLong,
+		Short:                 i18n.T("Create a job with the specified name"),
 		Long:                  jobLong,
 		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {

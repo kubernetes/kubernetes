@@ -153,12 +153,25 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testRSLifeCycle(f)
 	})
 
-	ginkgo.It("should list and delete a collection of ReplicaSets", func() {
+	/*
+		Release: v1.22
+		Testname: ReplicaSet, list and delete a collection of ReplicaSets
+		Description: When a ReplicaSet is created it MUST succeed. It
+		MUST succeed when listing ReplicaSets via a label selector. It
+		MUST succeed when deleting the ReplicaSet via deleteCollection.
+	*/
+	framework.ConformanceIt("should list and delete a collection of ReplicaSets", func() {
 		listRSDeleteCollection(f)
 
 	})
 
-	ginkgo.It("should validate Replicaset Status endpoints", func() {
+	/*	Release: v1.22
+		Testname: ReplicaSet, status sub-resource
+		Description: Create a ReplicaSet resource which MUST succeed.
+		Attempt to read, update and patch its status sub-resource; all
+		mutating sub-resource operations MUST be visible to subsequent reads.
+	*/
+	framework.ConformanceIt("should validate Replicaset Status endpoints", func() {
 		testRSStatus(f)
 	})
 })

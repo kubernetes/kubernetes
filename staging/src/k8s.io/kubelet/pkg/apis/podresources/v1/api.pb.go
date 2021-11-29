@@ -86,6 +86,7 @@ var xxx_messageInfo_AllocatableResourcesRequest proto.InternalMessageInfo
 type AllocatableResourcesResponse struct {
 	Devices              []*ContainerDevices `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
 	CpuIds               []int64             `protobuf:"varint,2,rep,packed,name=cpu_ids,json=cpuIds,proto3" json:"cpu_ids,omitempty"`
+	Memory               []*ContainerMemory  `protobuf:"bytes,3,rep,name=memory,proto3" json:"memory,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
 }
@@ -132,6 +133,13 @@ func (m *AllocatableResourcesResponse) GetDevices() []*ContainerDevices {
 func (m *AllocatableResourcesResponse) GetCpuIds() []int64 {
 	if m != nil {
 		return m.CpuIds
+	}
+	return nil
+}
+
+func (m *AllocatableResourcesResponse) GetMemory() []*ContainerMemory {
+	if m != nil {
+		return m.Memory
 	}
 	return nil
 }
@@ -287,6 +295,7 @@ type ContainerResources struct {
 	Name                 string              `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Devices              []*ContainerDevices `protobuf:"bytes,2,rep,name=devices,proto3" json:"devices,omitempty"`
 	CpuIds               []int64             `protobuf:"varint,3,rep,packed,name=cpu_ids,json=cpuIds,proto3" json:"cpu_ids,omitempty"`
+	Memory               []*ContainerMemory  `protobuf:"bytes,4,rep,name=memory,proto3" json:"memory,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
 }
@@ -344,6 +353,75 @@ func (m *ContainerResources) GetCpuIds() []int64 {
 	return nil
 }
 
+func (m *ContainerResources) GetMemory() []*ContainerMemory {
+	if m != nil {
+		return m.Memory
+	}
+	return nil
+}
+
+// ContainerMemory contains information about memory and hugepages assigned to a container
+type ContainerMemory struct {
+	MemoryType           string        `protobuf:"bytes,1,opt,name=memory_type,json=memoryType,proto3" json:"memory_type,omitempty"`
+	Size_                uint64        `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	Topology             *TopologyInfo `protobuf:"bytes,3,opt,name=topology,proto3" json:"topology,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
+}
+
+func (m *ContainerMemory) Reset()      { *m = ContainerMemory{} }
+func (*ContainerMemory) ProtoMessage() {}
+func (*ContainerMemory) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+}
+func (m *ContainerMemory) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ContainerMemory) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ContainerMemory.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ContainerMemory) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContainerMemory.Merge(m, src)
+}
+func (m *ContainerMemory) XXX_Size() int {
+	return m.Size()
+}
+func (m *ContainerMemory) XXX_DiscardUnknown() {
+	xxx_messageInfo_ContainerMemory.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ContainerMemory proto.InternalMessageInfo
+
+func (m *ContainerMemory) GetMemoryType() string {
+	if m != nil {
+		return m.MemoryType
+	}
+	return ""
+}
+
+func (m *ContainerMemory) GetSize_() uint64 {
+	if m != nil {
+		return m.Size_
+	}
+	return 0
+}
+
+func (m *ContainerMemory) GetTopology() *TopologyInfo {
+	if m != nil {
+		return m.Topology
+	}
+	return nil
+}
+
 // ContainerDevices contains information about the devices assigned to a container
 type ContainerDevices struct {
 	ResourceName         string        `protobuf:"bytes,1,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
@@ -356,7 +434,7 @@ type ContainerDevices struct {
 func (m *ContainerDevices) Reset()      { *m = ContainerDevices{} }
 func (*ContainerDevices) ProtoMessage() {}
 func (*ContainerDevices) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
 }
 func (m *ContainerDevices) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -416,7 +494,7 @@ type TopologyInfo struct {
 func (m *TopologyInfo) Reset()      { *m = TopologyInfo{} }
 func (*TopologyInfo) ProtoMessage() {}
 func (*TopologyInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{8}
 }
 func (m *TopologyInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -462,7 +540,7 @@ type NUMANode struct {
 func (m *NUMANode) Reset()      { *m = NUMANode{} }
 func (*NUMANode) ProtoMessage() {}
 func (*NUMANode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{8}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
 }
 func (m *NUMANode) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -505,6 +583,7 @@ func init() {
 	proto.RegisterType((*ListPodResourcesResponse)(nil), "v1.ListPodResourcesResponse")
 	proto.RegisterType((*PodResources)(nil), "v1.PodResources")
 	proto.RegisterType((*ContainerResources)(nil), "v1.ContainerResources")
+	proto.RegisterType((*ContainerMemory)(nil), "v1.ContainerMemory")
 	proto.RegisterType((*ContainerDevices)(nil), "v1.ContainerDevices")
 	proto.RegisterType((*TopologyInfo)(nil), "v1.TopologyInfo")
 	proto.RegisterType((*NUMANode)(nil), "v1.NUMANode")
@@ -513,37 +592,41 @@ func init() {
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 480 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x93, 0xcd, 0x6e, 0xd3, 0x40,
-	0x10, 0x80, 0xb3, 0x76, 0x69, 0x9b, 0xc1, 0x45, 0xd5, 0x0a, 0x11, 0x93, 0xa6, 0xc6, 0x5a, 0x2e,
-	0x39, 0x80, 0xab, 0x06, 0xc1, 0xbd, 0x34, 0x12, 0xb2, 0x04, 0x11, 0xac, 0xe0, 0x4a, 0xe4, 0xd8,
-	0x5b, 0x63, 0x29, 0xf5, 0x6c, 0xbd, 0x76, 0x04, 0x37, 0x0e, 0x3c, 0x00, 0xaf, 0xc3, 0x1b, 0xf4,
-	0xc8, 0x91, 0x23, 0x0d, 0x2f, 0x82, 0xbc, 0x8e, 0x53, 0x87, 0xa4, 0x48, 0x3d, 0x79, 0x66, 0xbe,
-	0xf9, 0xf3, 0xcc, 0x2c, 0xb4, 0x03, 0x99, 0x78, 0x32, 0xc3, 0x1c, 0xa9, 0x31, 0x3b, 0xee, 0x3e,
-	0x8d, 0x93, 0xfc, 0x53, 0x31, 0xf1, 0x42, 0x3c, 0x3f, 0x8a, 0x31, 0xc6, 0x23, 0x8d, 0x26, 0xc5,
-	0x99, 0xd6, 0xb4, 0xa2, 0xa5, 0x2a, 0x84, 0x1d, 0xc2, 0xc1, 0xc9, 0x74, 0x8a, 0x61, 0x90, 0x07,
-	0x93, 0xa9, 0xe0, 0x42, 0x61, 0x91, 0x85, 0x42, 0x71, 0x71, 0x51, 0x08, 0x95, 0xb3, 0x18, 0x7a,
-	0x9b, 0xb1, 0x92, 0x98, 0x2a, 0x41, 0x3d, 0xd8, 0x89, 0xc4, 0x2c, 0x09, 0x85, 0xb2, 0x89, 0x6b,
-	0xf6, 0xef, 0x0e, 0xee, 0x7b, 0xb3, 0x63, 0xef, 0x14, 0xd3, 0x3c, 0x48, 0x52, 0x91, 0x0d, 0x2b,
-	0xc6, 0x6b, 0x27, 0xda, 0x81, 0x9d, 0x50, 0x16, 0xe3, 0x24, 0x52, 0xb6, 0xe1, 0x9a, 0x7d, 0x93,
-	0x6f, 0x87, 0xb2, 0xf0, 0x23, 0xc5, 0x1e, 0x42, 0xe7, 0x75, 0xa2, 0xf2, 0xb7, 0x18, 0xad, 0xf5,
-	0xf0, 0x0e, 0xec, 0x75, 0xb4, 0xa8, 0xff, 0x1c, 0xf6, 0x24, 0x46, 0xe3, 0xac, 0x06, 0x8b, 0x2e,
-	0xf6, 0xcb, 0x2e, 0x56, 0x02, 0x2c, 0xd9, 0xd0, 0xd8, 0x67, 0xb0, 0x9a, 0x94, 0x52, 0xd8, 0x4a,
-	0x83, 0x73, 0x61, 0x13, 0x97, 0xf4, 0xdb, 0x5c, 0xcb, 0xb4, 0x07, 0xed, 0xf2, 0xab, 0x64, 0x10,
-	0x0a, 0xdb, 0xd0, 0xe0, 0xda, 0x40, 0x5f, 0x00, 0x84, 0xf5, 0x5f, 0x2a, 0xdb, 0xd4, 0x55, 0x1f,
-	0xac, 0xfc, 0xfb, 0x75, 0xed, 0x86, 0x27, 0xbb, 0x00, 0xba, 0xee, 0xb1, 0xb1, 0x7e, 0x63, 0xb4,
-	0xc6, 0x2d, 0x47, 0x6b, 0xae, 0x8c, 0xf6, 0x1b, 0x81, 0xfd, 0x7f, 0xc3, 0xe8, 0x63, 0xd8, 0xab,
-	0x87, 0x36, 0x6e, 0x94, 0xb6, 0x6a, 0xe3, 0xa8, 0x6c, 0xe1, 0x10, 0xa0, 0xca, 0xbe, 0x5c, 0x58,
-	0x9b, 0xb7, 0x2b, 0x8b, 0x1f, 0x29, 0xfa, 0x04, 0x76, 0x73, 0x94, 0x38, 0xc5, 0xf8, 0x8b, 0x6d,
-	0xba, 0xa4, 0x9e, 0xfb, 0xfb, 0x85, 0xcd, 0x4f, 0xcf, 0x90, 0x2f, 0x3d, 0xd8, 0x00, 0xac, 0x26,
-	0xa1, 0x0c, 0xee, 0xa4, 0x18, 0x2d, 0x57, 0x66, 0x95, 0xa1, 0xa3, 0x0f, 0x6f, 0x4e, 0x46, 0x18,
-	0x09, 0x5e, 0x21, 0xd6, 0x85, 0xdd, 0xda, 0x44, 0xef, 0x81, 0xe1, 0x0f, 0x75, 0x9b, 0x26, 0x37,
-	0xfc, 0xe1, 0xe0, 0x07, 0x01, 0xda, 0x5c, 0x62, 0x79, 0x23, 0x22, 0xa3, 0xa7, 0xb0, 0x55, 0x4a,
-	0xf4, 0xa0, 0xcc, 0x77, 0xc3, 0x49, 0x75, 0x7b, 0x9b, 0x61, 0x75, 0x54, 0xac, 0x45, 0x3f, 0x42,
-	0xe7, 0x95, 0xc8, 0x37, 0x5d, 0x3e, 0x7d, 0x54, 0x86, 0xfe, 0xe7, 0xc9, 0x74, 0xdd, 0x9b, 0x1d,
-	0xea, 0xfc, 0x2f, 0x7b, 0x97, 0x57, 0x0e, 0xf9, 0x75, 0xe5, 0xb4, 0xbe, 0xce, 0x1d, 0x72, 0x39,
-	0x77, 0xc8, 0xcf, 0xb9, 0x43, 0x7e, 0xcf, 0x1d, 0xf2, 0xfd, 0x8f, 0xd3, 0x9a, 0x6c, 0xeb, 0xa7,
-	0xf9, 0xec, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x6f, 0x70, 0xd4, 0x4f, 0xda, 0x03, 0x00, 0x00,
+	// 539 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x54, 0xc1, 0x6e, 0xd3, 0x40,
+	0x10, 0xed, 0xda, 0x21, 0x6d, 0xa6, 0x29, 0x54, 0x0b, 0x22, 0x26, 0x4d, 0xdd, 0xc8, 0x5c, 0x22,
+	0x01, 0xae, 0x1a, 0x04, 0xf7, 0xd2, 0x48, 0x28, 0x12, 0x8d, 0x60, 0x55, 0xae, 0x44, 0x8e, 0xbd,
+	0x0d, 0x96, 0x12, 0xef, 0xe2, 0x5d, 0x47, 0x84, 0x13, 0x07, 0x3e, 0x80, 0x03, 0x67, 0xfe, 0x83,
+	0x3f, 0xe8, 0x91, 0x23, 0x47, 0x1a, 0x7e, 0x04, 0xed, 0xda, 0x4e, 0x9d, 0x26, 0x01, 0xf5, 0xe4,
+	0xd9, 0x79, 0x33, 0xb3, 0x6f, 0xe6, 0x8d, 0x17, 0x2a, 0x1e, 0x0f, 0x5d, 0x1e, 0x33, 0xc9, 0xb0,
+	0x31, 0x39, 0xaa, 0x3f, 0x19, 0x86, 0xf2, 0x7d, 0x32, 0x70, 0x7d, 0x36, 0x3e, 0x1c, 0xb2, 0x21,
+	0x3b, 0xd4, 0xd0, 0x20, 0x39, 0xd7, 0x27, 0x7d, 0xd0, 0x56, 0x9a, 0xe2, 0xec, 0xc3, 0xde, 0xf1,
+	0x68, 0xc4, 0x7c, 0x4f, 0x7a, 0x83, 0x11, 0x25, 0x54, 0xb0, 0x24, 0xf6, 0xa9, 0x20, 0xf4, 0x43,
+	0x42, 0x85, 0x74, 0xbe, 0x21, 0x68, 0xac, 0xc6, 0x05, 0x67, 0x91, 0xa0, 0xd8, 0x85, 0xcd, 0x80,
+	0x4e, 0x42, 0x9f, 0x0a, 0x0b, 0x35, 0xcd, 0xd6, 0x76, 0xfb, 0x9e, 0x3b, 0x39, 0x72, 0x4f, 0x58,
+	0x24, 0xbd, 0x30, 0xa2, 0x71, 0x27, 0xc5, 0x48, 0x1e, 0x84, 0x6b, 0xb0, 0xe9, 0xf3, 0xa4, 0x1f,
+	0x06, 0xc2, 0x32, 0x9a, 0x66, 0xcb, 0x24, 0x65, 0x9f, 0x27, 0xdd, 0x40, 0xe0, 0x47, 0x50, 0x1e,
+	0xd3, 0x31, 0x8b, 0xa7, 0x96, 0xa9, 0xeb, 0xdc, 0x5d, 0xa8, 0x73, 0xaa, 0x21, 0x92, 0x85, 0x38,
+	0x0f, 0xa0, 0xf6, 0x2a, 0x14, 0xf2, 0x35, 0x0b, 0x96, 0x18, 0xbf, 0x01, 0x6b, 0x19, 0xca, 0xc8,
+	0x3e, 0x83, 0x1d, 0xce, 0x82, 0x7e, 0x9c, 0x03, 0x19, 0xe5, 0x5d, 0x75, 0xd5, 0x42, 0x42, 0x95,
+	0x17, 0x4e, 0xce, 0x47, 0xa8, 0x16, 0x51, 0x8c, 0xa1, 0x14, 0x79, 0x63, 0x6a, 0xa1, 0x26, 0x6a,
+	0x55, 0x88, 0xb6, 0x71, 0x03, 0x2a, 0xea, 0x2b, 0xb8, 0xe7, 0x53, 0xcb, 0xd0, 0xc0, 0x95, 0x03,
+	0x3f, 0x07, 0xf0, 0xf3, 0x56, 0x44, 0xd6, 0xe0, 0xfd, 0x85, 0x06, 0xaf, 0xee, 0x2e, 0x44, 0x3a,
+	0xdf, 0x11, 0xe0, 0xe5, 0x90, 0x95, 0x04, 0x0a, 0x42, 0x18, 0x37, 0x14, 0xc2, 0x5c, 0x23, 0x44,
+	0xe9, 0xff, 0x42, 0x48, 0xb8, 0x73, 0x0d, 0xc2, 0x07, 0xb0, 0x9d, 0x82, 0x7d, 0x39, 0xe5, 0x39,
+	0x47, 0x48, 0x5d, 0x67, 0x53, 0x4e, 0x15, 0x7b, 0x11, 0x7e, 0x4a, 0xa7, 0x54, 0x22, 0xda, 0xc6,
+	0x8f, 0x61, 0x4b, 0x32, 0xce, 0x46, 0x6c, 0xa8, 0xf4, 0x47, 0xb9, 0x28, 0x67, 0x99, 0xaf, 0x1b,
+	0x9d, 0x33, 0x32, 0x8f, 0x70, 0xbe, 0x20, 0xd8, 0xbd, 0xde, 0x19, 0x7e, 0x08, 0x3b, 0xb9, 0xb0,
+	0xfd, 0xc2, 0x74, 0xaa, 0xb9, 0xb3, 0xa7, 0xa6, 0xb4, 0x0f, 0x90, 0x0e, 0x60, 0xbe, 0x81, 0x15,
+	0x52, 0x49, 0x3d, 0xaa, 0xf7, 0x9b, 0xd1, 0x68, 0x43, 0xb5, 0x88, 0x60, 0x07, 0x6e, 0x45, 0x2c,
+	0x98, 0xaf, 0x55, 0x55, 0xa5, 0xf6, 0xde, 0x9e, 0x1e, 0xf7, 0x58, 0x40, 0x49, 0x0a, 0x39, 0x75,
+	0xd8, 0xca, 0x5d, 0xf8, 0x36, 0x18, 0xdd, 0x8e, 0xa6, 0x69, 0x12, 0xa3, 0xdb, 0x69, 0xff, 0x40,
+	0x80, 0x8b, 0x8b, 0xa6, 0xf6, 0x98, 0xc6, 0xf8, 0x04, 0x4a, 0xca, 0xc2, 0x7b, 0xaa, 0xde, 0x9a,
+	0xb5, 0xaf, 0x37, 0x56, 0x83, 0xe9, 0xe2, 0x3b, 0x1b, 0xf8, 0x1d, 0xd4, 0x5e, 0x52, 0xb9, 0xea,
+	0x57, 0xc6, 0x07, 0x2a, 0xf5, 0x1f, 0x8f, 0x40, 0xbd, 0xb9, 0x3e, 0x20, 0xaf, 0xff, 0xa2, 0x71,
+	0x71, 0x69, 0xa3, 0x5f, 0x97, 0xf6, 0xc6, 0xe7, 0x99, 0x8d, 0x2e, 0x66, 0x36, 0xfa, 0x39, 0xb3,
+	0xd1, 0xef, 0x99, 0x8d, 0xbe, 0xfe, 0xb1, 0x37, 0x06, 0x65, 0xfd, 0xd8, 0x3c, 0xfd, 0x1b, 0x00,
+	0x00, 0xff, 0xff, 0x43, 0x46, 0x5d, 0x7f, 0xac, 0x04, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -705,6 +788,20 @@ func (m *AllocatableResourcesResponse) MarshalToSizedBuffer(dAtA []byte) (int, e
 	_ = i
 	var l int
 	_ = l
+	if len(m.Memory) > 0 {
+		for iNdEx := len(m.Memory) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Memory[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if len(m.CpuIds) > 0 {
 		dAtA2 := make([]byte, len(m.CpuIds)*10)
 		var j1 int
@@ -872,6 +969,20 @@ func (m *ContainerResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Memory) > 0 {
+		for iNdEx := len(m.Memory) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Memory[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
 	if len(m.CpuIds) > 0 {
 		dAtA4 := make([]byte, len(m.CpuIds)*10)
 		var j3 int
@@ -909,6 +1020,53 @@ func (m *ContainerResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.Name)
 		copy(dAtA[i:], m.Name)
 		i = encodeVarintApi(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerMemory) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerMemory) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerMemory) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Topology != nil {
+		{
+			size, err := m.Topology.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Size_ != 0 {
+		i = encodeVarintApi(dAtA, i, uint64(m.Size_))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.MemoryType) > 0 {
+		i -= len(m.MemoryType)
+		copy(dAtA[i:], m.MemoryType)
+		i = encodeVarintApi(dAtA, i, uint64(len(m.MemoryType)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -1070,6 +1228,12 @@ func (m *AllocatableResourcesResponse) Size() (n int) {
 		}
 		n += 1 + sovApi(uint64(l)) + l
 	}
+	if len(m.Memory) > 0 {
+		for _, e := range m.Memory {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -1142,6 +1306,32 @@ func (m *ContainerResources) Size() (n int) {
 			l += sovApi(uint64(e))
 		}
 		n += 1 + sovApi(uint64(l)) + l
+	}
+	if len(m.Memory) > 0 {
+		for _, e := range m.Memory {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerMemory) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.MemoryType)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Size_ != 0 {
+		n += 1 + sovApi(uint64(m.Size_))
+	}
+	if m.Topology != nil {
+		l = m.Topology.Size()
+		n += 1 + l + sovApi(uint64(l))
 	}
 	return n
 }
@@ -1220,9 +1410,15 @@ func (this *AllocatableResourcesResponse) String() string {
 		repeatedStringForDevices += strings.Replace(f.String(), "ContainerDevices", "ContainerDevices", 1) + ","
 	}
 	repeatedStringForDevices += "}"
+	repeatedStringForMemory := "[]*ContainerMemory{"
+	for _, f := range this.Memory {
+		repeatedStringForMemory += strings.Replace(f.String(), "ContainerMemory", "ContainerMemory", 1) + ","
+	}
+	repeatedStringForMemory += "}"
 	s := strings.Join([]string{`&AllocatableResourcesResponse{`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`CpuIds:` + fmt.Sprintf("%v", this.CpuIds) + `,`,
+		`Memory:` + repeatedStringForMemory + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1277,10 +1473,28 @@ func (this *ContainerResources) String() string {
 		repeatedStringForDevices += strings.Replace(f.String(), "ContainerDevices", "ContainerDevices", 1) + ","
 	}
 	repeatedStringForDevices += "}"
+	repeatedStringForMemory := "[]*ContainerMemory{"
+	for _, f := range this.Memory {
+		repeatedStringForMemory += strings.Replace(f.String(), "ContainerMemory", "ContainerMemory", 1) + ","
+	}
+	repeatedStringForMemory += "}"
 	s := strings.Join([]string{`&ContainerResources{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`CpuIds:` + fmt.Sprintf("%v", this.CpuIds) + `,`,
+		`Memory:` + repeatedStringForMemory + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerMemory) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerMemory{`,
+		`MemoryType:` + fmt.Sprintf("%v", this.MemoryType) + `,`,
+		`Size_:` + fmt.Sprintf("%v", this.Size_) + `,`,
+		`Topology:` + strings.Replace(this.Topology.String(), "TopologyInfo", "TopologyInfo", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1519,6 +1733,40 @@ func (m *AllocatableResourcesResponse) Unmarshal(dAtA []byte) error {
 			} else {
 				return fmt.Errorf("proto: wrong wireType = %d for field CpuIds", wireType)
 			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Memory", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Memory = append(m.Memory, &ContainerMemory{})
+			if err := m.Memory[len(m.Memory)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -1993,6 +2241,177 @@ func (m *ContainerResources) Unmarshal(dAtA []byte) error {
 			} else {
 				return fmt.Errorf("proto: wrong wireType = %d for field CpuIds", wireType)
 			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Memory", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Memory = append(m.Memory, &ContainerMemory{})
+			if err := m.Memory[len(m.Memory)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerMemory) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerMemory: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerMemory: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryType", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MemoryType = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Size_", wireType)
+			}
+			m.Size_ = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Size_ |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Topology", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Topology == nil {
+				m.Topology = &TopologyInfo{}
+			}
+			if err := m.Topology.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])

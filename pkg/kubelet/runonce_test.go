@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/mount-utils"
@@ -28,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -48,20 +48,24 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/utils/clock"
 )
 
 func TestRunOnce(t *testing.T) {
-	cadvisor := &cadvisortest.Mock{}
-	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	cadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	cadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).AnyTimes()
+	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,
-	}, nil)
-	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+	}, nil).AnyTimes()
+	cadvisor.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{
 		Usage:    9,
 		Capacity: 10,
-	}, nil)
+	}, nil).AnyTimes()
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
@@ -79,6 +83,7 @@ func TestRunOnce(t *testing.T) {
 		nodeLister:       testNodeLister{},
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		podManager:       podManager,
+		podWorkers:       &fakePodWorkers{},
 		os:               &containertest.FakeOS{},
 		containerRuntime: fakeRuntime,
 		reasonCache:      NewReasonCache(),
@@ -101,7 +106,7 @@ func TestRunOnce(t *testing.T) {
 		true,
 		kb.nodeName,
 		kb.podManager,
-		kb.statusManager,
+		kb.podWorkers,
 		kb.kubeClient,
 		kb.volumePluginMgr,
 		fakeRuntime,
@@ -122,7 +127,7 @@ func TestRunOnce(t *testing.T) {
 		UID:       types.UID(kb.nodeName),
 		Namespace: "",
 	}
-	fakeKillPodFunc := func(pod *v1.Pod, podStatus v1.PodStatus, gracePeriodOverride *int64) error {
+	fakeKillPodFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 		return nil
 	}
 	fakeMirrodPodFunc := func(*v1.Pod) (*v1.Pod, bool) { return nil, false }

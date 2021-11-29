@@ -210,7 +210,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
 }
 
-func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
+func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedInformerFactory) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
@@ -593,12 +593,12 @@ func TestPVCBoundWithADC(t *testing.T) {
 	}
 
 	// start controller loop
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	informers.WaitForCacheSync(stopCh)
-	initCSIObjects(stopCh, informers)
-	go ctrl.Run(stopCh)
-	go pvCtrl.Run(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
+	initCSIObjects(ctx.Done(), informers)
+	go ctrl.Run(ctx.Done())
+	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4)
 	// Give attachdetach controller enough time to populate pods into DSWP.
@@ -608,7 +608,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 		createPVForPVC(t, testClient, pvc)
 	}
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 4 pods in dsw after PVCs are bound", 4)
-	close(stopCh)
+	cancel()
 }
 
 // Create PV for PVC, pv controller will bind them together.

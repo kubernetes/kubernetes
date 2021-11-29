@@ -59,6 +59,34 @@ func Unmarshal(data []byte, v interface{}) error {
 	}
 }
 
+// UnmarshalStrict unmarshals the given data
+// strictly (erroring when there are duplicate fields).
+func UnmarshalStrict(data []byte, v interface{}) error {
+	preserveIntFloat := func(d *json.Decoder) *json.Decoder {
+		d.UseNumber()
+		return d
+	}
+	switch v := v.(type) {
+	case *map[string]interface{}:
+		if err := yaml.UnmarshalStrict(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertMapNumbers(*v, 0)
+	case *[]interface{}:
+		if err := yaml.UnmarshalStrict(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertSliceNumbers(*v, 0)
+	case *interface{}:
+		if err := yaml.UnmarshalStrict(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertInterfaceNumbers(v, 0)
+	default:
+		return yaml.UnmarshalStrict(data, v)
+	}
+}
+
 // ToJSON converts a single YAML document into a JSON document
 // or returns an error. If the document appears to be JSON the
 // YAML decoding path is not used (so that error messages are
@@ -291,14 +319,18 @@ func (r *YAMLReader) Read() ([]byte, error) {
 		if i := bytes.Index(line, []byte(separator)); i == 0 {
 			// We have a potential document terminator
 			i += sep
-			after := line[i:]
-			if len(strings.TrimRightFunc(string(after), unicode.IsSpace)) == 0 {
-				if buffer.Len() != 0 {
-					return buffer.Bytes(), nil
+			trimmed := strings.TrimSpace(string(line[i:]))
+			// We only allow comments and spaces following the yaml doc separator, otherwise we'll return an error
+			if len(trimmed) > 0 && string(trimmed[0]) != "#" {
+				return nil, YAMLSyntaxError{
+					err: fmt.Errorf("invalid Yaml document separator: %s", trimmed),
 				}
-				if err == io.EOF {
-					return nil, err
-				}
+			}
+			if buffer.Len() != 0 {
+				return buffer.Bytes(), nil
+			}
+			if err == io.EOF {
+				return nil, err
 			}
 		}
 		if err == io.EOF {

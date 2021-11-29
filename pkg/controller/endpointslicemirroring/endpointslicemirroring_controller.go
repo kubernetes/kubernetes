@@ -42,6 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 const (
@@ -116,7 +117,7 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
-	c.endpointSliceTracker = newEndpointSliceTracker()
+	c.endpointSliceTracker = endpointsliceutil.NewEndpointSliceTracker()
 
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
@@ -169,7 +170,7 @@ type Controller struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 
 	// serviceLister is able to list/get services and is populated by the shared
 	// informer passed to NewController.
@@ -303,12 +304,11 @@ func (c *Controller) syncEndpoints(key string) error {
 		return err
 	}
 
-	// This means that if a Service transitions away from a nil selector, any
-	// mirrored EndpointSlices will not be cleaned up. #91072 tracks this issue
-	// for this controller along with the Endpoints and EndpointSlice
-	// controllers.
+	// If a selector is specified, clean up any mirrored slices.
 	if svc.Spec.Selector != nil {
-		return nil
+		klog.V(4).Infof("%s/%s Service now has selector, cleaning up any mirrored EndpointSlices", namespace, name)
+		c.endpointSliceTracker.DeleteService(namespace, name)
+		return c.deleteMirroredSlices(namespace, name)
 	}
 
 	endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, namespace, name)
@@ -317,7 +317,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	}
 
 	if c.endpointSliceTracker.StaleSlices(svc, endpointSlices) {
-		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
+		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
 
 	err = c.reconciler.reconcile(endpoints, endpointSlices)
@@ -371,7 +371,7 @@ func (c *Controller) onServiceUpdate(prevObj, obj interface{}) {
 	service := obj.(*v1.Service)
 	prevService := prevObj.(*v1.Service)
 	if service == nil || prevService == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Service, got %T, %T", prevObj, obj))
 		return
 	}
 	if (service.Spec.Selector == nil) != (prevService.Spec.Selector == nil) {

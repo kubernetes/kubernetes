@@ -91,10 +91,6 @@ func (s EgressType) AsNetworkContext() NetworkContext {
 
 func lookupServiceName(name string) (EgressType, error) {
 	switch strings.ToLower(name) {
-	// 'master' is deprecated, interpret "master" as controlplane internally until removed in v1.22.
-	case "master":
-		klog.Warning("EgressSelection name 'master' is deprecated, use 'controlplane' instead")
-		return ControlPlane, nil
 	case "controlplane":
 		return ControlPlane, nil
 	case "etcd":
@@ -134,7 +130,7 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 type proxier interface {
 	// proxy returns a connection to addr.
-	proxy(addr string) (net.Conn, error)
+	proxy(ctx context.Context, addr string) (net.Conn, error)
 }
 
 var _ proxier = &httpConnectProxier{}
@@ -144,7 +140,7 @@ type httpConnectProxier struct {
 	proxyAddress string
 }
 
-func (t *httpConnectProxier) proxy(addr string) (net.Conn, error) {
+func (t *httpConnectProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
 	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
 }
 
@@ -154,8 +150,8 @@ type grpcProxier struct {
 	tunnel client.Tunnel
 }
 
-func (g *grpcProxier) proxy(addr string) (net.Conn, error) {
-	return g.tunnel.Dial("tcp", addr)
+func (g *grpcProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
+	return g.tunnel.DialContext(ctx, "tcp", addr)
 }
 
 type proxyServerConnector interface {
@@ -203,7 +199,8 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
-	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	ctx := context.TODO()
+	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, udsName, dialOption, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +231,7 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
 			return nil, err
 		}
-		conn, err := proxier.proxy(addr)
+		conn, err := proxier.proxy(ctx, addr)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
 			return nil, err
@@ -359,6 +356,16 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		cs.egressToDialer[name] = dialerCreator.createDialer()
 	}
 	return cs, nil
+}
+
+// NewEgressSelectorWithMap returns a EgressSelector with the supplied EgressType to DialFunc map.
+func NewEgressSelectorWithMap(m map[EgressType]utilnet.DialFunc) *EgressSelector {
+	if m == nil {
+		m = make(map[EgressType]utilnet.DialFunc)
+	}
+	return &EgressSelector{
+		egressToDialer: m,
+	}
 }
 
 // Lookup gets the dialer function for the network context.

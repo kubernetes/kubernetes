@@ -51,7 +51,7 @@ func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 // ExtractConfigMap extracts the applied configuration owned by fieldManager from
 // configMap. If no managedFields are found in configMap for fieldManager, a
 // ConfigMapApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // configMap must be a unmodified ConfigMap API object that was retrieved from the Kubernetes API.

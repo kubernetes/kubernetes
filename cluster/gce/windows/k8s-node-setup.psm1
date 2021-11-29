@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.21.0'
-$CRICTL_SHA256 = '437d5301f6f5b9848ef057cee98474ce11a6679c91b4d4e83677a8c1f2415143'
+$CRICTL_VERSION = 'v1.22.0'
+$CRICTL_SHA256 = '8f32d09d56716ab47ede3410c0aa91921668510a457b878f4442edcd2ef7bc10'
 
 Import-Module -Force C:\common.psm1
 
@@ -229,6 +229,13 @@ function Fetch-KubeEnv {
   # The type of kube_env is a powershell String.
   $kube_env = Get-InstanceMetadataAttribute 'kube-env'
   $kube_env_table = ConvertFrom_Yaml_KubeEnv ${kube_env}
+
+  Log-Output "Logging kube-env key-value pairs except CERT and KEY values"
+  foreach ($entry in $kube_env_table.GetEnumerator()) {
+    if ((-not ($entry.Name.contains("CERT"))) -and (-not ($entry.Name.contains("KEY")))) {
+      Log-Output "$($entry.Name): $($entry.Value)"
+    }
+  }
   return ${kube_env_table}
 }
 
@@ -288,6 +295,7 @@ function Set-EnvironmentVars {
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
     "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
+    "WINDOWS_ENABLE_HYPERV" = ${kube_env}['WINDOWS_ENABLE_HYPERV']
     "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
     "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
 
@@ -1248,7 +1256,7 @@ function Start-WorkerServices {
         "A kubelet process is already running, don't know what to do"
   }
   Log-Output "Creating kubelet service"
-  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
+  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kubelet.log ${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
   & sc.exe failure kubelet reset= 0 actions= restart/10000
   Log-Output "Starting kubelet service"
   & sc.exe start kubelet
@@ -1262,7 +1270,7 @@ function Start-WorkerServices {
         "A kube-proxy process is already running, don't know what to do"
   }
   Log-Output "Creating kube-proxy service"
-  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
+  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kube-proxy.log ${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
   & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
   & sc.exe start kube-proxy
@@ -1277,6 +1285,12 @@ function Start-WorkerServices {
   WaitFor_KubeletAndKubeProxyReady
   Verify_GceMetadataServerRouteIsPresent
   Log-Output "Kubernetes components started successfully"
+}
+
+# Stop and unregister both kubelet & kube-proxy services.
+function Unregister-WorkerServices {
+  & sc.exe delete kube-proxy
+  & sc.exe delete kubelet
 }
 
 # Wait for kubelet and kube-proxy to be ready within 10s.
@@ -1373,6 +1387,24 @@ function Install-ContainersFeature {
   Install-WindowsFeature Containers
 }
 
+# Verifies if Hyper-V should be enabled in the node
+function Test-ShouldEnableHyperVFeature {
+  return "${env:WINDOWS_ENABLE_HYPERV}" -eq "true"
+}
+
+# Check if Hyper-V feature is enabled
+function Test-HyperVFeatureEnabled {
+  return ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled')
+}
+
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Enable-HyperVFeature {
+  Log-Output "Enabling Windows 'HyperV' feature"
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
+}
+
 function Test-DockerIsInstalled {
   return ((Get-Package `
                -ProviderName DockerMsftProvider `
@@ -1436,6 +1468,25 @@ function Configure_Dockerd {
 '@
 
  Restart-Service Docker
+}
+
+# Configures the TCP/IP parameters to be in sync with the GCP recommendation.
+# Not setting these values correctly can cause network issues for connections
+# that live longer than 10 minutes.
+# See: https://cloud.google.com/compute/docs/troubleshooting/general-tips#idle-connections
+function Set-WindowsTCPParameters {
+  Set-ItemProperty -Force -Confirm:$false -Path `
+    'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'KeepAliveInterval' -Type Dword -Value 1000
+  Set-ItemProperty -Force -Confirm:$false `
+    -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'KeepAliveTime' -Type Dword -Value 60000
+  Set-ItemProperty -Force -Confirm:$false `
+    -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'TcpMaxDataRetransmissions' -Type Dword -Value 10
+
+  Log-Output 'TCP/IP Parameters'
+  Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
 }
 
 # Writes a CNI config file under $env:CNI_CONFIG_DIR for containerd.
@@ -1566,7 +1617,7 @@ function Install_Containerd {
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
   # TODO(ibrahimab) Change this to a gcs bucket with CI maintained and accessible by community.
-  $version = '1.4.4'
+  $version = '1.5.4'
   $tar_url = ("https://github.com/containerd/containerd/releases/download/v${version}/" +
               "cri-containerd-cni-${version}-windows-amd64.tar.gz")
   $sha_url = $tar_url + ".sha256sum"
@@ -1673,9 +1724,9 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.8'
-$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
-$DEFAULT_NPD_HASH = 'ff264e727fecf7114f00afb9b63755b47b62fc85bffb4a39062d4bbe105186d13cbd111431ae01e49cae3b6940c42934cac0fbbbcae2395df7a73507dc44bc80'
+$DEFAULT_NPD_VERSION = '0.8.10-gke0.1'
+$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/gke-release/winnode'
+$DEFAULT_NPD_HASH = '97ddfe3544da9e02a1cfb55d24f329eb29d606fca7fbbf800415d5de9dbc29a00563f8e0d1919595c8e316fd989d45b09b13c07be528841fc5fd37e21d016a2d'
 
 # Install Node Problem Detector (NPD).
 # NPD analyzes the host for problems that can disrupt workloads.
@@ -1754,6 +1805,7 @@ function Configure-NodeProblemDetector {
         # Custom Plugin Monitors
         $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubelet.json")
         $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubeproxy.json")
+        $custom_plugin_monitors += @("${npd_dir}\config\windows-defender-monitor.json")
 
         # System Stats Monitors
         $system_stats_monitors += @("${npd_dir}\config\windows-system-stats-monitor.json")
@@ -1800,15 +1852,16 @@ function Configure-NodeProblemDetector {
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$LOGGINGAGENT_VERSION = '1.7.6'
+$LOGGINGAGENT_VERSION = '1.7.7'
 $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
 
-$LOGGINGEXPORTER_VERSION = 'v0.16.2'
+$LOGGINGEXPORTER_VERSION = 'v0.17.0'
 $LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
 $LOGGINGEXPORTER_SERVICE = 'flb-exporter'
 $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
+$LOGGINGEXPORTER_HASH = 'c808c9645d84b06b89932bd707d51a9d1d0b451b5a702a5f9b2b4462c8be6502'
 
 # Restart Logging agent or starts it if it is not currently running
 function Restart-LoggingAgent {
@@ -1923,7 +1976,10 @@ function DownloadAndInstall-LoggingAgents {
       Log-Output 'Downloading logging exporter'
       New-Item $LOGGINGEXPORTER_ROOT -ItemType 'directory' -Force | Out-Null
       MustDownload-File `
-          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe -URLs $url
+          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe `
+          -URLs $url `
+          -Hash $LOGGINGEXPORTER_HASH `
+          -Algorithm SHA256
   }
 }
 

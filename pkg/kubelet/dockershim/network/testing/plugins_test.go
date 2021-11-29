@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -20,15 +21,15 @@ package testing
 
 import (
 	"fmt"
-	"net"
 	"sync"
 	"testing"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
+	sysctltest "k8s.io/component-helpers/node/util/sysctl/testing"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
-	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
+	netutils "k8s.io/utils/net"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +81,7 @@ func TestInit(t *testing.T) {
 func TestPluginManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	fnp := NewMockNetworkPlugin(ctrl)
-	defer fnp.Finish()
+	defer ctrl.Finish()
 	pm := network.NewPluginManager(fnp)
 
 	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
@@ -95,8 +96,8 @@ func TestPluginManager(t *testing.T) {
 		podName := fmt.Sprintf("pod%d", i)
 		containerID := kubecontainer.ContainerID{ID: podName}
 
-		fnp.EXPECT().SetUpPod("", podName, containerID).Return(nil).Times(4)
-		fnp.EXPECT().GetPodNetworkStatus("", podName, containerID).Return(&network.PodNetworkStatus{IP: net.ParseIP("1.2.3.4")}, nil).Times(4)
+		fnp.EXPECT().SetUpPod("", podName, containerID, nil, nil).Return(nil).Times(4)
+		fnp.EXPECT().GetPodNetworkStatus("", podName, containerID).Return(&network.PodNetworkStatus{IP: netutils.ParseIPSloppy("1.2.3.4")}, nil).Times(4)
 		fnp.EXPECT().TearDownPod("", podName, containerID).Return(nil).Times(4)
 
 		for x := 0; x < 4; x++ {
@@ -173,7 +174,7 @@ func (p *hookableFakeNetworkPlugin) TearDownPod(string, string, kubecontainer.Co
 }
 
 func (p *hookableFakeNetworkPlugin) GetPodNetworkStatus(string, string, kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	return &network.PodNetworkStatus{IP: net.ParseIP("10.1.2.3")}, nil
+	return &network.PodNetworkStatus{IP: netutils.ParseIPSloppy("10.1.2.3")}, nil
 }
 
 func (p *hookableFakeNetworkPlugin) Status() error {

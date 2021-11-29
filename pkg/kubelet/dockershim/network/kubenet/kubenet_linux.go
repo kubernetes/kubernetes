@@ -1,3 +1,4 @@
+//go:build linux && !dockerless
 // +build linux,!dockerless
 
 /*
@@ -35,6 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -42,12 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 	utilebtables "k8s.io/utils/net/ebtables"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -252,14 +251,8 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	klog.V(4).InfoS("Kubenet: PodCIDR is set to new value", "podCIDR", podCIDR)
 	podCIDRs := strings.Split(podCIDR, ",")
 
-	// reset to one cidr if dual stack is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) && len(podCIDRs) > 1 {
-		klog.V(2).InfoS("This node has multiple pod cidrs assigned and dual stack is not enabled. ignoring all except first cidr")
-		podCIDRs = podCIDRs[0:1]
-	}
-
 	for idx, currentPodCIDR := range podCIDRs {
-		_, cidr, err := net.ParseCIDR(currentPodCIDR)
+		_, cidr, err := netutils.ParseCIDRSloppy(currentPodCIDR)
 		if nil != err {
 			klog.InfoS("Failed to generate CNI network config with cidr at the index", "podCIDR", currentPodCIDR, "index", idx, "err", err)
 			return
@@ -451,7 +444,7 @@ func (plugin *kubenetNetworkPlugin) addPortMapping(id kubecontainer.ContainerID,
 			Namespace:    namespace,
 			Name:         name,
 			PortMappings: portMappings,
-			IP:           net.ParseIP(ip),
+			IP:           netutils.ParseIPSloppy(ip),
 			HostNetwork:  false,
 		}
 		if netutils.IsIPv6(pm.IP) {
@@ -635,7 +628,7 @@ func (plugin *kubenetNetworkPlugin) getNetworkStatus(id kubecontainer.ContainerI
 
 	ips := make([]net.IP, 0, len(iplist))
 	for _, ip := range iplist {
-		ips = append(ips, net.ParseIP(ip))
+		ips = append(ips, netutils.ParseIPSloppy(ip))
 	}
 
 	return &network.PodNetworkStatus{

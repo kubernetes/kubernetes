@@ -20,14 +20,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robfig/cron"
-	"k8s.io/klog/v2"
+	"github.com/robfig/cron/v3"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -56,107 +57,14 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 	cj.Status.Active = newActive
 }
 
-// getParentUIDFromJob extracts UID of job's parent and whether it was found
-func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
-	controllerRef := metav1.GetControllerOf(&j)
-
-	if controllerRef == nil {
-		return types.UID(""), false
-	}
-
-	if controllerRef.Kind != "CronJob" {
-		klog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
-		return types.UID(""), false
-	}
-
-	return controllerRef.UID, true
-}
-
-// groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. cronJob).
-// It has no receiver, to facilitate testing.
-func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
-	jobsByCj := make(map[types.UID][]batchv1.Job)
-	for _, job := range js {
-		parentUID, found := getParentUIDFromJob(job)
-		if !found {
-			klog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
-			continue
-		}
-		jobsByCj[parentUID] = append(jobsByCj[parentUID], job)
-	}
-	return jobsByCj
-}
-
-// getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
-//
-// If there are too many (>100) unstarted times, just give up and return an empty slice.
-// If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(cj batchv1.CronJob, now time.Time) ([]time.Time, error) {
-	starts := []time.Time{}
-	sched, err := cron.ParseStandard(cj.Spec.Schedule)
-	if err != nil {
-		return starts, fmt.Errorf("unparseable schedule: %s : %s", cj.Spec.Schedule, err)
-	}
-
-	var earliestTime time.Time
-	if cj.Status.LastScheduleTime != nil {
-		earliestTime = cj.Status.LastScheduleTime.Time
-	} else {
-		// If none found, then this is either a recently created cronJob,
-		// or the active/completed info was somehow lost (contract for status
-		// in kubernetes says it may need to be recreated), or that we have
-		// started a job, but have not noticed it yet (distributed systems can
-		// have arbitrary delays).  In any case, use the creation time of the
-		// CronJob as last known start time.
-		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
-	}
-	if cj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
-
-		if schedulingDeadline.After(earliestTime) {
-			earliestTime = schedulingDeadline
-		}
-	}
-	if earliestTime.After(now) {
-		return []time.Time{}, nil
-	}
-
-	for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
-		starts = append(starts, t)
-		// An object might miss several starts. For example, if
-		// controller gets wedged on friday at 5:01pm when everyone has
-		// gone home, and someone comes in on tuesday AM and discovers
-		// the problem and restarts the controller, then all the hourly
-		// jobs, more than 80 of them for one hourly cronJob, should
-		// all start running with no further intervention (if the cronJob
-		// allows concurrency and late starts).
-		//
-		// However, if there is a bug somewhere, or incorrect clock
-		// on controller's server or apiservers (for setting creationTimestamp)
-		// then there could be so many missed start times (it could be off
-		// by decades or more), that it would eat up all the CPU and memory
-		// of this controller. In that case, we want to not try to list
-		// all the missed start times.
-		//
-		// I've somewhat arbitrarily picked 100, as more than 80,
-		// but less than "lots".
-		if len(starts) > 100 {
-			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew")
-		}
-	}
-	return starts, nil
-}
-
 // getNextScheduleTime gets the time of next schedule after last scheduled and before now
 //  it returns nil if no unmet schedule times.
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
 func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
-	starts := []time.Time{}
-
-	var earliestTime time.Time
+	var (
+		earliestTime time.Time
+	)
 	if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
 	} else {
@@ -200,8 +108,8 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		//
 		// I've somewhat arbitrarily picked 100, as more than 80,
 		// but less than "lots".
-		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", len(starts))
-		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", len(starts))
+		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", numberOfMissedSchedules)
+		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", numberOfMissedSchedules)
 	}
 	return t, err
 }
@@ -232,28 +140,20 @@ func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule c
 	return &t, numberOfMissedSchedules, nil
 }
 
-// getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
-	labels := copyLabels(&cj.Spec.JobTemplate)
-	annotations := copyAnnotations(&cj.Spec.JobTemplate)
-	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
-	name := fmt.Sprintf("%s-%d", cj.Name, getTimeHash(scheduledTime))
-
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:          labels,
-			Annotations:     annotations,
-			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
-		},
+func copyLabels(template *batchv1.JobTemplateSpec) labels.Set {
+	l := make(labels.Set)
+	for k, v := range template.Labels {
+		l[k] = v
 	}
-	cj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
-	return job, nil
+	return l
 }
 
-// getTimeHash returns Unix Epoch Time
-func getTimeHash(scheduledTime time.Time) int64 {
-	return scheduledTime.Unix()
+func copyAnnotations(template *batchv1.JobTemplateSpec) labels.Set {
+	a := make(labels.Set)
+	for k, v := range template.Annotations {
+		a[k] = v
+	}
+	return a
 }
 
 // getJobFromTemplate2 makes a Job from a CronJob. It converts the unix time into minutes from
@@ -267,10 +167,11 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          labels,
-			Annotations:     annotations,
-			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
+			Labels:            labels,
+			Annotations:       annotations,
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: scheduledTime},
+			OwnerReferences:   []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
 		},
 	}
 	cj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)

@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/utils/lru"
 
-	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/crypto/cryptobyte"
 )
 
@@ -64,14 +64,10 @@ type envelopeTransformer struct {
 func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
 	var (
 		cache *lru.Cache
-		err   error
 	)
 
 	if cacheSize > 0 {
-		cache, err = lru.New(cacheSize)
-		if err != nil {
-			return nil, err
-		}
+		cache = lru.New(cacheSize)
 	}
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,

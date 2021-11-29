@@ -15,6 +15,7 @@ const (
 	Unknown BuiltinPluginType = iota
 	AnnotationsTransformer
 	ConfigMapGenerator
+	IAMPolicyGenerator
 	HashTransformer
 	ImageTagTransformer
 	LabelTransformer
@@ -58,6 +59,7 @@ func GetBuiltinPluginType(n string) BuiltinPluginType {
 
 var GeneratorFactories = map[BuiltinPluginType]func() resmap.GeneratorPlugin{
 	ConfigMapGenerator:          builtins.NewConfigMapGeneratorPlugin,
+	IAMPolicyGenerator:          builtins.NewIAMPolicyGeneratorPlugin,
 	SecretGenerator:             builtins.NewSecretGeneratorPlugin,
 	HelmChartInflationGenerator: builtins.NewHelmChartInflationGeneratorPlugin,
 }
