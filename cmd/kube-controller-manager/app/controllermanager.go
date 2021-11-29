@@ -259,10 +259,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 		controllerInitializers := initializersFunc(controllerContext.LoopMode)
 
-		if err := createPVRecyclerSA(c.OpenShiftContext.OpenShiftConfig, rootClientBuilder); err != nil {
-			klog.Fatalf("error creating recycler serviceaccount: %v", err)
-		}
-
 		if err := StartControllers(ctx, controllerContext, startSATokenController, controllerInitializers, unsecuredMux, healthzHandler); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
