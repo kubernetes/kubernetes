@@ -1285,16 +1285,14 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(context.TODO(), secondRS.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
-	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
-	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
-	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
+	// First rollout's replicaset should have .spec.replicas = 8 (didn't scale since the spec.template was changed).
+	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 8")
+	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, 8)
 	framework.ExpectNoError(err)
 
-	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
-	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
-	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
-	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
+	// Second rollout's replicaset should have .spec.replicas = 5 + min(33-(5+8), 30-5) = 5 + 20 = 25 replicas.
+	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 25")
+	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, 25)
 	framework.ExpectNoError(err)
 }
 

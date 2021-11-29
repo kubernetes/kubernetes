@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
 func intOrStrP(val int) *intstr.IntOrString {
@@ -588,5 +590,106 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 			t.Errorf("expect to delete old replica sets %v, but got %v", test.expectedDeletedRSs, deletedRSs)
 			continue
 		}
+	}
+}
+
+func newRSForDeployment(d *apps.Deployment, timestamp metav1.Time, revision string) *apps.ReplicaSet {
+	newRSTemplate := *d.Spec.Template.DeepCopy()
+	podTemplateSpecHash := controller.ComputeHash(&newRSTemplate, d.Status.CollisionCount)
+	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
+	// Add podTemplateHash label to selector.
+	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
+
+	// Create new ReplicaSet
+	newRS := apps.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			// Make the name deterministic, to ensure idempotence
+			Name:              d.Name + "-" + podTemplateSpecHash,
+			Namespace:         d.Namespace,
+			CreationTimestamp: timestamp,
+			OwnerReferences:   []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
+			Labels:            newRSTemplate.Labels,
+			Annotations: map[string]string{
+				deploymentutil.RevisionAnnotation:        revision,
+				deploymentutil.DesiredReplicasAnnotation: fmt.Sprintf("%d", d.Spec.Replicas),
+			},
+		},
+		Spec: apps.ReplicaSetSpec{
+			Replicas:        d.Spec.Replicas,
+			MinReadySeconds: d.Spec.MinReadySeconds,
+			Selector:        newRSSelector,
+			Template:        newRSTemplate,
+		},
+	}
+
+	return &newRS
+}
+
+func TestDeploymentController_isScalingEvent(t *testing.T) {
+	type args struct {
+		d      *apps.Deployment
+		rsList []*apps.ReplicaSet
+	}
+
+	// change the labels in podTemplate
+	selector := map[string]string{"foo": "bar"}
+	selectorChanged := map[string]string{"foo": "bar-changed"}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "only replicas changed",
+			args: args{
+				d: newDeployment("foo", 4, nil, nil, nil, selector),
+				rsList: []*apps.ReplicaSet{
+					newRSForDeployment(newDeployment("foo", 2, nil, nil, nil, selector), metav1.NewTime(time.Now().Add(-1*time.Minute)), "1"),
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "replicas and pod template changed",
+			args: args{
+				d: newDeployment("foo", 4, nil, nil, nil, selectorChanged),
+				rsList: []*apps.ReplicaSet{
+					newRSForDeployment(newDeployment("foo", 2, nil, nil, nil, selector), metav1.NewTime(time.Now().Add(-1*time.Minute)), "1"),
+				},
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "only pod template changed",
+			args: args{
+				d: newDeployment("foo", 2, nil, nil, nil, selectorChanged),
+				rsList: []*apps.ReplicaSet{
+					newRSForDeployment(newDeployment("foo", 2, nil, nil, nil, selector), metav1.NewTime(time.Now().Add(-1*time.Minute)), "1"),
+				},
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := fake.Clientset{}
+			dc := &DeploymentController{
+				client:        &fake,
+				eventRecorder: &record.FakeRecorder{},
+			}
+			got, err := dc.isScalingEvent(context.TODO(), tt.args.d, tt.args.rsList)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeploymentController.isScalingEvent() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("DeploymentController.isScalingEvent() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
