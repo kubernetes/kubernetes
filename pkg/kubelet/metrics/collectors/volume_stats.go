@@ -64,7 +64,7 @@ var (
 
 	volumeStatsHealthAbnormalDesc = metrics.NewDesc(
 		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsHealthStatusKey),
-		"Volume health status. The value 1 of this metrics indicates volume is unhealthy, 0 indicates the unhealthy volume",
+		"Volume health status. The value 1 of this metrics indicates unhealthy volume, 0 indicates the healthy",
 		[]string{"namespace", "persistentvolumeclaim", "volume_health_status"}, nil,
 		metrics.ALPHA, "")
 )
