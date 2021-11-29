@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1219,6 +1220,10 @@ type cacheWatcher struct {
 	// all bookmark events < bookmarkAfterResourceVersion will be dropped
 	// useful when a client wants to know if the watch cache has observed the desired RV
 	bookmarkAfterResourceVersion uint64
+
+	// we consider cacheWatcher to be initialized once it has sent initial data
+	// for now it only works when bookmarkAfterResourceVersion > 0
+	initialized int32
 }
 
 func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type, identifier string, bookmarkAfterResourceVersion uint64) *cacheWatcher {
@@ -1258,6 +1263,13 @@ func (c *cacheWatcher) stopThreadUnsafe() {
 }
 
 func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
+	// an ugly optimization for not polluting the input channel
+	// if c.bookmarkAfterResourceVersion > 0 we will try to deliver a bookmark event every second
+	// the following code will discard a bookmark event when the cacheWatcher hasn't been initialized
+	// i.e. it might be in the process of sending initial events
+	if event.Type == watch.Bookmark && c.bookmarkAfterResourceVersion > 0 && atomic.LoadInt32(&c.initialized) == 0 {
+		return false
+	}
 	select {
 	case c.input <- event:
 		return true
@@ -1303,8 +1315,10 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 	// (b) right before the watcher timeout - for now we simply set it 2s before
 	//     the deadline
 	// (c) immediately when c.bookmarkAfterResourceVersion > 0
-	//     TODO: in the future we could switch to (a) once the cacheWatcher has observed
-	//     rv >= c.bookmarkAfterResourceVersion
+	//     in this scenario the client have already seen all initial data and is interested in seeing
+	//     a specific RV value (c.bookmarkAfterResourceVersion) so we increase frequency
+	//
+	//     in the future we could switch to (a) once the cacheWatcher has observed rv >= c.bookmarkAfterResourceVersion
 	//     ATM a watch with c.bookmarkAfterResourceVersion set always quits after receiving the first bookmark event
 	//
 	// The former gives us periodicity if the watch breaks due to unexpected
@@ -1430,6 +1444,10 @@ func (c *cacheWatcher) processEvents(ctx context.Context, initEvents []*watchCac
 	startTime := time.Now()
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
+	}
+	if c.bookmarkAfterResourceVersion > 0 {
+		initialized := int32(1)
+		atomic.StoreInt32(&c.initialized, initialized)
 	}
 
 	objType := c.objectType.String()
