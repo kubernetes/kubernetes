@@ -307,7 +307,8 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
 	err := ds.client.StopContainer(r.ContainerId, time.Duration(r.Timeout)*time.Second)
-	if err != nil {
+	// Do not return error if the container does not exist
+	if err != nil && !libdocker.IsContainerNotFoundError(err) {
 		return nil, err
 	}
 	return &runtimeapi.StopContainerResponse{}, nil
