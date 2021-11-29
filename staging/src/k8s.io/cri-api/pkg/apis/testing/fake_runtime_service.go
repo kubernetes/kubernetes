@@ -258,7 +258,7 @@ func (r *FakeRuntimeService) StopPodSandbox(podSandboxID string) error {
 	if s, ok := r.Sandboxes[podSandboxID]; ok {
 		s.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	} else {
-		return fmt.Errorf("pod sandbox %s not found", podSandboxID)
+		return fmt.Errorf("No such container: %s", podSandboxID)
 	}
 
 	return nil
@@ -396,7 +396,7 @@ func (r *FakeRuntimeService) StartContainer(containerID string) error {
 
 	c, ok := r.Containers[containerID]
 	if !ok {
-		return fmt.Errorf("container %s not found", containerID)
+		return fmt.Errorf("No such container: %s", containerID)
 	}
 
 	// Set container to running.
@@ -418,7 +418,7 @@ func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) er
 
 	c, ok := r.Containers[containerID]
 	if !ok {
-		return fmt.Errorf("container %q not found", containerID)
+		return fmt.Errorf("No such container: %s", containerID)
 	}
 
 	// Set container to exited state.
@@ -501,7 +501,7 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeapi.Co
 
 	c, ok := r.Containers[containerID]
 	if !ok {
-		return nil, fmt.Errorf("container %q not found", containerID)
+		return nil, fmt.Errorf("No such container: %s", containerID)
 	}
 
 	status := c.ContainerStatus
