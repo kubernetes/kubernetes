@@ -119,6 +119,18 @@ func TestKillContainer(t *testing.T) {
 			gracePeriodOverride: 0,
 			succeed:             false,
 		},
+		{
+			caseName: "No such container in runtime, expect to succeed",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1_id", Name: "pod1", Namespace: "default"},
+				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "not_exist_container"}}},
+			},
+			containerID:         kubecontainer.ContainerID{Type: "docker", ID: "notexistcontainerid"},
+			containerName:       "not_exist_container",
+			reason:              "unknown reason",
+			gracePeriodOverride: 0,
+			succeed:             true,
+		},
 	}
 
 	for _, test := range tests {
