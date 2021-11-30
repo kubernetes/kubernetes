@@ -120,7 +120,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 			prof := &c.profiles[i]
 			var found = false
 			for k := range prof.PluginConfig {
-				if prof.PluginConfig[k].Name == noderesources.FitName {
+				if prof.PluginConfig[k].Name == noderesources.Name {
 					// Update the existing args
 					pc := &prof.PluginConfig[k]
 					args, ok := pc.Args.(*schedulerapi.NodeResourcesFitArgs)
