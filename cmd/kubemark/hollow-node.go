@@ -180,12 +180,13 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 		return fmt.Errorf("Failed to create a ClientConfig, error: %w. Exiting", err)
 	}
 
-	client, err := clientset.NewForConfig(clientConfig)
-	if err != nil {
-		return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
-	}
-
 	if config.Morph == "kubelet" {
+		clientConfig.UserAgent = "hollow-kubelet"
+		client, err := clientset.NewForConfig(clientConfig)
+		if err != nil {
+			return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
+		}
+
 		f, c := kubemark.GetHollowKubeletConfig(config.createHollowKubeletOptions())
 
 		heartbeatClientConfig := *clientConfig
@@ -253,6 +254,8 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 	}
 
 	if config.Morph == "proxy" {
+		clientConfig.UserAgent = "hollow-proxy"
+
 		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
 			return fmt.Errorf("Failed to create API Server client, error: %w", err)
