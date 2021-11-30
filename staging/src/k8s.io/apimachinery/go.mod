@@ -37,4 +37,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	google.golang.org/grpc => google.golang.org/grpc v1.40.0
+	k8s.io/apimachinery => ../apimachinery
+)
