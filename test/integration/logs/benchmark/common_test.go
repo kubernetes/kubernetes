@@ -70,10 +70,17 @@ func printf(item logMessage) {
 	}
 }
 
+// These variables are a workaround for logcheck complaining about the dynamic
+// parameters.
+var (
+	errorS = klog.ErrorS
+	infoS  = klog.InfoS
+)
+
 func prints(item logMessage) {
 	if item.isError {
-		klog.ErrorS(item.err, item.msg, item.kvs...)
+		errorS(item.err, item.msg, item.kvs...)
 	} else {
-		klog.InfoS(item.msg, item.kvs...)
+		infoS(item.msg, item.kvs...)
 	}
 }
