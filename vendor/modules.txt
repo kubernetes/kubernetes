@@ -254,6 +254,7 @@ github.com/fvbommel/sortorder
 # github.com/go-errors/errors v1.0.1 => github.com/go-errors/errors v1.0.1
 github.com/go-errors/errors
 # github.com/go-logr/logr v1.2.0 => github.com/go-logr/logr v1.2.0
+## explicit
 github.com/go-logr/logr
 # github.com/go-logr/zapr v1.2.0 => github.com/go-logr/zapr v1.2.0
 github.com/go-logr/zapr
@@ -932,6 +933,7 @@ go.uber.org/atomic
 # go.uber.org/multierr v1.6.0 => go.uber.org/multierr v1.6.0
 go.uber.org/multierr
 # go.uber.org/zap v1.19.0 => go.uber.org/zap v1.19.0
+## explicit
 go.uber.org/zap
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/bufferpool
