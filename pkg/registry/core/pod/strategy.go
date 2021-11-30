@@ -115,6 +115,9 @@ func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 
 // Canonicalize normalizes the object after validation.
 func (podStrategy) Canonicalize(obj runtime.Object) {
+	// This has to happen here, rather than PrepareForCreate() because
+	// generateName has not yet been evaluated there.
+	setDefaultHostname(obj.(*api.Pod))
 }
 
 // AllowCreateOnUpdate is false for pods.
@@ -749,4 +752,13 @@ func seccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// setDefaultHostname sets the pod's hostname field if needed.
+func setDefaultHostname(pod *api.Pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodHostnameWhenSubdomain) {
+		if pod.Spec.Subdomain != "" && pod.Spec.Hostname == "" {
+			pod.Spec.Hostname = pod.Name
+		}
+	}
 }

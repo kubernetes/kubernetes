@@ -908,6 +908,13 @@ const (
 	// instead of changing each file on the volumes recursively.
 	// Initial implementation focused on ReadWriteOncePod volumes.
 	SELinuxMountReadWriteOncePod featuregate.Feature = "SELinuxMountReadWriteOncePod"
+
+	// owner: @thockin
+	// kep: http://kep.k8s.io/????
+	// alpha: v1.24
+	//
+	// Enables default pod hostname when subdomain is set
+	PodHostnameWhenSubdomain featuregate.Feature = "PodHostnameWhenSubdomain"
 )
 
 func init() {
@@ -1156,6 +1163,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NodeInclusionPolicyInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodHostnameWhenSubdomain: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
