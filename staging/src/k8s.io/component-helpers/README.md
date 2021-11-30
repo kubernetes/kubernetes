@@ -27,3 +27,4 @@ There are NO compatibility guarantees for this repository. It is in direct suppo
 
 This repo is synced from https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/component-helpers.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here by a bot.
+
