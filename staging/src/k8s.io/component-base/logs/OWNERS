@@ -3,6 +3,7 @@
 approvers:
 - sig-instrumentation-approvers
 - serathius
+- pohly
 reviewers:
 - sig-instrumentation-reviewers
 - serathius
