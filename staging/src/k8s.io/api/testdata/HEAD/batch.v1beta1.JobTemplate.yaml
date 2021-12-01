@@ -282,7 +282,7 @@ template:
               command:
               - "298"
             failureThreshold: -1918622971
-            gRPC:
+            grpc:
               port: -1758095966
               service: "305"
             httpGet:
@@ -313,7 +313,7 @@ template:
               command:
               - "306"
             failureThreshold: -824445204
-            gRPC:
+            grpc:
               port: -655359985
               service: "313"
             httpGet:
@@ -368,7 +368,7 @@ template:
               command:
               - "314"
             failureThreshold: -2068583194
-            gRPC:
+            grpc:
               port: 240657401
               service: "320"
             httpGet:
@@ -482,7 +482,7 @@ template:
               command:
               - "371"
             failureThreshold: -176877925
-            gRPC:
+            grpc:
               port: 151468789
               service: "379"
             httpGet:
@@ -512,7 +512,7 @@ template:
               command:
               - "380"
             failureThreshold: 718799934
-            gRPC:
+            grpc:
               port: -1001034710
               service: "387"
             httpGet:
@@ -566,7 +566,7 @@ template:
               command:
               - "388"
             failureThreshold: 22814565
-            gRPC:
+            grpc:
               port: 212308536
               service: "395"
             httpGet:
@@ -677,7 +677,7 @@ template:
               command:
               - "225"
             failureThreshold: 1714588921
-            gRPC:
+            grpc:
               port: 133009177
               service: "231"
             httpGet:
@@ -708,7 +708,7 @@ template:
               command:
               - "232"
             failureThreshold: 1313273370
-            gRPC:
+            grpc:
               port: 1990641192
               service: "240"
             httpGet:
@@ -763,7 +763,7 @@ template:
               command:
               - "241"
             failureThreshold: 1877574041
-            gRPC:
+            grpc:
               port: -1813746408
               service: "249"
             httpGet:
