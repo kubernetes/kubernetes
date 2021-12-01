@@ -909,7 +909,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Verifying the deleted ResourceQuota")
 		_, err = client.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("Expected `not found` error, got: %v", err)
+		}
 	})
 })
 
@@ -1099,7 +1101,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1138,7 +1142,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1183,7 +1189,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1229,10 +1237,14 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	ginkgo.It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func() {
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass6"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("2")
@@ -1284,7 +1296,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1318,7 +1332,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1357,7 +1373,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)}, metav1.CreateOptions{})
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
