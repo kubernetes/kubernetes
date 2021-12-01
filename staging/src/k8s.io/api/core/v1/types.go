@@ -2468,7 +2468,7 @@ type ProbeHandler struct {
 	// This is an alpha field and requires enabling GRPCContainerProbe feature gate.
 	// +featureGate=GRPCContainerProbe
 	// +optional
-	GRPC *GRPCAction `json:"gRPC,omitempty" protobuf:"bytes,4,opt,name=grpc"`
+	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle

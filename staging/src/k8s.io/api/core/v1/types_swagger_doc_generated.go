@@ -1808,7 +1808,7 @@ var map_ProbeHandler = map[string]string{
 	"exec":      "Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
 	"tcpSocket": "TCPSocket specifies an action involving a TCP port.",
-	"gRPC":      "GRPC specifies an action involving a GRPC port. This is an alpha field and requires enabling GRPCContainerProbe feature gate.",
+	"grpc":      "GRPC specifies an action involving a GRPC port. This is an alpha field and requires enabling GRPCContainerProbe feature gate.",
 }
 
 func (ProbeHandler) SwaggerDoc() map[string]string {
