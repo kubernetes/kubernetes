@@ -300,14 +300,20 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 
-	// Overwrite kubeconfig context setting with KUBE_CONTEXT env var
-	if envContext := os.Getenv("KUBE_CONTEXT"); envContext != "" {
-		*kubeConfigFlags.Context = envContext
-	}
-
-	// Overwrite kubeconfig namespace setting with KUBE_NAMESPACE env var
-	if envNamespace := os.Getenv("KUBE_NAMESPACE"); envNamespace != "" {
-		*kubeConfigFlags.Namespace = envNamespace
+	// Overwrite Kube Config settings with environment variables if they exist
+	envContext := os.Getenv("KUBE_CONTEXT")
+	envNamespace := os.Getenv("KUBE_NAMESPACE")
+	if envNamespace != "" || envContext != "" {
+		// Warn the user that their Kube Config settings are being over written to reduce confusion
+		o.IOStreams.Out.Write([]byte("Warning: You are inheriting settings from environment variables.\n"))
+		if envNamespace != "" {
+			o.IOStreams.Out.Write([]byte(fmt.Sprintf("namespace = %s\n", envNamespace)))
+			*kubeConfigFlags.Namespace = envNamespace
+		}
+		if envContext != "" {
+			o.IOStreams.Out.Write([]byte(fmt.Sprintf("context = %s\n", envContext)))
+			*kubeConfigFlags.Context = envContext
+		}
 	}
 
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
