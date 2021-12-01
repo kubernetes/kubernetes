@@ -18,6 +18,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -333,13 +334,18 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return r.base.RoundTrip(req)
 	}
 
-	creds, err := r.a.getCreds()
+	creds, _, err := r.a.getCreds()
 	if err != nil {
 		return nil, fmt.Errorf("getting credentials: %v", err)
 	}
 	if creds.token != "" {
+		req = utilnet.CloneRequest(req)
 		req.Header.Set("Authorization", "Bearer "+creds.token)
 	}
+
+	// make it possible for r.a.cert to detect when creds have already been fetched
+	ctx := context.WithValue(req.Context(), credsKey, creds)
+	req = req.WithContext(ctx)
 
 	res, err := r.base.RoundTrip(req)
 	if err != nil {
@@ -347,40 +353,67 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if res.StatusCode == http.StatusUnauthorized {
 		if err := r.a.maybeRefreshCreds(creds); err != nil {
-			klog.Errorf("refreshing credentials: %v", err)
+			klog.ErrorS(err, "refreshing credentials")
 		}
 	}
 	return res, nil
 }
 
-func (a *Authenticator) credsExpired() bool {
+// contextKey type is unexported to prevent collisions.
+type contextKey int
+
+const credsKey contextKey = iota
+
+func (a *Authenticator) credsExpiredLocked() bool {
 	if a.exp.IsZero() {
 		return false
 	}
 	return a.now().After(a.exp)
 }
 
-func (a *Authenticator) cert() (*tls.Certificate, error) {
-	creds, err := a.getCreds()
+func (a *Authenticator) cert(ctx context.Context) (*tls.Certificate, error) {
+	// ensure a single exec plugin call per RoundTrip
+	if credsVal := ctx.Value(credsKey); credsVal != nil {
+		creds, ok := credsVal.(*credentials)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type stored in creds: %T", creds)
+		}
+		return creds.cert, nil
+	}
+
+	// fallback to fetching creds directly if we are not called via RoundTrip
+	creds, connClosed, err := a.getCreds()
 	if err != nil {
 		return nil, err
+	}
+	if connClosed {
+		// If we close the underlying TCP connection in the process of starting the TLS handshake,
+		// there is no point in letting the handshake continue.  At least this way we provide a
+		// better error message then "write tcp host:port->host:port use of closed network connection"
+		return nil, errors.New("failing TLS handshake due to certificate rotation")
 	}
 	return creds.cert, nil
 }
 
-func (a *Authenticator) getCreds() (*credentials, error) {
+// getCreds returns the current, unexpired cached credentials
+// or refreshes the credentials if they are expired or missing.
+// After a successful credential refresh, the returned boolean is true when
+// connections are closed due to the cached credential having a certificate
+// that is different from the latest certificate (i.e. certificate rotation).
+func (a *Authenticator) getCreds() (*credentials, bool, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if a.cachedCreds != nil && !a.credsExpired() {
-		return a.cachedCreds, nil
+	if a.cachedCreds != nil && !a.credsExpiredLocked() {
+		return a.cachedCreds, false, nil
 	}
 
-	if err := a.refreshCredsLocked(); err != nil {
-		return nil, err
+	connClosed, err := a.refreshCredsLocked()
+	if err != nil {
+		return nil, false, err
 	}
 
-	return a.cachedCreds, nil
+	return a.cachedCreds, connClosed, nil
 }
 
 // maybeRefreshCreds executes the plugin to force a rotation of the
@@ -396,15 +429,19 @@ func (a *Authenticator) maybeRefreshCreds(creds *credentials) error {
 		return nil
 	}
 
-	return a.refreshCredsLocked()
+	_, err := a.refreshCredsLocked()
+	return err
 }
 
 // refreshCredsLocked executes the plugin and reads the credentials from
 // stdout. It must be called while holding the Authenticator's mutex.
-func (a *Authenticator) refreshCredsLocked() error {
+// After a successful credential refresh, the returned boolean is true when
+// connections are closed due to the cached credential having a certificate
+// that is different from the latest certificate (i.e. certificate rotation).
+func (a *Authenticator) refreshCredsLocked() (bool, error) {
 	interactive, err := a.interactiveFunc()
 	if err != nil {
-		return fmt.Errorf("exec plugin cannot support interactive mode: %w", err)
+		return false, fmt.Errorf("exec plugin cannot support interactive mode: %w", err)
 	}
 
 	cred := &clientauthentication.ExecCredential{
@@ -419,7 +456,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 	env := append(a.environ(), a.env...)
 	data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
 	if err != nil {
-		return fmt.Errorf("encode ExecCredentials: %v", err)
+		return false, fmt.Errorf("encode ExecCredentials: %v", err)
 	}
 	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
 
@@ -435,26 +472,26 @@ func (a *Authenticator) refreshCredsLocked() error {
 	err = cmd.Run()
 	incrementCallsMetric(err)
 	if err != nil {
-		return a.wrapCmdRunErrorLocked(err)
+		return false, a.wrapCmdRunErrorLocked(err)
 	}
 
 	_, gvk, err := codecs.UniversalDecoder(a.group).Decode(stdout.Bytes(), nil, cred)
 	if err != nil {
-		return fmt.Errorf("decoding stdout: %v", err)
+		return false, fmt.Errorf("decoding stdout: %v", err)
 	}
 	if gvk.Group != a.group.Group || gvk.Version != a.group.Version {
-		return fmt.Errorf("exec plugin is configured to use API version %s, plugin returned version %s",
+		return false, fmt.Errorf("exec plugin is configured to use API version %s, plugin returned version %s",
 			a.group, schema.GroupVersion{Group: gvk.Group, Version: gvk.Version})
 	}
 
 	if cred.Status == nil {
-		return fmt.Errorf("exec plugin didn't return a status field")
+		return false, fmt.Errorf("exec plugin didn't return a status field")
 	}
 	if cred.Status.Token == "" && cred.Status.ClientCertificateData == "" && cred.Status.ClientKeyData == "" {
-		return fmt.Errorf("exec plugin didn't return a token or cert/key pair")
+		return false, fmt.Errorf("exec plugin didn't return a token or cert/key pair")
 	}
 	if (cred.Status.ClientCertificateData == "") != (cred.Status.ClientKeyData == "") {
-		return fmt.Errorf("exec plugin returned only certificate or key, not both")
+		return false, fmt.Errorf("exec plugin returned only certificate or key, not both")
 	}
 
 	if cred.Status.ExpirationTimestamp != nil {
@@ -469,7 +506,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 	if cred.Status.ClientKeyData != "" && cred.Status.ClientCertificateData != "" {
 		cert, err := tls.X509KeyPair([]byte(cred.Status.ClientCertificateData), []byte(cred.Status.ClientKeyData))
 		if err != nil {
-			return fmt.Errorf("failed parsing client key/certificate: %v", err)
+			return false, fmt.Errorf("failed parsing client key/certificate: %v", err)
 		}
 
 		// Leaf is initialized to be nil:
@@ -480,7 +517,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 		// certificate values.
 		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
 		if err != nil {
-			return fmt.Errorf("failed parsing client leaf certificate: %v", err)
+			return false, fmt.Errorf("failed parsing client leaf certificate: %v", err)
 		}
 		newCreds.cert = &cert
 	}
@@ -489,12 +526,14 @@ func (a *Authenticator) refreshCredsLocked() error {
 	a.cachedCreds = newCreds
 	// Only close all connections when TLS cert rotates. Token rotation doesn't
 	// need the extra noise.
+	var connClosed bool
 	if oldCreds != nil && !reflect.DeepEqual(oldCreds.cert, a.cachedCreds.cert) {
 		// Can be nil if the exec auth plugin only returned token auth.
 		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
 			metrics.ClientCertRotationAge.Observe(time.Since(oldCreds.cert.Leaf.NotBefore))
 		}
 		a.connTracker.CloseAll()
+		connClosed = true
 	}
 
 	expiry := time.Time{}
@@ -502,7 +541,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 		expiry = a.cachedCreds.cert.Leaf.NotAfter
 	}
 	expirationMetrics.set(a, expiry)
-	return nil
+	return connClosed, nil
 }
 
 // wrapCmdRunErrorLocked pulls out the code to construct a helpful error message

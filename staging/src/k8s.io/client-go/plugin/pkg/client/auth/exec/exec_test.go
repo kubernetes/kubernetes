@@ -18,6 +18,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -27,7 +28,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -813,7 +814,7 @@ func TestRefreshCreds(t *testing.T) {
 			a.stderr = stderr
 			a.environ = func() []string { return nil }
 
-			if err := a.refreshCredsLocked(); err != nil {
+			if _, err := a.refreshCredsLocked(); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
 				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
@@ -888,7 +889,7 @@ func TestRoundTripper(t *testing.T) {
 	}
 	a.environ = environ
 	a.now = now
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	tc := &transport.Config{}
 	if err := a.UpdateTransportConfig(tc); err != nil {
@@ -1002,7 +1003,7 @@ func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
 
 			// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
 			// transport config, in which case it takes precedence
-			cert := func() (*tls.Certificate, error) {
+			cert := func(context.Context) (*tls.Certificate, error) {
 				return nil, nil
 			}
 			tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
@@ -1051,23 +1052,23 @@ func TestTLSCredentials(t *testing.T) {
 		return []string{"TEST_OUTPUT=" + string(data)}
 	}
 	a.now = func() time.Time { return now }
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	// We're not interested in server's cert, this test is about client cert.
 	tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true}}
 	if err := a.UpdateTransportConfig(tc); err != nil {
 		t.Fatal(err)
 	}
+	rt, err := transport.New(tc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := http.Client{
+		Transport: rt,
+	}
 
 	get := func(t *testing.T, desc string, wantErr bool) {
 		t.Run(desc, func(t *testing.T) {
-			tlsCfg, err := transport.TLSConfigFor(tc)
-			if err != nil {
-				t.Fatal("TLSConfigFor:", err)
-			}
-			client := http.Client{
-				Transport: &http.Transport{TLSClientConfig: tlsCfg},
-			}
 			resp, err := client.Get(server.URL)
 			switch {
 			case err != nil && !wantErr:
@@ -1075,8 +1076,10 @@ func TestTLSCredentials(t *testing.T) {
 			case err == nil && wantErr:
 				t.Error("got nil client.Get error, want non-nil")
 			}
-			if err == nil {
-				resp.Body.Close()
+			if resp != nil && resp.Body != nil {
+				// drain and close body to reuse http keep-alive TCP connections
+				_, _ = io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
 			}
 		})
 	}
@@ -1134,7 +1137,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 	}
 	a.environ = environ
 	a.now = now
-	a.stderr = ioutil.Discard
+	a.stderr = io.Discard
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -1209,7 +1212,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 
 			count := 0
 			for i := 0; i < test.calls; i++ {
-				err := a.refreshCredsLocked()
+				_, err := a.refreshCredsLocked()
 				if strings.Contains(err.Error(), c.InstallHint) {
 					count++
 				}
@@ -1261,4 +1264,104 @@ func genClientCert(t *testing.T) ([]byte, []byte) {
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certRaw}),
 		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyRaw})
+}
+
+func TestTLSCredentialsCallsAndRotation(t *testing.T) {
+	now := time.Now()
+
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	}))
+	server.TLS = &tls.Config{
+		ClientAuth: tls.RequireAnyClientCert,
+	}
+	server.StartTLS()
+	defer server.Close()
+
+	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
+		Command:         "./testdata/test-plugin.sh",
+		APIVersion:      "client.authentication.k8s.io/v1beta1",
+		InteractiveMode: api.IfAvailableExecInteractiveMode,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var outputCalls int
+	a.environ = func() []string {
+		outputCalls++
+		cert, key := genClientCert(t)
+		output := &clientauthentication.ExecCredential{
+			Status: &clientauthentication.ExecCredentialStatus{
+				ClientCertificateData: string(cert),
+				ClientKeyData:         string(key),
+				ExpirationTimestamp:   &v1.Time{Time: now.Add(-3 * time.Hour)}, // force a cache miss
+			},
+		}
+		data, err := runtime.Encode(codecs.LegacyCodec(a.group), output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return []string{"TEST_OUTPUT=" + string(data)}
+	}
+	a.now = func() time.Time { return now }
+	a.stderr = io.Discard
+
+	caBundle := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: server.Certificate().Raw,
+	})
+	tc := &transport.Config{TLS: transport.TLSConfig{CAData: caBundle}}
+	if err := a.UpdateTransportConfig(tc); err != nil {
+		t.Fatal(err)
+	}
+	rt, err := transport.New(tc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var getCalls int
+	get := func(t *testing.T, name string, f transport.WrapperFunc, wantErr string) {
+		t.Run(name, func(t *testing.T) {
+			getCalls++
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := f(rt).RoundTrip(req)
+			if gotErr := errString(err); wantErr != gotErr {
+				t.Errorf("round trip error does not match: want=%q, got=%q", wantErr, gotErr)
+			}
+			if resp != nil && resp.Body != nil {
+				// drain and close body to reuse http keep-alive TCP connections
+				_, _ = io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+			}
+		})
+	}
+
+	// regular cert flow with cache miss
+	noWrap := func(rt http.RoundTripper) http.RoundTripper { return rt }
+	get(t, "valid TLS cert", noWrap, "")
+	get(t, "valid TLS cert again", noWrap, "")
+
+	// force every call to invoke the cert callback
+	// while uncommon, a server can disable keep-alives
+	server.Config.SetKeepAlivesEnabled(false)
+
+	// cause the round tripper to be skipped combined with cache miss and single connection
+	tokenWrap := func(rt http.RoundTripper) http.RoundTripper { return transport.NewBearerAuthRoundTripper("foo", rt) }
+	get(t, "valid TLS cert with token", tokenWrap, "failing TLS handshake due to certificate rotation")
+	get(t, "valid TLS cert again with token", tokenWrap, "failing TLS handshake due to certificate rotation")
+
+	if want, got := getCalls, outputCalls; want != got {
+		t.Errorf("unexpected exec call count: want=%d, got=%d", want, got)
+	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
 }

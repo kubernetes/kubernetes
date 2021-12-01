@@ -61,8 +61,8 @@ func certRotatingDialer(reload reloadFunc, dial utilnet.DialFunc) *dynamicClient
 }
 
 // loadClientCert calls the callback and rotates connections if needed
-func (c *dynamicClientCert) loadClientCert() (*tls.Certificate, error) {
-	cert, err := c.reload(nil)
+func (c *dynamicClientCert) loadClientCert(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	cert, err := c.reload(cri)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (c *dynamicClientCert) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(dsKey)
 
-	_, err := c.loadClientCert()
+	_, err := c.loadClientCert(nil)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true
@@ -171,6 +171,6 @@ func (c *dynamicClientCert) processNextWorkItem() bool {
 	return true
 }
 
-func (c *dynamicClientCert) GetClientCertificate(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
-	return c.loadClientCert()
+func (c *dynamicClientCert) GetClientCertificate(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	return c.loadClientCert(cri)
 }

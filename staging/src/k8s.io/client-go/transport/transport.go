@@ -105,7 +105,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 	}
 
 	if c.HasCertAuth() || c.HasCertCallback() {
-		tlsConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			// Note: static key/cert data always take precedence over cert
 			// callback.
 			if staticCert != nil {
@@ -116,7 +116,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 				return dynamicCertLoader()
 			}
 			if c.HasCertCallback() {
-				cert, err := c.TLS.GetCert()
+				cert, err := c.TLS.GetCert(certificateRequestInfoContext(cri))
 				if err != nil {
 					return nil, err
 				}
@@ -134,6 +134,14 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 	}
 
 	return tlsConfig, nil
+}
+
+func certificateRequestInfoContext(cri *tls.CertificateRequestInfo) context.Context {
+	if cri != nil && cri.Context() != nil { // can be nil, ex: when called through dynamicClientCert.processNextWorkItem
+		return cri.Context()
+	}
+
+	return context.Background() // always have a non-nil context
 }
 
 // loadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,

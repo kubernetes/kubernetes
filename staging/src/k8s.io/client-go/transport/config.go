@@ -143,5 +143,5 @@ type TLSConfig struct {
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
 
-	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
+	GetCert func(context.Context) (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
 }

@@ -152,7 +152,7 @@ func TestCallsMetric(t *testing.T) {
 		// Run refresh creds twice so that our test validates that the metrics are set correctly twice
 		// in a row with the same authenticator.
 		refreshCreds := func() {
-			if err := a.refreshCredsLocked(); (err == nil) != (exitCode == 0) {
+			if _, err := a.refreshCredsLocked(); (err == nil) != (exitCode == 0) {
 				if err != nil {
 					t.Fatalf("wanted no error, but got %q", err.Error())
 				} else {
@@ -182,7 +182,7 @@ func TestCallsMetric(t *testing.T) {
 			t.Fatal(err)
 		}
 		a.stderr = io.Discard
-		if err := a.refreshCredsLocked(); err == nil {
+		if _, err := a.refreshCredsLocked(); err == nil {
 			t.Fatal("expected the authenticator to fail because the plugin does not exist")
 		}
 		wantCallsMetrics = append(wantCallsMetrics, mockCallsMetric{exitCode: 1, errorType: "plugin_not_found_error"})
