@@ -142,6 +142,10 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(aggregatorscheme.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
+
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(aggregatorscheme.Scheme))
+	serverConfig.OpenAPIV3Config.Info.Title = "kube-aggregator"
+
 	// prevent generic API server from installing the OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
 	serverConfig.SkipOpenAPIInstallation = true

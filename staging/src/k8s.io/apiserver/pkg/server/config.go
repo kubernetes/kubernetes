@@ -171,6 +171,8 @@ type Config struct {
 	Serializer runtime.NegotiatedSerializer
 	// OpenAPIConfig will be used in generating OpenAPI spec. This is nil by default. Use DefaultOpenAPIConfig for "working" defaults.
 	OpenAPIConfig *openapicommon.Config
+	// OpenAPIV3Config will be used in generating OpenAPI V3 spec. This is nil by default. Use DefaultOpenAPIV3Config for "working" defaults.
+	OpenAPIV3Config *openapicommon.Config
 	// SkipOpenAPIInstallation avoids installing the OpenAPI handler if set to true.
 	SkipOpenAPIInstallation bool
 
@@ -399,6 +401,12 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 	}
 }
 
+func DefaultOpenAPIV3Config(getDefinitions openapicommon.GetOpenAPIDefinitions, defNamer *apiopenapi.DefinitionNamer) *openapicommon.Config {
+	defaultConfig := DefaultOpenAPIConfig(getDefinitions, defNamer)
+	defaultConfig.GetDefinitionName = defNamer.GetDefinitionNameV3
+	return defaultConfig
+}
+
 func (c *AuthenticationInfo) ApplyClientCert(clientCA dynamiccertificates.CAContentProvider, servingInfo *SecureServingInfo) error {
 	if servingInfo == nil {
 		return nil
@@ -491,23 +499,27 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
 
-	if c.OpenAPIConfig != nil {
-		if c.OpenAPIConfig.SecurityDefinitions != nil {
+	populateOpenAPI := func(config *openapicommon.Config) {
+		if config == nil {
+			return
+		}
+
+		if config.SecurityDefinitions != nil {
 			// Setup OpenAPI security: all APIs will have the same authentication for now.
-			c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
+			config.DefaultSecurity = []map[string][]string{}
 			keys := []string{}
-			for k := range *c.OpenAPIConfig.SecurityDefinitions {
+			for k := range *config.SecurityDefinitions {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
 			for _, k := range keys {
-				c.OpenAPIConfig.DefaultSecurity = append(c.OpenAPIConfig.DefaultSecurity, map[string][]string{k: {}})
+				config.DefaultSecurity = append(config.DefaultSecurity, map[string][]string{k: {}})
 			}
-			if c.OpenAPIConfig.CommonResponses == nil {
-				c.OpenAPIConfig.CommonResponses = map[int]spec.Response{}
+			if config.CommonResponses == nil {
+				config.CommonResponses = map[int]spec.Response{}
 			}
-			if _, exists := c.OpenAPIConfig.CommonResponses[http.StatusUnauthorized]; !exists {
-				c.OpenAPIConfig.CommonResponses[http.StatusUnauthorized] = spec.Response{
+			if _, exists := config.CommonResponses[http.StatusUnauthorized]; !exists {
+				config.CommonResponses[http.StatusUnauthorized] = spec.Response{
 					ResponseProps: spec.ResponseProps{
 						Description: "Unauthorized",
 					},
@@ -515,18 +527,21 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 			}
 		}
 
-		// make sure we populate info, and info.version, if not manually set
-		if c.OpenAPIConfig.Info == nil {
-			c.OpenAPIConfig.Info = &spec.Info{}
+		if config.Info == nil {
+			config.Info = &spec.Info{}
 		}
-		if c.OpenAPIConfig.Info.Version == "" {
+		if config.Info.Version == "" {
 			if c.Version != nil {
-				c.OpenAPIConfig.Info.Version = strings.Split(c.Version.String(), "-")[0]
+				config.Info.Version = strings.Split(c.Version.String(), "-")[0]
 			} else {
-				c.OpenAPIConfig.Info.Version = "unversioned"
+				config.Info.Version = "unversioned"
 			}
 		}
 	}
+
+	populateOpenAPI(c.OpenAPIConfig)
+	populateOpenAPI(c.OpenAPIV3Config)
+
 	if c.DiscoveryAddresses == nil {
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
@@ -603,6 +618,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		ExternalAddress:       c.ExternalAddress,
 
 		openAPIConfig:           c.OpenAPIConfig,
+		openAPIV3Config:         c.OpenAPIV3Config,
 		skipOpenAPIInstallation: c.SkipOpenAPIInstallation,
 
 		postStartHooks:         map[string]postStartHookEntry{},

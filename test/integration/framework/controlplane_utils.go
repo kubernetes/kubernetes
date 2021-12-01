@@ -106,9 +106,7 @@ func (h *APIServerHolder) SetAPIServer(m *controlplane.Instance) {
 	close(h.Initialized)
 }
 
-// DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
-func DefaultOpenAPIConfig() *openapicommon.Config {
-	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+func applyTestDefaultsToOpenAPIConfig(openAPIConfig *openapicommon.Config) {
 	openAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
@@ -121,7 +119,18 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 		},
 	}
 	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
+}
 
+// DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
+func DefaultOpenAPIConfig() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	applyTestDefaultsToOpenAPIConfig(openAPIConfig)
+	return openAPIConfig
+}
+
+func DefaultOpenAPIV3Config() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	applyTestDefaultsToOpenAPIConfig(openAPIConfig)
 	return openAPIConfig
 }
 

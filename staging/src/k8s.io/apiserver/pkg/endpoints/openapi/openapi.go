@@ -189,3 +189,50 @@ func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extension
 	}
 	return friendlyName(name), nil
 }
+
+// Input is canonical type name of expected model type for this definition.
+// Desired definition name is: GROUP.VERSION.KIND
+// If GVK is unable to be determined, the name/path is simply returned in
+//	reverse-DNS form.
+func (d *DefinitionNamer) GetDefinitionNameV3(name string) (string, spec.Extensions) {
+	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok &&
+		len(groupVersionKinds) > 0 {
+		// For readability, if GROUP is a DNS-style string, it will be
+		// reversed: batch.k8s.io v1 CronJob becomes io.k8s.batch.v1.CronJob
+
+		// It is not expected for there ever to be multiple GVKs for a single
+		// type, but if there is, it will not be fatal since this is just
+		// the name of the OpenAPI schema definition.
+		// We only truly rely that the returned definition is consistent, and
+		// unique.
+		gvk := groupVersionKinds[0]
+		group := gvk.Group
+
+		// If the group is an empty string then it is part of the core apigroup
+		if len(group) == 0 {
+			group = "core"
+		}
+
+		return friendlyName(fmt.Sprintf("%s/%s.%s", group, gvk.Version, gvk.Kind)),
+			spec.Extensions{
+				extensionGVK: groupVersionKinds.JSON(),
+			}
+	}
+
+	// This type is not known to the scheme. Its OpenAPI definition name will be
+	// a simple transformation of its canonical type name.
+	//
+	// CRDs will always hit this branch, since their Go types are not known to
+	// the scheme supplied to the definition namer. Instead the name supplied
+	// in the case of CRDs is determined by
+	// `CRDCanonicalTypeNamer` to be in the form GROUP/VERSION.KIND.
+	// `friendlyName` is able to transform that format into a reverse-dns
+	//	GROUP.VERSION.KIND
+	//
+	// If the type is not a CRD, and also not known to the scheme, it will hit
+	//	this branch. In this case, we can not know the GVK of the object, so
+	//	its path is used. An example of this case is:
+	// `io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails`, a type used as a
+	// field of a top-level object, but it does not itself have a GVK.
+	return friendlyName(name), nil
+}

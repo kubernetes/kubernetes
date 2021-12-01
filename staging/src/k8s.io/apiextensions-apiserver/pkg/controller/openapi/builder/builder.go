@@ -476,7 +476,7 @@ func withDescription(s spec.Schema, desc string) spec.Schema {
 func generateBuildDefinitionsFunc() {
 	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
 	definitionsV3 = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
-		defName, _ := namer.GetDefinitionName(name)
+		defName, _ := namer.GetDefinitionNameV3(name)
 		prefix := v3DefinitionPrefix
 		return spec.MustCreateRef(prefix + common.EscapeJsonPointer(defName))
 	})
@@ -535,7 +535,10 @@ func (b *builder) getOpenAPIConfig(v2 bool) *common.Config {
 		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
-			return namer.GetDefinitionName(name)
+			if v2 {
+				return namer.GetDefinitionName(name)
+			}
+			return namer.GetDefinitionNameV3(name)
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)

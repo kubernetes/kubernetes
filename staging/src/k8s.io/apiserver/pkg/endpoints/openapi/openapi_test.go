@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	openapitesting "k8s.io/apiserver/pkg/endpoints/openapi/testing"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -59,4 +60,41 @@ func TestGetDefinitionName(t *testing.T) {
 	n, e2 := namer.GetDefinitionName("test.com/another.Type")
 	assertEqual(t, "com.test.another.Type", n)
 	assertEqual(t, e2, spec.Extensions(nil))
+}
+
+// Tests the functionality of the OpenAPI v3 GetDefinitionNamev3 function of
+// the definition namer.
+func TestGetDefinitionNamev3(t *testing.T) {
+	testType := openapitesting.TestType{}
+
+	// Setup scheme
+	s := runtime.NewScheme()
+	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
+	authenticationv1.AddToScheme(s)
+
+	// Test a type known statically from this package
+	namer := NewDefinitionNamer(s)
+	n, e := namer.GetDefinitionNameV3("k8s.io/apiserver/pkg/endpoints/openapi/testing.TestType")
+	assertEqual(t, "test.v1.TestType", n)
+	assertEqual(t, []interface{}{
+		map[string]interface{}{
+			"group":   "test",
+			"version": "v1",
+			"kind":    "TestType",
+		},
+	}, e["x-kubernetes-group-version-kind"])
+
+	// Test a type not known statically like a CRD
+	n, e2 := namer.GetDefinitionNameV3("test.com/another.Type")
+	assertEqual(t, "com.test.another.Type", n)
+	assertEqual(t, e2, spec.Extensions(nil))
+
+	// Test a type known statically from k8s.io
+	n, e3 := namer.GetDefinitionNameV3("k8s.io/api/authentication/v1.TokenRequest")
+	assertEqual(t, "io.k8s.authentication.v1.TokenRequest", n)
+	assertEqual(t, []interface{}{map[string]interface{}{
+		"group":   authenticationv1.SchemeGroupVersion.Group,
+		"version": authenticationv1.SchemeGroupVersion.Version,
+		"kind":    reflect.TypeOf(&authenticationv1.TokenRequest{}).Elem().Name(),
+	}}, e3["x-kubernetes-group-version-kind"])
 }
