@@ -30,16 +30,10 @@ import (
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
-	info, err := ds.client.Info()
-	if err != nil {
-		klog.Errorf("Failed to get docker info: %v", err)
-		return nil, err
-	}
-
 	statsClient := &winstats.StatsClient{}
-	fsinfo, err := statsClient.GetDirFsInfo(info.DockerRootDir)
+	fsinfo, err := statsClient.GetDirFsInfo(ds.dockerRootDir)
 	if err != nil {
-		klog.Errorf("Failed to get dir fsInfo for %q: %v", info.DockerRootDir, err)
+		klog.Errorf("Failed to get dir fsInfo for %q: %v", ds.dockerRootDir, err)
 		return nil, err
 	}
 
@@ -48,7 +42,7 @@ func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInf
 			Timestamp: time.Now().UnixNano(),
 			UsedBytes: &runtimeapi.UInt64Value{Value: fsinfo.Usage},
 			FsId: &runtimeapi.FilesystemIdentifier{
-				Mountpoint: info.DockerRootDir,
+				Mountpoint: ds.dockerRootDir,
 			},
 		},
 	}
