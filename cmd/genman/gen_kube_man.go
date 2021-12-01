@@ -38,7 +38,7 @@ import (
 )
 
 func main() {
-	// use os.Args instead of "flags" because "flags" will mess up the man pages!
+	// use os.Args instead of "flags" because "flags" will mess up the man pages!!
 	path := "docs/man/man1"
 	module := ""
 	if len(os.Args) == 3 {
