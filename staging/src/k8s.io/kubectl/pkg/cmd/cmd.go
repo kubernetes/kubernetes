@@ -299,6 +299,17 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
+
+	// Overwrite kubeconfig context setting with KUBE_CONTEXT env var
+	if envContext := os.Getenv("KUBE_CONTEXT"); envContext != "" {
+		*kubeConfigFlags.Context = envContext
+	}
+
+	// Overwrite kubeconfig namespace setting with KUBE_NAMESPACE env var
+	if envNamespace := os.Getenv("KUBE_NAMESPACE"); envNamespace != "" {
+		*kubeConfigFlags.Namespace = envNamespace
+	}
+
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
 
