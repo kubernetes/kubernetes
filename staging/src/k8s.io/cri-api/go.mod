@@ -20,6 +20,6 @@ require (
 )
 
 replace (
-	google.golang.org/grpc => google.golang.org/grpc v1.40.0
+	google.golang.org/grpc => google.golang.org/grpc v1.42.0
 	k8s.io/cri-api => ../cri-api
 )
