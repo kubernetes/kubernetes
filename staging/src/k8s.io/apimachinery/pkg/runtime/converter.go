@@ -722,7 +722,7 @@ func mapToUnstructured(sv, dv reflect.Value) error {
 		dt = dv.Type()
 	}
 	if dt.Kind() != reflect.Map {
-		return fmt.Errorf("cannot convert struct to: %v", dt.Kind())
+		return fmt.Errorf("cannot convert map to: %v", dt.Kind())
 	}
 
 	if !st.Key().AssignableTo(dt.Key()) && !st.Key().ConvertibleTo(dt.Key()) {
