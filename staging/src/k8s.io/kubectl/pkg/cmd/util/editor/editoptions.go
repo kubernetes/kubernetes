@@ -838,7 +838,7 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 		return fmt.Sprintf("error: %s %q is invalid", resourceString, info.Name)
 	case apierrors.IsNotFound(err):
 		r.notfound++
-		return fmt.Sprintf("error: %s %q could not be found on the server", resourceString, info.Name)
+		return fmt.Sprintf("error: %s %q could not be patched: %v", resourceString, info.Name, err)
 	default:
 		r.retryable++
 		return fmt.Sprintf("error: %s %q could not be patched: %v", resourceString, info.Name, err)
