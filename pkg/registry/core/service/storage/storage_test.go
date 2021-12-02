@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
@@ -31,6 +30,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	netutils "k8s.io/utils/net"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -421,7 +421,7 @@ func TestServiceDefaultOnRead(t *testing.T) {
 				ResourcePrefix:          "services",
 			}
 
-			_, cidr, err := net.ParseCIDR("10.0.0.0/24")
+			_, cidr, err := netutils.ParseCIDRSloppy("10.0.0.0/24")
 			if err != nil {
 				t.Fatalf("failed to parse CIDR")
 			}
@@ -479,7 +479,7 @@ func TestServiceDefaulting(t *testing.T) {
 			ResourcePrefix:          "services",
 		}
 
-		_, cidr, err := net.ParseCIDR(primaryCIDR)
+		_, cidr, err := netutils.ParseCIDRSloppy(primaryCIDR)
 		if err != nil {
 			t.Fatalf("failed to parse CIDR %s", primaryCIDR)
 		}

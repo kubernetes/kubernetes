@@ -30,6 +30,7 @@ import (
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	netutils "k8s.io/utils/net"
 
 	certutil "k8s.io/client-go/util/cert"
 )
@@ -46,7 +47,7 @@ var (
 			CommonName:   "test-common-name",
 			Organization: []string{"sig-cluster-lifecycle"},
 			AltNames: certutil.AltNames{
-				IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 				DNSNames: []string{"test-domain.space"},
 			},
 			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
@@ -234,7 +235,7 @@ func TestCertToConfig(t *testing.T) {
 		CommonName:   "test-common-name",
 		Organization: []string{"sig-cluster-lifecycle"},
 		AltNames: certutil.AltNames{
-			IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+			IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 			DNSNames: []string{"test-domain.space"},
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
@@ -247,7 +248,7 @@ func TestCertToConfig(t *testing.T) {
 		},
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		DNSNames:    []string{"test-domain.space"},
-		IPAddresses: []net.IP{net.ParseIP("10.100.0.1")},
+		IPAddresses: []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 	}
 
 	cfg := certToConfig(cert)

@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	netutils "k8s.io/utils/net"
 
 	// install all APIs
 	_ "k8s.io/kubernetes/pkg/controlplane"
@@ -68,7 +69,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatal(err)
 	}
 
-	_, defaultServiceClusterIPRange, err := net.ParseCIDR("10.0.0.0/24")
+	_, defaultServiceClusterIPRange, err := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}

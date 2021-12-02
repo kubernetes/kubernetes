@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -24,7 +25,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	goruntime "runtime"
 	"strings"
 	"time"
@@ -65,7 +65,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -177,7 +177,7 @@ func newProxyServer(
 	klog.V(2).Info("DetectLocalMode: '", string(detectLocalMode), "'")
 
 	primaryProtocol := utiliptables.ProtocolIPv4
-	if utilsnet.IsIPv6(nodeIP) {
+	if netutils.IsIPv6(nodeIP) {
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
 	iptInterface = utiliptables.New(execer, primaryProtocol)
@@ -350,7 +350,7 @@ func newProxyServer(
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(
 			userspace.NewLoadBalancerRR(),
-			net.ParseIP(config.BindAddress),
+			netutils.ParseIPSloppy(config.BindAddress),
 			iptInterface,
 			execer,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
@@ -504,7 +504,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 		// localDetectors, like ipt, need to be of the order [IPv4, IPv6], but PodCIDRs is setup so that PodCIDRs[0] == PodCIDR.
 		// so have to handle the case where PodCIDR can be IPv6 and set that to localDetectors[1]
-		if utilsnet.IsIPv6CIDRString(nodeInfo.Spec.PodCIDR) {
+		if netutils.IsIPv6CIDRString(nodeInfo.Spec.PodCIDR) {
 			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt[1])
 			if err != nil {
 				return localDetectors, err
@@ -538,7 +538,7 @@ func cidrTuple(cidrList string) [2]string {
 	foundIPv6 := false
 
 	for _, cidr := range strings.Split(cidrList, ",") {
-		if utilsnet.IsIPv6CIDRString(cidr) && !foundIPv6 {
+		if netutils.IsIPv6CIDRString(cidr) && !foundIPv6 {
 			cidrs[1] = cidr
 			foundIPv6 = true
 		} else if !foundIPv4 {

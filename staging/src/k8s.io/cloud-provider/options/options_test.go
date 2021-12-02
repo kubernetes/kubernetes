@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ import (
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
+	netutils "k8s.io/utils/net"
 )
 
 func TestDefaultFlags(t *testing.T) {
@@ -92,7 +92,7 @@ func TestDefaultFlags(t *testing.T) {
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10258,
-			BindAddress: net.ParseIP("0.0.0.0"),
+			BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "",
 				PairName:      "cloud-controller-manager",
@@ -100,7 +100,7 @@ func TestDefaultFlags(t *testing.T) {
 			HTTP2MaxStreamsPerConnection: 0,
 		}).WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP("0.0.0.0"),
+			BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 			BindPort:    int(0),
 			BindNetwork: "tcp",
 		}).WithLoopback(),
@@ -231,7 +231,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
-			BindAddress: net.ParseIP("192.168.4.21"),
+			BindAddress: netutils.ParseIPSloppy("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "/a/b/c",
 				PairName:      "cloud-controller-manager",
@@ -239,7 +239,7 @@ func TestAddFlags(t *testing.T) {
 			HTTP2MaxStreamsPerConnection: 47,
 		}).WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP("192.168.4.10"),
+			BindAddress: netutils.ParseIPSloppy("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
 		}).WithLoopback(),

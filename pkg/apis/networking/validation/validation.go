@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"net"
 	"strings"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -36,6 +35,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -341,7 +341,7 @@ func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.
 	for i, ih := range ingressRules {
 		wildcardHost := false
 		if len(ih.Host) > 0 {
-			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
+			if isIP := (netutils.ParseIPSloppy(ih.Host) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
 			}
 			// TODO: Ports and ips are allowed in the host part of a url

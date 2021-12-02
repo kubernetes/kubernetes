@@ -1,3 +1,4 @@
+//go:build windows && !dockerless
 // +build windows,!dockerless
 
 /*

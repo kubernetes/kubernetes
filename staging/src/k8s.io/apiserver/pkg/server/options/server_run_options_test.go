@@ -17,12 +17,12 @@ limitations under the License.
 package options
 
 import (
-	"net"
 	"strings"
 	"testing"
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	netutils "k8s.io/utils/net"
 )
 
 func TestServerRunOptionsValidate(t *testing.T) {
@@ -34,7 +34,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when MaxRequestsInFlight is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         -400,
 				MaxMutatingRequestsInFlight: 200,
@@ -48,7 +48,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when MaxMutatingRequestsInFlight is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: -200,
@@ -62,7 +62,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when RequestTimeout is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -76,7 +76,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when MinRequestTimeout is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -90,7 +90,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when JSONPatchMaxCopyBytes is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -104,7 +104,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when MaxRequestBodyBytes is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -118,7 +118,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when LivezGracePeriod is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -133,7 +133,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when MinimalShutdownDuration is negative value",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -148,7 +148,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when HSTSHeaders is valid",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				HSTSDirectives:              []string{"fakevalue", "includeSubDomains", "preload"},
 				MaxRequestsInFlight:         400,
@@ -163,7 +163,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 		{
 			name: "Test when ServerRunOptions is valid",
 			testOptions: &ServerRunOptions{
-				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
 				MaxRequestsInFlight:         400,

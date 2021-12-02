@@ -24,7 +24,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -83,12 +83,12 @@ type Range struct {
 
 // NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
-	max := utilnet.RangeSize(cidr)
-	base := utilnet.BigForIP(cidr.IP)
+	max := netutils.RangeSize(cidr)
+	base := netutils.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
 	var family api.IPFamily
 
-	if utilnet.IsIPv6CIDR(cidr) {
+	if netutils.IsIPv6CIDR(cidr) {
 		family = api.IPv6Protocol
 		// Limit the max size, since the allocator keeps a bitmap of that size.
 		if max > 65536 {
@@ -124,7 +124,7 @@ func NewCIDRRange(cidr *net.IPNet) (*Range, error) {
 
 // NewFromSnapshot allocates a Range and initializes it from a snapshot.
 func NewFromSnapshot(snap *api.RangeAllocation) (*Range, error) {
-	_, ipnet, err := net.ParseCIDR(snap.Range)
+	_, ipnet, err := netutils.ParseCIDRSloppy(snap.Range)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (r *Range) AllocateNext() (net.IP, error) {
 	if !ok {
 		return nil, ErrFull
 	}
-	return utilnet.AddIPOffset(r.base, offset), nil
+	return netutils.AddIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -208,7 +208,7 @@ func (r *Range) Release(ip net.IP) error {
 // ForEach calls the provided function for each allocated IP.
 func (r *Range) ForEach(fn func(net.IP)) {
 	r.alloc.ForEach(func(offset int) {
-		ip, _ := utilnet.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
+		ip, _ := netutils.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
 		fn(ip)
 	})
 }
@@ -274,5 +274,5 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
-	return int(big.NewInt(0).Sub(utilnet.BigForIP(ip), base).Int64())
+	return int(big.NewInt(0).Sub(netutils.BigForIP(ip), base).Int64())
 }

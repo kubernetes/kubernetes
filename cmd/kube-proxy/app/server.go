@@ -86,7 +86,7 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -828,13 +828,13 @@ func (s *ProxyServer) CleanupAndExit() error {
 // 2. the primary IP from the Node object, if set
 // 3. if no IP is found it defaults to 127.0.0.1 and IPv4
 func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
-	nodeIP := net.ParseIP(bindAddress)
+	nodeIP := netutils.ParseIPSloppy(bindAddress)
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if nodeIP == nil {
 		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = net.ParseIP("127.0.0.1")
+		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 	return nodeIP
 }
@@ -845,8 +845,8 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 func nodeIPTuple(bindAddress string) [2]net.IP {
 	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
 
-	adr := net.ParseIP(bindAddress)
-	if utilsnet.IsIPv6(adr) {
+	adr := netutils.ParseIPSloppy(bindAddress)
+	if netutils.IsIPv6(adr) {
 		nodes[1] = adr
 	} else {
 		nodes[0] = adr

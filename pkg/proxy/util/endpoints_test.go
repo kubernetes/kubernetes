@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"net"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 )
 
 func TestIPPart(t *testing.T) {
@@ -112,7 +113,7 @@ func TestToCIDR(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ip := net.ParseIP(tc.ip)
+		ip := netutils.ParseIPSloppy(tc.ip)
 		addr := ToCIDR(ip)
 		if addr != tc.expectedAddr {
 			t.Errorf("Unexpected host address for %s: Expected: %s, Got %s", tc.ip, tc.expectedAddr, addr)

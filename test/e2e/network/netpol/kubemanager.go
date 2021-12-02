@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -73,7 +74,7 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 			if err != nil {
 				return err
 			}
-			if net.ParseIP(svc.Spec.ClusterIP) == nil {
+			if netutils.ParseIPSloppy(svc.Spec.ClusterIP) == nil {
 				return fmt.Errorf("empty IP address found for service %s/%s", svc.Namespace, svc.Name)
 			}
 			pod.ServiceIP = svc.Spec.ClusterIP

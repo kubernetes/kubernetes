@@ -51,7 +51,7 @@ import (
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -285,7 +285,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		var expExecs int
 		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			isIPv6 := func(ip string) bool {
-				netIP := net.ParseIP(ip)
+				netIP := netutils.ParseIPSloppy(ip)
 				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
@@ -428,7 +428,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 		var expExecs int
 		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			isIPv6 := func(ip string) bool {
-				netIP := net.ParseIP(ip)
+				netIP := netutils.ParseIPSloppy(ip)
 				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
@@ -471,12 +471,12 @@ func (f *fakeCloseable) Close() error {
 
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
-	openPorts []*utilnet.LocalPort
+	openPorts []*netutils.LocalPort
 }
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilnet.LocalPort) (utilnet.Closeable, error) {
+func (f *fakePortOpener) OpenLocalPort(lp *netutils.LocalPort) (netutils.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return &fakeCloseable{}, nil
 }
@@ -501,8 +501,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		masqueradeMark:           "0x4000",
 		localDetector:            detectLocal,
 		hostname:                 testHostname,
-		portsMap:                 make(map[utilnet.LocalPort]utilnet.Closeable),
-		portMapper:               &fakePortOpener{[]*utilnet.LocalPort{}},
+		portsMap:                 make(map[netutils.LocalPort]netutils.Closeable),
+		portMapper:               &fakePortOpener{[]*netutils.LocalPort{}},
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
@@ -1123,9 +1123,9 @@ func TestNodePort(t *testing.T) {
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
 	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{&net.IPNet{IP: net.ParseIP("::1/128"), Mask: net.CIDRMask(128, 128)}}
+	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1/128"), Mask: net.CIDRMask(128, 128)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{}
@@ -1175,9 +1175,9 @@ func TestHealthCheckNodePort(t *testing.T) {
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
 	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{&net.IPNet{IP: net.ParseIP("::1"), Mask: net.CIDRMask(128, 128)}}
+	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{"127.0.0.1/16"}
@@ -1615,7 +1615,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("10.20.30.51"), Mask: net.CIDRMask(24, 32)}}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.nodePortAddresses = []string{"10.20.30.0/24"}
 

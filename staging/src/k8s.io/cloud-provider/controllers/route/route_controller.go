@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -340,7 +341,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 }
 
 func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) bool {
-	_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(route.DestinationCIDR)
 	if err != nil {
 		klog.Errorf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
 		return false

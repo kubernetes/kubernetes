@@ -26,6 +26,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	netutils "k8s.io/utils/net"
 )
 
 // CombinedInsecureServingOptions sets up to two insecure listeners for healthz and metrics. The flags
@@ -78,11 +79,11 @@ func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, c
 
 	if o.Healthz != nil {
 		o.Healthz.BindPort = o.BindPort
-		o.Healthz.BindAddress = net.ParseIP(o.BindAddress)
+		o.Healthz.BindAddress = netutils.ParseIPSloppy(o.BindAddress)
 	}
 	if o.Metrics != nil {
 		o.Metrics.BindPort = o.BindPort
-		o.Metrics.BindAddress = net.ParseIP(o.BindAddress)
+		o.Metrics.BindAddress = netutils.ParseIPSloppy(o.BindAddress)
 	}
 
 	return o.applyTo(c, componentConfig)
@@ -125,7 +126,7 @@ func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.Depr
 	} else {
 		// In the previous `validate` process, we can ensure that the `addr` is legal, so ignore the error
 		host, portInt, _ := splitHostIntPort(addr)
-		is.BindAddress = net.ParseIP(host)
+		is.BindAddress = netutils.ParseIPSloppy(host)
 		is.BindPort = portInt
 	}
 }
@@ -142,7 +143,7 @@ func (o *CombinedInsecureServingOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", o.BindPort))
 	}
 
-	if len(o.BindAddress) > 0 && net.ParseIP(o.BindAddress) == nil {
+	if len(o.BindAddress) > 0 && netutils.ParseIPSloppy(o.BindAddress) == nil {
 		errors = append(errors, fmt.Errorf("--address %v is an invalid IP address", o.BindAddress))
 	}
 

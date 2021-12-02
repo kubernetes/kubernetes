@@ -18,11 +18,11 @@ package netpol
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	netutils "k8s.io/utils/net"
 )
 
 // decouple us from k8smanager.go
@@ -95,7 +95,7 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
 		podFrom := job.PodFrom
-		if net.ParseIP(job.PodTo.ServiceIP) == nil {
+		if netutils.ParseIPSloppy(job.PodTo.ServiceIP) == nil {
 			results <- &ProbeJobResults{
 				Job:         job,
 				IsConnected: false,

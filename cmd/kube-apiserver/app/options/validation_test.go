@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 )
 
 func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *ServerRunOptions {
@@ -33,14 +34,14 @@ func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *Serv
 
 	var primaryCIDR, secondaryCIDR net.IPNet
 	if len(serviceCIDR) > 0 {
-		_, cidr, _ := net.ParseCIDR(serviceCIDR)
+		_, cidr, _ := netutils.ParseCIDRSloppy(serviceCIDR)
 		if cidr != nil {
 			primaryCIDR = *(cidr)
 		}
 	}
 
 	if len(secondaryServiceCIDR) > 0 {
-		_, cidr, _ := net.ParseCIDR(secondaryServiceCIDR)
+		_, cidr, _ := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 		if cidr != nil {
 			secondaryCIDR = *(cidr)
 		}
@@ -151,7 +152,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 }
 
 func getIPnetFromCIDR(cidr string) *net.IPNet {
-	_, ipnet, _ := net.ParseCIDR(cidr)
+	_, ipnet, _ := netutils.ParseCIDRSloppy(cidr)
 	return ipnet
 }
 
