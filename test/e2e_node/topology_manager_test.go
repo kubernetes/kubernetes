@@ -519,6 +519,15 @@ type sriovData struct {
 }
 
 func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sriovData {
+	sd := createSRIOVConfigOrFail(f, configMap)
+
+	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+
+	sd.pod = createSRIOVPodOrFail(f)
+	return sd
+}
+
+func createSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sriovData {
 	var err error
 
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
@@ -536,8 +545,13 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 		framework.Failf("unable to create test serviceAccount %s: %v", serviceAccount.Name, err)
 	}
 
-	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+	return &sriovData{
+		configMap:      configMap,
+		serviceAccount: serviceAccount,
+	}
+}
 
+func createSRIOVPodOrFail(f *framework.Framework) *v1.Pod {
 	dp := getSRIOVDevicePluginPod()
 	dp.Spec.NodeName = framework.TestContext.NodeName
 
@@ -550,11 +564,7 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 	}
 	framework.ExpectNoError(err)
 
-	return &sriovData{
-		configMap:      configMap,
-		serviceAccount: serviceAccount,
-		pod:            dpPod,
-	}
+	return dpPod
 }
 
 // waitForSRIOVResources waits until enough SRIOV resources are avaailable, expecting to complete within the timeout.
@@ -574,7 +584,7 @@ func waitForSRIOVResources(f *framework.Framework, sd *sriovData) {
 	framework.Logf("Detected SRIOV allocatable devices name=%q amount=%d", sd.resourceName, sd.resourceAmount)
 }
 
-func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+func deleteSRIOVPodOrFail(f *framework.Framework, sd *sriovData) {
 	var err error
 	gp := int64(0)
 	deleteOptions := metav1.DeleteOptions{
@@ -585,6 +595,14 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForAllContainerRemoval(sd.pod.Name, sd.pod.Namespace)
+}
+
+func removeSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+	var err error
+	gp := int64(0)
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
 	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, deleteOptions)
@@ -593,6 +611,11 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
 	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, deleteOptions)
 	framework.ExpectNoError(err)
+}
+
+func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+	deleteSRIOVPodOrFail(f, sd)
+	removeSRIOVConfigOrFail(f, sd)
 }
 
 func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
