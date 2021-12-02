@@ -16,11 +16,6 @@ rules:
       dir: staging/src/k8s.io/code-generator
     name: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/code-generator
-    name: release-1.19
-    go: 1.15.15
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/code-generator
     name: release-1.20
@@ -47,11 +42,6 @@ rules:
       branch: master
       dir: staging/src/k8s.io/apimachinery
     name: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/apimachinery
-    name: release-1.19
-    go: 1.15.15
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/apimachinery
@@ -82,14 +72,6 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/api
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-      - repository: apimachinery
-        branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/api
@@ -134,20 +116,6 @@ rules:
       branch: master
     - repository: api
       branch: master
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod ./...
-      go test -mod=mod ./...
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/client-go
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-      - repository: apimachinery
-        branch: release-1.19
-      - repository: api
-        branch: release-1.19
     smoke-test: |
       # assumes GO111MODULE=on
       go build -mod=mod ./...
@@ -222,18 +190,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/component-base
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/component-base
@@ -361,20 +317,6 @@ rules:
     - repository: component-base
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/apiserver
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/apiserver
     name: release-1.20
@@ -449,24 +391,6 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kube-aggregator
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: apiserver
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kube-aggregator
@@ -558,29 +482,6 @@ rules:
       branch: master
     - repository: component-base
       branch: master
-    required-packages:
-    - k8s.io/code-generator
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod .
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/sample-apiserver
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: apiserver
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
     required-packages:
     - k8s.io/code-generator
     smoke-test: |
@@ -699,25 +600,6 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/sample-controller
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
-    required-packages:
-    - k8s.io/code-generator
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod .
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/sample-controller
     name: release-1.20
@@ -812,26 +694,6 @@ rules:
       branch: master
     - repository: component-base
       branch: master
-    required-packages:
-    - k8s.io/code-generator
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/apiextensions-apiserver
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: apiserver
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
     required-packages:
     - k8s.io/code-generator
   - source:
@@ -931,20 +793,6 @@ rules:
     - repository: code-generator
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/metrics
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/metrics
     name: release-1.20
@@ -1015,18 +863,6 @@ rules:
     - repository: client-go
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/cli-runtime
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/cli-runtime
     name: release-1.20
@@ -1090,20 +926,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/sample-cli-plugin
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: cli-runtime
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/sample-cli-plugin
@@ -1177,20 +999,6 @@ rules:
     - repository: client-go
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kube-proxy
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kube-proxy
     name: release-1.20
@@ -1263,20 +1071,6 @@ rules:
     - repository: component-base
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kubelet
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kubelet
     name: release-1.20
@@ -1348,20 +1142,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kube-scheduler
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kube-scheduler
@@ -1436,11 +1216,6 @@ rules:
       branch: master
     - repository: apiserver
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/controller-manager
-    name: release-1.19
-    go: 1.15.15
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/controller-manager
@@ -1527,22 +1302,6 @@ rules:
       branch: master
     - repository: component-helpers
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/cloud-provider
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: component-helpers
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/cloud-provider
@@ -1648,22 +1407,6 @@ rules:
     - repository: component-helpers
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kube-controller-manager
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: component-helpers
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kube-controller-manager
     name: release-1.20
@@ -1764,16 +1507,6 @@ rules:
     - repository: api
       branch: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/cluster-bootstrap
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: api
-      branch: release-1.19
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/cluster-bootstrap
     name: release-1.20
@@ -1825,22 +1558,6 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/csi-translation-lib
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: cloud-provider
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/csi-translation-lib
@@ -1936,28 +1653,6 @@ rules:
       branch: master
     - repository: component-helpers
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/legacy-cloud-providers
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: cloud-provider
-      branch: release-1.19
-    - repository: csi-translation-lib
-      branch: release-1.19
-    - repository: apiserver
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: component-helpers
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/legacy-cloud-providers
@@ -2066,11 +1761,6 @@ rules:
       dir: staging/src/k8s.io/cri-api
     name: master
   - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/cri-api
-    name: release-1.19
-    go: 1.15.15
-  - source:
       branch: release-1.20
       dir: staging/src/k8s.io/cri-api
     name: release-1.20
@@ -2114,26 +1804,6 @@ rules:
       branch: master
     - repository: metrics
       branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/kubectl
-    name: release-1.19
-    go: 1.15.15
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: cli-runtime
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: code-generator
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-    - repository: metrics
-      branch: release-1.19
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/kubectl
