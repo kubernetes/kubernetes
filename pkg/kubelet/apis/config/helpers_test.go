@@ -218,7 +218,6 @@ var (
 		"Logging.Options.JSON.InfoBufferSize.Quantity.i.value",
 		"Logging.Options.JSON.InfoBufferSize.Quantity.s",
 		"Logging.Options.JSON.SplitStream",
-		"Logging.Sanitization",
 		"Logging.VModule[*].FilePattern",
 		"Logging.VModule[*].Verbosity",
 		"Logging.Verbosity",

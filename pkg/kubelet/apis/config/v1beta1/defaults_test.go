@@ -235,7 +235,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
@@ -333,7 +332,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:  utilpointer.Bool(false),
 				ReservedMemory:          []v1beta1.MemoryReservation{},
@@ -476,7 +474,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -623,7 +620,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
