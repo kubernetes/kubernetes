@@ -559,7 +559,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.It("should create unbound pv count metrics for pvc controller after creating pv only",
 			func() {
 				var err error
-				pv, err = e2epv.CreatePV(c, pv)
+				pv, err = e2epv.CreatePV(c, f.Timeouts, pv)
 				framework.ExpectNoError(err, "Error creating pv: %v", err)
 				waitForPVControllerSync(metricsGrabber, unboundPVKey, classKey)
 				validator([]map[string]int64{nil, {className: 1}, nil, nil})
@@ -577,7 +577,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.It("should create bound pv/pvc count metrics for pvc controller after creating both pv and pvc",
 			func() {
 				var err error
-				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err, "Error creating pv pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
 				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)
@@ -588,7 +588,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			func() {
 				var err error
 				dimensions := []string{pluginNameKey, volumeModeKey}
-				pv, err = e2epv.CreatePV(c, pv)
+				pv, err = e2epv.CreatePV(c, f.Timeouts, pv)
 				framework.ExpectNoError(err, "Error creating pv: %v", err)
 				waitForPVControllerSync(metricsGrabber, totalPVKey, pluginNameKey)
 				controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
