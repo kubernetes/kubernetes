@@ -41,6 +41,8 @@ import (
 
 const (
 	errStrLbNoHosts = "cannot EnsureLoadBalancer() with no hosts"
+
+	ELBRbsFinalizer = "gke.networking.io/l4-netlb-v2"
 )
 
 // ensureExternalLoadBalancer is the external implementation of LoadBalancer.EnsureLoadBalancer.
@@ -54,6 +56,10 @@ const (
 func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	// Skip service handling if managed by ingress-gce using Regional Backend Services
 	if val, ok := apiService.Annotations[RBSAnnotationKey]; ok && val == RBSEnabled {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+	// Skip service handling if service has Regional Backend Services finalizer
+	if hasFinalizer(apiService, ELBRbsFinalizer) {
 		return nil, cloudprovider.ImplementedElsewhere
 	}
 
