@@ -208,7 +208,7 @@ spec:
         command:
         - "257"
       failureThreshold: -181693648
-      gRPC:
+      grpc:
         port: 1832870128
         service: "263"
       httpGet:
@@ -239,7 +239,7 @@ spec:
         command:
         - "264"
       failureThreshold: 1507815593
-      gRPC:
+      grpc:
         port: 1584001904
         service: "271"
       httpGet:
@@ -294,7 +294,7 @@ spec:
         command:
         - "272"
       failureThreshold: 790462391
-      gRPC:
+      grpc:
         port: 1919527626
         service: "278"
       httpGet:
@@ -407,7 +407,7 @@ spec:
         command:
         - "330"
       failureThreshold: 591440053
-      gRPC:
+      grpc:
         port: 582041100
         service: "336"
       httpGet:
@@ -438,7 +438,7 @@ spec:
         command:
         - "337"
       failureThreshold: -1471289102
-      gRPC:
+      grpc:
         port: -125932767
         service: "344"
       httpGet:
@@ -493,7 +493,7 @@ spec:
         command:
         - "345"
       failureThreshold: 303592056
-      gRPC:
+      grpc:
         port: -2146674095
         service: "353"
       httpGet:
@@ -604,7 +604,7 @@ spec:
         command:
         - "183"
       failureThreshold: 2110181803
-      gRPC:
+      grpc:
         port: 1843670786
         service: "190"
       httpGet:
@@ -635,7 +635,7 @@ spec:
         command:
         - "191"
       failureThreshold: -288563359
-      gRPC:
+      grpc:
         port: -1996616480
         service: "198"
       httpGet:
@@ -690,7 +690,7 @@ spec:
         command:
         - "199"
       failureThreshold: -1126738259
-      gRPC:
+      grpc:
         port: 1154560741
         service: "207"
       httpGet:

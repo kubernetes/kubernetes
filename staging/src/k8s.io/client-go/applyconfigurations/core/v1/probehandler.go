@@ -24,7 +24,7 @@ type ProbeHandlerApplyConfiguration struct {
 	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
 	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
-	GRPC      *GRPCActionApplyConfiguration      `json:"gRPC,omitempty"`
+	GRPC      *GRPCActionApplyConfiguration      `json:"grpc,omitempty"`
 }
 
 // ProbeHandlerApplyConfiguration constructs an declarative configuration of the ProbeHandler type for use with
