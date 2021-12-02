@@ -36,21 +36,6 @@ Expected output:
 {"ts":1624215726270.8428,"caller":"cmd/logger.go:64","msg":"Log with sensitive key, data: {\"secret\"}\n","v":0}
 ```
 
-## Logging sanitization
-
-```console
-go run ./staging/src/k8s.io/component-base/logs/example/cmd/logger.go --experimental-logging-sanitization
-```
-
-Expected output:
-```
-I0605 22:04:02.019609 3229645 logger.go:58] Log using Infof, key: value
-I0605 22:04:02.019677 3229645 logger.go:59] "Log using InfoS" key="value"
-E0605 22:04:02.019698 3229645 logger.go:61] Log using Errorf, err: fail
-E0605 22:04:02.019709 3229645 logger.go:62] "Log using ErrorS" err="fail"
-I0605 22:04:02.019714 3229645 logger.go:64] Log message has been redacted. Log argument #0 contains: [secret-key]
-```
-
 ## Verbosity
 
 ```console

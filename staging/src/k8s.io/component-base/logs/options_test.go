@@ -33,14 +33,12 @@ func TestFlags(t *testing.T) {
 	o.AddFlags(fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
-	want := `      --experimental-logging-sanitization   [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-                                            Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.
-      --log-flush-frequency duration        Maximum number of seconds between log flushes (default 5s)
-      --logging-format string               Sets the log format. Permitted formats: "text".
-                                            Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --one-output, --skip-headers, --skip-log-headers, --stderrthreshold, --vmodule.
-                                            Non-default choices are currently alpha and subject to change without warning. (default "text")
-  -v, --v Level                             number for the log level verbosity
-      --vmodule pattern=N,...               comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+	want := `      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
+      --logging-format string          Sets the log format. Permitted formats: "text".
+                                       Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --one-output, --skip-headers, --skip-log-headers, --stderrthreshold, --vmodule.
+                                       Non-default choices are currently alpha and subject to change without warning. (default "text")
+  -v, --v Level                        number for the log level verbosity
+      --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
 `
 	if !assert.Equal(t, want, output.String()) {
 		t.Errorf("Wrong list of flags. expect %q, got %q", want, output.String())
@@ -63,15 +61,6 @@ func TestOptions(t *testing.T) {
 			name: "Text log format",
 			args: []string{"--logging-format=text"},
 			want: newOptions,
-		},
-		{
-			name: "log sanitization",
-			args: []string{"--experimental-logging-sanitization"},
-			want: func() *Options {
-				c := newOptions.Config.DeepCopy()
-				c.Sanitization = true
-				return &Options{*c}
-			}(),
 		},
 		{
 			name: "Unsupported log format",

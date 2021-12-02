@@ -1937,12 +1937,10 @@ k8s.io/component-base/configz
 k8s.io/component-base/featuregate
 k8s.io/component-base/featuregate/testing
 k8s.io/component-base/logs
-k8s.io/component-base/logs/datapol
 k8s.io/component-base/logs/json
 k8s.io/component-base/logs/json/register
 k8s.io/component-base/logs/logreduction
 k8s.io/component-base/logs/registry
-k8s.io/component-base/logs/sanitization
 k8s.io/component-base/logs/testinit
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
