@@ -61,6 +61,10 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	if hasFinalizer(apiService, ELBRbsFinalizer) {
 		return nil, cloudprovider.ImplementedElsewhere
 	}
+	// Skip service handling if it has Regional Backend Service created by Ingress-GCE
+	if existingFwdRule != nil && existingFwdRule.BackendService != "" {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
 
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf(errStrLbNoHosts)
