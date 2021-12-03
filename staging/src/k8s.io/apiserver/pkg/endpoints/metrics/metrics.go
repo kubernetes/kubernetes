@@ -631,6 +631,7 @@ func cleanDryRun(u *url.URL) string {
 }
 
 var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)
+var _ http.Flusher = (*ResponseWriterDelegator)(nil)
 var _ responsewriter.UserProvidedDecorator = (*ResponseWriterDelegator)(nil)
 
 // ResponseWriterDelegator interface wraps http.ResponseWriter to additionally record content-length, status-code, etc.
@@ -644,6 +645,12 @@ type ResponseWriterDelegator struct {
 
 func (r *ResponseWriterDelegator) Unwrap() http.ResponseWriter {
 	return r.ResponseWriter
+}
+
+func (r *ResponseWriterDelegator) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func (r *ResponseWriterDelegator) WriteHeader(code int) {

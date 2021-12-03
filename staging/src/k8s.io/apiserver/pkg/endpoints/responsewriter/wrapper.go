@@ -41,7 +41,7 @@ type UserProvidedDecorator interface {
 // the inner http.ResponseWriter (otherwise), so that the returned http.ResponseWriter
 // object implements the same subset of those interfaces as the inner http.ResponseWriter.
 //
-// This function handles the following three casses.
+// This function handles the following three cases.
 // - The inner ResponseWriter implements `http.CloseNotifier`, `http.Flusher`,
 //   and `http.Hijacker` (an HTTP/1.1 sever provides such a ResponseWriter).
 // - The inner ResponseWriter implements `http.CloseNotifier` and `http.Flusher`
