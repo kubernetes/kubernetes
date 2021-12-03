@@ -269,11 +269,6 @@ func RunServer(
 		},
 	}
 
-	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		quicServer.SetQuicHeaders(w.Header())
-		server.Handler.ServeHTTP(w, r)
-	})
-
 	go func() {
 		defer utilruntime.HandleCrash()
 		defer udpConn.Close()
