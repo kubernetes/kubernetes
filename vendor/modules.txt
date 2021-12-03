@@ -695,8 +695,11 @@ github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
 # github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7 => github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 ## explicit
+github.com/openshift/client-go/apiserver/clientset/versioned
+github.com/openshift/client-go/apiserver/clientset/versioned/fake
 github.com/openshift/client-go/apiserver/clientset/versioned/scheme
 github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1
+github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1/fake
 github.com/openshift/client-go/apps/clientset/versioned
 github.com/openshift/client-go/apps/clientset/versioned/scheme
 github.com/openshift/client-go/apps/clientset/versioned/typed/apps/v1
