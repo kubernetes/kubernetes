@@ -582,16 +582,6 @@ func TestEnsureExternalLoadBalancerFailsWithNoNodes(t *testing.T) {
 func TestEnsureExternalLoadBalancerRBSAnnotation(t *testing.T) {
 	t.Parallel()
 
-	vals := DefaultTestClusterValues()
-	gce, err := fakeGCECloud(DefaultTestClusterValues())
-	require.NoError(t, err)
-	nodeNames := []string{"test-node-1"}
-
-	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
-
-	svc := fakeLoadbalancerService("")
-
 	for desc, tc := range map[string]struct {
 		annotations map[string]string
 		expectError *error
@@ -610,8 +600,98 @@ func TestEnsureExternalLoadBalancerRBSAnnotation(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			vals := DefaultTestClusterValues()
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
+			nodeNames := []string{"test-node-1"}
+
+			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+			require.NoError(t, err)
+
+			svc := fakeLoadbalancerService("")
 			svc.Annotations = tc.annotations
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
+			if tc.expectError != nil {
+				assert.EqualError(t, err, (*tc.expectError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+		})
+	}
+}
+
+func TestEnsureExternalLoadBalancerRBSFinalizer(t *testing.T) {
+	t.Parallel()
+
+	for desc, tc := range map[string]struct {
+		finalizers  []string
+		expectError *error
+	}{
+		"When has ELBRbsFinalizer": {
+			finalizers:  []string{ELBRbsFinalizer},
+			expectError: &cloudprovider.ImplementedElsewhere,
+		},
+		"When has no finalizer": {
+			finalizers:  []string{},
+			expectError: nil,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			vals := DefaultTestClusterValues()
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
+			nodeNames := []string{"test-node-1"}
+
+			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+			require.NoError(t, err)
+
+			svc := fakeLoadbalancerService("")
+			svc.Finalizers = tc.finalizers
+			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
+			if tc.expectError != nil {
+				assert.EqualError(t, err, (*tc.expectError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+		})
+	}
+}
+
+func TestEnsureExternalLoadBalancerExistingFwdRule(t *testing.T) {
+	t.Parallel()
+
+	for desc, tc := range map[string]struct {
+		existingForwardingRule *compute.ForwardingRule
+		expectError            *error
+	}{
+		"When has existingForwardingRule with backend service": {
+			existingForwardingRule: &compute.ForwardingRule{
+				BackendService: "exists",
+			},
+			expectError: &cloudprovider.ImplementedElsewhere,
+		},
+		"When has existingForwardingRule with empty backend service": {
+			existingForwardingRule: &compute.ForwardingRule{
+				BackendService: "",
+			},
+			expectError: nil,
+		},
+		"When has no existingForwardingRule": {
+			existingForwardingRule: nil,
+			expectError:            nil,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			vals := DefaultTestClusterValues()
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
+			nodeNames := []string{"test-node-1"}
+
+			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+			require.NoError(t, err)
+
+			svc := fakeLoadbalancerService("")
+			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, tc.existingForwardingRule, nodes)
 			if tc.expectError != nil {
 				assert.EqualError(t, err, (*tc.expectError).Error())
 			} else {
