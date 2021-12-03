@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ReopenContainerLog reopens the container log file.
